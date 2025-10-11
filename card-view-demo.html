@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KPI 카드 연결선 데모</title>
+    
+    <!-- LeaderLine CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/leader-line@1.0.7/leader-line.min.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background-color: #f8f9fa;
+            font-family: "Inter", "Noto Sans KR", sans-serif;
+            padding: 20px;
+        }
+        
+        .board {
+            position: relative;
+            display: flex;
+            column-gap: 120px;
+            align-items: flex-start;
+            margin: 80px;
+            min-height: 600px;
+        }
+        
+        .right-col {
+            display: flex;
+            flex-direction: column;
+            row-gap: 40px;
+        }
+        
+        .task {
+            width: 340px;
+            padding: 24px 28px;
+            background: #fff;
+            border: 1px solid #E9E9EF;
+            border-radius: 16px;
+            box-shadow: 0 2px 4px rgba(0,0,0,.06);
+            font-family: "Inter", "Noto Sans KR", sans-serif;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+        
+        .task:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,.1);
+            transform: translateY(-1px);
+        }
+        
+        /* 타이틀과 레벨 */
+        .title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+        
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #252525;
+            line-height: 1.4;
+            margin: 0;
+            flex: 1;
+            margin-right: 12px;
+        }
+        
+        .level-chip {
+            height: 20px;
+            padding: 0 8px;
+            border-radius: 10px;
+            background-color: #e3f2fd;
+            color: #1565c0;
+            font-size: 10px;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        
+        /* 정보 행들 */
+        .info-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            font-size: 12px;
+            color: #8C8C8C;
+        }
+        
+        .info-row:last-child {
+            margin-bottom: 0;
+        }
+        
+        .info-label {
+            font-weight: 500;
+            min-width: 60px;
+        }
+        
+        .assignee-chip {
+            padding: 4px 12px;
+            border-radius: 20px;
+            background-color: #D8DCFF;
+            color: #333;
+            font-size: 11px;
+            font-weight: 400;
+        }
+        
+        .deadline-text {
+            color: #606060;
+        }
+        
+        .deadline-text.empty {
+            color: #C0C0C0;
+            font-style: italic;
+        }
+        
+        /* 진행률 바 */
+        .progress-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #8C8C8C;
+        }
+        
+        .progress-bar {
+            flex: 1;
+            height: 8px;
+            background-color: #E0E0E0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background-color: #21B530;
+            transition: width 0.3s ease;
+        }
+        
+        .progress-percent {
+            min-width: 35px;
+            text-align: right;
+            font-weight: 500;
+            color: #606060;
+        }
+        
+        /* 상태별 카드 스타일 */
+        .task.status-waiting {
+            border-left: 4px solid #ff9800;
+        }
+        
+        .task.status-progress {
+            border-left: 4px solid #2196f3;
+        }
+        
+        .task.status-complete {
+            border-left: 4px solid #4caf50;
+        }
+        
+        /* 반응형 */
+        @media (max-width: 1200px) {
+            .board {
+                column-gap: 80px;
+                margin: 40px;
+            }
+            
+            .task {
+                width: 300px;
+                padding: 20px 24px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .board {
+                flex-direction: column;
+                align-items: center;
+                gap: 40px;
+                margin: 20px;
+            }
+            
+            .right-col {
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="board">
+        <!-- 좌측 부모 카드 -->
+        <div class="task status-progress" id="task-kpi">
+            <div class="title-row">
+                <h3 class="card-title">KPI 성과 관리 시스템</h3>
+                <span class="level-chip">L0</span>
+            </div>
+            
+            <div class="info-row">
+                <span class="info-label">Assign:</span>
+                <span class="assignee-chip">김철수</span>
+            </div>
+            
+            <div class="info-row">
+                <span class="info-label">Deadline:</span>
+                <span class="deadline-text">2025-01-15</span>
+            </div>
+            
+            <div class="progress-row">
+                <span class="info-label">Progress:</span>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 75%;"></div>
+                </div>
+                <span class="progress-percent">75%</span>
+            </div>
+        </div>
+        
+        <!-- 우측 자식 카드들 -->
+        <div class="right-col">
+            <!-- 첫 번째 자식 카드 -->
+            <div class="task status-waiting" id="task-data">
+                <div class="title-row">
+                    <h3 class="card-title">데이터 수집 시스템 구축</h3>
+                    <span class="level-chip">L1</span>
+                </div>
+                
+                <div class="info-row">
+                    <span class="info-label">Assign:</span>
+                    <span class="assignee-chip">이영희</span>
+                </div>
+                
+                <div class="info-row">
+                    <span class="info-label">Deadline:</span>
+                    <span class="deadline-text">2025-01-10</span>
+                </div>
+                
+                <div class="progress-row">
+                    <span class="info-label">Progress:</span>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 45%;"></div>
+                    </div>
+                    <span class="progress-percent">45%</span>
+                </div>
+            </div>
+            
+            <!-- 두 번째 자식 카드 -->
+            <div class="task status-complete" id="task-improve">
+                <div class="title-row">
+                    <h3 class="card-title">개선 방안 도출 및 적용</h3>
+                    <span class="level-chip">L1</span>
+                </div>
+                
+                <div class="info-row">
+                    <span class="info-label">Assign:</span>
+                    <span class="assignee-chip">박민수</span>
+                </div>
+                
+                <div class="info-row">
+                    <span class="info-label">Deadline:</span>
+                    <span class="deadline-text">2025-01-20</span>
+                </div>
+                
+                <div class="progress-row">
+                    <span class="info-label">Progress:</span>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 100%;"></div>
+                    </div>
+                    <span class="progress-percent">100%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.addEventListener('load', () => {
+            const kpi = document.getElementById('task-kpi');
+            const dataSys = document.getElementById('task-data');
+            const improve = document.getElementById('task-improve');
+
+            // ① KPI ↔ 데이터 수집 시스템
+            const line1 = new LeaderLine(
+                LeaderLine.pointAnchor(kpi, { x: '100%', y: '50%' }),
+                LeaderLine.pointAnchor(dataSys, { x: '0%', y: '50%' }),
+                {
+                    path: 'straight',
+                    startPlug: 'behind',   // 뒤쪽에서 시작
+                    endPlug: 'disc',       // 점 모양
+                    endPlugSize: 1.8,
+                    color: '#202020',
+                    size: 2
+                }
+            );
+
+            // ② KPI ↔ 개선 방안 도출
+            const line2 = new LeaderLine(
+                LeaderLine.pointAnchor(kpi, { x: '100%', y: '50%' }),
+                LeaderLine.pointAnchor(improve, { x: '0%', y: '50%' }),
+                {
+                    path: 'straight',
+                    startPlug: 'behind',
+                    endPlug: 'disc',
+                    endPlugSize: 1.8,
+                    color: '#202020',
+                    size: 2
+                }
+            );
+
+            // 창 크기 변할 때 선 재계산
+            window.addEventListener('resize', () => {
+                line1.position();
+                line2.position();
+            });
+
+            // 호버 효과 시 선 재계산 (부드러운 애니메이션을 위해)
+            const tasks = [kpi, dataSys, improve];
+            tasks.forEach(task => {
+                task.addEventListener('mouseenter', () => {
+                    setTimeout(() => {
+                        line1.position();
+                        line2.position();
+                    }, 200);
+                });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,339 @@
+// 기록 탭 컴포넌트
+const RecordTab = memo(
+  ({
+    comments,
+    newComment,
+    onNewCommentChange,
+    onAddComment,
+    editingCommentId,
+    editingCommentText,
+    onEditComment,
+    onSaveEditComment,
+    onCancelEditComment,
+    onDeleteComment,
+    onEditCommentTextChange,
+    currentUserName,
+    currentUserAvatar,
+    currentUserRole,
+    currentUserDepartment
+  }: {
+    comments: Array<{
+      id: string;
+      author: string;
+      content: string;
+      timestamp: string;
+      avatar?: string;
+      department?: string;
+      position?: string;
+      role?: string;
+    }>;
+    newComment: string;
+    onNewCommentChange: (value: string) => void;
+    onAddComment: () => void;
+    editingCommentId: string | null;
+    editingCommentText: string;
+    onEditComment: (id: string, content: string) => void;
+    onSaveEditComment: () => void;
+    onCancelEditComment: () => void;
+    onDeleteComment: (id: string) => void;
+    onEditCommentTextChange: (value: string) => void;
+    currentUserName?: string;
+    currentUserAvatar?: string;
+    currentUserRole?: string;
+    currentUserDepartment?: string;
+  }) => {
+    const [page, setPage] = useState(1);
+    const itemsPerPage = 5;
+
+    const handleCommentKeyPress = useCallback(
+      (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          onAddComment();
+        }
+      },
+      [onAddComment]
+    );
+
+    const handlePageChange = useCallback((event: React.ChangeEvent<unknown>, value: number) => {
+      setPage(value);
+    }, []);
+
+    // 페이지네이션 계산
+    const totalPages = Math.ceil(comments.length / itemsPerPage);
+    const startIndex = (page - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedComments = comments.slice(startIndex, endIndex);
+
+    return (
+      <Box sx={{ height: '720px', display: 'flex', flexDirection: 'column', px: 5, pt: 3, position: 'relative', overflow: 'hidden' }}>
+        {/* 새 기록 등록 - 좌우 배치 */}
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', mb: 3 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+            <Avatar src={currentUserAvatar} sx={{ width: 35, height: 35 }}>
+              {currentUserName?.charAt(0) || 'U'}
+            </Avatar>
+            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+              <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '11px' }}>
+                {currentUserName || '사용자'}
+              </Typography>
+              {currentUserRole && (
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '10px' }}>
+                  {currentUserRole}
+                </Typography>
+              )}
+            </Box>
+            {currentUserDepartment && (
+              <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '10px' }}>
+                {currentUserDepartment}
+              </Typography>
+            )}
+          </Box>
+          <TextField
+            multiline
+            rows={3}
+            placeholder="새 기록을 입력하세요..."
+            value={newComment}
+            onChange={(e) => onNewCommentChange(e.target.value)}
+            onKeyPress={handleCommentKeyPress}
+            variant="outlined"
+            size="small"
+            InputLabelProps={{ shrink: true }}
+            sx={{ flex: 1, maxWidth: '95%' }}
+          />
+          <Button
+            variant="contained"
+            onClick={onAddComment}
+            disabled={!newComment.trim()}
+            sx={{ minWidth: '80px', height: '40px', mt: 0.5 }}
+          >
+            등록
+          </Button>
+        </Box>
+
+        {/* 기록 항목들 */}
+        <Box
+          sx={{
+            flex: 1,
+            maxHeight: '500px',
+            overflowY: 'auto',
+            minHeight: 0,
+            pb: 0,
+            '&::-webkit-scrollbar': {
+              width: '8px'
+            },
+            '&::-webkit-scrollbar-track': {
+              background: 'transparent'
+            },
+            '&::-webkit-scrollbar-thumb': {
+              background: '#c1c1c1',
+              borderRadius: '4px',
+              '&:hover': {
+                background: '#a8a8a8'
+              }
+            }
+          }}
+        >
+          <Stack spacing={2} sx={{ px: 3 }}>
+            {paginatedComments.map((comment) => (
+              <Paper
+                key={`comment-${comment.id}`}
+                variant="outlined"
+                sx={{
+                  p: 2,
+                  borderRadius: 2,
+                  border: '1px solid',
+                  borderColor: 'grey.300',
+                  backgroundColor: 'background.paper',
+                  transition: 'all 0.2s ease-in-out',
+                  '&:hover': {
+                    borderColor: 'primary.light',
+                    boxShadow: 1
+                  }
+                }}
+              >
+                <Stack direction="row" spacing={2} alignItems="flex-start">
+                  {/* 사용자 아바타 */}
+                  <Avatar src={comment.avatar} sx={{ width: 30, height: 30 }}>
+                    {comment.author.charAt(0)}
+                  </Avatar>
+
+                  {/* 기록 내용 영역 */}
+                  <Box sx={{ flexGrow: 1 }}>
+                    {/* 사용자 정보 및 시간 */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '13px' }}>
+                        {comment.author}
+                      </Typography>
+                      {comment.role && (
+                        <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '11px' }}>
+                          {comment.role}
+                        </Typography>
+                      )}
+                      {comment.department && (
+                        <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '11px' }}>
+                          • {comment.department}
+                        </Typography>
+                      )}
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '11px', ml: 'auto' }}>
+                        {comment.timestamp}
+                      </Typography>
+                    </Box>
+
+                    {/* 기록 내용 */}
+                    {editingCommentId === comment.id ? (
+                      <TextField
+                        fullWidth
+                        multiline
+                        rows={3}
+                        value={editingCommentText}
+                        onChange={(e) => onEditCommentTextChange(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && e.ctrlKey) onSaveEditComment();
+                          if (e.key === 'Escape') onCancelEditComment();
+                        }}
+                        variant="outlined"
+                        size="small"
+                        autoFocus
+                        InputLabelProps={{ shrink: true }}
+                      />
+                    ) : (
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          whiteSpace: 'pre-wrap',
+                          cursor: 'pointer',
+                          '&:hover': {
+                            backgroundColor: 'action.hover',
+                            borderRadius: 1,
+                            px: 1
+                          }
+                        }}
+                        onClick={() => onEditComment(comment.id, comment.content)}
+                      >
+                        {comment.content}
+                      </Typography>
+                    )}
+                  </Box>
+
+                  {/* 액션 버튼들 */}
+                  <Stack direction="row" spacing={1}>
+                    {editingCommentId === comment.id ? (
+                      <>
+                        <IconButton size="small" onClick={onSaveEditComment} color="success" sx={{ p: 0.5 }} title="저장 (Ctrl+Enter)">
+                          <Typography fontSize="14px">✓</Typography>
+                        </IconButton>
+                        <IconButton size="small" onClick={onCancelEditComment} color="error" sx={{ p: 0.5 }} title="취소 (Escape)">
+                          <Typography fontSize="14px">✕</Typography>
+                        </IconButton>
+                      </>
+                    ) : (
+                      <>
+                        <IconButton
+                          size="small"
+                          onClick={() => onEditComment(comment.id, comment.content)}
+                          color="primary"
+                          sx={{ p: 0.5 }}
+                          title="수정"
+                        >
+                          <Typography fontSize="14px">✏️</Typography>
+                        </IconButton>
+                        <IconButton size="small" onClick={() => onDeleteComment(comment.id)} color="error" sx={{ p: 0.5 }} title="삭제">
+                          <Typography fontSize="14px">🗑️</Typography>
+                        </IconButton>
+                      </>
+                    )}
+                  </Stack>
+                </Stack>
+              </Paper>
+            ))}
+          </Stack>
+
+          {/* 빈 상태 메시지 */}
+          {comments.length === 0 && (
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 4,
+                textAlign: 'center',
+                borderStyle: 'dashed',
+                borderColor: 'grey.300',
+                backgroundColor: 'grey.50',
+                mt: 2
+              }}
+            >
+              <Typography variant="body2" color="text.secondary">
+                📝 아직 기록이 없습니다.
+                <br />
+                위의 입력 필드에서 새 기록을 등록해보세요.
+              </Typography>
+            </Paper>
+          )}
+        </Box>
+
+        {/* 페이지네이션 - 하단 고정 */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            mt: 'auto',
+            pt: 3,
+            pb: 3,
+            px: 4,
+            borderTop: '1px solid',
+            borderColor: 'divider',
+            backgroundColor: 'background.paper',
+            position: 'absolute',
+            bottom: '0px',
+            left: '40px',
+            right: '40px'
+          }}
+        >
+          <Typography variant="body2" color="text.secondary">
+            {comments.length > 0
+              ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}`
+              : '0-0 of 0'}
+          </Typography>
+          {comments.length > 0 && (
+            <Pagination
+              count={totalPages}
+              page={page}
+              onChange={handlePageChange}
+              color="primary"
+              size="small"
+              showFirstButton
+              showLastButton
+              sx={{
+                '& .MuiPaginationItem-root': {
+                  fontSize: '0.875rem',
+                  minWidth: '32px',
+                  height: '32px',
+                  borderRadius: '4px'
+                },
+                '& .MuiPaginationItem-page.Mui-selected': {
+                  backgroundColor: 'primary.main',
+                  color: 'white !important',
+                  borderRadius: '4px',
+                  fontWeight: 500,
+                  '&:hover': {
+                    backgroundColor: 'primary.dark',
+                    color: 'white !important'
+                  }
+                },
+                '& .MuiPaginationItem-page': {
+                  borderRadius: '4px',
+                  '&:hover': {
+                    backgroundColor: 'grey.100'
+                  }
+                }
+              }}
+            />
+          )}
+        </Box>
+      </Box>
+    );
+  }
+);
+
+RecordTab.displayName = 'RecordTab';

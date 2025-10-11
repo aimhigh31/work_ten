@@ -1,0 +1,11 @@
+{
+  "scripts": {
+    "setup:supabase": "bash setup-supabase.sh",
+    "db:reset": "supabase db reset --linked",
+    "db:migrate": "supabase migration up --linked",
+    "db:generate-types": "supabase gen types typescript --linked > src/types/supabase-types.ts",
+    "db:seed": "node scripts/seed-data.js",
+    "setup:complete": "npm run setup:supabase && npm run db:reset && npm run db:generate-types",
+    "test:api": "node scripts/test-api.js"
+  }
+}

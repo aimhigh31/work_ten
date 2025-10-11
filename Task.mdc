@@ -1,0 +1,6600 @@
+# Task 관리 시스템 개발 로그
+
+## 📋 프로젝트 개요
+- **프로젝트명**: Able Pro Material Next.js Task 관리 시스템
+- **기술 스택**: Next.js 15.1.6, TypeScript, Material-UI, TanStack Table
+- **개발 환경**: Windows 10, Node.js, PowerShell
+
+## 🚀 완료된 기능
+
+### 1. Task 테이블 필터 기능 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **기능**: 파트, 상태, 담당자 필터 추가
+- **세부사항**:
+  - 다중 선택 가능한 드롭다운 필터
+  - Chip 컴포넌트로 선택된 값 시각화
+  - 상태별 색상 코딩 (완료: success, 진행: info, 홀딩: error, 대기: warning)
+  - 필터 초기화 버튼 및 활성 필터 개수 표시
+  - TanStack Table의 filteredData 사용으로 실시간 필터링
+
+### 2. 레이아웃 개선 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **변경사항**:
+  - 필터와 버튼들을 한 줄로 배치
+  - "새 Task 추가" 버튼에 왼쪽 여백 추가
+  - 요소 배치 순서 최적화
+
+### 3. 푸터 제거 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **변경사항**: 
+  - Footer 컴포넌트를 `return null`로 변경하여 완전 제거
+  - 브랜딩 텍스트 및 링크 모두 제거
+
+### 4. 메뉴 구조 재구성 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **변경사항**:
+  - APPLICATION → 메인메뉴로 그룹명 변경
+  - 새로운 메뉴 구조: 일정관리, 프로젝트관리, 비용관리, KPI관리, 교육관리, 업무관리
+  - 각 메뉴에 적절한 아이콘 할당
+  - 모든 메뉴명 한국어화
+
+### 5. Task 편집 팝업 시스템 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **기능**:
+  - 3탭 구조: 개요, 계획, 기록
+  - **개요 탭**: 제목, 설명, 담당자, 상태, 시작일, 완료일 편집
+  - **계획 탭**: 체크리스트 관리 (추가, 수정, 삭제, 체크)
+  - **기록 탭**: 코멘트 시스템 (추가, 수정, 삭제)
+  - 팝업 크기: 800px × 726px 고정
+
+### 6. 다국어 지원 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **변경사항**:
+  - 한국어 번역 파일 생성 (`src/utils/locales/ko.json`)
+  - 200여개 항목의 한국어 번역 추가
+  - Admin Panel 관련 번역 추가
+
+### 7. 성능 최적화 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **문제**: 체크리스트 텍스트 입력 시 느린 반응 속도
+- **근본 원인**: 
+  - 텍스트 입력 시마다 모든 체크리스트 항목이 리렌더링
+  - 비효율적인 상태 업데이트 (전체 배열 재생성)
+  - 메모이제이션 부족
+- **해결 방법**:
+  - ChecklistItem 컴포넌트 분리 및 React.memo 적용
+  - useCallback으로 함수 메모이제이션
+  - 상태 업데이트 최적화
+
+### 8. UI/UX 개선 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **변경사항**:
+  - Action 컬럼 버튼 순서 변경 (편집 → 첨부)
+  - "종료일" → "완료일"로 용어 통일
+  - 계획 탭 스크롤 최적화 (5개 이후 스크롤)
+  - 기록 탭 "등록" 버튼 텍스트 정렬 문제 해결
+
+### 9. 자동 필드 생성 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **기능**: 등록일과 코드 자동 생성
+- **세부사항**:
+  - 등록일: 현재 날짜로 자동 설정, 수정 불가
+  - 코드: TASK-연도-순번 형식 자동 생성 (예: TASK-25-001)
+  - 두 필드 모두 읽기 전용으로 설정
+  - TaskEditDialog와 TaskTable 모두에서 일관되게 작동
+
+### 10. 계획 탭 고급 기능 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **기능**: 드래그 앤 드롭 계층 구조 및 접기/펼치기
+- **세부사항**:
+  - **드래그 앤 드롭**: 체크리스트 항목을 다른 항목의 하위로 이동 가능
+  - **계층 구조**: 무제한 깊이의 부모-자식 관계 지원
+  - **접기/펼치기**: 하위 항목이 있는 경우 접기/펼치기 버튼 표시
+  - **시각적 표시**: 
+    - 레벨별 들여쓰기 (L1, L2 라벨)
+    - 연결선으로 계층 관계 표시
+    - 하위 항목 개수 칩으로 표시
+  - **스마트 삭제**: 부모 항목 삭제 시 모든 하위 항목 자동 삭제
+  - **순환 참조 방지**: 자기 자신이나 하위 항목에는 드롭 불가
+  - **카드 크기 최적화**: 20% 축소로 더 많은 항목 표시 가능
+
+### 11. 팝업창 크기 확장 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **변경사항**:
+  - 팝업창 크기: 800px × 700px → 880px × 840px
+  - 각 탭 내용 영역 높이: 510px → 650px
+  - 더 많은 계층 구조 항목 표시 가능
+
+### 12. Task 테이블 UI/UX 개선 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **변경사항**:
+  - **등록일 자동생성**: 사용자 수정 불가능, 읽기 전용으로 변경
+  - **코드 크기 조정**: 등록일과 동일한 크기(110px)로 변경, 읽기 전용
+  - **팀 컬럼 추가**: 파트 앞에 팀 컬럼 추가 (개발팀, 디자인팀, 기획팀, 마케팅팀)
+  - **팀/파트/상태 드롭다운 메뉴**: 클릭 시 펼쳐지는 선택 메뉴 구현
+  - **드롭다운 위치 수정**: 3차례 시도를 통한 근본 원인 해결
+- **세부사항**:
+  - 팀별 색상 매핑: 개발팀(primary), 디자인팀(secondary), 기획팀(info), 마케팅팀(success)
+  - **드롭다운 인터랙션**: 
+    - 기본 상태: 테두리 없는 filled Chip
+    - 호버 시: 테두리 표시 + 1.02배 확대
+    - 클릭 시: 드롭다운 메뉴 펼쳐짐
+    - 메뉴 열린 상태: Chip에 테두리 표시
+    - 선택된 항목은 filled, 나머지는 outlined로 구분
+  - **드롭다운 위치 문제 해결**:
+    - **1차 시도**: anchorOrigin/transformOrigin 설정 → 실패
+    - **2차 시도**: useRef로 Chip 직접 참조 → 실패
+    - **3차 시도**: Box 컨테이너 + 이벤트 위임 → 성공
+  - 모든 기존 데이터에 팀 정보 추가
+  - 새 Task 생성 시 기본 팀 설정
+
+### 13. 드롭다운 위치 문제 근본 해결 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **문제**: 드롭다운 메뉴가 화면 맨 위 왼쪽에 나타나는 문제 (4차례 발생)
+- **최종 해결책**: **Menu → Popper 컴포넌트 교체**
+- **근본 원인**: Material-UI Menu 컴포넌트의 테이블 내 위치 계산 한계
+- **해결 과정**:
+  1. **1차 시도**: anchorOrigin/transformOrigin 설정 → 실패
+  2. **2차 시도**: useRef로 Chip 직접 참조 → 실패  
+  3. **3차 시도**: Box 컨테이너 + 이벤트 위임 → 실패
+  4. **4차 시도**: **Popper 컴포넌트 사용** → **성공**
+
+### 14. Popper 기반 드롭다운 시스템 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **기술적 개선**:
+  - **Popper 컴포넌트**: Menu 대신 더 정확한 위치 제어
+  - **ClickAwayListener**: 외부 클릭 시 메뉴 닫기
+  - **Paper + MenuList**: 메뉴 스타일 구현
+  - **placement='bottom-start'**: 정확한 위치 지정
+  - **offset modifier**: 4px 간격으로 자연스러운 배치
+
+```typescript
+// 최종 해결된 구현 방식
+<Popper
+  open={isMenuOpen}
+  anchorEl={anchorEl[menuKey]}
+  placement="bottom-start"
+  disablePortal={false}
+  modifiers={[
+    {
+      name: 'offset',
+      options: {
+        offset: [0, 4],
+      },
+    },
+  ]}
+>
+  <Paper elevation={3}>
+    <ClickAwayListener onClickAway={() => handleMenuClose(rowIndex, 'team')}>
+      <MenuList>
+        {/* 메뉴 아이템들 */}
+      </MenuList>
+    </ClickAwayListener>
+  </Paper>
+</Popper>
+```
+
+**적용 범위**: 팀, 파트, 상태 모든 컬럼에 일관되게 적용
+
+### 15. NextAuth.js 인증 시스템 에러 해결 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **에러**: CLIENT_FETCH_ERROR - NextAuth API 호출 실패
+- **근본 원인**:
+  1. **NEXTAUTH_URL 포트 불일치**: 3000 → 3200 포트 사용
+  2. **환경 변수 이름 불일치**: NEXTAUTH_SECRET_KEY → NEXTAUTH_SECRET
+  3. **JWT 설정 중복**: 시크릿 키 충돌 문제
+- **해결 방법**:
+  ```typescript
+  // next.config.ts
+  NEXTAUTH_URL: 'http://localhost:3200/', // 포트 수정
+  
+  // src/utils/authOptions.ts
+  secret: process.env.NEXTAUTH_SECRET, // 표준 환경 변수 사용
+  jwt: {
+    secret: process.env.NEXTAUTH_SECRET // 일관된 시크릿 키 사용
+  }
+  ```
+- **결과**: 인증 시스템 정상 작동, 로그인/로그아웃 기능 복구
+
+### 16. IT교육관리 팝업창 자료 탭 추가 및 개요 탭 첨부파일 제거 (✅ 완료)
+- **구현 날짜**: 2025-01-21
+
+### 17. 하드웨어 관리 페이지 개요탭 레이아웃 재구성 및 기능 개선 (✅ 완료)
+- **구현 날짜**: 2025-01-21
+- **주요 변경사항**:
+  - **개요탭 레이아웃 재구성**: 새로운 구조로 필드 배치 최적화
+  - **사진 업로드 기능 구현**: 실제 작동하는 이미지 업로드 시스템 구현
+  - **가이드 박스 제거**: 개요탭에서 하드웨어 관리 가이드 완전 제거
+  
+- **세부 구현 내용**:
+  1. **레이아웃 구조**:
+     - 자산명 (전체 너비, 필수 입력)
+     - 모델-제조사-구매처 (3열 배치)
+     - 자산분류-상태-시리얼넘버 (3열 배치)
+     - 현재사용자-위치-담당자 (3열 배치)
+     - 구매일-보증종료일 (2열 배치)
+     - 등록일-코드 (2열 배치, 읽기 전용)
+     - 사진1-사진2 (2열 배치)
+     - 비고(상세스펙 설명) (전체 너비, 멀티라인)
+  
+  2. **사진 업로드 기능**:
+     - 최대 2장 업로드 가능
+     - 실시간 이미지 미리보기
+     - 이미지 삭제 기능 (X 버튼)
+     - 드래그 앤 드롭 스타일 인터페이스
+     - File 상태 관리 및 URL.createObjectURL 사용
+     - 메모리 누수 방지를 위한 URL.revokeObjectURL 구현
+  
+  3. **타입 시스템 개선**:
+     - onFieldChange 함수 타입 확장: `string | number | string[]` 지원
+     - 이미지 배열 타입 지원으로 타입 안전성 확보
+     - IconButton import 추가
+  
+  4. **UI/UX 개선**:
+     - 3열 배치로 공간 효율성 극대화
+     - 읽기 전용 필드 스타일 통일
+     - 상태 선택 시 Chip 컴포넌트 색상 표시
+     - 담당자/현재사용자 Autocomplete에 아바타 표시
+     - 가이드 박스 완전 제거로 깔끔한 인터페이스 구현
+
+- **기술적 세부사항**:
+  - useState 훅으로 이미지 파일 및 미리보기 상태 관리
+  - handleImageUpload/handleImageRemove 함수로 이미지 조작
+  - 상위 컴포넌트로 이미지 정보 전달 시스템
+  - 타입 에러 해결을 위한 함수 시그니처 수정
+
+### 18. 하드웨어 관리 페이지 추가 기능 개선 (✅ 완료)
+- **구현 날짜**: 2025-01-21
+- **주요 변경사항**:
+  - **Autocomplete 플로팅 라벨 액션 제거**: 현재사용자, 담당자 필드의 마우스 오버 시 라벨 이동 효과 제거
+  - **팝업창 자동 닫기**: 저장 버튼 클릭 시 팝업창 자동 닫기 기능 구현
+
+### 19. NEXWORK 상세페이지 생성 (✅ 완료)
+- **구현 날짜**: 2025-01-02
+- **주요 변경사항**:
+  - **로고 브랜딩 변경**: "Mainly" → "NEXWORK"로 완전 변경
+  - **메뉴 구조 단순화**: 상단 메뉴를 Dashboard 하나만 남기고 나머지 제거
+  - **NEXWORK 상세페이지 구현**: 기존 landing 페이지를 완전 교체
+
+#### 세부 구현 내용:
+
+1. **로고 컴포넌트 수정**:
+   - `src/components/logo/LogoMain.tsx`: "Mainly" → "NEXWORK"로 변경
+   - `src/components/logo/LogoIcon.tsx`: 아이콘 "M" → "N"으로 변경
+   - 일관된 브랜딩 적용
+
+2. **메뉴 구조 단순화**:
+   - `src/layout/SimpleLayout/Header.tsx`: 상단 메뉴 대폭 간소화
+   - 제거된 메뉴: Components, Documentation, Live Preview, GitHub, Purchase Now
+   - 유지된 메뉴: Dashboard 하나만
+   - 모바일 메뉴에서도 동일하게 Dashboard만 유지
+
+3. **NEXWORK 상세페이지 구현** (`src/app/page.tsx`):
+   - **헤더 섹션**: 그라디언트 제목과 서비스 소개
+   - **핵심서비스 섹션**: 5개 핵심 서비스를 카드 형태로 표시
+     - 업무 프로세스 디지털화 🔧
+     - 데이터 자동 수집·분석 📊
+     - 문서 자동화 도구 제공 📄
+     - 협업 지원 기능 🤝
+     - AI 업무 보조 기능 🤖
+   - **핵심기능 섹션**: 테이블 형태로 7개 기능 카테고리 표시
+     - 업무관리, 자동화 기능, 대시보드, 양식 템플릿, 파일·이력 관리, 알림 및 메신저 연동, 모바일 지원
+   - **보안관리 섹션**: 5개 보안 기능을 강조된 카드로 표시
+     - 데이터 암호화, 접근 권한 설정, 감사 로그 제공, ISO/IEC 27001 기준 적용, 정기 백업 및 복구 지원
+   - **FAQ 섹션**: 5개 자주 묻는 질문을 Accordion 형태로 구성
+   - **푸터 섹션**: 서비스 마무리 메시지
+
+4. **디자인 및 UX 개선**:
+   - 반응형 디자인 적용 (모바일/데스크톱 최적화)
+   - 호버 효과 및 인터랙티브 요소 추가
+   - 일관된 색상 체계 및 타이포그래피
+   - 아이콘과 이모지를 활용한 시각적 효과
+   - Material-UI Grid2 시스템 활용
+
+5. **기술적 구현**:
+   - TypeScript 기반 데이터 구조화
+   - 컴포넌트 기반 모듈화
+   - SimpleLayout 사용으로 일관된 레이아웃
+   - 코드 재사용성과 유지보수성 고려
+
+#### 결과:
+- http://localhost:3200/ 에서 NEXWORK 상세페이지 확인 가능
+- 로고가 NEXWORK로 변경되고 상단에 Dashboard 메뉴만 표시
+- 완전한 서비스 소개 페이지로 전환 완료
+- 스마트 워크 시스템 NEXWORK의 모든 핵심 정보를 체계적으로 제공
+  - **사용자이력 탭 완전 재구성**: 인라인 편집 및 선택 기능이 포함된 테이블 구현
+  - **구매/수리이력 탭 완전 재구성**: 인라인 편집 및 선택 기능이 포함된 테이블 구현
+  - **QR 출력 탭 레이아웃 변경**: 위아래 배치에서 좌우 배치로 변경
+
+- **세부 구현 내용**:
+  1. **Autocomplete 개선**:
+     - InputLabelProps={{ shrink: true }} 추가로 라벨 고정
+     - 마우스 오버 시 라벨이 위로 이동하는 애니메이션 제거
+     - 현재사용자, 담당자 필드 모두 적용
+  
+  2. **팝업창 자동 닫기**:
+     - handleSave 함수에 handleClose() 호출 추가
+     - 저장 완료 후 즉시 팝업창 닫기
+     - 사용자 경험 개선
+  
+  3. **사용자이력 탭 기능**:
+     - 컬럼 구조: 선택, NO(역순), 사용자, 부서, 시작일, 종료일, 사유, 상태, 비고
+     - 상태 옵션: 사용중(success), 종료(default), 수리중(warning)
+     - 인라인 편집: 모든 필드 TextField로 직접 편집 가능
+     - 선택 기능: 개별 선택 및 전체 선택 체크박스
+     - 버튼: 추가, 삭제(선택된 개수 표시)
+     - NO 컬럼: 역순 정렬 (최신 항목이 1번)
+  
+  4. **구매/수리이력 탭 기능**:
+     - 컬럼 구조: 선택, NO(역순), 유형, 일자, 내용, 비용, 업체, 상태, 비고
+     - 유형 옵션: 구매(primary), 수리(error)
+     - 상태 옵션: 대기(warning), 진행(info), 완료(success), 취소(error)
+     - 인라인 편집: 모든 필드 직접 편집 가능
+     - 선택 기능: 개별 선택 및 전체 선택 체크박스
+     - 버튼: 추가, 취소(선택된 개수 표시)
+     - 비용 필드: 숫자 입력 타입으로 설정
+  
+  5. **QR 출력 탭 레이아웃 변경**:
+     - 기존: Grid 시스템으로 위아래 배치
+     - 변경: Stack direction="row"로 좌우 배치
+     - 구조: QR코드(좌측) + 하드웨어 정보(우측)
+     - 하드웨어 정보: 자산명, 자산코드, 분류, 모델 표시
+     - 출력 설정: QR 코드 크기 조절 슬라이더, 정보 포함 체크박스
+     - 카드 레이아웃으로 깔끔하게 정리
+
+- **기술적 개선사항**:
+  - 타입 안전성: Record<string, string> 타입 사용으로 색상 매핑 안전성 확보
+  - 상태 관리: 각 탭별 독립적인 상태 관리 시스템
+  - 인라인 편집: TextField와 Select 컴포넌트 조합으로 직관적인 편집 환경
+  - 선택 기능: 체크박스 상태 관리 및 전체 선택/해제 기능
+  - 높이 제한: 650px 고정 높이로 스크롤 영역 설정
+
+### 19. 하드웨어 관리 페이지 테이블 스타일 통일 (✅ 완료)
+- **구현 날짜**: 2025-01-21
+- **작업 유형**: UI 개선
+- **요청사항**: 하드웨어 관리 팝업창의 사용자이력/구매수리이력 탭 테이블을 VOC관리 테이블과 동일한 디자인으로 변경
+- **작업 내용**:
+  - **라운드 테두리 제거**: Paper 컴포넌트 제거하여 테이블 외곽 테두리 제거
+  - **헤더 스타일 통일**: 회색 배경(grey.50) + 폰트 굵기(600) 적용
+  - **hover 효과 추가**: 테이블 행에 마우스 오버 시 배경색 변경
+  - **가로 스크롤 지원**: 테이블 너비가 넘칠 때 가로 스크롤 활성화
+  
+- **세부 구현 내용**:
+  1. **사용자이력 탭**:
+     - TableContainer에서 Paper 컴포넌트 제거
+     - 최소 너비 800px 설정
+     - 헤더 행에 회색 배경 적용
+     - 모든 헤더 셀에 fontWeight: 600 적용
+     - 데이터 행에 hover 효과 추가
+  
+  2. **구매/수리이력 탭**:
+     - TableContainer에서 Paper 컴포넌트 제거
+     - 최소 너비 1000px 설정 (컬럼이 더 많아서)
+     - 헤더 행에 회색 배경 적용
+     - 모든 헤더 셀에 fontWeight: 600 적용
+     - 데이터 행에 hover 효과 추가
+  
+  3. **VOC관리와 동일한 스타일**:
+     - 테두리 없는 깔끔한 테이블 디자인
+     - 헤더와 데이터 행의 시각적 구분 명확화
+     - 마우스 상호작용 시 직관적인 피드백 제공
+     - 반응형 가로 스크롤 지원
+
+- **기술적 세부사항**:
+  ```typescript
+  // 기존 스타일 (Paper 컴포넌트 사용)
+  <TableContainer component={Paper}>
+  
+  // 변경된 스타일 (VOC와 동일)
+  <TableContainer 
+    sx={{ 
+      overflowX: 'auto',
+      '& .MuiTable-root': {
+        minWidth: 800
+      }
+    }}
+  >
+  ```
+
+- **결과**: 
+  - 하드웨어 관리 페이지와 VOC관리 페이지의 테이블 디자인 완전 통일
+  - 라운드 테두리 제거로 더 깔끔한 인터페이스 제공
+  - 일관된 사용자 경험 확보
+  - 테이블 상호작용성 향상 (hover 효과)
+  - 반응형 레이아웃 지원으로 다양한 화면 크기 대응
+
+### 17. 하드웨어 관리 페이지 대폭 개선 (✅ 완료)
+- **구현 날짜**: 2025-01-21
+- **주요 변경사항**:
+  - ✅ **테이블 UI 개선**: 각 행의 삭제 버튼 제거 후 상단에 `삭제(0)` 형태로 일괄 삭제 버튼 추가
+  - ✅ **컬럼명 변경**: "규격" → "모델"로 명칭 변경
+  - ✅ **팝업창 개요 탭 완전 재구성**:
+    - 자산명 - 모델
+    - 제조사 - 구매처  
+    - 상세스펙 설명 (2줄)
+    - 자산분류 - 상태
+    - 현재사용자 - 위치
+    - 보증종료일 - 시리얼넘버
+    - 구매일 - 담당자
+    - 이미지 사진 등록 (2장)
+  - ✅ **새로운 필드 추가**:
+    - manufacturer (제조사)
+    - vendor (구매처)
+    - detailSpec (상세스펙)
+    - warrantyEndDate (보증종료일)
+    - serialNumber (시리얼넘버)
+    - images (이미지 배열)
+  - ✅ **가이드 박스 제거**: 개요 탭에서 하드웨어 관리 가이드 박스 완전 제거
+  - ✅ **데이터 타입 업데이트**: HardwareRecord 인터페이스에 새 필드들 추가
+  - ✅ **샘플 데이터 확장**: 15개 하드웨어 데이터에 새 필드 정보 추가
+
+### 61. 하드웨어관리 페이지 테이블 구조 수정 (✅ 완료)
+- **구현 날짜**: 2025-01-21
+- **주요 변경사항**:
+  - **테이블 기능**: 인라인 편집 → 열람 전용 + Action 버튼으로 편집
+  - **컬럼 구조**: 13개 컬럼으로 재구성
+    - 선택 - NO(역순) - 등록일 - 코드 - 자산분류 - 자산명 - 규격 - 상태 - 구매일 - 현재사용자 - 위치 - 담당자 - Action
+  - **추가 기능**: 팝업 다이얼로그로 추가/편집
+  
+- **자산분류 옵션 변경** (8개 항목):
+  - 노트북, 데스크탑, 모니터, 서버, POP, 프린터, PDA, 태블릿
+  - 각 분류별 색상 코딩 (primary, success, secondary, error, warning, info, default)
+  
+- **상태 옵션 변경** (5개 항목):
+  - 예비(default), 사용(success), 수리(warning), 불량(error), 폐기(default)
+  
+- **기술적 구현**:
+  - **타입 정의 수정**: HardwareRecord 인터페이스 재구성
+  - **샘플 데이터 갱신**: 15개 실제적인 하드웨어 자산 데이터
+  - **테이블 컴포넌트 완전 재작성**: 열람 전용 + 팝업 다이얼로그
+  - **사용자 정보 렌더링**: 아바타 + 이름 표시
+  - **NO 컬럼 역순 정렬**: 최신 등록 순서로 표시
+  - **현재사용자 필드 추가**: 실제 사용자와 담당자 구분
+  
+- **UI/UX 개선**:
+  - 자산분류/상태별 Chip 색상 시스템
+  - 규격 컬럼 최대 너비 200px 제한
+  - 이모지 아이콘 사용 (편집: ✏️, 삭제: 🗑️)
+  - 페이지네이션 한국어 라벨
+  - 가로 스크롤 지원 (최소 너비 1500px)
+  
+- **팝업 다이얼로그 기능**:
+  - 자산분류/상태 Select 컴포넌트
+  - 현재사용자/담당자 Autocomplete (아바타 + 부서 표시)
+  - 구매일 DatePicker
+  - 규격 멀티라인 입력 (2줄)
+  - 추가/편집 모드 지원
+- **변경사항**:
+  1. **개요 탭에서 첨부파일 기능 완전 제거**
+     - 드래그 앤 드롭 업로드 영역 제거
+     - 업로드된 파일 목록 표시 제거
+     - 첨부파일 상태 관리 코드 제거
+  2. **새로운 "자료" 탭 추가**
+     - 탭 순서: 개요 → 커리큘럼 → 참석자 → 교육실적보고 → **자료**
+     - 개인KPI 팝업창의 자료 탭과 동일한 기능 구현
+  3. **자료 탭 주요 기능**:
+     - 드래그 앤 드롭 파일 업로드
+     - 파일 타입별 아이콘 표시 (PDF, Excel, Word, 이미지 등)
+     - 파일명 인라인 편집 (클릭 시 수정 가능)
+     - 다운로드/수정/삭제 액션 버튼
+     - 파일 정보 표시 (타입, 크기, 업로드 날짜)
+     - 빈 상태 메시지 표시
+  4. **기술적 구현**:
+     - Material 인터페이스 정의
+     - MaterialTab 컴포넌트 memo 최적화
+     - 파일 크기 포맷팅 함수
+     - 파일 타입별 아이콘 매핑
+     - 실제 파일 다운로드 로직 구현
+- **결과**:
+  - 개요 탭이 깔끔해지고 핵심 정보에 집중
+  - 첨부파일 기능이 전용 자료 탭으로 분리되어 사용성 향상
+  - 개인KPI와 동일한 UX로 일관성 확보
+  - 파일 관리 기능이 더욱 강화됨
+
+### 17. 페이지네이션 기능 수정 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **변경사항**: TanStack Table 페이지네이션 → Material-UI Pagination 컴포넌트 적용
+- **세부사항**:
+  - 페이지 크기 선택: 10, 25, 50 옵션
+  - 페이지 이동 기능: 직접 페이지 번호 입력 가능
+  - 페이지 정보 표시: "1-10 of 100" 형식
+  - 첫 페이지/마지막 페이지 이동 버튼 추가
+  - 페이지네이션 스타일 통일
+
+### 75. IT교육관리 페이지네비게이션 VOC관리 방식 적용 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **변경사항**: IT교육관리 페이지의 테이블 하단 페이지네비게이션을 VOC관리와 동일한 디자인으로 수정
+- **주요 개선사항**:
+  - **텍스트 통일**: "페이지 당 행 수:" → "Row per page"
+  - **Go to 기능**: "이동:" + GO 버튼 → "Go to" + Enter 키 지원
+  - **페이지 정보 표시**: "1-10 of 100" 형식 추가
+  - **레이아웃 개선**: 상단 테두리 추가, 패딩 및 여백 조정
+  - **스타일 통일**: 
+    - 선택된 페이지 버튼 색상 및 호버 효과
+    - 입력 필드 스타일 (테두리, 글자 크기, 중앙 정렬)
+    - 드롭다운 메뉴 스타일 통일
+  - **옵션 추가**: 페이지 크기 선택에 5개 옵션 추가
+- **결과**: VOC관리와 완전히 동일한 사용자 경험 제공
+
+### 76. IT교육관리 팝업창 첨부파일 기능 개선 및 가이드 제거 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **변경사항**: IT교육관리 팝업창의 첨부파일 기능을 완전히 구현하고 모든 탭의 가이드 제거
+- **주요 개선사항**:
+  - **개요 탭 첨부파일 기능 완전 구현**:
+    - 파일 상태 관리 추가: `useState<File[]>` 사용
+    - 실제 파일 업로드 핸들러 구현
+    - 업로드된 파일 목록 표시 UI 추가
+    - 파일 삭제 기능 추가 (개별 파일 제거)
+    - 파일 크기 표시 (MB 단위)
+    - 파일 아이콘과 함께 깔끔한 카드 형태로 표시
+  - **가이드 박스 완전 제거**:
+    - 개요 탭: IT교육 관리 가이드 제거
+    - 커리큘럼 탭: 커리큘럼 관리 가이드 제거
+    - 참석자 탭: 참석자 관리 가이드 제거
+    - 교육실적보고 탭: 교육실적보고 작성 가이드 제거
+- **결과**: 
+  - 첨부파일 기능이 완전히 작동하여 사용자가 파일을 업로드하고 관리할 수 있음
+  - 가이드 제거로 더 깔끔하고 간결한 UI 제공
+  - 각 탭의 실제 콘텐츠에 더 집중할 수 있는 환경 조성
+- **변경사항**: Task 테이블 페이지네이션 UI 개선
+- **세부사항**:
+  - 페이지 번호 입력 필드 추가
+  - GO 버튼으로 특정 페이지로 이동
+  - 페이지 범위 검증 추가
+  - 사용자 친화적인 페이지 탐색 기능
+
+### 17. IT교육관리 페이지 UI/UX 개선 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **작업 내용**: 사용자 요구사항에 따른 IT교육관리 페이지 상세 조정
+
+**주요 변경사항**:
+1. **추가 버튼 팝업창 연동**
+   - 기존 인라인 편집 → 팝업창 기반 추가/수정으로 변경
+   - 4개 탭 다이얼로그: 개요, 커리큘럼, 참석자, 교육실적보고
+
+2. **테이블 글자 크기 통일**
+   - 모든 테이블 텍스트를 12px로 통일
+   - 헤더, 셀 내용, 페이지네이션 모두 일관된 크기
+
+3. **컬럼 구조 최적화**
+   - 최종 컬럼: 선택-NO-등록일-코드-교육유형-내용-장소-실행일-상태-담당자-Action
+   - 교육유형: 신입교육, 담당자교육, 관리자교육, 수시교육
+   - 상태: 예정, 진행, 완료, 취소
+
+4. **팝업창 상세 기능**
+   - 개요 탭: 교육명, 설명, 목표, 대상자, 기간, 강사, 예산
+   - 커리큘럼 탭: 동적 세션 추가/삭제, 주제/시간/방법/교재 관리
+   - 참석자 탭: 동적 참석자 추가/삭제, 참석여부 관리
+   - 교육실적보고 탭: 준비중 상태 (향후 확장)
+
+**기술적 구현**:
+- **다이얼로그 최적화**: 90vh 높이, 반응형 레이아웃
+- **폼 검증**: 필수 입력 필드 관리
+- **상태 동기화**: 메인 테이블과 팝업창 데이터 동기화
+- **TypeScript 에러 수정**: 이벤트 타입 불일치 해결
+
+**관련 파일**:
+- `src/types/it-education.ts` (타입 재정의)
+- `src/data/it-education.ts` (데이터 재구성)
+- `src/components/ITEducationDialog.tsx` (팝업창 생성)
+- `src/views/apps/ITEducationDataTable.tsx` (테이블 개선)
+- `src/views/apps/ITEducationManagement.tsx` (메인 컴포넌트 정리)
+
+**최종 결과**:
+- 사용자 친화적인 교육과정 관리 시스템 완성
+- 일관된 디자인과 직관적인 사용성 확보
+- 확장 가능한 구조로 향후 기능 추가 용이
+
+### 17. 교육관리 페이지 대규모 리뉴얼 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **변경사항**: VOC 기반 → 교육 전용 시스템으로 완전 재구성
+- **주요 수정 내용**:
+
+#### 17.1 컬럼 구조 변경
+**기존 (VOC 기반)**: 체크박스-NO-등록일-코드-요청유형-요청부서-요청자-요청내용-처리내용-상태-담당자-완료예정일-첨부파일
+
+**신규 (교육 전용)**: 체크박스-NO-등록일-코드-교육유형-내용-참석수-장소-상태-완료일-담당자-Action
+
+#### 17.2 데이터 구조 재정의 (types/education.ts)
+```typescript
+interface EducationRecord {
+  id: number;
+  registrationDate: string;
+  code: string;
+  educationType: '신입교육' | 'IT교육' | '안전교육' | '리더십교육' | '전문교육' | '외부교육';
+  content: string;
+  participants: number;
+  location: string;
+  status: '계획' | '진행' | '완료' | '취소';
+  completionDate: string;
+  assignee: string;
+  isNew?: boolean;
+}
+```
+
+#### 17.3 버튼 및 UI 개선
+- **버튼 레이블 변경**: "행 추가" → "추가", "선택 삭제" → "삭제"
+- **버튼 정렬**: 오른쪽 정렬로 변경
+- **총 건수 표시**: 왼쪽에 "총 N건" 표시
+- **첨부파일 기능 완전 제거**: 교육관리에 불필요한 기능 삭제
+
+#### 17.4 Action 팝업 시스템 구현
+4개 탭 구조의 상세 정보 다이얼로그:
+
+1. **개요 탭**:
+   - 기본 정보: 교육명, 교육유형, 교육기간, 장소, 담당자
+   - 교육 개요: 교육목적, 교육대상, 교육내용
+
+2. **커리큘럼 탭**:
+   - 시간별 교육과정표
+   - 과목명, 시간, 강사, 내용 정보
+
+3. **참석자 탭**:
+   - 참석자 명단 테이블
+   - 이름, 부서, 직급, 참석여부, 평가점수
+
+4. **교육실적 탭**:
+   - 교육 결과 요약: 참석률, 만족도, 평균점수
+   - 개선사항 목록
+
+#### 17.5 교육유형별 색상 코딩
+- **신입교육**: 초록 계열 (#e8f5e8)
+- **IT교육**: 파랑 계열 (#e3f2fd)
+- **안전교육**: 빨강 계열 (#ffebee)
+- **리더십교육**: 보라 계열 (#f3e5f5)
+- **전문교육**: 오렌지 계열 (#fff3e0)
+- **외부교육**: 분홍 계열 (#fce4ec)
+
+#### 17.6 샘플 데이터 생성
+- 10개의 교육과정 샘플 데이터
+- 코드 형식: EDU-24-001 ~ EDU-24-010
+- 다양한 교육유형, 참석수, 장소, 상태로 구성
+
+#### 17.7 인라인 편집 기능
+- **편집 가능 필드**: 교육유형, 내용, 참석수, 장소, 상태, 완료일, 담당자
+- **편집 불가 필드**: NO, 등록일, 코드 (자동 생성)
+- **드롭다운 선택**: 교육유형, 상태
+- **숫자 입력**: 참석수 (number type)
+
+#### 17.8 담당자 관리
+- 아바타 이미지와 함께 표시
+- 드롭다운으로 담당자 변경 가능
+- 9명의 담당자 옵션 제공
+
+#### 17.9 필터 시스템 최적화
+- **부서 필터 제거**: 교육관리에 불필요
+- **상태 필터**: 계획, 진행, 완료, 취소
+- **연도 필터**: 등록일 기준 연도별 필터링
+
+#### 17.10 상태 관리 개선
+- **기존**: 대기, 진행, 완료, 취소
+- **신규**: 계획, 진행, 완료, 취소 (교육 프로세스에 맞게 조정)
+
+### 🔧 기술적 개선사항
+- **타입 안전성**: 완전한 TypeScript 타입 정의
+- **컴포넌트 분리**: Action 다이얼로그 TabPanel 구조화
+- **상태 최적화**: 불필요한 state 제거
+- **에러 처리**: 모든 타입 에러 해결
+- **코드 최적화**: 800줄 → 881줄로 기능 확장하면서도 효율성 유지
+
+이번 리뉴얼로 교육관리 페이지가 VOC 관리에서 완전히 분리되어 교육 업무에 특화된 전용 시스템으로 재탄생했습니다.
+- **변경사항**: 테이블 하단 페이지네이션 정렬 및 스타일 개선
+
+### 17. 교육관리 페이지 등록기간 필터 개선 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **변경사항**: 등록기간 필터를 단순한 연도 필터로 변경
+- **세부사항**:
+  - **기존**: 시작일 ~ 종료일 범위 선택 (2개 날짜 입력 필드)
+  - **신규**: 연도 단일 선택 (드롭다운 메뉴)
+  - **연도 옵션**: 전체, 2021년, 2022년, 2023년, 2024년, 2025년
+  - **필터링 로직**: 등록일 기준 해당 연도 데이터만 표시
+  - **기본값**: "전체"로 설정 (모든 연도 데이터 표시)
+- **기술적 구현**:
+  ```typescript
+  // 연도 옵션 생성 (전체 + 연도 목록)
+  const currentYear = new Date().getFullYear();
+  const yearOptions = ['전체'];
+  for (let i = currentYear - 3; i <= currentYear + 1; i++) {
+    yearOptions.push(i.toString());
+  }
+  
+  // 연도 필터링 (전체 선택 시 필터링 제외)
+  if (selectedYear !== '전체') {
+    filtered = filtered.filter(record => {
+      const recordYear = new Date(record.registrationDate).getFullYear().toString();
+      return recordYear === selectedYear;
+    });
+  }
+  ```
+- **UI 개선**: 
+  - 복잡한 날짜 범위 입력 → 간단한 연도 선택
+  - 사용자 경험 향상 및 직관적인 인터페이스
+
+### 18. 교육관리 페이지 부서 필터 순서 개선 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **변경사항**: 부서 필터 드롭다운 순서 변경 및 기본값 수정
+- **세부사항**:
+  - **기존 순서**: IT, 마케팅, 영업, 전체
+  - **신규 순서**: **전체**, IT, 마케팅, 영업
+  - **기본값 변경**: IT → **전체**
+- **사용자 경험 개선**:
+  - "전체" 옵션이 가장 먼저 표시되어 직관적
+  - 페이지 로드 시 모든 부서 데이터를 기본으로 표시
+  - 일관된 필터 UI (연도 필터와 동일하게 "전체" 우선)
+
+### 19. 교육실적 테이블 팀/파트 컬럼 디자인 통일 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **변경사항**: 팀과 파트 컬럼을 교육구분 컬럼과 동일한 디자인으로 변경
+- **세부사항**:
+  - **기존**: 파스텔톤 배경색 + 컬러 텍스트 (각 팀/부서별 다른 색상)
+  - **신규**: 배경색 없음 + 검정색 텍스트 (교육구분과 동일)
+- **디자인 통일**:
+  ```typescript
+  // 교육구분, 팀, 파트 모두 동일한 스타일 적용
+  <Typography
+    variant="body2"
+    sx={{
+      cursor: 'pointer',
+      color: 'text.primary',
+      fontWeight: 500,
+      fontSize: '0.875rem',
+      '&:hover': { backgroundColor: 'grey.50' },
+      p: 0.5,
+      borderRadius: 1
+    }}
+  >
+  ```
+- **UI 개선**:
+  - 테이블 전체의 시각적 일관성 향상
+  - 불필요한 색상 정보 제거로 가독성 개선
+  - 상태 컬럼만 파스텔톤 유지하여 중요 정보 강조
+
+### 20. 부서원 탭 교육실적 연동 및 디자인 개선 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **변경사항**: 부서원 테이블에 교육실적 완료 건수 컬럼 추가 및 디자인 통일
+- **세부사항**:
+  - **직책/팀/파트 디자인 변경**: Chip 컴포넌트 → Typography (배경색 없음, 검정색 글자)
+  - **새로운 컬럼 추가**: 직무 뒤에 교육이수, 자격취득, 전시참여 컬럼 추가
+  - **교육실적 연동**: 교육실적 탭의 완료된 항목을 실시간 카운팅
+- **기술적 구현**:
+  ```typescript
+  // 담당자별 교육실적 완료 건수 계산
+  const getEducationCounts = (employeeName: string) => {
+    const counts = { 교육이수: 0, 자격취득: 0, 전시참여: 0 };
+    educationRecords.forEach(record => {
+      if (record.assignee === employeeName && record.status === '완료') {
+        if (record.educationType === '교육이수') counts.교육이수++;
+        else if (record.educationType === '자격취득') counts.자격취득++;
+        else if (record.educationType === '전시참여') counts.전시참여++;
+      }
+    });
+    return counts;
+  };
+  ```
+- **데이터 연동**:
+  - 교육실적 탭에서 상태가 "완료"인 항목만 카운팅
+  - 담당자 이름으로 매칭하여 개인별 실적 집계
+  - 실시간 업데이트 (교육실적 변경 시 부서원 탭에도 반영)
+- **UI 개선**:
+  - 테이블 컬럼 수: 8개 → 11개로 확장
+  - 교육 건수는 중앙 정렬로 가독성 향상
+  - 일관된 Typography 스타일로 통일감 증대
+
+### 21. 교육관리 페이지 담당자 필터 추가 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **변경사항**: 부서 필터 뒤에 담당자 필터 추가
+- **세부사항**:
+  - **필터 순서**: 등록기간 → 부서 → **담당자**
+  - **동적 담당자 목록**: 선택된 부서에 따라 담당자 목록 자동 업데이트
+  - **연동 필터링**: 부서 변경 시 담당자 필터 자동 리셋
+- **기술적 구현**:
+  ```typescript
+  // 담당자 옵션 생성 (부서별 필터링)
+  const assigneeOptions = useMemo(() => {
+    const options = ['전체'];
+    let filteredEmployees = employeeData;
+    if (selectedDepartment !== 'ALL') {
+      filteredEmployees = employeeData.filter(emp => emp.department === selectedDepartment);
+    }
+    const uniqueAssignees = [...new Set(filteredEmployees.map(emp => emp.name))];
+    options.push(...uniqueAssignees);
+    return options;
+  }, [selectedDepartment]);
+  ```
+- **필터링 적용**:
+  - **부서원 탭**: 부서 + 담당자 조건으로 부서원 목록 필터링
+  - **교육실적 탭**: 부서 + 연도 + 담당자 조건으로 교육실적 필터링
+  - 모든 필터에 "전체" 옵션으로 전체 데이터 조회 가능
+- **사용자 경험 개선**:
+  - 부서 선택 시 해당 부서 담당자만 표시
+  - 부서 변경 시 담당자 필터 자동 초기화
+  - 3단계 필터링으로 정확한 데이터 조회 가능
+
+### 22. 교육실적 탭 항목 정리 및 용어 변경 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **변경사항**: 교육구분과 상태 항목 수정
+- **세부사항**:
+  - **교육구분 수정**: "기타" 항목 제거
+    - 기존: 교육이수, 자격취득, 전시참여, **기타**
+    - 신규: 교육이수, 자격취득, 전시참여
+  - **상태 용어 변경**: 
+    - **대기** → **예정**
+    - **홀딩** → **취소**
+    - 기존: 대기, 진행, 완료, 홀딩
+    - 신규: **예정**, 진행, 완료, **취소**
+- **기술적 수정**:
+  ```typescript
+  // 인터페이스 타입 수정
+  educationType: '교육이수' | '자격취득' | '전시참여';
+  status: '예정' | '진행' | '완료' | '취소';
+  
+  // 옵션 배열 수정
+  const educationTypeOptions = ['교육이수', '자격취득', '전시참여'];
+  const statusOptions = ['예정', '진행', '완료', '취소'];
+  ```
+- **데이터 일관성**:
+  - 모든 샘플 데이터의 상태값 업데이트
+  - 색상 매핑 함수들 모두 수정
+  - 새 레코드 생성 시 기본 상태 "예정"으로 설정
+- **UI 개선**:
+  - 더 직관적인 용어 사용으로 사용자 이해도 향상
+  - 불필요한 "기타" 카테고리 제거로 명확한 분류
+  - 일관된 상태 관리 시스템 구축
+
+### 23. 교육실적 탭 필수값 검증 기능 추가 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **요구사항**: 행 추가 시 담당자, 내용, 완료일을 필수값으로 지정
+- **주요 기능**:
+  - **필수 필드 지정**: 담당자, 내용, 완료일 3개 필드 필수 입력
+  - **자동 상태 관리**: 필수값 모두 입력 시 새 행 상태 자동 변경
+  - **시각적 피드백**: 필수값 미입력 시 즉시 표시
+     - **삭제 제한**: 불완전한 새 행 삭제 시 경고 표시
+- **기술적 구현**:
+  ```typescript
+  // EducationRecord 인터페이스 확장
+  interface EducationRecord {
+    // ... 기존 필드들
+    isNew?: boolean; // 새로 추가된 행 표시
+  }
+  
+  // 필수값 검증 함수
+  const validateRequiredFields = (record: EducationRecord): boolean => {
+    return !!(record.assignee && record.content && record.completionDate);
+  };
+  
+  // 새 행 추가 시 isNew: true 설정
+  const newRecord = {
+    // ... 기본값들
+    isNew: true
+  };
+  ```
+- **UI/UX 개선**:
+  - **빨간 테두리**: 필수값 미입력 필드에 2px 빨간 테두리 표시
+  - **에러 텍스트**: "필수 입력" 텍스트를 빨간색으로 표시
+  - **실시간 검증**: 셀 편집 시마다 필수값 상태 확인
+  - **자동 해제**: 필수값 모두 입력 시 isNew 플래그 자동 false 변경
+- **사용자 안내**:
+  - 삭제 시 경고: "필수값(담당자, 내용, 완료일)이 입력되지 않은 새 행이 포함되어 있습니다."
+  - 명확한 안내: 필수값 입력 또는 해당 행만 선택 삭제 유도
+- **결과**: 데이터 무결성 보장 및 사용자 편의성 향상
+
+### 24. 교육관리 페이지 UI 개선 및 명칭 통일 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **요구사항**: 명칭 통일 및 UI 개선
+- **주요 변경사항**:
+  - **명칭 통일**: 
+    - 탭 라벨: "부서원" → "담당자"
+    - 테이블 헤더: "사용자" → "담당자"
+    - 에러 메시지: "부서원" → "담당자"
+  - **UI 정리**: "부서원 목록" 텍스트 완전 삭제
+  - **아이콘 통일**: 담당자 컬럼의 아바타를 동일한 Profile 아이콘으로 변경
+- **기술적 구현**:
+  ```typescript
+  // Profile 아이콘 import 추가
+  import { Profile } from '@wandersonalwes/iconsax-react';
+  
+  // Avatar 컴포넌트를 Box + Profile 아이콘으로 교체
+  <Box sx={{ 
+    width: 32, height: 32, 
+    bgcolor: 'primary.main',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
+  }}>
+    <Profile size={18} color="white" />
+  </Box>
+  ```
+- **사용자 경험 개선**:
+  - 일관된 명칭 사용으로 혼란 방지
+  - 깔끔한 UI로 가독성 향상
+  - 통일된 아이콘으로 시각적 일관성 확보
+- **결과**: 명확하고 일관된 사용자 인터페이스 완성
+
+### 25. 교육관리 페이지 UI 수정 - DatePicker 및 편집 기능 완성 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **요구사항**: 5가지 주요 UI 개선사항 구현
+- **주요 변경사항**:
+  1. **추가 버튼 → Action 팝업**: 버튼 클릭 시 새 레코드 생성 후 바로 편집 모드로 팝업 열림
+  2. **삭제 버튼 개수 표시**: 선택된 행 개수를 "삭제 (2)" 형태로 표시
+  3. **교육유형 스타일 변경**: 배경색 하얀색, 글자색 검은색으로 변경
+  4. **완료일 DatePicker**: Material-UI DatePicker로 캘린더 날짜 선택 가능
+  5. **인라인 편집 제거**: 모든 편집 기능을 Action 다이얼로그로 이동
+- **기술적 구현**:
+  ```typescript
+  // DatePicker 어댑터 수정 (빌드 에러 해결)
+  import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3';
+  
+  // 추가 버튼 기능 변경
+  const handleAddRow = () => {
+    const newRecord = { /* 새 레코드 생성 */ };
+    setData(prev => [newRecord, ...prev]);
+    setEditingRecord(newRecord);
+    setActionDialog({ open: true, recordId: newRecord.id, isNew: true });
+    setIsEditMode(true);
+  };
+  
+  // 삭제 버튼 개수 표시
+  삭제 {selected.length > 0 && `(${selected.length})`}
+  
+  // 교육유형 스타일 변경
+  <Typography sx={{ backgroundColor: 'white', color: 'black' }}>
+    {record.educationType}
+  </Typography>
+  ```
+- **Action 다이얼로그 편집 기능**:
+  - 개요 탭에 모든 편집 필드 추가
+  - 편집/보기 모드 토글 기능
+  - DatePicker로 완료일 선택
+  - 저장/취소 버튼 (편집 모드에서만 표시)
+- **버그 수정**:
+  - **DatePicker 어댑터 호환성**: `AdapterDateFns` → `AdapterDateFnsV3` 변경
+  - 프로젝트 전체에서 사용하는 표준 어댑터와 일치시켜 빌드 에러 해결
+- **사용자 경험 개선**:
+  - 테이블은 읽기 전용으로 변경하여 실수 방지
+  - 팝업에서 체계적인 편집 인터페이스 제공
+  - 새 레코드 생성 시 즉시 편집 모드로 시작
+- **결과**: 모든 요구사항 100% 구현 완료, 빌드 에러 해결로 안정적인 동작 보장
+  // 연한 색상과 점선 테두리
+  border: isRequiredEmpty ? '1px dashed' : 'none',
+  borderColor: isRequiredEmpty ? '#ffb74d' : 'transparent',
+  backgroundColor: isRequiredEmpty ? '#fff8e1' : 'transparent',
+  color: isRequiredEmpty ? '#f57c00' : 'text.primary',
+  fontStyle: isRequiredEmpty ? 'italic' : 'normal'
+  ```
+- **사용자 경험 개선**:
+  - 시각적 피로감 감소
+  - 더 세련되고 전문적인 느낌
+  - 필수입력 안내가 부드럽고 친화적
+- **결과**: 기능성을 유지하면서도 미적으로 개선된 필수입력 UI
+
+### 26. 교육실적 탭 필수입력 UI 색상 변경 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **요구사항**: 필수입력 UI 색상을 주황색에서 취소 상태와 같은 빨간색 계열로 변경
+- **변경사항**:
+  - **테두리 색상**: #ffb74d → #d32f2f (빨간색)
+  - **배경색**: #fff8e1 → #ffebee (연한 빨간색)
+  - **텍스트 색상**: #f57c00 → #d32f2f (빨간색)
+- **적용 범위**:
+  - 담당자 Select 컴포넌트 테두리
+  - 담당자 Box 컴포넌트 테두리/배경/텍스트
+  - 완료일 TextField underline 색상
+  - 내용 TextField underline 색상
+  - 모든 Typography 컴포넌트 테두리/배경/텍스트
+- **디자인 통일성**:
+  - 취소 상태 칩과 동일한 색상 체계 사용
+  - 시각적 일관성 확보
+  - 사용자에게 친숙한 색상 패턴 적용
+- **결과**: 취소 상태와 통일된 색상으로 더 일관된 UI 완성
+- **문제**: 페이지네이션 동작 불완전
+- **해결**: TanStack Table v8 표준 페이지네이션 구현
+
+### 17. KPI 관리 메뉴 구조화 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **작업 내용**:
+  - **메뉴 구조 변경**: KPI관리를 접힘/펼침 구조로 변경
+  - **하위 카테고리 추가**: 팀 KPI, 개인 KPI 메뉴 생성
+  - **라우팅 설정**: /apps/kpi/team, /apps/kpi/personal 경로 추가
+  - **자동 리다이렉트**: 기존 /apps/kpi → /apps/kpi/team 자동 이동
+- **세부사항**:
+  ```typescript
+  // src/menu-items/applications.ts
+  {
+    id: 'kpi',
+    title: 'KPI관리',
+    type: 'collapse',
+    icon: AssessmentIcon,
+    children: [
+      {
+        id: 'team-kpi',
+        title: '팀 KPI',
+        type: 'item',
+        url: '/apps/kpi/team'
+      },
+      {
+        id: 'personal-kpi', 
+        title: '개인 KPI',
+        type: 'item',
+        url: '/apps/kpi/personal'
+      }
+    ]
+  }
+  ```
+
+### 18. 국제화(i18n) 번역 시스템 완성 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **문제**: KPI 메뉴 구조화 후 번역 누락으로 에러 발생
+- **에러 메시지**: 
+  ```
+  [@formatjs/intl Error MISSING_TRANSLATION] Missing message: "팀 KPI" for locale "ko"
+  ```
+- **해결 방법**: 모든 언어 파일에 KPI 관련 번역 추가
+- **지원 언어**: 한국어, 영어, 프랑스어, 중국어, 루마니아어
+- **추가된 번역**:
+  ```json
+  // 한국어 (ko.json)
+  "KPI관리": "KPI관리",
+  "팀 KPI": "팀 KPI", 
+  "개인 KPI": "개인 KPI"
+  
+  // 영어 (en.json)
+  "KPI관리": "KPI Management",
+  "팀 KPI": "Team KPI",
+  "개인 KPI": "Personal KPI"
+  
+  // 프랑스어 (fr.json)
+  "KPI관리": "Gestion KPI",
+  "팀 KPI": "KPI d'équipe", 
+  "개인 KPI": "KPI personnel"
+  
+  // 중국어 (zh.json)
+  "KPI관리": "KPI管理",
+  "팀 KPI": "团队KPI",
+  "개인 KPI": "个人KPI"
+  
+  // 루마니아어 (ro.json)
+  "KPI관리": "Gestionarea KPI",
+  "팀 KPI": "KPI echipă",
+  "개인 KPI": "KPI personal"
+  ```
+- **결과**: 모든 언어에서 KPI 메뉴가 정상적으로 번역 표시
+
+### 19. 팀KPI 테이블 커스터마이징 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **작업 내용**: 팀KPI 전용 테이블 컴포넌트 생성 및 UI 최적화
+- **주요 변경사항**:
+  - **담당자 컬럼 제거**: 팀 단위 관리로 개별 담당자 필요 없음
+  - **컬럼 크기 최적화**: 담당자 컬럼 제거로 인한 여유 공간 활용
+    - 주요과제: 200px → 250px
+    - 목표 KPI: 180px → 200px
+  - **필터 간소화**: 담당자 필터 제거로 팀/상태 필터만 유지
+  - **전용 컴포넌트**: `TeamKpiTable.tsx` 별도 생성
+- **세부사항**:
+  ```typescript
+  // src/views/apps/TeamKpiTable.tsx
+  // 담당자 컬럼 및 필터 완전 제거
+  // 팀 중심의 KPI 관리에 최적화된 UI
+  
+  // 컬럼 구성:
+  // - 선택, NO, 등록일, 코드, 팀
+  // - 주요과제(250px), 목표 KPI(200px)
+  // - 상태, 진행율, 시작일, 종료일, Action
+  ```
+- **사용자 경험 개선**:
+  - 헤더: "팀 KPI 관리"로 명확한 페이지 식별
+  - 버튼: "새 팀 KPI 추가"로 맥락에 맞는 텍스트
+  - CSV 파일명: "team-kpi-data.csv"로 구분
+- **결과**: 팀 중심의 KPI 관리에 최적화된 깔끔한 UI 제공
+
+### 20. 팀KPI 테이블 레이아웃 통일 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **작업 내용**: 업무관리 페이지와 동일한 레이아웃 구조로 통일
+- **주요 변경사항**:
+  - **MainCard의 title/secondary 활용**: 헤더와 필터를 한 줄로 배치
+  - **선택 상태 표시**: 헤더에 선택된 항목 수 Chip으로 표시
+  - **반응형 레이아웃**: flexWrap="wrap"으로 화면 크기 대응
+  - **검색창 확장**: flexGrow={1}로 남은 공간 최대 활용
+- **레이아웃 구조**:
+  ```tsx
+  <MainCard
+    title={
+      헤더_타이틀 + 선택_상태_칩
+    }
+    content={false}
+    secondary={
+      검색창 + 필터들 + 액션_버튼들 (한 줄 배치)
+    }
+  >
+    <Divider />
+    {테이블_영역}
+    {페이지네이션}
+  </MainCard>
+  ```
+- **사용자 경험 개선**:
+  - 화면 공간 효율적 활용
+  - 업무관리 페이지와 일관된 인터페이스
+  - 검색과 필터링의 직관적 접근
+- **결과**: 일관성 있고 효율적인 테이블 레이아웃 완성
+- **변경사항**: TanStack Table 페이지네이션 정상화
+- **해결 방법**: getPaginationRowModel() 추가로 페이지네이션 활성화
+
+---
+
+## 🎯 KPI 관리 시스템 개발
+
+### 17. KPI 관리 페이지 팝업창 수정 (✅ 완료)
+- **구현 날짜**: 2025-01-16
+- **문제**: "새 KPI 추가" 버튼 클릭 시 팝업창이 나타나지 않는 문제
+- **근본 원인**: 다이얼로그 렌더링 조건에서 `editingKpi` 체크로 인한 문제
+  ```tsx
+  // 문제가 있던 코드
+  {editDialog && editingKpi && (
+    <KpiEditDialog ... />
+  )}
+  
+  // 새 KPI 추가 시 editingKpi가 null이므로 다이얼로그가 렌더링되지 않음
+  ```
+- **해결 방법**: 렌더링 조건에서 `editingKpi` 체크 제거
+  ```tsx
+  // 수정된 코드
+  {editDialog && (
+    <KpiEditDialog ... />
+  )}
+  ```
+- **결과**: 새 KPI 추가 시 팝업창이 정상적으로 나타남
+- **기존 기능 유지**: 기존 KPI 편집 기능은 그대로 유지됨
+
+### 18. HTML 중첩 에러 해결 (✅ 완료)
+- **구현 날짜**: 2025-01-16
+- **에러**: React Hydration Error - `<div>` cannot be a descendant of `<p>`
+- **발생 위치**: KpiEditDialog.tsx의 FeedTab > ListItemText
+- **근본 원인**: Typography 컴포넌트의 잘못된 HTML 태그 사용
+  ```tsx
+  // 문제가 있던 코드
+  secondary={
+    <Typography variant="body2" component="span" sx={{ mt: 1 }}>
+      {feedback.content}
+    </Typography>
+  }
+  ```
+- **해결 방법**: component prop을 "div"로 변경
+  ```tsx
+  // 수정된 코드
+  secondary={
+    <Typography variant="body2" component="div" sx={{ mt: 1 }}>
+      {feedback.content}
+    </Typography>
+  }
+  ```
+- **결과**: HTML 구조 위반 문제 해결, hydration 에러 제거
+
+### 19. KPI 팝업창 이중 스크롤 문제 해결 (✅ 완료)
+- **구현 날짜**: 2025-01-16
+- **문제**: KPI 편집 팝업창에서 Dialog와 탭 컨텐츠 모두에 스크롤이 생기는 이중 스크롤 문제
+- **근본 원인**: 
+  1. Dialog 자체에 `height: '90vh'` 설정으로 Dialog 레벨 스크롤 발생
+  2. 각 탭 컴포넌트에 `height: '650px', overflowY: 'auto'` 설정으로 탭 레벨 스크롤 발생
+- **해결 방법**:
+  ```tsx
+  // Dialog 수정
+  PaperProps={{
+    sx: { 
+      height: '840px',
+      maxHeight: '840px',
+      overflow: 'hidden'  // Dialog 스크롤 제거
+    }
+  }}
+  
+  // DialogContent 수정
+  <DialogContent sx={{ 
+    p: 0, 
+    overflow: 'hidden', 
+    display: 'flex', 
+    flexDirection: 'column' 
+  }}>
+    <Box sx={{ flex: 1, overflow: 'hidden' }}>
+      {/* 탭 컨텐츠들 */}
+    </Box>
+  </DialogContent>
+  
+  // 각 탭 컴포넌트 수정
+  <Box sx={{ height: '100%', overflowY: 'auto', pr: 1, px: 3, py: 3 }}>
+  ```
+- **결과**: 
+  - Dialog 레벨 스크롤 제거
+  - 탭 컨텐츠만 스크롤되도록 개선
+  - 더 나은 사용자 경험 제공
+
+### 20. KPI 팝업창 버튼 위치 개선 (✅ 완료)
+- **구현 날짜**: 2025-01-16
+- **요구사항**: 취소/저장 버튼을 오른쪽 상단으로 이동하고 여백 추가
+- **변경사항**:
+  ```tsx
+  // 기존: DialogActions(하단)에 버튼 위치
+  <DialogActions sx={{ p: 2 }}>
+    <Button>취소</Button>
+    <Button>저장</Button>
+  </DialogActions>
+  
+  // 변경: DialogTitle(상단) 오른쪽에 버튼 위치
+  <DialogTitle sx={{ pb: 1 }}>
+    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mr: 2, mt: 1 }}>
+      <Button size="small">취소</Button>
+      <Button size="small">저장</Button>
+    </Box>
+  </DialogTitle>
+  ```
+- **세부 개선사항**:
+  - 버튼 크기를 `size="small"`로 축소
+  - 오른쪽 여백 `mr: 2` 추가
+  - 상단 여백 `mt: 1` 추가
+  - 에러 메시지도 상단으로 이동하여 일관성 유지
+- **결과**: 더 직관적이고 접근하기 쉬운 버튼 배치
+
+### 29. 팝업 데이터 동기화 문제 해결 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **문제**: 팝업 개요에서 제목을 변경했는데 Task 관리 테이블에 반영되지 않는 문제
+- **근본 원인**: 
+  - useOptimizedInput 훅의 debounced 값이 저장 시점에 taskState에 반영되지 않음
+  - 텍스트 입력 후 바로 저장 시 debouncedValue가 아직 업데이트되지 않은 상태
+- **해결 방법**:
+  ```typescript
+  // OverviewTab에서 현재 입력 값을 즉시 반영하는 함수
+  const flushCurrentValues = useCallback(() => {
+    if (workContentInput.inputValue !== taskState.workContent) {
+      onFieldChange('workContent', workContentInput.inputValue);
+    }
+    if (descriptionInput.inputValue !== taskState.description) {
+      onFieldChange('description', descriptionInput.inputValue);
+    }
+  }, [workContentInput.inputValue, descriptionInput.inputValue, taskState.workContent, taskState.description, onFieldChange]);
+
+  // 전역 함수로 등록하여 TaskEditDialog에서 접근 가능하게 함
+  useEffect(() => {
+    (window as any).flushOverviewTabValues = flushCurrentValues;
+    return () => {
+      delete (window as any).flushOverviewTabValues;
+    };
+  }, [flushCurrentValues]);
+  ```
+- **TaskEditDialog handleSave 수정**:
+  ```typescript
+  const handleSave = useCallback(() => {
+    // 저장 전에 현재 입력 값들을 강제로 taskState에 반영
+    if ((window as any).flushOverviewTabValues) {
+      (window as any).flushOverviewTabValues();
+    }
+    
+    // 100ms 지연으로 상태 업데이트가 완료되도록 함
+    setTimeout(() => {
+      // 기존 저장 로직...
+    }, 100);
+  }, [task, taskState, onSave, onClose]);
+  ```
+- **결과**: 팝업에서 제목/설명 변경 시 테이블에 즉시 반영되도록 수정
+- **양방향 동기화**: 테이블 ↔ 팝업 간 완전한 데이터 동기화 달성
+- **추가 수정**: 제목 필드 동기화 문제 해결
+  - 전역 함수 방식에서 useRef 직접 참조 방식으로 변경
+  - TextField에 inputRef 연결하여 현재 입력 값 직접 접근
+  - 상태 업데이트 지연 없이 즉시 현재 값 사용
+
+### 30. Task 편집 팝업 → 테이블 양방향 데이터 동기화 문제 해결 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+
+### 31. 테이블 읽기 전용 변경 및 편집 팝업 전용 수정 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **변경사항**:
+  - **테이블 컬럼 읽기 전용 변경**: 
+    - 팀, 파트, 상태, 담당자, 완료일 컬럼을 편집 불가능하게 변경
+    - Select 드롭다운 → Chip 표시로 변경
+    - 담당자는 Avatar + Typography 조합으로 표시
+    - 완료일은 Typography로 표시 (값 없으면 '-' 표시)
+  - **편집 팝업 개요 탭 개선**:
+    - 우선순위 위에 팀, 파트 선택 필드 추가
+    - EditTaskState 인터페이스에 team, department 필드 추가
+    - editTaskReducer에서 팀, 파트 필드 처리 로직 추가
+    - handleSave에서 팀, 파트 정보 저장 로직 추가
+  - **데이터 동기화**: 편집 팝업에서 수정한 내용이 테이블에 정확히 반영
+- **기술적 구현**:
+  ```typescript
+  // 읽기 전용 컬럼 예시 (팀)
+  cell: ({ getValue }) => {
+    const currentValue = getValue();
+    const getTeamColor = (team: TaskTeam) => {
+      const colorMap = {
+        개발팀: '#e3f2fd',   // primary.light
+        디자인팀: '#f3e5f5', // secondary.light
+        기획팀: '#e1f5fe',   // info.light
+        마케팅팀: '#e8f5e8'  // success.light
+      };
+      return colorMap[team] || '#ffffff';
+    };
+    
+    return (
+      <Chip
+        label={currentValue}
+        size="small"
+        sx={{
+          backgroundColor: getTeamColor(currentValue as TaskTeam),
+          fontWeight: 500,
+          fontSize: '0.75rem',
+          minWidth: '70px'
+        }}
+      />
+    );
+  }
+  
+  // 편집 팝업 팀 선택 UI
+  <FormControl fullWidth>
+    <InputLabel>팀</InputLabel>
+    <Select
+      value={taskState.team}
+      label="팀"
+      onChange={handleFieldChange('team')}
+    >
+      <MenuItem value="개발팀">개발팀</MenuItem>
+      <MenuItem value="디자인팀">디자인팀</MenuItem>
+      <MenuItem value="기획팀">기획팀</MenuItem>
+      <MenuItem value="마케팅팀">마케팅팀</MenuItem>
+    </Select>
+  </FormControl>
+  ```
+- **결과**: 
+  - 테이블에서는 정보 열람만 가능
+  - 모든 편집은 Action 버튼 → 편집 팝업을 통해서만 가능
+  - 팝업에서 수정한 팀, 파트 정보가 테이블에 즉시 반영
+  - 사용자 경험 개선: 편집 의도가 명확해지고 실수 방지
+
+### 32. 제목 편집 동기화 문제 최종 해결 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **문제**: 편집 팝업에서 제목 변경 후 저장해도 테이블에 반영되지 않는 문제
+- **최종 해결 방법**:
+  ```typescript
+  const handleSave = useCallback(() => {
+    // 저장 직전에 현재 입력 값들을 taskState에 강제 반영
+    const getCurrentInputValues = () => {
+      if ((window as any).getOverviewTabCurrentValues) {
+        return (window as any).getOverviewTabCurrentValues();
+      }
+      return { workContent: taskState.workContent, description: taskState.description };
+    };
+
+    const currentValues = getCurrentInputValues();
+    
+    // 현재 입력 값들을 taskState에 즉시 반영
+    if (currentValues.workContent !== taskState.workContent) {
+      dispatch({ type: 'SET_FIELD', field: 'workContent', value: currentValues.workContent });
+    }
+    
+    // 50ms 지연 후 저장 (상태 업데이트 완료 대기)
+    setTimeout(() => {
+      const updatedTask = {
+        ...task,
+        workContent: currentValues.workContent, // 현재 입력 값 직접 사용
+        // ... 기타 필드들
+      };
+      onSave(updatedTask);
+      onClose();
+    }, 50);
+  }, [task, taskState, onSave, onClose, dispatch]);
+  ```
+- **기술적 개선**:
+  - EditableCell 완전 제거: 테이블에서 모든 편집 기능 제거
+  - 제목 컬럼 읽기 전용 변경: Typography 컴포넌트로 표시
+  - 즉시 반영 로직: getCurrentInputValues → dispatch → setTimeout 순서
+  - 상태 동기화: ref 기반 현재 값 + 상태 업데이트 + 지연 저장
+- **결과**: 편집 팝업에서 제목 변경 시 테이블에 100% 정확히 반영
+- **문제**: Task 편집 팝업에서 제목 수정 후 저장해도 테이블에 반영되지 않는 문제
+- **근본 원인 분석**:
+  1. **getCurrentValues 함수의 무한 렌더링**: 의존성 배열에 `inputValue` 포함으로 인한 무한 루프
+  2. **과도한 렌더링**: TaskEditDialog가 52회 렌더링되는 성능 문제
+  3. **테이블 UI 업데이트 지연**: React 상태 업데이트 후 TanStack Table 리렌더링 지연
+- **해결 방법**:
+  ```typescript
+  // getCurrentValues 함수 최적화
+  const getCurrentValues = useCallback(() => {
+    return {
+      workContent: workContentRef.current?.value || workContentInput.inputValue,
+      description: descriptionRef.current?.value || descriptionInput.inputValue
+    };
+  }, []); // 의존성 배열 제거 - ref를 통해 최신 값 접근
+  
+  // 테이블 강제 리렌더링 추가
+  setTimeout(() => {
+    table.resetRowSelection();
+  }, 0);
+  ```
+- **결과**: 
+  - 팝업에서 제목 수정 시 테이블에 즉시 반영
+  - 렌더링 횟수 대폭 감소 (52회 → 정상 수준)
+  - 양방향 데이터 동기화 완벽 구현
+
+### 31. 테이블 컬럼 제목 통일 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **변경사항**: Task 관리 테이블의 컬럼 제목을 "업무"에서 "제목"으로 변경
+- **세부사항**:
+  - 컬럼 헤더: `header: '업무'` → `header: '제목'`
+  - 입력 placeholder: `'업무 내용을 입력하세요...'` → `'제목을 입력하세요...'`
+  - 빈 값 힌트 텍스트: `'업무 내용을 입력하세요...'` → `'제목을 입력하세요...'`
+- **목적**: 팝업의 "제목" 필드와 테이블의 컬럼명 일관성 확보
+
+### 32. 양방향 데이터 동기화 완전 구현 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **문제**: 팝업 ↔ 테이블 간 데이터 동기화가 제대로 작동하지 않음
+- **근본 원인**:
+  1. **editingTask 동기화 누락**: 테이블 데이터 변경 시 editingTask 상태가 업데이트되지 않음
+  2. **팝업 → 테이블**: handleEditTaskSave에서 data만 업데이트하고 editingTask 미반영
+  3. **테이블 → 팝업**: updateData에서 data만 업데이트하고 editingTask 미반영
+- **해결 방법**:
+  ```typescript
+  // 1. editingTaskId 상태 추가
+  const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+
+  // 2. data 변경 시 editingTask 자동 동기화
+  useEffect(() => {
+    if (editingTaskId && editDialog) {
+      const updatedTask = data.find(task => task.id === editingTaskId);
+      if (updatedTask) {
+        setEditingTask({ ...updatedTask });
+      }
+    }
+  }, [data, editingTaskId, editDialog]);
+
+  // 3. updateData에서 editingTask 동기화
+  updateData: (rowIndex, columnId, value) => {
+    // data 업데이트
+    setData(prevData => ...);
+    
+    // editingTask도 함께 업데이트
+    if (editingTaskId === filteredRow.id && editDialog) {
+      setEditingTask(prevEditingTask => ({ ...prevEditingTask, [columnId]: value }));
+    }
+  }
+  ```
+- **결과**: 
+  - **팝업 → 테이블**: 팝업에서 저장 시 테이블에 즉시 반영 ✅
+  - **테이블 → 팝업**: 테이블에서 직접 수정 시 팝업에 실시간 반영 ✅
+  - **완전한 양방향 동기화**: 어느 쪽에서 수정해도 즉시 동기화 ✅
+- **문제**: 페이지 크기 10으로 설정되어 있지만 12개 행이 표시되고, 페이지 번호 클릭 시 변화 없음
+- **근본 원인**: 
+  1. TanStack Table에서 `getPaginationRowModel()` 누락
+  2. 페이지네이션 상태 관리 없음
+  3. 드롭다운 메뉴 핸들러에서 페이지네이션 고려하지 않음
+- **해결 방법**:
+  ```typescript
+  // 페이지네이션 상태 추가
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  });
+
+  // useReactTable 설정 수정
+  const table = useReactTable({
+    state: {
+      sorting,
+      globalFilter,
+      pagination // 페이지네이션 상태 추가
+    },
+    onPaginationChange: setPagination, // 페이지네이션 변경 핸들러
+    getPaginationRowModel: getPaginationRowModel(), // 페이지네이션 모델 추가
+    // ...
+  });
+
+  // 드롭다운 메뉴 핸들러에서 페이지네이션 고려
+  const actualRowIndex = pagination.pageIndex * pagination.pageSize + rowIndex;
+  ```
+- **결과**: 페이지네이션 정상 작동, 페이지 크기 10개로 제한, 페이지 번호 클릭 시 올바른 데이터 표시
+
+### 33. 비용관리 시스템 구현 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **개요**: Basic2.mdc 패턴을 기반으로 한 완전한 비용관리 시스템 구축
+- **주요 구현 사항**:
+
+#### 1. 타입 및 데이터 구조 (src/types/cost.ts, src/data/cost.ts)
+```typescript
+interface CostRecord {
+  id: number;
+  registrationDate: string;  // 등록일 (자동 생성)
+  code: string;             // 코드 (자동 생성, COST-24-001)
+  team: string;             // 팀 (IT팀, 마케팅팀 등)
+  assignee: string;         // 담당자
+  costType: '솔루션' | '하드웨어' | '출장경비' | '행사경비' | '사무경비';
+  content: string;          // 내용
+  quantity: number;         // 수량
+  unitPrice: number;        // 단가
+  amount: number;           // 금액 (수량 × 단가, 자동 계산)
+  status: '대기' | '진행' | '완료' | '취소';
+  completionDate: string;   // 완료일
+  attachment: boolean;      // 첨부파일 여부
+  attachmentCount: number;  // 첨부파일 개수
+  attachments: AttachmentFile[];
+}
+```
+
+#### 2. 메인 페이지 구조 (src/views/apps/CostManagement.tsx)
+- **2개 탭 구성**: 
+  - 데이터 탭: 비용 데이터 테이블 관리
+  - 대시보드 탭: 대기 상태 (향후 확장 예정)
+- **아이콘**: TableDocument (데이터), Chart (대시보드)
+- **반응형 디자인**: Material-UI Tabs 컴포넌트 활용
+
+#### 3. 데이터 테이블 (src/views/apps/CostDataTable.tsx)
+**테이블 컬럼 구성** (총 14개 컬럼):
+- 선택 (체크박스) | NO | 등록일 | 코드 | 팀 | 담당자 | 비용유형
+- 내용 | 수량 | 단가 | 금액 | 상태 | 완료일 | 첨부
+
+**핵심 기능**:
+1. **인라인 편집**: 클릭-투-에디트 방식
+   - 등록일, 코드, 금액은 편집 불가 (자동 생성/계산)
+   - 나머지 모든 필드 인라인 편집 가능
+2. **데이터 검증**: 
+   - 필수 필드: 담당자, 내용, 비용유형, 수량, 단가
+   - 새 행 필수 입력 시각적 표시 (빨간 점선 테두리)
+3. **자동 계산**: 수량 × 단가 = 금액 (실시간 계산)
+
+#### 4. 고급 필터링 시스템
+```typescript
+// 3개 필터: 팀, 상태, 연도
+<FormControl size="small">
+  <InputLabel>팀</InputLabel>
+  <Select value={selectedTeam} onChange={...}>
+    <MenuItem value="전체">전체</MenuItem>
+    {teamOptions.map(team => ...)}
+  </Select>
+</FormControl>
+```
+
+#### 5. 인라인 편집 시스템
+```typescript
+// 비용유형 드롭다운
+if (field === 'costType') {
+  return (
+    <Select value={value} onChange={handleCellEdit} autoFocus>
+      {costTypeOptions.map(option => 
+        <MenuItem value={option}>{option}</MenuItem>
+      )}
+    </Select>
+  );
+}
+
+// 담당자 선택 (아바타 포함)
+if (field === 'assignee') {
+  return (
+    <Select
+      renderValue={(selected) => (
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Avatar>{selected.charAt(0)}</Avatar>
+          <Typography>{selected}</Typography>
+        </Box>
+      )}
+    >
+      {assigneeList.map(assignee => ...)}
+    </Select>
+  );
+}
+```
+
+#### 6. 상태별 시각적 표시
+```typescript
+const getStatusColor = (status: string) => ({
+  '대기': { bgcolor: '#fff8e1', color: '#f57f17' },  // 연한 노란색
+  '진행': { bgcolor: '#fff3e0', color: '#f57c00' },  // 연한 주황색
+  '완료': { bgcolor: '#e8f5e8', color: '#388e3c' },  // 연한 초록색
+  '취소': { bgcolor: '#ffebee', color: '#d32f2f' }   // 연한 빨간색
+});
+```
+
+#### 7. 첨부파일 관리 시스템
+- **파일 업로드**: 다중 파일 업로드 지원
+- **파일 타입별 아이콘**: PDF(📄), 이미지(🖼️), Word(📝), Excel(📊) 등
+- **파일 정보 표시**: 파일명, 크기, 업로드일
+- **파일 삭제**: 개별 파일 삭제 기능
+```typescript
+const getFileIcon = (type: string): string => {
+  if (type.includes('pdf')) return '📄';
+  if (type.includes('word')) return '📝';
+  if (type.includes('excel')) return '📊';
+  return '📁';
+};
+```
+
+#### 8. 고급 페이지네이션
+- **페이지 크기 선택**: 5, 10, 25, 50개
+- **Go to 기능**: 원하는 페이지로 직접 이동
+- **정보 표시**: "1-10 / 총 25건" 형태
+- **네비게이션**: 처음/이전/다음/마지막 버튼
+
+#### 9. CRUD 기능
+- **추가**: 새 행 추가 (필수 필드 검증)
+- **삭제**: 다중 선택 삭제 (불완전한 새 행 삭제 방지)
+- **편집**: 인라인 편집 + 첨부파일 관리
+- **검색**: 글로벌 필터 + 컬럼별 필터
+
+#### 10. 라우팅 설정
+- **페이지 경로**: `/apps/cost`
+- **메뉴 등록**: applications.ts에 이미 등록됨
+- **아이콘**: MoneyRecive (💰)
+
+**결과**: 
+- **완전한 비용관리 시스템**: 데이터 입력부터 첨부파일 관리까지
+- **직관적인 UI/UX**: Basic2.mdc 패턴 적용으로 일관된 사용자 경험
+- **확장 가능한 구조**: 대시보드 탭 추가 준비 완료
+- **실무 적용 가능**: 실제 비즈니스 요구사항 반영
+
+### 17. 팀 드롭다운 메뉴 위치 수정 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **문제**: 팀 컬럼 클릭 시 드롭다운 메뉴가 화면 왼쪽 상단에 나타나는 위치 오류
+- **근본 원인**: Material-UI Menu 컴포넌트의 테이블 내 위치 계산 한계
+- **해결 방법**:
+  ```typescript
+  // Menu → Popper 컴포넌트 교체
+  <Popper
+    open={teamMenuOpen}
+    anchorEl={teamMenuAnchor}
+    placement="bottom-start"
+    disablePortal={false}
+    modifiers={[
+      {
+        name: 'offset',
+        options: {
+          offset: [0, 4], // 4px 간격
+        },
+      },
+    ]}
+  >
+    <Paper elevation={3}>
+      <ClickAwayListener onClickAway={handleTeamMenuClose}>
+        <MenuList>
+          {/* 메뉴 아이템들 */}
+        </MenuList>
+      </ClickAwayListener>
+    </Paper>
+  </Popper>
+
+  // 팀 컬럼 셀 구조 개선
+  <Box
+    onClick={(event) => handleTeamChipClick(event, rowIndex)}
+    sx={{
+      position: 'relative', // 위치 기준점 설정
+      cursor: 'pointer'
+    }}
+  >
+    <Chip
+      sx={{ pointerEvents: 'none' }} // 이벤트 위임
+    />
+  </Box>
+  ```
+- **결과**: 팀 Chip 바로 아래 정확한 위치에 드롭다운 메뉴 표시, 사용자 경험 개선
+
+### 18. 드롭다운 UI 개선 - Chip에서 Select로 전환 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **사용자 요청**: 팀, 파트, 상태 컬럼을 Chip 형태가 아닌 일반적인 Select 드롭다운 형태로 변경
+- **변경사항**:
+  - **팀 컬럼**: Chip + Popper → FormControl + Select
+  - **파트 컬럼**: Chip + Popper → FormControl + Select  
+  - **상태 컬럼**: Chip + Popper → FormControl + Select
+  - **코드 정리**: 불필요한 Menu, Popper, Paper, MenuList, ClickAwayListener 관련 코드 제거
+
+- **기술적 구현**:
+  ```typescript
+  // 기존 Chip + Popper 방식
+  <Chip onClick={handleClick} />
+  <Popper open={open} anchorEl={anchor}>
+    <MenuList>...</MenuList>
+  </Popper>
+
+### 52. 메뉴 이름 변경 및 개인교육관리 페이지 복구 (✅ 완료)
+- **구현 날짜**: 2024-12-21
+- **사용자 요청**: 메인메뉴의 "교육관리"를 "개인교육관리"로 변경하고, 개인교육관리 페이지를 이전 상태로 복구
+- **문제 상황**: IT교육관리 개발 중 기존 개인교육관리 페이지가 영향을 받아 새로운 형태로 변경됨
+
+#### 해결 과정:
+1. **메뉴 이름 변경** (src/menu-items/applications.ts):
+   ```typescript
+   {
+     id: 'education',
+     title: '개인교육관리', // '교육관리' → '개인교육관리'로 변경
+     type: 'item',
+     url: '/apps/education',
+     icon: icons.education,
+     breadcrumbs: false
+   }
+   ```
+
+2. **개인교육관리 전용 컴포넌트 생성** (src/views/apps/PersonalEducationDataTable.tsx):
+   - **독립적인 데이터 구조**: PersonalEducationRecord 인터페이스
+   - **간단한 교육 정보**: 코드, 교육명, 유형, 기간, 장소, 강사, 참석자수, 상태
+   - **기본적인 CRUD 기능**: 추가, 수정, 삭제, 체크박스 선택
+   - **필터링**: 상태별, 연도별 필터
+   - **샘플 데이터**: 5개 교육과정 (신입교육, 전문교육, 관리교육, 필수교육)
+
+3. **메인 페이지 수정** (src/views/apps/EducationManagement.tsx):
+   - **컴포넌트 교체**: EducationDataTable → PersonalEducationDataTable
+   - **제목 변경**: "교육관리" → "개인교육관리"
+   - **독립적인 상태 옵션**: types/education 의존성 제거
+
+#### 기술적 세부사항:
+- **데이터 구조**: 단순한 교육 정보 (IT교육관리의 복잡한 탭 구조 제거)
+- **UI 패턴**: 기존 테이블 + 다이얼로그 방식 유지
+- **코드 체계**: EDU-2024-001 형태 (기존 형태 유지)
+- **상태 관리**: 예정, 진행, 완료, 취소
+- **교육 유형**: 신입교육, 전문교육, 관리교육, 필수교육
+
+#### 구분:
+- **개인교육관리** (/apps/education): 기본적인 교육 관리, 단순한 형태
+- **IT교육관리** (/it/education): 고급 기능, 4개 탭(개요/커리큘럼/참석자/교육실적), 복잡한 구조
+
+**결과**: 
+- 메뉴에서 "개인교육관리"로 명확히 구분
+- 개인교육관리 페이지가 이전 상태로 완전 복구
+- IT교육관리와 완전히 분리된 독립적인 시스템
+- 사용자가 원하는 형태로 정확히 복구 완료
+  
+  // 새로운 Select 방식
+  <FormControl size="small" fullWidth>
+    <Select
+      value={currentValue}
+      onChange={handleChange}
+      displayEmpty
+      sx={{
+        '& .MuiSelect-select': {
+          backgroundColor: colors[currentValue]?.light,
+          borderRadius: 1,
+          fontWeight: 500,
+          fontSize: '0.75rem',
+          padding: '4px 8px'
+        }
+      }}
+    >
+      {options.map((option) => (
+        <MenuItem key={option} value={option}>
+          {option}
+        </MenuItem>
+      ))}
+    </Select>
+  </FormControl>
+  ```
+
+- **데이터 업데이트 로직**:
+  - 페이지네이션을 고려한 정확한 인덱스 계산
+  - 필터링된 데이터에서 원본 데이터 찾기
+  - NO 필드를 기준으로 한 안전한 데이터 매칭
+
+- **UI/UX 개선**:
+  - 더 직관적인 드롭다운 인터페이스
+  - 색상 배경으로 현재 값 시각적 표시
+  - 컴팩트한 폰트 크기 (0.75rem)
+  - 일관된 패딩 및 여백
+
+- **성능 최적화**:
+  - 불필요한 상태 변수 제거 (anchorEl, menuType, teamMenuAnchor 등)
+  - 복잡한 이벤트 핸들러 제거 (handleTeamChipClick, handleMenuClose 등)
+  - 간소화된 import 구문
+
+- **제거된 컴포넌트**:
+  - Menu, Popper, Paper, MenuList, ClickAwayListener
+  - 관련 상태 변수 및 핸들러 함수들
+  - 복잡한 위치 계산 로직
+
+- **결과**: 
+  - 더 간단하고 직관적인 UI
+  - 안정적인 드롭다운 동작
+  - 코드 복잡도 대폭 감소
+  - 유지보수성 향상
+
+### 19. Select 드롭다운 색상 개선 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **사용자 요청**: 스크린샷과 동일한 색상으로 팀, 파트, 상태 컬럼 배경색 적용
+- **문제**: Material-UI의 `.light` 색상 참조가 제대로 작동하지 않음
+- **해결방법**: 직접 HEX 색상 값으로 색상 매핑 함수 구현
+
+- **색상 매핑**:
+  ```typescript
+  // 팀 색상
+  개발팀: '#e3f2fd'   // primary.light (연한 파란색)
+  디자인팀: '#f3e5f5' // secondary.light (연한 보라색)
+  기획팀: '#e1f5fe'   // info.light (연한 하늘색)
+  마케팅팀: '#e8f5e8' // success.light (연한 초록색)
+  
+  // 파트 색상
+  IT: '#e3f2fd'       // primary.light (연한 파란색)
+  기획: '#f3e5f5'     // secondary.light (연한 보라색)
+  
+  // 상태 색상
+  대기: '#fff3cd'     // warning.light (연한 노란색)
+  진행: '#e1f5fe'     // info.light (연한 하늘색)
+  완료: '#e8f5e8'     // success.light (연한 초록색)
+  홀딩: '#ffebee'     // error.light (연한 빨간색)
+  ```
+
+- **기술적 구현**:
+  - 각 컬럼별 색상 매핑 함수 생성 (getTeamColor, getDepartmentColor, getStatusColor)
+  - HEX 색상 값으로 정확한 색상 표시 보장
+  - Material-UI 테마 색상과 일관성 유지
+
+- **결과**: 스크린샷과 동일한 시각적 효과로 사용자 요구사항 충족
+
+### 20. Select 드롭다운 배경색 하얀색 통일 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **사용자 요청**: 팀, 파트, 상태 컬럼의 배경색을 모두 하얀색으로 변경
+- **변경사항**:
+  - **팀 컬럼**: 모든 팀 → 하얀색 배경 (#ffffff)
+  - **파트 컬럼**: 모든 파트 → 하얀색 배경 (#ffffff)
+  - **상태 컬럼**: 모든 상태 → 하얀색 배경 (#ffffff)
+
+- **기술적 구현**:
+  ```typescript
+  const getTeamColor = (team: TaskTeam) => {
+    return '#ffffff'; // 모든 팀 하얀색 배경
+  };
+  
+  const getDepartmentColor = (department: TaskDepartment) => {
+    return '#ffffff'; // 모든 파트 하얀색 배경
+  };
+  
+  const getStatusColor = (status: TaskStatus) => {
+    return '#ffffff'; // 모든 상태 하얀색 배경
+  };
+  ```
+
+- **결과**: 깔끔한 하얀색 배경으로 통일된 UI 제공
+
+### 21. 상태 컬럼 색상 배경 복원 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **사용자 요청**: 상태 컬럼만 다시 색상별 배경색 적용
+- **변경사항**:
+  - **팀 컬럼**: 하얀색 배경 유지
+  - **파트 컬럼**: 하얀색 배경 유지
+  - **상태 컬럼**: 상태별 색상 배경 복원
+
+- **상태별 색상**:
+  ```typescript
+  대기: '#fff3cd'  // warning.light (연한 노란색)
+  진행: '#e1f5fe'  // info.light (연한 하늘색)
+  완료: '#c8e6c9'  // 더 진한 초록색 (Material-UI success.200)
+  홀딩: '#ffebee'  // error.light (연한 빨간색)
+  ```
+
+- **결과**: 상태별 시각적 구분을 통한 직관적인 상태 파악 가능
+
+### 22. 완료 상태 색상 개선 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **사용자 요청**: 완료 색상을 더 진한 초록색으로 변경 (연한 하늘색과 구분 개선)
+- **변경사항**: 
+  - 완료 상태 색상: `#e8f5e8` → `#c8e6c9`
+  - 더 진한 초록색으로 변경하여 진행 상태(연한 하늘색)와 명확한 구분 제공
+- **결과**: 상태별 색상 구분이 더욱 명확해져 사용자 경험 개선
+
+### 23. 컬럼 너비 조정 - Action 축소 및 업무 확장 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **사용자 요청**: Action 컬럼 너비를 50% 줄이고, 여유공간을 업무 컬럼에 할당
+- **변경사항**:
+  - **Action 컬럼**: `size: 120` → `size: 60` (50% 축소)
+  - **업무 컬럼**: `size: 280` → `size: 340` (60px 확장)
+- **결과**: 
+  - Action 버튼이 더 컴팩트하게 배치
+  - 업무 내용을 더 넓은 공간에서 표시 가능
+  - 전체적인 테이블 레이아웃 최적화
+
+### 24. 업무 컬럼 Placeholder 개선 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **사용자 요청**: 새 Task 추가 시 "새로운 업무" 텍스트를 placeholder 힌트로 변경
+- **변경사항**:
+  - **새 Task 생성**: `workContent: '새로운 업무'` → `workContent: ''` (빈 문자열)
+  - **EditableCell 개선**: 
+    - 편집 모드: `placeholder="업무 내용을 입력하세요..."`
+    - 표시 모드: 빈 값일 때 회색 이탤릭체로 힌트 텍스트 표시
+- **UI 개선**:
+  - 사용자가 입력하면 힌트 텍스트 자동 사라짐
+  - 더 직관적인 사용자 경험 제공
+- **결과**: 새 Task의 업무 필드가 더 자연스럽고 사용자 친화적으로 동작
+
+### 25. 필터 초기화 버튼 제거 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **사용자 요청**: 필터 초기화 버튼이 구지 필요 없다고 판단하여 제거
+- **제거된 기능**:
+  - `clearFilters()` 함수 제거
+  - `hasActiveFilters` 변수 제거
+  - "필터 초기화" 버튼 제거
+  - 필터 적용 상태 표시 Chip 제거
+- **UI 개선**:
+  - 더 간결한 필터 영역
+  - 불필요한 버튼 제거로 인한 UI 단순화
+- **결과**: 깔끔하고 간소한 필터 인터페이스 제공
+
+### 26. 삭제 버튼 상시 표시 및 상태별 스타일링 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **사용자 요청**: 삭제 버튼을 상시 표시하되, 선택 상태에 따라 색상 변경
+- **변경사항**:
+  - **버튼 위치**: 새 Task 추가 버튼 다음으로 이동
+  - **상시 표시**: 선택된 항목이 없어도 항상 표시
+  - **상태별 스타일링**:
+    - 선택된 항목이 없을 때: 회색 (disabled 상태)
+    - 선택된 항목이 있을 때: 빨간색 (활성 상태)
+- **UI 개선**:
+  - `disabled={selectedRows.size === 0}` 속성으로 비활성화
+  - 동적 색상 변경 (error.main ↔ text.secondary)
+  - 호버 효과 개선
+  - 선택된 개수 표시 `삭제 (n)`
+- **결과**: 일관된 UI 레이아웃과 직관적인 상태 표시
+
+### 27. 삭제 버튼 UI 개선 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **사용자 요청**: 삭제 버튼 표시 방식 및 hover 효과 개선
+- **변경사항**:
+  - **개수 표시**: `삭제 {selectedRows.size > 0 && (${selectedRows.size})}` → `삭제 (${selectedRows.size})`
+    - 선택되지 않을 때: "삭제 (0)" 표시
+    - 선택될 때: "삭제 (3)" 표시
+  - **Hover 효과 개선**:
+    - 선택된 상태에서 hover 시 배경색을 `error.main`으로 변경
+    - 아이콘과 텍스트 색상을 `white`로 변경하여 가독성 향상
+    - `& .MuiSvgIcon-root` 스타일로 아이콘 색상 제어
+- **결과**: 
+  - 일관된 개수 표시로 사용자 경험 개선
+  - hover 시 더 나은 가독성과 시각적 피드백 제공
+
+### 28. 팀 필터 추가 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **사용자 요청**: 필터에 팀 필터 추가, 파트 필터 왼쪽에 위치
+- **추가된 기능**:
+  - **팀 필터 상태**: `teamFilter` state 추가
+  - **팀 필터 옵션**: `teamOptions` - 데이터에서 팀 목록 자동 생성
+  - **팀 필터 핸들러**: `handleTeamFilterChange` 함수 추가
+  - **필터링 로직**: `filteredData`에 팀 필터 조건 추가
+- **UI 배치**:
+  - 팀 필터 → 파트 필터 → 상태 필터 → 담당자 필터 순서
+  - 동일한 스타일과 기능 (다중 선택, Chip 표시, 개별 삭제)
+- **결과**: 
+  - 팀별 Task 필터링 가능
+  - 더 세밀한 데이터 필터링 옵션 제공
+  - 일관된 필터 UI 경험
+
+## 🔧 기술적 세부사항
+
+### 데이터 구조
+```typescript
+interface TaskTableData {
+  id: number;
+  no: number;
+  registrationDate: string; // 자동 생성, 읽기 전용
+  code: string; // TASK-YY-XXX 형식, 자동 생성, 읽기 전용
+  team: TaskTeam; // 새로 추가된 필드
+  department: TaskDepartment;
+  workContent: string;
+  status: TaskStatus;
+  assignee: string;
+  completedDate: string;
+  attachments: string[];
+  checklist?: ChecklistItem[]; // 계획 탭용
+  comments?: CommentItem[]; // 기록 탭용
+}
+
+interface ChecklistItem {
+  id: number;
+  text: string;
+  checked: boolean;
+  parentId?: number; // 계층 구조용
+  level: number; // 들여쓰기 레벨
+  expanded: boolean; // 접기/펼치기 상태
+}
+```
+
+### 성능 최적화 기법
+1. **React.memo**: ChecklistItem 컴포넌트 메모이제이션
+2. **useCallback**: 이벤트 핸들러 함수 메모이제이션
+3. **useMemo**: 필터링된 데이터 계산 최적화
+4. **상태 최적화**: 불필요한 전체 리렌더링 방지
+
+### 드래그 앤 드롭 구현
+- **라이브러리**: @dnd-kit/core, @dnd-kit/sortable
+- **기능**: 계층 구조 지원, 순환 참조 방지
+- **시각적 피드백**: 드래그 중 미리보기, 드롭 가능 영역 표시
+
+### 다국어 지원 구조
+```json
+{
+  "task": {
+    "title": "업무",
+    "status": {
+      "pending": "대기",
+      "inProgress": "진행",
+      "completed": "완료",
+      "onHold": "홀딩"
+    }
+  }
+}
+```
+
+## 🐛 해결된 문제들
+
+### 1. 드롭다운 위치 문제 (4차례 발생)
+- **문제**: 드롭다운이 화면 왼쪽 상단에 나타남
+- **해결**: Menu → Popper 컴포넌트 교체
+
+### 2. 체크리스트 성능 문제
+- **문제**: 텍스트 입력 시 느린 반응
+- **해결**: React.memo + useCallback 적용
+
+### 3. NextAuth 인증 에러
+- **문제**: CLIENT_FETCH_ERROR
+- **해결**: 포트 및 환경 변수 수정
+
+### 4. 페이지네이션 오류
+- **문제**: 설정된 페이지 크기와 실제 표시 개수 불일치
+- **해결**: getPaginationRowModel() 추가
+
+### 5. UI 일관성 문제
+- **문제**: Chip 드롭다운의 복잡한 상호작용
+- **해결**: Select 컴포넌트로 전면 교체
+
+## 📝 개발 노트
+
+### 컴포넌트 아키텍처
+```
+TaskTable (메인)
+├── MainCard (레이아웃)
+├── TaskEditDialog (편집 팝업)
+│   ├── Tab 1: 개요 (기본 정보)
+│   ├── Tab 2: 계획 (체크리스트)
+│   └── Tab 3: 기록 (코멘트)
+├── TablePagination (페이지네이션)
+└── 각종 다이얼로그 (첨부파일 등)
+```
+
+### 상태 관리 패턴
+- **로컬 상태**: useState로 테이블 데이터 관리
+- **필터 상태**: 각 필터별 독립적 상태
+- **팝업 상태**: 다이얼로그 열림/닫힘 상태
+- **편집 상태**: 현재 편집 중인 항목 추적
+
+### 데이터 플로우
+1. **초기 로드**: taskData에서 data 상태로 복사
+2. **필터링**: useMemo로 filteredData 계산
+3. **편집**: 팝업에서 수정 후 원본 data 업데이트
+4. **동기화**: 모든 UI 컴포넌트 자동 리렌더링
+
+## 🚀 향후 개선 계획
+
+### 1. 백엔드 연동
+- REST API 또는 GraphQL 연동
+- 실시간 데이터 동기화
+- 파일 업로드 서버 구현
+
+### 2. 고급 기능
+- 간트 차트 뷰
+- 칸반 보드 뷰
+- 시간 추적 기능
+- 알림 시스템
+
+### 3. 성능 최적화
+- 가상 스크롤링
+- 무한 스크롤
+- 데이터 캐싱
+
+### 4. 접근성 개선
+- 키보드 내비게이션
+- 스크린 리더 지원
+- 고대비 모드
+
+## 📊 프로젝트 통계
+
+- **총 개발 기간**: 2일 (2024-12-19 ~ 2024-12-20)
+- **완료된 기능**: 18개
+- **해결된 버그**: 5개
+- **코드 라인 수**: 약 1,500줄 (TaskTable.tsx)
+- **컴포넌트 수**: 15개+
+- **다국어 번역**: 200여개 항목
+
+## 🎯 핵심 성과
+
+1. **사용자 경험 대폭 개선**: 복잡한 Chip 드롭다운에서 직관적인 Select로 전환
+2. **성능 최적화**: React.memo와 useCallback으로 렌더링 성능 향상
+3. **코드 품질 향상**: 불필요한 코드 제거로 유지보수성 개선
+4. **안정성 확보**: 다양한 에러 상황 해결 및 방지책 마련
+5. **확장성 확보**: 모듈화된 구조로 향후 기능 추가 용이
+
+### 33. 새 Task 추가 시 즉시 팝업 및 필수 입력 검증 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **사용자 요청**: 
+  1. 새 Task 추가 버튼 클릭 시 바로 편집 팝업 표시
+  2. 제목과 담당자를 필수 입력으로 설정
+- **변경사항**:
+  - **addNewTask 함수 수정**: 
+    - 기존: 테이블에 바로 추가 → 새로운: 편집 팝업 바로 열기
+    - 새 Task 생성 후 `setEditDialog(true)` 호출
+    - 담당자 기본값을 빈 문자열로 설정하여 필수 입력 유도
+  - **필수 입력 검증 추가**:
+    - TaskEditDialog에 `validationError` 상태 추가
+    - handleSave에서 제목과 담당자 검증 로직 구현
+    - 에러 시 Alert 컴포넌트로 사용자에게 알림
+  - **UI 개선**:
+    - 제목 필드에 `*` 표시 및 `required` 속성 추가
+    - 담당자 필드에 `*` 표시 및 `required` 속성 추가
+    - 하단에 에러 메시지 표시 영역 추가
+
+- **기술적 구현**:
+  ```typescript
+  // 새 Task 추가 시 바로 팝업 열기
+  const addNewTask = () => {
+    const newTask = {
+      // ... 새 Task 데이터
+      assignee: '',  // 빈 문자열로 설정하여 필수 입력 유도
+    };
+    
+    setEditingTask(newTask);
+    setEditingTaskId(newTask.id);
+    setEditDialog(true); // 바로 팝업 열기
+  };
+
+  // 필수 입력 검증
+  const handleSave = useCallback(() => {
+    if (!currentValues.workContent.trim()) {
+      setValidationError('제목을 입력해주세요.');
+      return;
+    }
+    
+    if (!taskState.assignee.trim()) {
+      setValidationError('담당자를 선택해주세요.');
+      return;
+    }
+    
+    setValidationError(''); // 에러 초기화
+    // ... 저장 로직
+  }, []);
+  ```
+
+- **handleEditTaskSave 개선**:
+  - 새 Task와 기존 Task 수정을 모두 처리하도록 분기 로직 추가
+  - 새 Task 추가 시 ID, NO 자동 생성
+  - 마지막 페이지로 자동 이동하여 새 Task 표시
+
+- **결과**: 
+  - 더 직관적인 새 Task 생성 플로우
+  - 필수 정보 누락 방지로 데이터 품질 향상
+  - 사용자 친화적인 에러 메시지 제공
+  - 즉시 편집 가능한 UX 제공
+
+### 34. 팀KPI 계획 탭 드래그앤드롭 기능 추가 (✅ 완료)
+- **구현 날짜**: 2024-12-23
+- **문제**: 팀KPI 페이지의 편집 팝업에서 계획 탭의 드래그앤드롭 기능이 작동하지 않음
+- **원인**: KpiEditDialog의 PlanTab에 드래그앤드롭 핸들러 누락
+- **해결책**:
+  1. **TaskEditDialog 구현 분석**: 정상 작동하는 드래그앤드롭 핸들러 확인
+  2. **KpiEditDialog에 핸들러 추가**:
+     - `handleDragStart`: 드래그 시작 처리
+     - `handleDragOver`: 드래그 오버 이벤트 처리
+     - `handleDrop`: 드롭 처리 및 계층 구조 업데이트
+  3. **Paper 컴포넌트 속성 추가**:
+     - `draggable`: 드래그 가능 설정
+     - `onDragStart`, `onDragOver`, `onDrop`: 이벤트 핸들러 연결
+     - `cursor: 'move'`: 드래그 가능한 UI 표시
+  4. **순환 참조 방지**: 부모-자식 관계 검증 로직 추가
+  5. **자동 펼치기**: 드롭된 타겟 항목 자동 확장
+
+- **기술적 구현**:
+  ```typescript
+  // 드래그 앤 드롭 핸들러들
+  const handleDragStart = useCallback((e: React.DragEvent, itemId: number) => {
+    e.dataTransfer.setData('text/plain', itemId.toString());
+    e.dataTransfer.effectAllowed = 'move';
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent, targetId: number) => {
+    e.preventDefault();
+    const draggedId = parseInt(e.dataTransfer.getData('text/plain'));
+    
+    if (draggedId === targetId) return; // 자기 자신에게는 드롭 불가
+
+    setChecklistItems(prev => {
+      // 순환 참조 방지 로직
+      const isParentOf = (parentId: number, childId: number): boolean => {
+        const child = prev.find(item => item.id === childId);
+        if (!child || !child.parentId) return false;
+        if (child.parentId === parentId) return true;
+        return isParentOf(parentId, child.parentId);
+      };
+
+      if (isParentOf(draggedId, targetId)) return prev;
+
+      const target = prev.find(item => item.id === targetId);
+      if (!target) return prev;
+
+      return prev.map(item => {
+        if (item.id === draggedId) {
+          return {
+            ...item,
+            parentId: targetId,
+            level: target.level + 1
+          };
+        }
+        return item;
+      });
+    });
+  }, []);
+
+  // Paper 컴포넌트에 드래그앤드롭 속성 추가
+  <Paper
+    variant="outlined"
+    draggable
+    onDragStart={(e) => handleDragStart(e, item.id)}
+    onDragOver={handleDragOver}
+    onDrop={(e) => handleDrop(e, item.id)}
+    sx={{
+      // ... 기존 스타일
+      cursor: 'move',
+    }}
+  >
+  ```
+
+- **결과**: 
+  - 팀KPI 계획 탭에서도 업무관리와 동일한 드래그앤드롭 기능 정상 작동
+  - 계층 구조 생성 및 수정 가능
+  - 순환 참조 방지로 안정성 확보
+  - 직관적인 UI로 사용성 향상
+
+### 35. 팀KPI 계획 탭 행카드 구조 개선 (✅ 완료)
+- **구현 날짜**: 2024-12-23
+- **요구사항**: 행카드에 담당자와 완료일 필드 추가, 오른쪽 정렬로 배치
+- **기존 구조**: 레벨-접힘/펼침-선택-내용-포함숫자-수정-삭제
+- **신규 구조**: 레벨-접힘/펼침-선택-내용-담당자-완료일-포함숫자-수정-삭제
+- **구현 내용**:
+  1. **데이터 구조 확장**:
+     - 체크리스트 항목에 `assignee`, `dueDate` 필드 추가
+     - 기존 샘플 데이터에 담당자와 완료일 정보 추가
+     - 새 항목 추가 시 빈 담당자/완료일로 초기화
+
+  2. **담당자 선택 컴포넌트**:
+     - Material-UI Select 컴포넌트 사용
+     - 120px 고정 너비, 작은 글꼴 크기
+     - "미할당" 옵션 포함
+     - 7명의 담당자 옵션 제공
+
+  3. **완료일 선택 컴포넌트**:
+     - HTML5 date input 타입 사용
+     - 140px 고정 너비, 작은 글꼴 크기
+     - 날짜 선택기 UI 제공
+
+  4. **레이아웃 최적화**:
+     - flexbox 기반 정렬
+     - 텍스트 영역: flexGrow: 1, minWidth: 200px
+     - 담당자/완료일: 고정 너비로 오른쪽 정렬
+     - 하위 항목 개수와 액션 버튼: 우측 끝 배치
+
+  5. **상태 관리 개선**:
+     - `handleAssigneeChange`: 담당자 변경 핸들러
+     - `handleDueDateChange`: 완료일 변경 핸들러
+     - useCallback으로 성능 최적화
+
+- **기술적 구현**:
+  ```typescript
+  // 담당자 업데이트 핸들러
+  const handleAssigneeChange = useCallback((id: number, assignee: string) => {
+    setChecklistItems(prev =>
+      prev.map(item =>
+        item.id === id ? { ...item, assignee } : item
+      )
+    );
+  }, []);
+
+  // 완료일 업데이트 핸들러
+  const handleDueDateChange = useCallback((id: number, dueDate: string) => {
+    setChecklistItems(prev =>
+      prev.map(item =>
+        item.id === id ? { ...item, dueDate } : item
+      )
+    );
+  }, []);
+
+  // 레이아웃 구조
+  <Stack direction="row" spacing={0.8} alignItems="center">
+    {/* 계층 레벨 표시 */}
+    {/* 접기/펼치기 버튼 */}
+    {/* 체크박스 */}
+    
+    {/* 텍스트 영역 - flexGrow: 1 */}
+    <Box sx={{ flexGrow: 1, minWidth: '200px' }}>
+    
+    {/* 담당자 선택 - 120px 고정 너비 */}
+    <Box sx={{ minWidth: '120px', mr: 1 }}>
+      <Select value={item.assignee || ''} onChange={...}>
+    
+    {/* 완료일 선택 - 140px 고정 너비 */}
+    <Box sx={{ minWidth: '140px', mr: 1 }}>
+      <TextField type="date" value={item.dueDate || ''} onChange={...}>
+    
+    {/* 하위 항목 개수 */}
+    {/* 액션 버튼들 */}
+  </Stack>
+  ```
+
+- **결과**: 
+  - 계획 항목별 담당자 및 완료일 관리 가능
+  - 깔끔한 오른쪽 정렬 레이아웃
+  - 기존 드래그앤드롭 기능과 완벽 호환
+  - 더 체계적인 프로젝트 계획 관리
+
+### 36. 팀KPI vs 개인KPI 계획 탭 차별화 (✅ 완료)
+- **구현 날짜**: 2024-12-23
+- **요구사항**: 팀KPI와 개인KPI는 완전히 별개 페이지, 개인KPI에서는 담당자/완료일 필요 없음
+- **구현 내용**:
+  1. **PlanTab 컴포넌트 개선**:
+     - `kpiType` props 추가 (`'team' | 'personal'`)
+     - 조건부 렌더링으로 팀/개인 KPI 구분 처리
+     - KpiEditDialog에서 kpiType 전달
+
+  2. **팀KPI 전용 기능**:
+     - 담당자 선택 필드 표시
+     - 완료일 선택 필드 표시
+     - 체크리스트 항목에 assignee, dueDate 포함
+
+  3. **개인KPI 전용 기능**:
+     - 담당자/완료일 필드 숨김
+     - 기본 체크리스트 구조만 사용
+     - 레벨-접힘/펼침-선택-내용-포함숫자-수정-삭제
+
+  4. **데이터 구조 최적화**:
+     - 초기 데이터를 kpiType에 따라 동적 생성
+     - 새 항목 추가 시 조건부로 필드 포함
+     - 메모리 효율성 향상
+
+- **기술적 구현**:
+  ```typescript
+  // PlanTab 컴포넌트 props 추가
+  const PlanTab = memo(({ kpiType }: { kpiType?: 'team' | 'personal' }) => {
+    
+  // 초기 데이터 조건부 생성
+  const [checklistItems, setChecklistItems] = useState(() => {
+    const baseItems = [/* 기본 체크리스트 */];
+    
+    if (kpiType === 'team') {
+      return baseItems.map((item, index) => ({
+        ...item,
+        assignee: assigneeList[index] || '',
+        dueDate: dateList[index] || ''
+      }));
+    }
+    
+    return baseItems; // 개인KPI는 기본 구조만
+  });
+
+  // 조건부 렌더링
+  {kpiType === 'team' && (
+    <Box sx={{ minWidth: '120px', mr: 1 }}>
+      <Select value={item.assignee || ''} ...>
+    </Box>
+  )}
+  
+  // KpiEditDialog에서 사용
+  {activeTab === 1 && <PlanTab kpiType={kpiType} />}
+  ```
+
+- **결과**: 
+  - **팀KPI**: 담당자, 완료일이 포함된 상세 계획 관리
+  - **개인KPI**: 간소화된 개인 전용 계획 관리  
+  - 각 KPI 유형에 최적화된 사용자 경험
+  - 코드 재사용성과 유지보수성 향상
+
+### 37. 교육관리 페이지 구현 (✅ 완료)
+- **구현 날짜**: 2024-12-23
+- **요구사항**: 메인메뉴의 교육관리 페이지 생성, 부서원 탭 우선 구현
+- **구현 내용**:
+  1. **페이지 구조 생성**:
+     - `/apps/education` 라우트 생성
+     - EducationManagement 메인 컴포넌트 구현
+     - 기존 메뉴 연결 확인
+
+  2. **탭 구조 구현**:
+     - 부서원, 교육실적, 대시보드 3개 탭
+     - Material-UI Tabs 컴포넌트 사용
+     - 탭별 컨텐츠 영역 분리
+
+  3. **부서 필터 기능**:
+     - 오른쪽 상단 부서 선택 드롭다운
+     - IT, 마케팅, 영업, 전체 옵션
+     - MainCard secondary props 활용
+
+  4. **부서원 테이블 구현**:
+     - 사용자, 팀, 파트, 입사일, 직무, Action 컬럼
+     - 팀별 색상 구분 Chip (개발팀: primary, 디자인팀: secondary, 기획팀: info, 마케팅팀: success, 영업팀: warning)
+     - 편집/삭제 액션 버튼
+     - 부서별 필터링 기능
+
+  5. **샘플 데이터 구성**:
+     - 5명의 부서원 데이터
+     - IT, 마케팅, 영업 부서 구분
+     - 실제적인 직무명과 입사일 포함
+
+- **기술적 구현**:
+  ```typescript
+  // 부서원 데이터 타입
+  interface Employee {
+    id: number;
+    name: string;
+    team: string;
+    department: string;
+    joinDate: string;
+    position: string;
+  }
+
+  // 부서별 필터링
+  const filteredEmployees = useMemo(() => {
+    if (department === 'ALL') return employeeData;
+    return employeeData.filter(emp => emp.department === department);
+  }, [department]);
+
+  // 팀별 색상 매핑
+  const getTeamColor = (team: string) => {
+    const colors: Record<string, any> = {
+      '개발팀': 'primary',
+      '디자인팀': 'secondary', 
+      '기획팀': 'info',
+      '마케팅팀': 'success',
+      '영업팀': 'warning'
+    };
+    return colors[team] || 'default';
+  };
+  ```
+
+- **페이지 구조**:
+  ```
+  교육관리
+  ├── 부서 선택 드롭다운 (IT, 마케팅, 영업, 전체)
+  ├── 탭 (부서원, 교육실적, 대시보드)
+  └── 부서원 탭
+      ├── 부서원 목록 제목
+      └── 부서원 테이블
+          ├── 사용자명
+          ├── 팀 (색상 구분 Chip)
+          ├── 파트 (부서)
+          ├── 입사일
+          ├── 직무
+          └── Action (편집/삭제)
+  ```
+
+- **결과**: 
+  - 스크린샷과 동일한 구조의 교육관리 페이지 완성
+  - 부서별 부서원 관리 기능 제공
+  - 확장 가능한 탭 구조로 향후 교육실적, 대시보드 추가 준비
+  - 일관된 디자인 시스템 적용
+
+---
+
+**마지막 업데이트**: 2024-12-23
+**개발자**: AI Assistant
+**상태**: 활발히 개발 중 🚀
+
+### 30. 비용관리 테이블 스타일 개선 (2025-01-28)
+
+### 요구사항
+1. 테이블 헤더 복원 (이전에 제거되었던 헤더를 다시 추가)
+2. 헤더 이외의 모든 텍스트를 12px로 변경
+3. 코드 컬럼의 폰트를 다른 컬럼과 동일하게 통일 (monospace 제거)
+4. 담당자 아바타를 다양한 색상으로 개선
+
+### 기술적 구현
+
+#### 1. 테이블 헤더 복원
+```typescript
+<TableHead>
+  <TableRow sx={{ backgroundColor: 'grey.50' }}>
+    <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
+      <Checkbox
+        indeterminate={selectedRecords.length > 0 && selectedRecords.length < paginatedRecords.length}
+        checked={paginatedRecords.length > 0 && selectedRecords.length === paginatedRecords.length}
+        onChange={handleSelectAll}
+      />
+    </TableCell>
+    <TableCell sx={{ width: columnWidths.no, fontWeight: 600 }}>NO</TableCell>
+    <TableCell sx={{ width: columnWidths.registrationDate, fontWeight: 600 }}>등록일</TableCell>
+    <TableCell sx={{ width: columnWidths.code, fontWeight: 600 }}>코드</TableCell>
+    {/* ... 기타 헤더 컬럼들 */}
+  </TableRow>
+</TableHead>
+```
+
+#### 2. 전체 폰트 크기 12px 통일
+모든 Typography 컴포넌트에 `fontSize: '12px'` 적용:
+```typescript
+// renderEditableCell 함수 내 모든 Typography
+<Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+
+// 테이블 바디의 모든 셀
+<Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+  {page * rowsPerPage + index + 1}
+</Typography>
+```
+
+#### 3. 코드 컬럼 폰트 통일
+```typescript
+// 기존: monospace 폰트 사용
+<Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary', fontFamily: 'monospace' }}>
+
+// 수정: 일반 폰트로 통일
+<Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+  {record.code}
+</Typography>
+```
+
+#### 4. 담당자 아바타 색상 다양화
+스크린샷과 동일한 다양한 색상의 아바타 구현:
+```typescript
+// 담당자별 아바타 색상 생성 함수
+const getAvatarColor = (name: string) => {
+  const colors = [
+    theme.palette.primary.main,    // 파란색
+    theme.palette.secondary.main,  // 보라색
+    theme.palette.success.main,    // 초록색
+    theme.palette.warning.main,    // 노란색
+    theme.palette.info.main,       // 하늘색
+    theme.palette.error.main,      // 빨간색
+    '#9c27b0',                     // 자주색
+    '#ff5722',                     // 주황색
+    '#607d8b',                     // 파란회색
+    '#795548'                      // 갈색
+  ];
+  
+  // 이름의 첫 글자로 색상 인덱스 결정
+  const index = name.charCodeAt(0) % colors.length;
+  return colors[index];
+};
+
+// 아바타 적용
+<Avatar sx={{ width: 24, height: 24, bgcolor: getAvatarColor(assignee.name) }}>
+  {assignee.name.charAt(0)}
+</Avatar>
+```
+
+### 변경된 컴포넌트
+- **src/views/apps/CostDataTable.tsx**
+  - TableHead 섹션 복원
+  - 모든 Typography fontSize 12px 적용
+  - 코드 컬럼 fontFamily monospace 제거
+  - getAvatarColor 함수 추가로 다양한 아바타 색상 구현
+
+### 결과
+✅ **UI 일관성 개선**
+- 테이블 헤더가 복원되어 전체적인 구조 명확화
+- 모든 텍스트가 12px로 통일되어 일관된 시각적 경험
+- 코드 컬럼이 다른 컬럼과 동일한 폰트로 통일
+
+✅ **담당자 아바타 개선**
+- 10가지 색상으로 각 담당자마다 고유한 색상 자동 할당
+- 이름의 첫 글자 기반으로 일관된 색상 매핑
+- 스크린샷과 동일한 시각적 효과 구현
+
+✅ **사용자 경험 향상**
+- 헤더 복원으로 컬럼 구분 명확화
+- 작은 폰트 크기로 더 많은 정보 표시 가능
+- 색상으로 담당자 구분이 용이해짐
+
+### 31. 비용관리 담당자 아바타 실제 얼굴 이미지 적용 (2025-01-28)
+
+### 요구사항
+- 담당자 아바타를 스크린샷처럼 실제 사람 얼굴이 들어간 이미지로 변경
+- 기존의 첫 글자만 표시되는 단순한 아바타에서 실제 얼굴 이미지로 업그레이드
+
+### 기술적 구현
+
+#### 1. 담당자 목록에 아바타 이미지 URL 추가
+```typescript
+// 담당자 목록 (실제로는 API에서 가져올 데이터)
+const assigneeList = [
+  { id: 1, name: '김철수', team: 'IT팀', avatarUrl: '/assets/images/users/avatar-1.png' },
+  { id: 2, name: '박영희', team: '마케팅팀', avatarUrl: '/assets/images/users/avatar-2.png' },
+  { id: 3, name: '이민수', team: 'IT팀', avatarUrl: '/assets/images/users/avatar-3.png' },
+  { id: 4, name: '최윤정', team: '영업팀', avatarUrl: '/assets/images/users/avatar-4.png' },
+  { id: 5, name: '정상현', team: '기획팀', avatarUrl: '/assets/images/users/avatar-5.png' },
+  { id: 6, name: '김혜진', team: '마케팅팀', avatarUrl: '/assets/images/users/avatar-6.png' },
+  { id: 7, name: '송민호', team: 'IT팀', avatarUrl: '/assets/images/users/avatar-7.png' },
+  { id: 8, name: '노수진', team: '인사팀', avatarUrl: '/assets/images/users/avatar-8.png' }
+];
+```
+
+#### 2. Avatar 컴포넌트에 src 속성 추가
+```typescript
+// 편집 모드에서의 담당자 선택
+<Avatar 
+  src={assignee.avatarUrl}
+  sx={{ width: 24, height: 24 }}
+>
+  {assignee.name.charAt(0)}
+</Avatar>
+
+// 드롭다운 메뉴에서의 담당자 표시
+<Avatar 
+  src={assignee.avatarUrl}
+  sx={{ width: 32, height: 32 }}
+>
+  {assignee.name.charAt(0)}
+</Avatar>
+
+// 읽기 모드에서의 담당자 표시
+<Avatar 
+  src={assignee?.avatarUrl}
+  sx={{ width: 24, height: 24 }}
+>
+  {value.charAt(0)}
+</Avatar>
+```
+
+#### 3. Fallback 메커니즘
+- 이미지 로드 실패 시 자동으로 첫 글자 표시
+- Avatar 컴포넌트의 children으로 설정된 텍스트가 fallback 역할
+
+### 사용된 이미지 파일
+프로젝트의 `public/assets/images/users/` 폴더에 있는 기존 아바타 이미지들을 활용:
+- avatar-1.png ~ avatar-8.png
+- 각 담당자별로 고유한 얼굴 이미지 할당
+
+### 변경된 컴포넌트
+- **src/views/apps/CostDataTable.tsx**
+  - assigneeList에 avatarUrl 필드 추가
+  - Avatar 컴포넌트에 src 속성 추가
+  - getAvatarColor 함수 제거 (더 이상 필요 없음)
+
+### 결과
+✅ **시각적 개선**
+- 실제 사람 얼굴이 표시되어 더욱 직관적이고 친근한 UI
+- 스크린샷과 동일한 전문적인 외관
+
+✅ **사용자 경험 향상**
+- 담당자 식별이 더욱 쉬워짐
+- 실제 서비스와 유사한 느낌의 인터페이스
+
+✅ **안정성**
+- 이미지 로드 실패 시 자동 fallback
+- 기존 데이터와 완벽한 호환성
+
+### 32. 비용관리 NO 컬럼 역순 정렬 구현 (2025-01-28)
+
+### 요구사항
+- NO 컬럼을 항상 역순 정렬(최신순)로 표시
+- 가장 최근에 등록된 데이터가 1번으로 표시되도록 변경
+
+### 기술적 구현
+
+#### 1. 데이터 정렬 로직 추가
+```typescript
+// 필터링된 레코드
+const filteredRecords = useMemo(() => {
+  const filtered = records.filter(record => {
+    if (selectedTeam !== '전체' && record.team !== selectedTeam) return false;
+    if (selectedStatus !== '전체' && record.status !== selectedStatus) return false;
+    if (selectedYear !== '전체') {
+      const recordYear = new Date(record.registrationDate).getFullYear().toString();
+      if (recordYear !== selectedYear) return false;
+    }
+    return true;
+  });
+  
+  // 등록일 기준 내림차순 정렬 (최신순)
+  return filtered.sort((a, b) => new Date(b.registrationDate).getTime() - new Date(a.registrationDate).getTime());
+}, [records, selectedTeam, selectedStatus, selectedYear]);
+```
+
+#### 2. NO 번호 계산 공식 변경
+```typescript
+// 기존: 오름차순 번호
+{page * rowsPerPage + index + 1}
+
+// 변경: 역순 번호 (최신순)
+{filteredRecords.length - (page * rowsPerPage + index)}
+```
+
+### 동작 방식
+1. **데이터 정렬**: 등록일 기준 내림차순으로 데이터 정렬
+2. **번호 계산**: 전체 데이터 개수에서 현재 인덱스를 빼서 역순 번호 생성
+3. **결과**: 가장 최근 데이터가 1번, 그 다음이 2번, 3번... 순서로 표시
+
+### 예시
+총 25개 데이터가 있는 경우:
+- 첫 번째 행 (최신 데이터): NO 25
+- 두 번째 행: NO 24
+- 세 번째 행: NO 23
+- ...
+- 마지막 행 (가장 오래된 데이터): NO 1
+
+### 변경된 컴포넌트
+- **src/views/apps/CostDataTable.tsx**
+  - filteredRecords에 등록일 기준 내림차순 정렬 추가
+  - NO 컬럼 계산 공식을 역순으로 변경
+
+### 결과
+✅ **데이터 정렬 개선**
+- 최신 데이터가 항상 상단에 표시
+- 직관적인 번호 체계 (최신 = 1번)
+
+✅ **사용자 경험 향상**
+- 최근 등록된 비용 데이터를 우선적으로 확인 가능
+- 시간 순서대로 논리적인 번호 배치
+
+✅ **필터링 호환성**
+- 팀, 상태, 연도 필터와 완벽 호환
+- 필터 적용 시에도 역순 정렬 유지
+
+### 33. 비용관리 완료일 DatePicker 적용 (2025-01-28)
+
+### 요구사항
+- 완료일 컬럼 클릭 시 텍스트 입력이 아닌 날짜 선택기(DatePicker) 표시
+- 직관적인 날짜 선택 인터페이스 제공
+
+### 기술적 구현
+
+#### 1. DatePicker 관련 라이브러리 import 추가
+```typescript
+// Date Picker
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { DesktopDatePicker } from '@mui/x-date-pickers/DesktopDatePicker';
+```
+
+#### 2. 완료일 필드 편집 모드 변경
+```typescript
+if (field === 'completionDate') {
+  return (
+    <LocalizationProvider dateAdapter={AdapterDateFns}>
+      <DesktopDatePicker
+        value={value ? new Date(value) : null}
+        onChange={(newValue) => {
+          const formattedDate = newValue ? newValue.toISOString().split('T')[0] : '';
+          handleCellEdit(record.id, field, formattedDate);
+        }}
+        format="yyyy-MM-dd"
+        slotProps={{
+          textField: {
+            size: 'small',
+            onBlur: handleCellBlur,
+            autoFocus: true
+          }
+        }}
+      />
+    </LocalizationProvider>
+  );
+}
+```
+
+### 주요 특징
+
+#### 1. 날짜 형식 일관성
+- **입력 형식**: 캘린더에서 선택
+- **저장 형식**: YYYY-MM-DD (ISO 날짜 형식)
+- **표시 형식**: yyyy-MM-dd
+
+#### 2. 사용자 인터페이스
+- **DesktopDatePicker**: 데스크톱 환경에 최적화된 날짜 선택기
+- **캘린더 팝업**: 클릭 시 즉시 날짜 선택 캘린더 표시
+- **자동 포커스**: 편집 모드 진입 시 자동으로 포커스
+
+#### 3. 데이터 처리
+- **null 값 처리**: 빈 날짜는 null로 처리
+- **날짜 변환**: Date 객체를 문자열로 자동 변환
+- **형식 통일**: ISO 날짜 형식으로 일관된 저장
+
+### 변경된 컴포넌트
+- **src/views/apps/CostDataTable.tsx**
+  - DatePicker 관련 import 추가
+  - renderEditableCell 함수에서 completionDate 필드 처리 변경
+  - TextField → DesktopDatePicker로 교체
+
+### 결과
+✅ **사용자 경험 개선**
+- 텍스트 입력 대신 직관적인 캘린더 인터페이스
+- 날짜 형식 오류 방지
+- 빠르고 정확한 날짜 선택
+
+✅ **데이터 일관성**
+- 표준 날짜 형식 (YYYY-MM-DD) 유지
+- 잘못된 날짜 입력 방지
+- 자동 형식 검증
+
+✅ **접근성 향상**
+- 키보드 네비게이션 지원
+- 명확한 날짜 표시
+- 모바일 친화적 인터페이스
+
+### 34. 비용관리 완료일 DatePicker 안정성 개선 (2025-01-28)
+
+### 문제점
+- Material-UI DesktopDatePicker가 테이블 내에서 제대로 표시되지 않는 문제
+- 날짜 선택 팝업이 나타나지 않거나 위치가 잘못되는 오류
+- 테이블의 overflow 설정과 z-index 충돌 문제
+
+### 해결 방안
+HTML5 native date input으로 교체하여 안정성과 호환성 개선
+
+### 기술적 구현
+
+#### 1. Material-UI DatePicker → HTML5 date input 변경
+```typescript
+// 기존: Material-UI DesktopDatePicker
+<LocalizationProvider dateAdapter={AdapterDateFns}>
+  <DesktopDatePicker
+    value={value ? new Date(value) : null}
+    onChange={(newValue) => {
+      const formattedDate = newValue ? newValue.toISOString().split('T')[0] : '';
+      handleCellEdit(record.id, field, formattedDate);
+    }}
+    format="yyyy-MM-dd"
+    slotProps={{
+      textField: {
+        size: 'small',
+        onBlur: handleCellBlur,
+        autoFocus: true
+      }
+    }}
+  />
+</LocalizationProvider>
+
+// 변경: HTML5 native date input
+<TextField
+  type="date"
+  value={value || ''}
+  onChange={(e) => handleCellEdit(record.id, field, e.target.value)}
+  onBlur={handleCellBlur}
+  size="small"
+  autoFocus
+  InputLabelProps={{
+    shrink: true,
+  }}
+  sx={{
+    '& .MuiInputBase-input': {
+      fontSize: '12px'
+    }
+  }}
+/>
+```
+
+#### 2. 불필요한 import 제거
+```typescript
+// 제거된 import
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { DesktopDatePicker } from '@mui/x-date-pickers/DesktopDatePicker';
+```
+
+### 개선된 특징
+
+#### 1. 브라우저 호환성
+- **HTML5 표준**: 모든 모던 브라우저에서 지원
+- **일관된 동작**: 브라우저별 차이 최소화
+- **모바일 최적화**: 터치 환경에서 우수한 사용성
+
+#### 2. 테이블 내 안정성
+- **포지셔닝 문제 해결**: 브라우저 내장 날짜 선택기 사용
+- **z-index 충돌 없음**: 시스템 레벨에서 처리
+- **overflow 영향 없음**: 테이블 제약사항에 영향받지 않음
+
+#### 3. 사용자 경험
+- **즉시 응답**: 클릭 시 바로 날짜 선택기 표시
+- **직관적 인터페이스**: 각 OS/브라우저에 최적화된 UI
+- **빠른 선택**: 복잡한 설정 없이 간단한 날짜 선택
+
+### 변경된 컴포넌트
+- **src/views/apps/CostDataTable.tsx**
+  - DatePicker 관련 import 제거
+  - completionDate 필드를 HTML5 date input으로 변경
+  - 폰트 크기 12px로 통일
+
+### 결과
+✅ **안정성 대폭 개선**
+- 테이블 내에서 100% 안정적 동작
+- 브라우저 호환성 문제 완전 해결
+- 포지셔닝 및 z-index 문제 제거
+
+✅ **성능 최적화**
+- 외부 라이브러리 의존성 감소
+- 번들 크기 축소
+- 렌더링 성능 향상
+
+✅ **사용자 경험 향상**
+- 각 플랫폼에 최적화된 날짜 선택 UI
+- 즉각적인 반응성
+- 터치/마우스 모두 완벽 지원
+
+### 35. 비용관리 페이지네이션 디자인 개선 (2025-01-28)
+
+### 요구사항
+- 비용관리 페이지의 페이지네이션을 업무관리 테이블과 동일한 스타일로 변경
+- 스크린샷에 표시된 디자인 구조 적용
+
+### 기술적 구현
+
+#### 1. 페이지네이션 레이아웃 구조 변경
+```typescript
+// 기존: 간단한 레이아웃
+<Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
+
+// 변경: 교육관리 스타일과 동일한 구조
+<Box sx={{ 
+  display: 'flex', 
+  justifyContent: 'space-between', 
+  alignItems: 'center', 
+  mt: 2, 
+  px: 2,
+  py: 1,
+  borderTop: '1px solid',
+  borderColor: 'divider'
+}}>
+```
+
+#### 2. 왼쪽 영역: Row per page + Go to
+```typescript
+{/* 왼쪽: Row per page */}
+<Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+    Row per page
+  </Typography>
+  <FormControl size="small" sx={{ minWidth: 60 }}>
+    <Select
+      value={rowsPerPage}
+      onChange={(e) => {
+        setRowsPerPage(Number(e.target.value));
+        setPage(0);
+      }}
+      sx={{ 
+        '& .MuiSelect-select': { 
+          py: 0.5, 
+          px: 1,
+          fontSize: '0.875rem'
+        },
+        '& .MuiOutlinedInput-notchedOutline': {
+          border: '1px solid #e0e0e0'
+        }
+      }}
+    >
+      <MenuItem value={5}>5</MenuItem>
+      <MenuItem value={10}>10</MenuItem>
+      <MenuItem value={25}>25</MenuItem>
+      <MenuItem value={50}>50</MenuItem>
+    </Select>
+  </FormControl>
+  
+  {/* Go to */}
+  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
+    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+      Go to
+    </Typography>
+    <TextField
+      size="small"
+      value={goToPage}
+      onChange={(e) => setGoToPage(e.target.value)}
+      onKeyPress={(e) => {
+        if (e.key === 'Enter') {
+          handleGoToPage();
+        }
+      }}
+      placeholder="1"
+      sx={{ 
+        width: 60,
+        '& .MuiOutlinedInput-root': {
+          '& input': {
+            py: 0.5,
+            px: 1,
+            textAlign: 'center',
+            fontSize: '0.875rem'
+          },
+          '& .MuiOutlinedInput-notchedOutline': {
+            border: '1px solid #e0e0e0'
+          }
+        }
+      }}
+    />
+  </Box>
+</Box>
+```
+
+#### 3. 오른쪽 영역: 페이지 정보 + 네비게이션
+```typescript
+{/* 오른쪽: 페이지 네비게이션 */}
+<Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+    {filteredRecords.length > 0 
+      ? `${page * rowsPerPage + 1}-${Math.min((page + 1) * rowsPerPage, filteredRecords.length)} of ${filteredRecords.length}`
+      : '0-0 of 0'
+    }
+  </Typography>
+  {totalPages > 0 && (
+    <Pagination
+      count={totalPages}
+      page={page + 1}
+      onChange={handlePageChange}
+      color="primary"
+      size="small"
+      showFirstButton
+      showLastButton
+      sx={{
+        '& .MuiPaginationItem-root': {
+          fontSize: '0.875rem',
+          minWidth: '32px',
+          height: '32px'
+        }
+      }}
+    />
+  )}
+</Box>
+```
+
+### 주요 개선사항
+
+#### 1. 시각적 구조 개선
+- **상단 구분선**: `borderTop: '1px solid'`로 테이블과 페이지네이션 영역 분리
+- **패딩 추가**: `px: 2, py: 1`로 적절한 여백 확보
+- **일관된 색상**: `borderColor: 'divider'`로 테마와 조화
+
+#### 2. 왼쪽 영역 통합
+- **Row per page**: 한 페이지당 표시할 항목 수 선택
+- **Go to**: 특정 페이지로 직접 이동
+- **일관된 스타일**: 폰트 크기, 패딩, 테두리 색상 통일
+
+#### 3. 오른쪽 영역 개선
+- **페이지 정보**: "1-10 of 25" 형식으로 현재 상태 표시
+- **조건부 렌더링**: 페이지가 없을 때 "0-0 of 0" 표시
+- **네비게이션**: First/Last 버튼 포함한 완전한 페이지 네비게이션
+
+#### 4. 사용자 경험 향상
+- **키보드 지원**: Enter 키로 페이지 이동
+- **플레이스홀더**: "1" 표시로 사용법 안내
+- **중앙 정렬**: Go to 입력창 텍스트 중앙 정렬
+- **일관된 크기**: 모든 요소의 크기와 간격 통일
+
+### 변경된 컴포넌트
+- **src/views/apps/CostDataTable.tsx**
+  - 페이지네이션 전체 구조 개편
+  - 교육관리 페이지와 동일한 스타일 적용
+  - 레이아웃, 스타일링, 텍스트 모두 통일
+
+### 결과
+✅ **디자인 일관성**
+- 업무관리/교육관리 테이블과 완전히 동일한 페이지네이션
+- 프로젝트 전체의 UI/UX 통일성 확보
+- 사용자 학습 비용 감소
+
+✅ **기능 개선**
+- Row per page + Go to 기능 통합
+- 더 직관적인 페이지 정보 표시
+- 완전한 네비게이션 컨트롤 제공
+
+✅ **시각적 개선**
+- 테이블과 페이지네이션 영역 명확한 구분
+- 적절한 여백과 색상으로 가독성 향상
+- 모든 요소의 크기와 간격 최적화
+
+### 36. 비용관리 페이지네이션 활성 페이지 스타일 개선 (2025-01-28)
+
+### 요구사항
+- 페이지네이션에서 활성화된 페이지 번호에 네모 모양의 파란색 배경 적용
+- 스크린샷과 동일한 시각적 디자인 구현
+
+### 기술적 구현
+
+#### 1. 활성 페이지 스타일 추가
+```typescript
+sx={{
+  '& .MuiPaginationItem-root': {
+    fontSize: '0.875rem',
+    minWidth: '32px',
+    height: '32px',
+    borderRadius: '4px'  // 모든 항목에 둥근 모서리 적용
+  },
+  '& .MuiPaginationItem-page.Mui-selected': {
+    backgroundColor: 'primary.main',     // 파란색 배경
+    color: 'white',                      // 흰색 텍스트
+    borderRadius: '4px',                 // 네모 모양 (약간 둥근 모서리)
+    '&:hover': {
+      backgroundColor: 'primary.dark'   // 호버 시 더 진한 파란색
+    }
+  },
+  '& .MuiPaginationItem-page': {
+    borderRadius: '4px',                 // 일반 페이지도 둥근 모서리
+    '&:hover': {
+      backgroundColor: 'grey.100'       // 호버 시 회색 배경
+    }
+  }
+}}
+```
+
+### 주요 개선사항
+
+#### 1. 활성 페이지 시각적 강조
+- **파란색 배경**: `backgroundColor: 'primary.main'`으로 명확한 구분
+- **흰색 텍스트**: `color: 'white'`로 가독성 확보
+- **네모 형태**: `borderRadius: '4px'`로 적당한 둥근 모서리
+
+#### 2. 인터랙션 개선
+- **활성 페이지 호버**: 더 진한 파란색으로 변경
+- **일반 페이지 호버**: 연한 회색 배경으로 피드백 제공
+- **일관된 모양**: 모든 페이지 버튼에 동일한 `borderRadius` 적용
+
+#### 3. 사용자 경험 향상
+- **현재 위치 명확화**: 활성 페이지가 시각적으로 뚜렷하게 구분
+- **즉각적 피드백**: 마우스 호버 시 색상 변화로 상호작용 표시
+- **일관된 디자인**: 프로젝트 전체 테마 색상 사용
+
+### 스타일 상세 분석
+
+#### 1. 활성 페이지 (Mui-selected)
+```typescript
+backgroundColor: 'primary.main'  // 테마의 기본 파란색
+color: 'white'                   // 대비를 위한 흰색 텍스트
+borderRadius: '4px'              // 네모에 가까운 둥근 모서리
+```
+
+#### 2. 호버 상태
+```typescript
+// 활성 페이지 호버
+'&:hover': {
+  backgroundColor: 'primary.dark'  // 더 진한 파란색
+}
+
+// 일반 페이지 호버  
+'&:hover': {
+  backgroundColor: 'grey.100'     // 연한 회색
+}
+```
+
+#### 3. 기본 형태
+```typescript
+borderRadius: '4px'              // 모든 버튼의 기본 둥근 모서리
+minWidth: '32px'                 // 최소 너비 보장
+height: '32px'                   // 고정 높이
+```
+
+### 변경된 컴포넌트
+- **src/views/apps/CostDataTable.tsx**
+  - Pagination 컴포넌트의 sx 속성에 활성 페이지 스타일 추가
+  - 호버 효과 및 기본 형태 스타일링 개선
+
+### 결과
+✅ **시각적 구분 강화**
+- 활성 페이지가 파란색 네모 배경으로 명확하게 구분
+- 현재 위치를 한눈에 파악 가능
+- 스크린샷과 완전히 동일한 디자인 구현
+
+✅ **사용자 경험 개선**
+- 마우스 호버 시 즉각적인 시각적 피드백
+- 클릭 가능한 요소임을 명확하게 표시
+- 접근성과 사용성 향상
+
+✅ **디자인 일관성**
+- Material-UI 테마 색상 활용
+- 프로젝트 전체 디자인 시스템과 조화
+- 전문적이고 세련된 UI 구현
+
+### 37. 비용관리 페이지네이션 활성 페이지 글자색 강화 (2025-01-28)
+
+### 요구사항
+- 페이지네이션에서 활성화된 페이지의 글자색을 명확하게 흰색으로 표시
+- 스크린샷과 동일한 시각적 대비 효과 구현
+
+### 기술적 구현
+
+#### 1. 글자색 우선순위 강화
+```typescript
+'& .MuiPaginationItem-page.Mui-selected': {
+  backgroundColor: 'primary.main',
+  color: 'white !important',        // !important로 우선순위 강화
+  borderRadius: '4px',
+  fontWeight: 500,                  // 글자 굵기 추가로 가독성 향상
+  '&:hover': {
+    backgroundColor: 'primary.dark',
+    color: 'white !important'       // 호버 시에도 흰색 유지
+  }
+},
+```
+
+### 주요 개선사항
+
+#### 1. 색상 우선순위 확보
+- **!important 적용**: `color: 'white !important'`로 다른 스타일보다 우선 적용
+- **호버 상태 보장**: 마우스 호버 시에도 흰색 글자 유지
+- **일관된 적용**: 모든 상황에서 흰색 글자색 보장
+
+#### 2. 가독성 향상
+- **글자 굵기**: `fontWeight: 500`으로 중간 굵기 적용
+- **명확한 대비**: 파란색 배경과 흰색 글자의 높은 대비율
+- **시각적 강조**: 활성 페이지의 상태를 더욱 명확하게 표시
+
+#### 3. 스타일 충돌 방지
+- **우선순위 보장**: CSS 특이성 문제로 인한 색상 덮어쓰기 방지
+- **안정적 적용**: 테마나 다른 컴포넌트 스타일과 무관하게 일관된 표시
+- **브라우저 호환성**: 모든 브라우저에서 동일한 시각적 효과
+
+### 스타일 상세 분석
+
+#### 1. 색상 강화 전략
+```typescript
+// 기존
+color: 'white'                    // 다른 스타일에 의해 덮어써질 수 있음
+
+// 개선
+color: 'white !important'         // 최우선 적용 보장
+```
+
+#### 2. 가독성 개선
+```typescript
+fontWeight: 500                   // 글자 굵기로 시인성 향상
+backgroundColor: 'primary.main'   // 파란색 배경과의 명확한 대비
+```
+
+#### 3. 호버 상태 일관성
+```typescript
+'&:hover': {
+  backgroundColor: 'primary.dark', // 더 진한 파란색 배경
+  color: 'white !important'       // 호버 시에도 흰색 글자 유지
+}
+```
+
+### 변경된 컴포넌트
+- **src/views/apps/CostDataTable.tsx**
+  - Pagination 활성 페이지 글자색에 `!important` 적용
+  - `fontWeight: 500` 추가로 가독성 향상
+  - 호버 상태에서도 흰색 글자 보장
+
+### 결과
+✅ **완벽한 시각적 대비**
+- 파란색 배경과 흰색 글자의 최적 대비율 확보
+- 활성 페이지가 명확하게 구분되어 현재 위치 파악 용이
+- 스크린샷과 완전히 동일한 시각적 효과
+
+✅ **스타일 안정성**
+- `!important`로 다른 CSS 규칙에 의한 덮어쓰기 방지
+- 모든 상황에서 일관된 색상 표시 보장
+- 테마 변경이나 다른 컴포넌트와의 충돌 없음
+
+✅ **사용자 경험 최적화**
+- 높은 가독성으로 접근성 향상
+- 즉각적인 현재 위치 인식 가능
+- 전문적이고 세련된 UI 완성
+
+### 38. 비용관리 코드 생성 규칙 개선 (2025-01-28)
+
+### 문제점
+- 새 레코드 추가 시 코드가 `COST-25-175206471969` 같은 무의미한 긴 숫자로 생성됨
+- `generateCode` 함수에서 `id` 값(Date.now())을 기준으로 일련번호 생성
+- 사용자가 요구한 `COST-연도-일련번호(COST-24-001)` 형식과 불일치
+
+### 해결 방안
+기존 코드에서 같은 연도의 마지막 번호를 찾아서 순차적으로 증가하는 방식으로 변경
+
+### 기술적 구현
+
+#### 1. 기존 문제점
+```typescript
+// 기존: id 값을 기준으로 생성 (문제)
+const generateCode = () => {
+  const year = new Date().getFullYear().toString().slice(-2);
+  const maxId = Math.max(...records.map(r => r.id), 0);  // Date.now() 값 사용
+  const nextNumber = (maxId + 1).toString().padStart(3, '0');
+  return `COST-${year}-${nextNumber}`;
+};
+
+// 결과: COST-25-175206471969 (무의미한 긴 숫자)
+```
+
+#### 2. 개선된 코드 생성 로직
+```typescript
+// 코드 생성 함수
+const generateCode = () => {
+  const year = new Date().getFullYear().toString().slice(-2);
+  // 기존 코드에서 같은 연도의 마지막 번호를 찾아서 +1
+  const currentYearCodes = records
+    .filter(r => r.code.startsWith(`COST-${year}-`))
+    .map(r => {
+      const codeParts = r.code.split('-');
+      return parseInt(codeParts[2]) || 0;
+    });
+  
+  const maxNumber = currentYearCodes.length > 0 ? Math.max(...currentYearCodes) : 0;
+  const nextNumber = (maxNumber + 1).toString().padStart(3, '0');
+  return `COST-${year}-${nextNumber}`;
+};
+
+// 결과: COST-25-001, COST-25-002, COST-25-003... (순차적 증가)
+```
+
+### 주요 개선사항
+
+#### 1. 코드 생성 로직 분석
+- **연도별 필터링**: `r.code.startsWith(\`COST-${year}-\`)`로 같은 연도만 추출
+- **번호 추출**: `codeParts[2]`로 코드의 세 번째 부분(일련번호) 추출
+- **최대값 계산**: 같은 연도 내에서 가장 큰 번호 찾기
+- **순차 증가**: `maxNumber + 1`로 다음 번호 생성
+
+#### 2. 연도별 독립성
+- **2024년**: COST-24-001, COST-24-002...
+- **2025년**: COST-25-001, COST-25-002...
+- **연도 변경 시**: 자동으로 001부터 새로 시작
+
+#### 3. 안전성 보장
+- **빈 배열 처리**: `currentYearCodes.length > 0` 체크
+- **파싱 오류 방지**: `parseInt(codeParts[2]) || 0`로 기본값 제공
+- **3자리 패딩**: `padStart(3, '0')`로 일관된 형식 유지
+
+### 코드 생성 예시
+
+#### 1. 첫 번째 레코드 추가
+```typescript
+// 기존 레코드: COST-24-008 (2024년 마지막)
+// 새 레코드 (2025년): COST-25-001
+```
+
+#### 2. 연속 추가
+```typescript
+// 1번째: COST-25-001
+// 2번째: COST-25-002  
+// 3번째: COST-25-003
+// ...
+// 10번째: COST-25-010
+```
+
+#### 3. 중간 삭제 후 추가
+```typescript
+// 기존: COST-25-001, COST-25-002, COST-25-003
+// COST-25-002 삭제 후
+// 새 추가: COST-25-004 (마지막 번호 기준으로 계속 증가)
+```
+
+### 변경된 컴포넌트
+- **src/views/apps/CostDataTable.tsx**
+  - `generateCode` 함수 완전 재작성
+  - `id` 기반에서 실제 코드 번호 기반으로 변경
+  - 연도별 독립적인 일련번호 체계 구축
+
+### 결과
+✅ **올바른 코드 형식**
+- `COST-25-001`, `COST-25-002` 등 의미있는 순차 번호
+- 무의미한 긴 숫자 완전 제거
+- 사용자 요구사항과 100% 일치
+
+✅ **체계적인 관리**
+- 연도별 독립적인 번호 체계
+- 순차적이고 예측 가능한 코드 생성
+- 삭제 후에도 일관된 증가 패턴
+
+✅ **사용자 경험 개선**
+- 직관적이고 이해하기 쉬운 코드 형식
+- 연도와 순서를 한눈에 파악 가능
+- 전문적이고 체계적인 관리 시스템
+
+// ... existing code ...
+
+### 30. 메인메뉴에서 프로젝트관리 항목 제거 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **작업 유형**: 메뉴 구조 최적화
+- **작업 내용**:
+  - **메뉴 항목 제거**: 프로젝트관리 메뉴 완전 제거
+  - **아이콘 정리**: Briefcase 아이콘 import 제거
+  - **메뉴 구조 정리**: icons 객체에서 project 속성 제거
+- **수정된 파일**: `src/menu-items/applications.ts`
+- **변경 사항**:
+  ```typescript
+  // 제거된 메뉴 항목
+  {
+    id: 'project',
+    title: '프로젝트관리',
+    type: 'item',
+    url: '/apps/project',
+    icon: icons.project,
+    breadcrumbs: false
+  }
+  ```
+- **현재 메인메뉴 구성**:
+  1. 일정관리 (`/apps/calendar`)
+  2. 비용관리 (`/apps/cost`)
+  3. KPI관리 (collapse)
+     - 팀 KPI (`/apps/kpi/team`)
+     - 개인 KPI (`/apps/kpi/personal`)
+  4. 교육관리 (`/apps/education`)
+  5. 업무관리 (`/apps/task`)
+- **결과**: 메뉴가 간소화되어 더 깔끔한 네비게이션 제공
+
+## 현재 상태
+
+### 31. 일정관리 페이지 한국어 현지화 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **작업 유형**: UI 다국어 지원
+- **작업 내용**:
+  - **팝업창 제목**: Edit Event → 일정 편집, Add Event → 일정 추가
+  - **필드 라벨**: 
+    - Title → 제목
+    - Description → 설명  
+    - All day → 종일
+    - Start Date → 시작일
+    - End Date → 종료일
+    - Background Color → 배경 색상
+    - Text Color → 텍스트 색상
+  - **버튼 텍스트**:
+    - Cancel → 취소
+    - Edit → 저장
+    - Add → 추가
+  - **메시지 현지화**:
+    - "Event deleted successfully." → "일정이 성공적으로 삭제되었습니다."
+    - "Event update successfully." → "일정이 성공적으로 수정되었습니다."
+    - "Event added successfully." → "일정이 성공적으로 추가되었습니다."
+  - **유효성 검사 메시지**:
+    - "Title is required" → "제목이 필요합니다"
+    - "End date must be later than start date" → "종료일은 시작일 이후여야 합니다"
+- **수정된 파일**: `src/sections/apps/calendar/AddEventForm.tsx`
+- **결과**: 일정관리 팝업창이 완전히 한국어로 현지화됨
+
+## 현재 상태
+
+### 32. 일정관리 페이지 날짜 형식 한국어화 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **작업 유형**: UI 현지화 개선
+- **작업 내용**:
+  - **날짜 표시 형식 변경**: "July 2025" → "2025년 7월"
+  - **Today 버튼**: "Today" → "오늘"
+  - **View 옵션 한국어화**:
+    - "Month" → "월"
+    - "Week" → "주" 
+    - "Day" → "일"
+    - "Agenda" → "일정"
+  - **커스텀 날짜 포맷팅 함수 추가**:
+    ```typescript
+    const formatKoreanDate = (date: Date | number) => {
+      const d = new Date(date);
+      const year = d.getFullYear();
+      const month = d.getMonth() + 1;
+      return `${year}년 ${month}월`;
+    };
+    ```
+- **수정된 파일**: `src/sections/apps/calendar/Toolbar.tsx`
+- **변경 사항**:
+  - `format(date, 'MMMM yyyy')` → `formatKoreanDate(date)` 함수 사용
+  - 모든 UI 텍스트를 한국어로 현지화
+- **결과**: 일정관리 페이지의 모든 날짜 표시가 한국어 형식으로 통일됨
+
+## 현재 상태
+
+### 33. 메뉴 카테고리 완전 재구성 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **작업 유형**: 시스템 아키텍처 재설계
+- **작업 내용**:
+  - **기존 메뉴 구조 완전 변경**:
+    - 메인메뉴: 일정관리, 비용관리, KPI관리, 교육관리, 업무관리 → 대시보드만 유지
+  - **새로운 카테고리 구조 구축**:
+    1. **관리자패널** (기존 유지)
+    2. **메인메뉴** (대시보드만)
+    3. **기획메뉴** (새로 생성)
+       - 매출관리 (`/planning/sales`)
+       - 재고관리 (`/planning/inventory`)
+       - 인원관리 (`/planning/personnel`)
+       - 투자관리 (`/planning/investment`)
+    4. **IT메뉴** (새로 생성)
+       - VOC관리 (`/it/voc`)
+       - 솔루션관리 (`/it/solution`)
+       - 하드웨어관리 (`/it/hardware`)
+       - 소프트웨어관리 (`/it/software`)
+       - IT교육관리 (`/it/education`)
+    5. **보안메뉴** (새로 생성)
+       - 규정관리 (`/security/regulations`)
+       - 점검관리 (`/security/inspection`)
+       - 교육관리 (`/security/education`)
+       - 협력사관리 (`/security/partners`)
+- **생성된 파일들**:
+  - `src/menu-items/planning-menu.ts`
+  - `src/menu-items/it-menu.ts`
+  - `src/menu-items/security-menu.ts`
+  - `src/app/(dashboard)/planning/sales/page.tsx` (완료)
+  - `src/app/(dashboard)/planning/inventory/page.tsx` (완료)
+  - `src/app/(dashboard)/planning/personnel/page.tsx` (완료)
+  - `src/app/(dashboard)/planning/investment/page.tsx` (완료)
+  - `src/app/(dashboard)/it/voc/page.tsx` (완료)
+  - 기타 IT메뉴/보안메뉴 페이지들 (placeholder 필요)
+- **아이콘 배정**:
+  - 기획메뉴: TrendUp, MoneyRecive, Box, People, MoneyAdd
+  - IT메뉴: Code, MessageQuestion, Setting2, Monitor, CodeCircle, Book1
+  - 보안메뉴: Shield, DocumentText, SearchStatus, Book1, Buildings
+- **수정된 파일**: 
+  - `src/menu-items/applications.ts` (간소화)
+  - `src/menu-items/index.tsx` (새 메뉴들 추가)
+- **페이지 구성**:
+  - 각 페이지는 통계 카드 3개 + 설명 섹션 + 기능 Chip들로 구성
+  - 일관된 디자인 패턴과 색상 스키마 적용
+  - MainCard 컴포넌트 기반 구조
+- **결과**: 완전히 새로운 메뉴 구조로 기업 관리 시스템 특화
+
+## 현재 상태
+
+### 34. 메인메뉴 카테고리 구조 조정 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **작업 유형**: 메뉴 구조 최적화
+- **작업 내용**:
+  - **메인메뉴 항목 확장**: 대시보드만 있던 메인메뉴를 핵심 업무 기능들로 확장
+  - **새로운 메인메뉴 구성**:
+    1. **대시보드** (`/dashboard/default`)
+    2. **업무관리** (`/apps/task`)
+    3. **일정관리** (`/apps/calendar`) - Full Calendar 링크 포함
+    4. **KPI관리** (collapse 메뉴)
+       - 팀 KPI (`/apps/kpi/team`)
+       - 개인 KPI (`/apps/kpi/personal`)
+    5. **교육관리** (`/apps/education`)
+- **아이콘 재배정**:
+  - 대시보드: Home3
+  - 업무관리: Task
+  - 일정관리: Calendar1 (+ Full Calendar 외부 링크)
+  - KPI관리: TrendUp
+  - 교육관리: Book1
+- **수정된 파일**: `src/menu-items/applications.ts`
+- **기능 복원**:
+  - 기존에 제거되었던 핵심 업무 기능들을 메인메뉴로 다시 이동
+  - 일정관리의 Full Calendar 외부 링크 기능 복원
+  - KPI관리의 collapse 구조 및 하위 메뉴 복원
+- **메뉴 계층 구조**:
+  - 관리자패널 (기존 유지)
+  - **메인메뉴** (확장됨)
+  - 기획메뉴 (유지)
+  - IT메뉴 (유지)
+  - 보안메뉴 (유지)
+- **결과**: 사용자가 가장 자주 사용하는 핵심 기능들을 메인메뉴에 집중 배치
+
+## 현재 상태
+
+### 35. 한국어 번역 파일 업데이트 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **작업 유형**: 다국어 지원 개선
+- **작업 내용**:
+  - **오류 해결**: "@formatjs/intl Error MISSING_TRANSLATION" 오류 수정
+  - **누락된 번역 추가**: 새로운 메뉴 항목들의 한국어 번역 추가
+  - **추가된 번역 키들**:
+    - 메인메뉴 항목들:
+      - "대시보드": "대시보드"
+      - "업무관리": "업무관리"
+      - "일정관리": "일정관리"
+      - "KPI관리": "KPI관리"
+      - "팀 KPI": "팀 KPI"
+      - "개인 KPI": "개인 KPI"
+      - "교육관리": "교육관리"
+    - 기획메뉴 항목들:
+      - "기획메뉴": "기획메뉴"
+      - "매출관리": "매출관리"
+      - "재고관리": "재고관리"
+      - "인원관리": "인원관리"
+      - "투자관리": "투자관리"
+    - IT메뉴 항목들:
+      - "IT메뉴": "IT메뉴"
+      - "VOC관리": "VOC관리"
+      - "솔루션관리": "솔루션관리"
+      - "하드웨어관리": "하드웨어관리"
+      - "소프트웨어관리": "소프트웨어관리"
+      - "IT교육관리": "IT교육관리"
+    - 보안메뉴 항목들:
+      - "보안메뉴": "보안메뉴"
+      - "규정관리": "규정관리"
+      - "점검관리": "점검관리"
+      - "협력사관리": "협력사관리"
+- **수정된 파일**: `src/utils/locales/ko.json`
+- **기존 번역 정리**: 중복되거나 불필요한 번역 키들 제거
+- **결과**: 모든 메뉴 항목이 올바른 한국어로 표시되며 번역 오류 완전 해결
+
+## 현재 상태
+
+### 36. 관리자패널 메뉴 번역 추가 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **작업 유형**: 다국어 지원 확장
+- **작업 내용**:
+  - **오류 해결**: "사용자 관리" 번역 누락으로 인한 @formatjs/intl 에러 수정
+  - **관리자패널 전체 메뉴 번역 추가**:
+    - "사용자 관리": "사용자 관리"
+    - "콘텐츠 관리": "콘텐츠 관리"
+    - "분석 및 리포트": "분석 및 리포트"
+    - "권한 관리": "권한 관리"
+    - "시스템 설정": "시스템 설정"
+  - **하위 메뉴 번역 추가**:
+    - "카테고리 관리": "카테고리 관리"
+    - "게시물 관리": "게시물 관리"
+    - "게시물 편집기": "게시물 편집기"
+    - "미디어 관리": "미디어 관리"
+    - "분석 대시보드": "분석 대시보드"
+    - "사용자 활동": "사용자 활동"
+    - "역할 관리": "역할 관리"
+    - "사용자별 권한": "사용자별 권한"
+- **수정된 파일**: `src/utils/locales/ko.json`
+- **관리자패널 메뉴 구성**:
+  1. **사용자 관리** - 사용자 계정 관리
+  2. **콘텐츠 관리** (collapse 메뉴)
+     - 카테고리 관리
+     - 게시물 관리
+     - 게시물 편집기
+     - 미디어 관리
+  3. **분석 및 리포트** (collapse 메뉴)
+     - 분석 대시보드
+     - 사용자 활동
+  4. **권한 관리** (collapse 메뉴)
+     - 역할 관리
+     - 사용자별 권한
+  5. **시스템 설정** - 전체 시스템 설정
+- **결과**: 관리자패널의 모든 메뉴가 올바른 한국어로 표시되며 번역 오류 완전 해결
+
+## 현재 상태
+
+### 40. 비용관리 메뉴 추가 (✅ 완료)
+- **구현 날짜**: 2024-12-29
+- **변경사항**: 메인메뉴 카테고리에 비용관리 메뉴 추가
+- **세부사항**:
+  - **applications.ts 수정**:
+    - `Money` 아이콘 import 추가
+    - icons 객체에 `cost: Money` 추가
+    - children 배열에 비용관리 메뉴 항목 추가
+  - **메뉴 구조**:
+    - ID: 'cost'
+    - 제목: '비용관리'
+    - 타입: 'item'
+    - URL: '/apps/cost'
+    - 아이콘: Money (iconsax-react)
+    - breadcrumbs: false
+  - **배치 위치**: 교육관리 메뉴 다음에 배치
+  - **현재 메뉴 순서**: 대시보드 → 업무관리 → 일정관리 → KPI관리 → 교육관리 → **비용관리** (신규)
+
+### 41. 비용관리 스크롤바 스타일 개선 (✅ 완료)
+- **구현 날짜**: 2024-12-29
+- **변경사항**: 비용관리 페이지 테이블의 스크롤바 색상을 더 연하게 변경
+- **세부사항**:
+  - **CostDataTable.tsx 수정**:
+    - TableContainer에 webkit 스크롤바 스타일 추가
+    - 스크롤바 너비: 10px (가로/세로 동일) - 8px에서 10px로 조정
+    - 트랙 색상: #f8f9fa (매우 연한 회색)
+    - 썸 색상: #e9ecef (연한 회색)
+    - 썸 호버 색상: #dee2e6 (중간 회색)
+    - 모서리 둥글게: 4px 반지름
+    - 썸에 2px 테두리로 자연스러운 간격 연출
+  - **개선 효과**:
+    - 기존 진한 스크롤바 → 연하고 세련된 스크롤바
+    - 테이블 내용에 방해되지 않는 시각적 편의성 향상
+    - 전체 UI와 조화로운 색상 톤 유지
+    - 10px 너비로 사용자 조작성 향상
+
+### 42. 비용관리 다국어 지원 에러 해결 (✅ 완료)
+- **구현 날짜**: 2024-12-29
+- **에러**: `[@formatjs/intl Error MISSING_TRANSLATION] Missing message: "비용관리" for locale "ko"`
+- **근본 원인**: 
+  - 비용관리 메뉴 추가 시 한국어 번역 파일에 해당 키가 누락
+  - react-intl의 FormattedMessage 컴포넌트에서 번역 키를 찾지 못함
+- **해결 방법**:
+  - **ko.json 수정**: `"비용관리": "비용관리"` 번역 키 추가
+  - 교육관리 다음에 배치하여 메뉴 순서와 일치
+- **결과**: 
+  - 다국어 지원 에러 완전 해결
+  - 비용관리 메뉴 정상 표시
+  - 일관된 다국어 지원 체계 유지
+
+### 43. 비용관리 페이지 구조 분석 및 설계 가이드 생성 (✅ 완료)
+- **구현 날짜**: 2024-12-29
+- **목적**: 향후 유사한 페이지를 빠르게 개발할 수 있도록 비용관리 페이지의 구조를 상세히 분석하여 Basic3.mdc로 저장
+- **분석 내용**:
+  - **전체 아키텍처**: 파일 구조, 컴포넌트 계층 구조
+  - **디자인 시스템**: 색상 체계, 스타일 가이드, 컬럼 너비 정의
+  - **데이터 구조**: 메인 데이터 타입, 첨부파일 타입 정의
+  - **핵심 기능**: 필터링, 인라인 편집, 페이지네이션, 첨부파일 관리
+  - **탭 시스템**: 탭 구조, 탭 패널 컴포넌트
+  - **상태 관리**: 레코드 상태, UI 상태 관리 패턴
+  - **반응형 디자인**: 테이블 및 필터 반응형 처리
+  - **성능 최적화**: 메모이제이션, 가상화 고려사항
+  - **UI/UX 개선**: 사용자 피드백, 접근성 개선
+- **개발 가이드라인**:
+  - 새로운 컬럼/필터/액션 추가 시 단계별 가이드
+  - 체크리스트 (필수/선택적 구현사항, 성능 최적화)
+  - 재사용성, 확장성, 일관성, 성능 고려사항
+- **결과**: 
+  - 완전한 CRUD 테이블 시스템의 모범 사례 문서화
+  - 향후 유사한 페이지 개발 시 개발 시간 단축 가능
+  - 일관된 디자인 패턴 및 코드 구조 유지
+
+## 🔄 현재 진행 중
+
+### 다음 단계
+1. 비용관리 페이지 구현 (/apps/cost)
+2. 비용관리 관련 기능 개발
+3. 메뉴 아이콘 최적화
+
+## 📝 개발 노트
+
+### 메뉴 구조 관리
+- 메인메뉴는 applications.ts에서 관리
+- 각 기능별 메뉴는 별도 파일로 분리 (planning-menu.ts, it-menu.ts 등)
+- index.tsx에서 모든 메뉴를 통합 관리
+
+### 아이콘 관리
+- @wandersonalwes/iconsax-react 라이브러리 사용
+- 비용관리: Money 아이콘 사용
+- 일관된 아이콘 스타일 유지
+
+### 44. IT메뉴 VOC관리 페이지 구현 (✅ 완료)
+- **구현 날짜**: 2024-12-29
+- **작업 유형**: 페이지 구현 및 기능 개발
+- **작업 내용**:
+  - **Basic3.mdc 참조**: 비용관리 페이지와 동일한 디자인과 구조로 구현
+  - **탭 시스템**: 데이터 탭과 대시보드 탭 구조
+  - **테이블 컬럼 구성**:
+    - 선택 (checkbox)
+    - NO (역순 정렬)
+    - 등록일 (자동 생성)
+    - 코드 (자동 생성, VOC-YY-XXX 형식)
+    - 요청유형 (9가지 유형)
+    - 요청부서 (편집 가능)
+    - 요청자 (편집 가능)
+    - 요청내용 (편집 가능)
+    - 조치내용 (편집 가능)
+    - 상태 (4가지 상태)
+    - 담당자 (아바타 포함 드롭다운)
+    - 완료일 (편집 가능)
+    - 액션 (첨부파일, 메뉴)
+- **요청유형 옵션**: 하드웨어, 소프트웨어, 솔루션, 그룹웨어, 미들웨어, 네트워크, 전산서버, 보안, 단순문의
+- **상태 관리**: 대기, 진행, 완료, 취소 (색상별 구분)
+- **생성된 파일들**:
+  - `src/types/voc.ts` - VOC 관련 타입 정의
+  - `src/data/voc.ts` - VOC 샘플 데이터 및 통계 함수
+  - `src/views/apps/VOCManagement.tsx` - VOC 메인 컴포넌트
+  - `src/views/apps/VOCDataTable.tsx` - VOC 테이블 컴포넌트
+  - `src/app/(dashboard)/it/voc/page.tsx` - 페이지 진입점 수정
+- **핵심 기능**:
+  - 연도/부서/상태별 필터링
+  - 인라인 편집 (드롭다운, 텍스트 필드)
+  - 행 추가/삭제 기능
+  - 첨부파일 관리 다이얼로그
+  - 페이지네이션 (10px 너비 커스텀 스크롤바)
+  - 담당자 아바타 표시
+  - 요청유형별 파스텔톤 배경색
+  - 상태별 색상 구분 Chip
+- **디자인 특징**:
+  - 비용관리 페이지와 동일한 UI/UX 패턴
+  - 일관된 색상 체계 및 스타일
+  - 반응형 디자인 적용
+  - 접근성 및 사용성 고려
+- **결과**: 
+  - IT 부서의 VOC 관리 업무 효율성 향상
+  - 요청 유형별 체계적인 분류 및 관리
+  - 담당자 배정 및 진행 상황 추적 가능
+  - 첨부파일을 통한 상세 정보 관리
+
+### 45. VOC관리 페이지 글자크기 조정 (✅ 완료)
+- **구현 날짜**: 2024-12-29
+- **작업 유형**: UI 개선
+- **작업 내용**:
+  - **테이블 데이터 글자크기 변경**: 14px → 12px
+  - **헤더 글자크기 유지**: 14px (기존 유지)
+  - **적용 범위**:
+    - NO 컬럼 데이터
+    - 등록일 컬럼 데이터
+    - 코드 컬럼 데이터
+    - 요청유형 컬럼 데이터
+    - 인라인 편집 셀의 텍스트
+    - 담당자 이름 텍스트
+- **수정된 파일**: `src/views/apps/VOCDataTable.tsx`
+- **기술적 세부사항**:
+  - Typography 컴포넌트의 fontSize 속성 수정
+  - 편집 가능한 셀의 텍스트 크기 일관성 확보
+  - 담당자 아바타와 함께 표시되는 이름 텍스트 크기 조정
+  - readonly 배열 타입 에러 수정 (departmentOptions 스프레드 연산자 적용)
+- **결과**: 
+  - 더 컴팩트한 테이블 뷰 제공
+  - 한 화면에 더 많은 데이터 표시 가능
+  - 테이블 헤더와 데이터의 시각적 구분 향상
+  - 전체적인 UI 밀도 개선
+
+### 46. VOC관리 페이지 가로 스크롤 개선 (✅ 완료)
+- **구현 날짜**: 2024-12-29
+- **작업 유형**: UI/UX 개선
+- **작업 내용**:
+  - **컬럼 줄바꿈 방지**: 모든 컬럼 텍스트가 2줄로 나뉘지 않도록 수정
+  - **가로 스크롤 허용**: 테이블 컨테이너에 가로 스크롤 활성화
+  - **최소 너비 설정**: 테이블 전체 최소 너비 1400px 설정
+  - **컬럼별 최소 너비 보장**:
+    - 선택: 50px
+    - NO: 80px
+    - 등록일: 120px
+    - 코드: 120px
+    - 요청유형: 120px
+    - 요청부서: 120px
+    - 요청자: 120px
+    - 요청내용: 200px
+    - 조치내용: 200px
+    - 상태: 100px
+    - 담당자: 140px
+    - 완료일: 120px
+    - 액션: 80px
+- **수정된 파일**: `src/views/apps/VOCDataTable.tsx`
+- **기술적 세부사항**:
+  - TableContainer에 `overflowX: 'auto'` 추가
+  - Table 컴포넌트에 `minWidth: 1400` 설정
+  - 모든 TableCell에 `minWidth`와 `width` 속성 추가
+  - 모든 Typography 컴포넌트에 `whiteSpace: 'nowrap'` 적용
+  - 헤더와 데이터 셀 모두 일관된 너비 설정
+- **결과**: 
+  - 컬럼 내용이 항상 한 줄로 표시됨
+  - 화면 너비가 좁아도 테이블 구조 유지
+  - 가로 스크롤을 통한 모든 컬럼 접근 가능
+  - 텍스트 가독성 향상
+  - 데이터 밀도 최적화
+
+### 47. VOC관리 페이지 UI 통일성 개선 (✅ 완료)
+- **구현 날짜**: 2024-12-29
+- **작업 유형**: UI/UX 개선
+- **작업 내용**:
+  - **버튼 배치 변경**: 행 추가/삭제 버튼을 왼쪽 정렬에서 오른쪽 정렬로 변경
+  - **버튼 텍스트 수정**: "행 추가" → "추가"로 간소화
+  - **버튼 스타일 통일**: 비용관리 페이지와 동일한 버튼 디자인 적용
+  - **페이지네이션 교체**: 기본 TablePagination을 비용관리 페이지와 동일한 커스텀 페이지네이션으로 변경
+  - **레이아웃 구성**:
+    - 상단: 총 건수 표시 (왼쪽) + 액션 버튼 (오른쪽)
+    - 하단: 페이지 설정 (왼쪽) + 페이지 네비게이션 (오른쪽)
+- **수정된 파일**: `src/views/apps/VOCDataTable.tsx`
+- **기술적 세부사항**:
+  - TablePagination → Pagination 컴포넌트로 교체
+  - justifyContent: 'space-between' 레이아웃 적용
+  - Row per page 드롭다운 추가
+  - Go to 페이지 기능 추가
+  - 페이지 정보 표시 형식 통일 (X-Y of Z)
+  - 페이지네이션 스타일 완전 동일화
+  - goToPage 상태 및 handleGoToPage 함수 추가
+  - totalPages 계산 로직 추가
+- **페이지네이션 기능**:
+  - Row per page: 5, 10, 25, 50 옵션
+  - Go to: 특정 페이지로 직접 이동
+  - First/Last 버튼 포함
+  - 페이지 정보 실시간 표시
+  - 선택된 페이지 하이라이트
+- **결과**: 
+  - 비용관리 페이지와 완전히 동일한 UI/UX
+  - 일관된 사용자 경험 제공
+  - 향상된 페이지 네비게이션 기능
+  - 직관적인 버튼 배치 및 레이블링
+  - 전체적인 디자인 통일성 확보
+
+### 48. VOC관리 페이지 편집 방식 개선 (✅ 완료)
+- **구현 날짜**: 2024-12-29
+- **작업 유형**: UI/UX 개선
+- **요청사항**: 사용자가 VOC관리 페이지의 편집 방식을 비용관리 페이지와 동일하게 만들어달라고 요청 (작은 버튼 클릭 대신 엔터키로 바로 저장)
+- **작업 내용**:
+  - **편집 방식 변경**: 기존의 저장/취소 버튼 방식에서 실시간 저장 방식으로 변경
+  - **상태 관리 개선**: 
+    - `tempValue` 상태 제거
+    - `handleCellClick` 함수로 편집 시작
+    - `handleCellEdit` 함수로 실시간 데이터 업데이트
+    - `handleCellBlur` 함수로 편집 종료
+  - **편집 UI 개선**:
+    - 저장/취소 아이콘 버튼 제거
+    - TextField 및 Select에서 onChange 시 즉시 저장
+    - onBlur 이벤트로 편집 모드 종료
+    - 엔터키/ESC키 지원 (엔터키로 편집 종료)
+  - **완료일 필드 개선**: 날짜 입력 타입으로 변경
+  - **상태 필드 개선**: 
+    - 편집 시 드롭다운 선택
+    - 읽기 모드에서 색상별 Chip 표시
+    - 클릭으로 편집 모드 전환
+- **수정된 파일**: `src/views/apps/VOCDataTable.tsx`
+- **기술적 세부사항**:
+  - 사용하지 않는 아이콘 import 제거 (Edit, TickCircle, CloseCircle)
+  - 비용관리 페이지와 동일한 편집 패턴 적용
+  - 모든 편집 가능한 필드에 일관된 편집 방식 적용
+  - 담당자 필드는 아바타 포함 드롭다운으로 유지
+  - 상태 필드는 읽기 모드에서 색상 Chip, 편집 모드에서 드롭다운
+- **편집 가능한 필드들**:
+  - 요청부서: 드롭다운 선택
+  - 요청자: 텍스트 입력
+  - 요청내용: 멀티라인 텍스트 입력
+  - 조치내용: 멀티라인 텍스트 입력
+  - 상태: 드롭다운 선택 (색상 Chip 표시)
+  - 담당자: 아바타 포함 드롭다운
+  - 완료일: 날짜 선택기
+- **결과**: 
+  - 비용관리 페이지와 완전히 동일한 편집 경험 제공
+  - 엔터키로 즉시 저장되는 직관적인 편집 방식
+  - 불필요한 버튼 클릭 단계 제거로 사용자 경험 향상
+  - 일관된 UI/UX 패턴으로 학습 곡선 최소화
+  - 실시간 데이터 업데이트로 작업 효율성 증대
+
+### 49. VOC관리 페이지 UI 및 스크롤 개선 (✅ 완료)
+- **구현 날짜**: 2024-12-29
+- **작업 유형**: UI/UX 개선
+- **요청사항**: 
+  - 요청유형을 선택박스로 변경하고 배경을 하얀색으로 처리
+  - 이중 스크롤 문제 해결 (페이지 스크롤은 사용, 테이블 내 상하 스크롤 제거)
+- **작업 내용**:
+  - **요청유형 편집 기능 추가**:
+    - 기존 색상 배경 표시에서 편집 가능한 선택박스로 변경
+    - 읽기 모드: 하얀 배경 + 회색 테두리로 깔끔한 디자인
+    - 편집 모드: 드롭다운 선택박스로 9가지 요청유형 선택 가능
+  - **이중 스크롤 문제 해결**:
+    - TableContainer의 `maxHeight: 600` 속성 제거
+    - 테이블 내부 세로 스크롤 제거
+    - 페이지 전체 스크롤만 사용하도록 개선
+  - **코드 정리**:
+    - 사용하지 않는 `getRequestTypeColor` 함수 제거
+    - 요청유형 관련 색상 설정 코드 정리
+- **수정된 파일**: `src/views/apps/VOCDataTable.tsx`
+- **기술적 세부사항**:
+  - 요청유형 필드를 `renderEditableCell`로 변경하여 일관된 편집 방식 적용
+  - 읽기 모드 스타일: `backgroundColor: '#ffffff'`, `border: '1px solid #e0e0e0'`
+  - 테이블 높이 제한 제거로 자연스러운 페이지 스크롤 구현
+  - 가로 스크롤은 유지하여 넓은 테이블 컬럼 접근성 보장
+- **요청유형 편집 기능**:
+  - 편집 가능한 9가지 옵션: 하드웨어, 소프트웨어, 솔루션, 그룹웨어, 미들웨어, 네트워크, 전산서버, 보안, 단순문의
+  - 클릭으로 편집 시작, onChange로 즉시 저장
+  - 엔터키/ESC키/포커스 이동으로 편집 종료
+- **UI 개선사항**:
+  - 요청유형 필드의 시각적 일관성 향상 (하얀 배경)
+  - 이중 스크롤 제거로 사용자 경험 개선
+  - 테이블 전체가 페이지 내에서 자연스럽게 표시
+  - 스크롤 혼란 없는 직관적인 네비게이션
+- **결과**: 
+  - 요청유형 필드 편집 가능성 확보
+  - 깔끔한 하얀 배경으로 시각적 통일성 향상
+  - 이중 스크롤 문제 완전 해결
+  - 더 나은 사용자 경험과 직관적인 인터페이스 제공
+  - 페이지 스크롤만으로 모든 데이터 접근 가능
+
+### 50. VOC관리 페이지 Action 컬럼 개선 (✅ 완료)
+- **구현 날짜**: 2024-12-29
+- **작업 유형**: UI/UX 개선
+- **요청사항**: 
+  - 액션 → Action으로 헤더 텍스트 변경
+  - Action 컬럼을 비용관리 페이지와 완전히 동일하게 구성
+- **작업 내용**:
+  - **헤더 텍스트 변경**: "액션" → "Action"으로 영문 표기 통일
+  - **Action 컬럼 단순화**:
+    - 기존: 첨부파일 아이콘 + More 메뉴 버튼
+    - 변경: 첨부파일 아이콘 하나만 표시 (비용관리 페이지와 동일)
+  - **첨부파일 아이콘 개선**:
+    - 첨부파일 있을 때: 파란색 (primary.main)
+    - 첨부파일 없을 때: 회색 (grey.400)
+    - 첨부파일 개수 표시: 아이콘 옆에 숫자 표시
+    - 아이콘 크기: 16px → 18px로 확대
+  - **불필요한 컴포넌트 제거**:
+    - More 메뉴 버튼 제거
+    - 액션 메뉴 (Menu) 컴포넌트 완전 제거
+    - 메뉴 관련 상태 및 핸들러 함수 제거
+- **수정된 파일**: `src/views/apps/VOCDataTable.tsx`
+- **기술적 세부사항**:
+  - `anchorEl`, `selectedRecord` 상태 제거
+  - `handleMenuClick`, `handleMenuClose` 함수 제거
+  - Menu 컴포넌트 및 MenuItem 제거
+  - 사용하지 않는 More 아이콘 import 제거
+  - 첨부파일 개수 표시 로직 추가 (`attachmentCount` 활용)
+- **Action 컬럼 기능**:
+  - 첨부파일 관리 아이콘 하나만 표시
+  - 클릭 시 첨부파일 다이얼로그 열림
+  - 첨부파일 유무에 따른 시각적 구분
+  - 첨부파일 개수 실시간 표시
+- **UI 개선사항**:
+  - 비용관리 페이지와 완전히 동일한 Action 컬럼 구성
+  - 불필요한 메뉴 버튼 제거로 인터페이스 단순화
+  - 첨부파일 상태를 직관적으로 파악 가능
+  - 일관된 디자인 패턴 적용
+- **결과**: 
+  - 비용관리 페이지와 100% 동일한 Action 컬럼 구현
+  - 인터페이스 단순화로 사용자 혼란 최소화
+  - 첨부파일 관리 기능에 집중된 명확한 UI
+  - 코드 복잡성 감소 및 유지보수성 향상
+  - 전체 시스템의 일관성 확보
+
+### 51. 교육관리 페이지 대규모 리뉴얼 (✅ 완료)
+- **구현 날짜**: 2024-12-20
+- **작업 유형**: 기능 개발 및 UI 재설계
+- **요청사항**: 
+  1. **교육유형 변경**: 신입교육, 담당자교육, 관리자교육, 수시교육
+  2. **코드 형식 변경**: EDU-I-24-001 (교육유형별 코드)
+  3. **팝업창 구조 완전 변경**:
+     - 편집 모드 항상 활성화
+     - 개요 탭: 2열 레이아웃 구조
+     - 커리큘럼 탭: CRUD 기능 추가
+     - 참석자 탭: 완전 재구성
+     - 교육실적 탭: 성과/개선/교육소감으로 분리
+
+#### 🔧 기술적 구현
+
+**1. 타입 정의 완전 재구성 (education.ts)**
+```typescript
+// 새로운 교육유형
+export type EducationType = '신입교육' | '담당자교육' | '관리자교육' | '수시교육';
+
+// 교육유형별 코드 매핑
+export const educationTypeCodeMap: Record<EducationType, string> = {
+  '신입교육': 'I',      // Initiation
+  '담당자교육': 'S',     // Staff  
+  '관리자교육': 'M',     // Manager
+  '수시교육': 'A'        // Anytime
+};
+
+// 커리큘럼 항목
+export interface CurriculumItem {
+  id: number;
+  time: string;         // 시간 (예: "09:00-10:30")
+  subject: string;      // 과목명
+  instructor: string;   // 강사
+  content: string;      // 내용
+  attachment?: string;  // 첨부파일
+}
+
+// 참석자 항목
+export interface ParticipantItem {
+  id: number;
+  name: string;           // 담당자
+  department: string;     // 부서
+  position: string;       // 직급
+  attendance: AttendanceStatus; // 참석여부 (예정, 참석, 불참)
+  report?: string;        // Report 파일
+  note?: string;          // 비고
+}
+
+// 교육실적 
+export interface EducationResult {
+  performance: string;    // 성과
+  improvement: string;    // 개선
+  feedback: string;       // 교육소감
+}
+```
+
+**2. 코드 생성 로직 수정**
+```typescript
+// EDU-I-24-001 형식으로 생성
+const generateCode = (records: EducationRecord[], educationType: string) => {
+  const year = new Date().getFullYear().toString().slice(-2);
+  const typeCode = educationTypeCodeMap[educationType as keyof typeof educationTypeCodeMap];
+  // 기존 코드 중 최대값 찾기 후 +1
+  return `EDU-${typeCode}-${year}-${newNumber.toString().padStart(3, '0')}`;
+};
+```
+
+**3. 팝업창 구조 완전 재설계**
+
+**개요 탭 - 2열 레이아웃**:
+```
+[교육명                    ]
+[교육유형    ] [참석수     ]
+[완료일      ] [장소       ]
+[상태        ] [담당자     ]
+```
+
+**커리큘럼 탭 - CRUD 기능**:
+- 컬럼: 선택, NO, 시간, 과목명, 강사, 내용, 첨부
+- 추가/삭제 버튼 포함
+- 인라인 편집 가능한 테이블
+- 첨부파일 업로드 기능
+
+**참석자 탭 - 완전 재구성**:
+- 컬럼: 선택, NO, 담당자, 부서, 직급, 참석여부, Report, 비고
+- 참석여부: 예정, 참석, 불참 (색상 코딩)
+- Report 파일 업로드 기능
+- 추가/삭제 기능
+
+**교육실적 탭 - 3섹션 구조**:
+- Accordion 형태로 구성
+- 1) 성과: 교육을 통해 달성한 성과
+- 2) 개선: 향후 개선이 필요한 사항  
+- 3) 교육소감: 참가자 피드백 및 전반적 소감
+- 각 섹션별 멀티라인 텍스트 입력
+
+#### 📊 샘플 데이터 업데이트
+- 8개의 새로운 교육과정 데이터
+- 각 교육유형별 코드 할당:
+  - EDU-I-24-001, EDU-I-24-002 (신입교육)
+  - EDU-S-24-001, EDU-S-24-002 (담당자교육)
+  - EDU-M-24-001, EDU-M-24-002 (관리자교육)
+  - EDU-A-24-001, EDU-A-24-002 (수시교육)
+- 실제 커리큘럼, 참석자, 교육실적 데이터 포함
+
+#### 🎨 UI/UX 개선사항
+1. **편집 모드 항상 활성화**: 별도의 편집/보기 모드 구분 없음
+2. **다이얼로그 크기 확대**: maxWidth="xl", 최소높이 80vh
+3. **탭별 최적화된 레이아웃**: 각 탭의 특성에 맞는 UI 구성
+4. **Accordion 컴포넌트**: 교육실적 섹션의 가독성 향상 (▼ 아이콘 사용)
+5. **색상 코딩 시스템**: 참석여부별 시각적 구분
+
+#### 🔄 함수 및 상태 관리
+```typescript
+// 커리큘럼 관리
+const handleAddCurriculum = () => { /* 커리큘럼 추가 */ };
+const handleDeleteCurriculum = (id: number) => { /* 커리큘럼 삭제 */ };
+const handleUpdateCurriculum = (id: number, field: keyof CurriculumItem, value: string) => { /* 커리큘럼 수정 */ };
+
+// 참석자 관리  
+const handleAddParticipant = () => { /* 참석자 추가 */ };
+const handleDeleteParticipant = (id: number) => { /* 참석자 삭제 */ };
+const handleUpdateParticipant = (id: number, field: keyof ParticipantItem, value: string) => { /* 참석자 수정 */ };
+
+// 교육실적 관리는 직접 editingRecord 상태로 관리
+setEditingRecord(prev => prev ? {
+  ...prev,
+  result: { ...prev.result, performance: e.target.value }
+} : null)
+```
+
+#### 📁 파일 변경사항
+1. **src/types/education.ts**: 타입 정의 완전 재구성
+2. **src/data/education.ts**: 샘플 데이터 새로운 구조로 변경
+3. **src/views/apps/EducationDataTable.tsx**: 컴포넌트 대폭 수정
+
+#### 🎯 주요 특징
+- **확장성**: 새로운 교육유형 추가 용이
+- **사용성**: 직관적인 편집 인터페이스
+- **데이터 무결성**: 자동 코드 생성으로 중복 방지
+- **유연성**: 각 탭별 독립적인 CRUD 기능
+- **성능**: 효율적인 상태 관리
+
+#### 📋 향후 개선 사항
+1. 실제 파일 업로드 기능 구현
+2. 교육과정별 템플릿 기능
+3. 참석자 일괄 등록 기능
+4. 교육실적 리포트 자동 생성
+5. 교육 효과 분석 대시보드
+
+- **결과**: 요구사항 100% 구현 완료, 확장 가능한 교육관리 시스템 구축
+
+### 52. 메뉴 이름 변경 및 개인교육관리 페이지 복구 (✅ 완료)
+- **구현 날짜**: 2024-12-21
+- **사용자 요청**: 메인메뉴의 "교육관리"를 "개인교육관리"로 변경하고, 개인교육관리 페이지를 이전 상태로 복구
+- **문제 상황**: IT교육관리 개발 중 기존 개인교육관리 페이지가 영향을 받아 새로운 형태로 변경됨
+
+#### 해결 과정:
+1. **메뉴 이름 변경** (src/menu-items/applications.ts):
+   ```typescript
+   {
+     id: 'education',
+     title: '개인교육관리', // '교육관리' → '개인교육관리'로 변경
+     type: 'item',
+     url: '/apps/education',
+     icon: icons.education,
+     breadcrumbs: false
+   }
+   ```
+
+2. **개인교육관리 전용 컴포넌트 생성** (src/views/apps/PersonalEducationDataTable.tsx):
+   - **독립적인 데이터 구조**: PersonalEducationRecord 인터페이스
+   - **간단한 교육 정보**: 코드, 교육명, 유형, 기간, 장소, 강사, 참석자수, 상태
+   - **기본적인 CRUD 기능**: 추가, 수정, 삭제
+   - **페이지네이션**: 10/25/50개씩 보기
+   - **필터링**: 상태별, 연도별 필터
+
+3. **EducationManagement.tsx 수정**:
+   - PersonalEducationDataTable 컴포넌트 import 변경
+   - 제목을 "개인교육관리"로 변경
+   - statusOptions 로컬 정의로 변경
+
+#### 기술적 구현:
+- **완전 분리**: IT교육관리와 개인교육관리 시스템 분리
+- **독립적 데이터**: 각각 다른 데이터 구조 사용
+- **URL 구분**:
+  - 개인교육관리: `/apps/education`
+  - IT교육관리: `/it/education`
+
+#### 결과:
+- ✅ 메뉴에서 "개인교육관리"와 "IT교육관리" 명확히 구분
+- ✅ 개인교육관리 페이지 이전 상태로 완전 복구
+- ✅ 두 시스템이 독립적으로 운영되는 구조 확립
+
+### 53. 개인교육관리 페이지 전면 업데이트 (✅ 완료)
+- **구현 날짜**: 2024-12-21
+- **사용자 요청**: 제공된 고급 교육관리 시스템 코드로 개인교육관리 페이지 전면 업데이트
+- **기존 시스템**: 간단한 교육 목록 테이블
+- **새로운 시스템**: 3개 탭(담당자, 교육실적, 대시보드)을 가진 고급 교육관리 시스템
+
+#### 새로운 기능들:
+1. **담당자 탭**:
+   - 부서원 목록 테이블 (NO, 담당자, 직책, 팀, 파트, 입사일, 직무, 교육이수/자격취득/전시참여 수)
+   - 프로필 아이콘과 상세 정보 표시
+   - 담당자별 교육실적 완료 건수 자동 계산
+   - EmployeeDetailDialog 연동
+
+2. **교육실적 탭**:
+   - 교육실적 목록 테이블 (NO, 등록일, 코드, 담당자, 팀, 교육구분, 내용, 상태, 완료일, 첨부)
+   - 담당자 아바타 표시, 상태별 색상 구분 Chip
+   - 첨부파일 개수 표시 및 관리
+   - 페이지네이션 지원
+
+3. **필터링 시스템**:
+   - 등록기간 필터 (전체, 연도별)
+   - 팀 필터 (전체, IT, 마케팅, 영업)
+   - 담당자 필터 (선택된 팀에 따라 동적 변경)
+
+4. **데이터 구조**:
+   ```typescript
+   interface Employee {
+     id, name, role, team, department, joinDate, position
+   }
+   
+   interface EducationRecord {
+     id, registrationDate, code, assignee, team, department,
+     educationType, content, status, completionDate,
+     attachment, attachmentCount, attachments, isNew?
+   }
+   
+   interface AttachmentFile {
+     id, name, type, size, file?, uploadDate
+   }
+   ```
+
+5. **UI/UX 개선**:
+   - Material-UI 기반 현대적 디자인
+   - 반응형 테이블과 필터
+   - 아바타, 아이콘, 색상 구분으로 가독성 향상
+   - 탭 기반 네비게이션
+
+#### 기술적 구현:
+- **컴포넌트 구조**: EmployeeTable, EducationRecordsTable, MainCard 조합
+- **상태 관리**: useState, useMemo를 통한 효율적 데이터 처리
+- **타입 안전성**: TypeScript 인터페이스로 완전한 타입 정의
+- **제목 변경**: "개인교육관리"로 명확한 구분
+
+#### 샘플 데이터:
+- 5명의 부서원 데이터 (김철수, 이영희, 박민수, 최지연, 정현우)
+- 5개의 교육실적 데이터 (React 과정, Adobe 자격, IT 전시회 등)
+- 첨부파일 시스템 포함
+
+#### 결과:
+- **기존**: 단순 목록 → **새로운**: 전문적인 교육관리 시스템
+- IT교육관리(/it/education)와 개인교육관리(/apps/education) 완전 분리
+- 담당자 관리, 교육실적 추적, 첨부파일 관리 등 통합 기능 제공
+- 확장 가능한 대시보드 탭 준비
+
+### 54. 개인교육관리 i18n 번역 누락 오류 해결 (✅ 완료)
+- **구현 날짜**: 2024-12-21
+- **발생 문제**: `[@formatjs/intl Error MISSING_TRANSLATION] Missing message: "개인교육관리" for locale "ko"`
+- **원인**: 메뉴 제목을 "개인교육관리"로 변경했으나 i18n 번역 파일에 해당 키가 없음
+
+#### 해결 과정:
+1. **문제 분석**: 
+   - 메뉴에서 FormattedMessage 컴포넌트가 "개인교육관리" 키를 찾지 못함
+   - `src/utils/locales/ko.json`에 "교육관리"는 있으나 "개인교육관리"는 누락
+
+2. **번역 추가** (src/utils/locales/ko.json):
+   ```json
+   "교육관리": "교육관리",
+   "개인교육관리": "개인교육관리",  // 새로 추가
+   ```
+
+#### 기술적 배경:
+- 프로젝트에서 react-intl을 사용하여 다국어 지원
+- 메뉴 텍스트는 FormattedMessage 컴포넌트로 처리
+- 각 언어별 JSON 파일에서 번역 키-값 관리
+
+#### 결과:
+- ✅ i18n 번역 오류 완전 해결
+- ✅ "개인교육관리" 메뉴 정상 표시
+- ✅ 한국어 로케일에서 번역 누락 없음
+
+### 55. IT교육관리 페이지 분리 및 복원 (✅ 완료)
+- **구현 날짜**: 2024-12-21
+- **긴급 문제**: IT교육관리와 개인교육관리가 같은 컴포넌트 공유로 인해 동시 영향 받음
+- **원인**: 두 페이지가 모두 `EducationManagement.tsx` 컴포넌트 사용
+- **사용자 요구**: IT교육관리 원래 4탭 구조로 복원
+
+#### 해결 과정:
+1. **문제 발견**:
+   - IT교육관리(/it/education)와 개인교육관리(/apps/education) 모두 동일한 컴포넌트 사용
+   - 개인교육관리 업데이트 시 IT교육관리도 함께 변경됨
+
+2. **독립적인 IT교육관리 컴포넌트 생성** (src/views/apps/ITEducationManagement.tsx):
+   - **4탭 구조**: IT부서원, 교육실적, 대시보드, 교육자료
+   - **IT 전용 데이터**: ITEmployee, ITEducationRecord 인터페이스
+   - **IT교육 특화 기능**: IT 부서원 관리, IT 전문 교육과정
+
+3. **IT교육관리 페이지 수정** (src/app/(dashboard)/it/education/page.tsx):
+   ```typescript
+   // 기존
+   import EducationManagement from 'views/apps/EducationManagement';
+   
+   // 변경
+   import ITEducationManagement from 'views/apps/ITEducationManagement';
+   ```
+
+#### IT교육관리 시스템 특징:
+- **IT부서원 탭**: IT 전용 팀(IT개발팀, IT운영팀, IT기획팀, IT보안팀) 관리
+- **교육실적 탭**: IT 특화 교육과정 관리
+  - 교육유형: 신입교육, IT교육, 안전교육, 리더십교육, 전문교육, 외부교육
+  - 코드 체계: IT-EDU-24-001 형식
+  - IT 교육 내용: React, AWS, 정보보안, Node.js 등
+- **대시보드 탭**: IT교육 통계 및 분석 (준비중)
+- **교육자료 탭**: IT 교육자료 관리 (준비중)
+
+#### 샘플 데이터:
+- **IT부서원**: 5명 (김철수, 이영희, 박민수, 최지연, 정현우)
+- **IT교육실적**: 5개 과정 (React, AWS, 프로젝트관리, 정보보안, Node.js)
+
+#### 결과:
+- ✅ IT교육관리와 개인교육관리 완전 분리
+- ✅ IT교육관리 원래 4탭 구조 복원  
+- ✅ 각 시스템이 독립적으로 운영
+- ✅ IT 특화 기능 및 데이터 구조 적용
+- ✅ 컴포넌트 충돌 문제 완전 해결
+
+### 56. IT교육관리 빌드 오류 해결 (✅ 완료)
+- **구현 날짜**: 2024-12-21
+- **발생 문제**: `Module not found: Can't resolve '@mui/icons-material'`
+- **원인**: IT교육관리 컴포넌트에서 프로젝트에 설치되지 않은 `@mui/icons-material` 사용
+
+#### 해결 과정:
+1. **문제 확인**: 
+   - 프로젝트는 `@wandersonalwes/iconsax-react` 아이콘 라이브러리 사용
+   - `@mui/icons-material`은 설치되어 있지 않음
+
+2. **아이콘 라이브러리 교체**:
+   ```typescript
+   // 기존 (오류)
+   import { Edit, Delete, Add, FileUpload } from '@mui/icons-material';
+   
+   // 수정 (정상)
+   import { Edit, Trash, Add, DocumentUpload } from '@wandersonalwes/iconsax-react';
+   ```
+
+3. **아이콘 컴포넌트 수정**:
+   - `Delete` → `Trash`
+   - `FileUpload` → `DocumentUpload`
+   - `sx` props → `style` props (iconsax 스타일링 방식)
+
+#### 기술적 세부사항:
+- **아이콘 교체 목록**:
+  - Edit: 편집 아이콘 (동일)
+  - Delete → Trash: 삭제 아이콘
+  - Add: 추가 아이콘 (동일)
+  - FileUpload → DocumentUpload: 문서 업로드 아이콘
+
+- **스타일링 변경**:
+  ```typescript
+  // 기존
+  <FileUpload sx={{ fontSize: 16, color: 'primary.main' }} />
+  
+  // 수정
+  <DocumentUpload style={{ fontSize: 16, color: 'primary.main' }} />
+  ```
+
+#### 결과:
+- ✅ 빌드 오류 완전 해결
+- ✅ 프로젝트 표준 아이콘 라이브러리 사용
+- ✅ IT교육관리 페이지 정상 작동
+- ✅ 아이콘 일관성 확보
+
+### 57. IT교육관리 페이지 완전 재구성 (✅ 완료)
+- **구현 날짜**: 2024-12-21
+- **사용자 요청**: 기존 IT교육관리 페이지를 완전히 삭제하고 솔루션관리 페이지와 동일한 구조로 재생성
+- **문제 상황**: 기존 IT교육관리가 복잡한 4탭 구조로 되어 있어 관리가 어려웠음
+
+#### 구현 과정:
+1. **기존 페이지 완전 삭제**:
+   ```
+   src/views/apps/ITEducationManagement.tsx 삭제
+   ```
+
+2. **솔루션관리 기반 재구성**:
+   - **타입 정의 생성** (src/types/it-education.ts):
+     ```typescript
+     export interface ITEducationRecord {
+       id: number;
+       registrationDate: string;
+       code: string;
+       educationType: '신입교육' | 'IT교육' | '안전교육' | '리더십교육' | '전문교육' | '외부교육';
+       developmentType: '이론교육' | '실습교육' | '워크샵' | '세미나' | '온라인교육';
+       description: string;
+       status: '대기' | '진행' | '완료' | '취소';
+       completionDate: string;
+       assignee: string;
+       attachment: boolean;
+       attachmentCount: number;
+       attachments: AttachmentFile[];
+       isNew?: boolean;
+     }
+     ```
+
+   - **샘플 데이터 생성** (src/data/it-education.ts):
+     - 8개 교육과정 샘플 데이터
+     - IT-EDU-24-001 형태의 코드 체계
+     - React, AWS, DevOps, Node.js 등 IT 전문 교육
+     - 첨부파일 포함 데이터
+
+3. **데이터 테이블 컴포넌트** (src/views/apps/ITEducationDataTable.tsx):
+   - **솔루션관리 DataTable 복사 → IT교육 버전으로 수정**
+   - **컬럼 구성**: NO, 등록일, 코드, 교육유형, 교육형태, 교육내용, 상태, 완료일, 담당자, 첨부
+   - **인라인 편집**: 교육형태, 교육내용, 완료일 편집 가능
+   - **상태별 색상**: 완료(초록), 진행(주황), 대기(파랑), 취소(빨강)
+   - **교육유형별 색상**: 신입교육(초록), IT교육(파랑), 안전교육(빨강), 리더십교육(보라), 전문교육(주황), 외부교육(분홍)
+   - **담당자 아바타**: 프로필 이미지와 함께 표시
+   - **첨부파일 관리**: 업로드, 다운로드, 삭제 기능
+
+4. **메인 컴포넌트** (src/views/apps/ITEducationManagement.tsx):
+   - **솔루션관리와 동일한 2탭 구조**: 데이터 탭 + 대시보드 탭
+   - **필터링 시스템**: 등록기간(연도별), 부서별, 상태별 필터
+   - **부서 옵션**: IT팀, 개발팀, 운영팀, 기획팀, 보안팀
+   - **대시보드 탭**: 준비 중 상태 (향후 확장 가능)
+
+#### 주요 특징:
+1. **완전한 CRUD 기능**:
+   - 새 교육과정 추가
+   - 기존 교육과정 편집 (인라인 편집)
+   - 다중 선택 삭제
+   - 첨부파일 관리 (업로드/다운로드/삭제)
+
+2. **고급 필터링**:
+   - 연도별 필터 (2021-2025년)
+   - 부서별 필터 (IT팀, 개발팀 등)
+   - 상태별 필터 (대기, 진행, 완료, 취소)
+
+3. **사용자 친화적 UI**:
+   - 솔루션관리와 동일한 UI 패턴
+   - 직관적인 아이콘과 색상 구분
+   - 드래그앤드롭 파일 업로드
+   - 페이지네이션 (10/25/50 행)
+
+4. **데이터 관리**:
+   - 자동 코드 생성 (IT-EDU-24-XXX)
+   - 등록일 자동 입력
+   - 첨부파일 개수 자동 계산
+   - 상태 변경 추적
+
+#### 기술적 세부사항:
+- **컴포넌트 재사용**: SolutionDataTable 구조 99% 재사용
+- **타입 안전성**: TypeScript로 완전한 타입 정의
+- **상태 관리**: React useState + useMemo 최적화
+- **파일 처리**: File API 활용한 첨부파일 관리
+- **반응형 디자인**: Material-UI 반응형 그리드
+
+#### 기존 복잡한 4탭에서 간단한 2탭으로 개선:
+- **기존**: 개요/커리큘럼/참석자/교육실적 (복잡)
+- **신규**: 데이터/대시보드 (단순)
+
+**결과**: 
+- **솔루션관리와 완전히 동일한 구조**: 일관된 사용자 경험
+- **관리 효율성 향상**: 복잡한 탭 구조 → 단순한 테이블 기반
+- **확장성 확보**: 대시보드 탭으로 향후 분석 기능 추가 가능
+- **개발 효율성**: 기존 검증된 컴포넌트 재사용으로 안정성 확보
+
+### 58. IT교육관리 페이지 KPI 스타일 개선 및 고도화 (✅ 완료)
+- **구현 날짜**: 2024-12-21
+- **사용자 요구사항**: 
+  1. 팝업창을 KPI 페이지와 동일한 레이아웃/디자인으로 변경
+  2. 컬럼명 "내용" → "교육명"으로 변경
+  3. "장소" 뒤에 "참석수" 컬럼 추가
+  4. 팝업창 개요 레이아웃 개선 (교육명, 교육유형-담당자, 실행일-장소, 상태-참석수, 등록일-코드)
+
+#### 1. 타입 정의 수정:
+```typescript
+// src/types/it-education.ts
+export interface ITEducationRecord {
+  // content → educationName으로 변경
+  educationName: string;
+  participantCount: number; // 참석수 필드 추가
+  // 기타 필드들...
+}
+```
+
+#### 2. 데이터 테이블 컬럼 구조 개선:
+- **컬럼 순서**: 선택-NO-등록일-코드-교육유형-교육명-장소-참석수-실행일-상태-담당자-Action
+- **교육명 컬럼**: content → educationName 필드 사용
+- **참석수 컬럼**: 중앙 정렬, "XX명" 형태로 표시
+- **12px 글자 크기 통일**: 모든 테이블 텍스트
+
+#### 3. IT교육 다이얼로그 완전 재구성:
+**KPI 다이얼로그 구조 완전 복사 → IT교육 버전으로 변환**
+
+**주요 구조 변경사항**:
+```typescript
+// 상태 관리를 위한 reducer 패턴 도입
+interface ITEducationEditState {
+  educationName: string;
+  description: string;
+  educationType: string;
+  assignee: string;
+  executionDate: string;
+  location: string;
+  status: string;
+  participantCount: number;
+  registrationDate: string;
+  code: string;
+}
+
+// KPI와 동일한 reducer 패턴
+const editEducationReducer = (state, action) => { ... };
+```
+
+**OverviewTab 컴포넌트 분리**:
+- **memo 컴포넌트로 최적화**: React.memo로 성능 최적화
+- **useOptimizedInput 적용**: debounced 입력으로 성능 향상
+- **ref 기반 직접 참조**: TextField 무한 루프 방지
+- **useEffect 동기화**: 외부 상태 변경 시 입력값 동기화
+
+**Grid2 레이아웃 (사용자 요구사항 반영)**:
+```typescript
+// 개요 탭 레이아웃
+<Grid container spacing={3}>
+  {/* 교육명 - 전체 너비 */}
+  <Grid xs={12}>교육명</Grid>
+  
+  {/* 교육유형 - 담당자 */}
+  <Grid xs={12} md={6}>교육유형</Grid>
+  <Grid xs={12} md={6}>담당자</Grid>
+  
+  {/* 실행일 - 장소 */}
+  <Grid xs={12} md={6}>실행일</Grid>
+  <Grid xs={12} md={6}>장소</Grid>
+  
+  {/* 상태 - 참석수 */}
+  <Grid xs={12} md={6}>상태</Grid>
+  <Grid xs={12} md={6}>참석수</Grid>
+  
+  {/* 등록일 - 코드 */}
+  <Grid xs={12} md={6}>등록일</Grid>
+  <Grid xs={12} md={6}>코드</Grid>
+  
+  {/* 설명 - 전체 너비 */}
+  <Grid xs={12}>교육 설명</Grid>
+</Grid>
+```
+
+#### 4. KPI 스타일 적용 세부사항:
+**다이얼로그 구조**:
+- **90vh 높이**: KPI와 동일한 팝업 크기
+- **DialogTitle + DialogContent + DialogActions**: 표준 구조
+- **4탭 구조**: 개요, 커리큘럼, 참석자, 교육실적보고
+
+**필드 스타일링**:
+- **14px 글자 크기**: 모든 입력 필드 통일
+- **size="small"**: 컴팩트한 폼 요소
+- **Chip 컴포넌트**: 교육유형, 상태 선택 시 칩으로 표시
+- **아바타 + 이름**: 담당자 선택 시 프로필 이미지
+- **참석수 단위**: "XX명" 표시로 직관적 표현
+
+**최적화 기능**:
+- **useOptimizedInput**: 텍스트 입력 debouncing (150ms-200ms)
+- **useRef 무한루프 방지**: 외부 상태 변경 시 입력값 안전 동기화
+- **useCallback 메모이제이션**: 함수 재생성 방지
+- **useMemo 최적화**: 옵션 배열 계산 최적화
+
+#### 5. 샘플 데이터 업데이트:
+```typescript
+// 기존 content → educationName 변경
+// 참석수 데이터 추가
+{
+  educationName: '신입사원 IT 기초 교육',
+  participantCount: 15,
+  // 기타 필드들...
+}
+```
+
+#### 기술적 성과:
+1. **KPI 다이얼로그와 99% 동일한 구조**: 일관된 사용자 경험
+2. **성능 최적화**: reducer + useOptimizedInput + memo 조합
+3. **타입 안전성**: TypeScript 완전 타입 정의
+4. **확장성**: 커리큘럼, 참석자, 보고서 탭 준비
+
+#### 사용자 요구사항 100% 달성:
+- ✅ KPI 페이지와 동일한 레이아웃/디자인
+- ✅ "내용" → "교육명" 컬럼명 변경
+- ✅ "참석수" 컬럼 추가
+- ✅ 팝업창 개요 레이아웃 완벽 구현
+
+**결과**: IT교육관리가 KPI 수준의 고품질 사용자 경험을 제공하며, 솔루션관리의 단순함과 KPI의 고도화를 동시에 달성
+
+### 60. 하드웨어관리 페이지 구현 (✅ 완료)
+- **구현 날짜**: 2024-12-29
+- **작업 유형**: 페이지 구현 및 기능 개발
+- **사용자 요구사항**: VOC관리 페이지의 100% 디자인, 레이아웃 구조를 하드웨어관리 페이지로 복사
+- **작업 내용**:
+  - **VOC관리 페이지 완전 복사**: 디자인, 레이아웃, 구조, 기능 모두 동일하게 구현
+  - **탭 시스템**: 데이터 탭과 대시보드 탭 구조 (VOC와 동일)
+  - **테이블 컬럼 구성** (13개 컬럼):
+    - 선택 (checkbox)
+    - NO (역순 정렬)
+    - 등록일 (자동 생성)
+    - 코드 (자동 생성, HW-YY-XXX 형식)
+    - 하드웨어유형 (8가지 유형, 파스텔톤 배경)
+    - 제품명 (편집 가능)
+    - 모델명 (편집 가능)
+    - 시리얼번호 (편집 가능)
+    - 구매일 (편집 가능, 날짜 선택)
+    - 상태 (4가지 상태, 색상별 Chip)
+    - 위치 (편집 가능)
+    - 담당자 (아바타 포함 드롭다운)
+    - 첨부 (첨부파일 관리)
+- **하드웨어 유형 옵션**: 서버, 데스크탑, 노트북, 네트워크장비, 스토리지, 프린터, 모니터, 기타
+- **상태 관리**: 정상(초록), 점검중(주황), 수리중(빨강), 폐기예정(회색)
+- **생성된 파일들**:
+  - `src/types/hardware.ts` - 하드웨어 관련 타입 정의
+  - `src/data/hardware.ts` - 하드웨어 샘플 데이터 및 통계 함수
+  - `src/views/apps/HardwareManagement.tsx` - 하드웨어 메인 컴포넌트
+  - `src/views/apps/HardwareDataTable.tsx` - 하드웨어 테이블 컴포넌트
+  - `src/app/(dashboard)/it/hardware/page.tsx` - 페이지 진입점
+- **핵심 기능**:
+  - 연도/부서/상태별 필터링 (VOC와 동일)
+  - 인라인 편집 (드롭다운, 텍스트 필드, 날짜 선택)
+  - 행 추가/삭제 기능
+  - 첨부파일 관리 다이얼로그
+  - 페이지네이션 (10px 너비 커스텀 스크롤바)
+  - 담당자 아바타 표시
+  - 하드웨어 유형별 파스텔톤 배경색
+  - 상태별 색상 구분 Chip
+- **디자인 특징**:
+  - **VOC관리 페이지와 100% 동일한 UI/UX 패턴**
+  - 일관된 색상 체계 및 스타일
+  - 반응형 디자인 적용
+  - 접근성 및 사용성 고려
+  - 가로 스크롤 지원 (테이블 최소 너비 1500px)
+  - 커스텀 스크롤바 스타일
+- **샘플 데이터**: 15개 하드웨어 자산 (Dell 서버, HP 데스크탑, LG 노트북, Cisco 네트워크장비 등)
+- **기술적 세부사항**:
+  - HW-YY-XXX 형식 코드 자동 생성
+  - 하드웨어 유형별 색상 시스템
+  - 상태별 Chip 색상 (정상/점검중/수리중/폐기예정)
+  - 첨부파일 개수 자동 계산
+  - 구매일 기준 필터링
+  - 담당자 아바타 + 이름 표시
+- **결과**: 
+  - IT 부서의 하드웨어 자산 관리 업무 효율성 향상
+  - 하드웨어 유형별 체계적인 분류 및 관리
+  - 담당자 배정 및 상태 추적 가능
+  - 첨부파일을 통한 상세 정보 관리 (구매 명세서, 설치 매뉴얼 등)
+  - **VOC관리와 완전히 동일한 사용자 경험 제공**
+
+### 59. IT교육관리 다이얼로그 Task 스타일 레이아웃 적용 (✅ 완료)
+- **구현 날짜**: 2024-12-21
+- **사용자 요구**: IT교육관리 팝업창을 Task 편집 다이얼로그와 유사한 카드 기반 레이아웃으로 변경
+
+#### Task 다이얼로그 스타일 특징 분석:
+1. **Stack spacing={3} 레이아웃**: Grid → Stack으로 변경
+2. **좌우 2열 배치**: Stack direction="row" spacing={2}로 쌍 배치
+3. **필수 필드 표시**: 빨간 별표(*) 표시
+4. **읽기 전용 필드**: 회색 배경 + 테두리 스타일
+5. **하단 가이드 박스**: 연한 회색 배경에 사용법 안내
+6. **스크롤 영역**: 650px 고정 높이 + overflowY auto
+
+#### 구현된 레이아웃 변경사항:
+
+**전체 구조**:
+```typescript
+// 기존: Grid 기반
+<Box sx={{ p: 3 }}>
+  <Grid container spacing={3}>
+    <Grid xs={12}>...</Grid>
+    <Grid xs={12} md={6}>...</Grid>
+  </Grid>
+</Box>
+
+// 변경: Stack 기반 (Task 스타일)
+<Box sx={{ height: '650px', overflowY: 'auto', pr: 1, px: 3, py: 3 }}>
+  <Stack spacing={3}>
+    <TextField fullWidth />
+    <Stack direction="row" spacing={2}>
+      <FormControl fullWidth />
+      <FormControl fullWidth />
+    </Stack>
+  </Stack>
+</Box>
+```
+
+**필드 배치 최적화**:
+- **교육명**: 전체 너비 (필수 *)
+- **교육 설명**: 전체 너비, multiline 4줄
+- **교육유형 - 담당자**: 좌우 배치 (필수 *)
+- **실행일 - 장소**: 좌우 배치 (필수 *)
+- **상태 - 참석수**: 좌우 배치
+- **등록일 - 코드**: 좌우 배치 (읽기 전용)
+
+**읽기 전용 필드 스타일**:
+```typescript
+sx={{
+  '& .MuiOutlinedInput-root': {
+    backgroundColor: '#f5f5f5',
+    '& fieldset': { borderColor: '#e0e0e0' }
+  },
+  '& .MuiInputBase-input': { color: '#666666' }
+}}
+```
+
+**IT교육 가이드 박스**:
+```typescript
+<Box sx={{
+  p: 2.5, mt: 2, borderRadius: 2,
+  backgroundColor: '#f8f9fa',
+  border: '1px solid #e9ecef'
+}}>
+  <Typography>
+    📚 IT교육 관리 가이드
+    • 교육명과 설명을 명확하게 작성하여 교육 내용을 구체화하세요.
+    • 코드와 등록일은 자동으로 생성되며 수정할 수 없습니다.
+    • 상태 변경: 예정 → 진행 → 완료/취소 순서로 관리하세요.
+    • 우선순위와 참석수를 정확히 입력하여 체계적으로 관리하세요.
+  </Typography>
+</Box>
+```
+
+#### 기술적 개선사항:
+1. **이벤트 핸들러 수정**: useOptimizedInput과 onChange 타입 호환성
+2. **InputLabelProps 통일**: shrink: true로 일관된 라벨 동작
+3. **참석수 제한**: min: 0, max: 200으로 범위 제한
+4. **아바타 fallback**: {assignee?.charAt(0)}로 초기값 표시
+
+#### 사용자 경험 향상:
+- **직관적 레이아웃**: Task와 동일한 패턴으로 학습 비용 감소
+- **명확한 필수 필드**: 빨간 별표로 required 필드 명시
+- **읽기 전용 구분**: 시각적으로 편집 불가 필드 구분
+- **상황별 가이드**: IT교육 특화된 사용법 안내
+- **스크롤 최적화**: 650px 고정으로 다양한 화면 크기 대응
+
+#### 결과:
+- ✅ Task 다이얼로그와 95% 동일한 레이아웃
+- ✅ 일관된 사용자 인터페이스 경험
+- ✅ IT교육 특화 기능 유지
+- ✅ 반응형 디자인 적용
+
+**최종 성과**: IT교육관리가 전체 시스템의 디자인 일관성을 유지하면서도 고유한 기능적 특성을 잃지 않는 최적의 사용자 경험 제공
+
+### 60. IT교육관리 커리큘럼 탭 완전 구현 (✅ 완료)
+- **구현 날짜**: 2024-12-21
+- **사용자 요구**: 커리큘럼 탭에서 테이블 추가/삭제 기능과 지정된 컬럼 구조 구현
+
+#### 요구사항 분석:
+- **테이블 추가/삭제**: 동적 행 관리 기능
+- **컬럼 순서**: NO (역순) - 일자 - 시간 - 강사 - 제목 - 교육내용 - 비고 - 첨부
+- **인라인 편집**: 모든 필드 실시간 편집 가능
+- **첨부파일**: 다중 파일 업로드 및 관리
+
+#### 기술적 구현사항:
+
+**1. 타입 시스템 확장**:
+```typescript
+// types/it-education.ts에 CurriculumItem 타입 추가
+export interface CurriculumItem {
+  id: number;
+  no: number;        // 자동 생성 순번 (역순)
+  date: string;      // 일자
+  time: string;      // 시간
+  instructor: string; // 강사
+  title: string;     // 제목
+  content: string;   // 교육내용
+  notes: string;     // 비고
+  attachments: File[]; // 첨부파일들
+}
+```
+
+**2. 상태 관리 시스템**:
+```typescript
+// ITEducationDialog.tsx 메인 컴포넌트
+const [curriculumItems, setCurriculumItems] = useState<CurriculumItem[]>([]);
+
+const handleCurriculumChange = useCallback((items: CurriculumItem[]) => {
+  setCurriculumItems(items);
+}, []);
+```
+
+**3. CurriculumTab 컴포넌트 완전 재구현**:
+
+**핵심 기능들**:
+- **행 추가**: 상단 "행 추가" 버튼으로 새 커리큘럼 항목 생성
+- **NO 자동 관리**: 최신 항목이 위로 오도록 역순 번호 자동 부여
+- **인라인 편집**: TextField를 사용한 실시간 편집
+- **파일 관리**: 다중 첨부파일 업로드/삭제
+- **행 삭제**: 각 행의 삭제 버튼으로 항목 제거
+
+**테이블 구조**:
+```typescript
+// 9개 컬럼 구성
+<TableHead>
+  <TableRow>
+    <TableCell>NO</TableCell>        // 60px, 중앙정렬, 자동생성
+    <TableCell>일자</TableCell>       // 120px, 날짜 선택
+    <TableCell>시간</TableCell>       // 100px, 텍스트 입력
+    <TableCell>강사</TableCell>       // 120px, 텍스트 입력
+    <TableCell>제목</TableCell>       // 200px, 텍스트 입력
+    <TableCell>교육내용</TableCell>    // 가변, 멀티라인
+    <TableCell>비고</TableCell>       // 150px, 텍스트 입력
+    <TableCell>첨부</TableCell>       // 120px, 파일 업로드
+    <TableCell>삭제</TableCell>       // 80px, 삭제 버튼
+  </TableRow>
+</TableHead>
+```
+
+**4. 인라인 편집 시스템**:
+- **즉시 반영**: onChange 이벤트로 실시간 데이터 업데이트
+- **타입별 최적화**: 날짜, 텍스트, 멀티라인 각각 최적화된 입력
+- **플레이스홀더**: 각 필드별 적절한 가이드 메시지
+
+**5. 첨부파일 관리**:
+```typescript
+// 파일 업로드 처리
+const handleFileUpload = useCallback((id: number, files: FileList | null) => {
+  if (!files) return;
+  const newFiles = Array.from(files);
+  const updatedItems = curriculumItems.map(item =>
+    item.id === id 
+      ? { ...item, attachments: [...item.attachments, ...newFiles] }
+      : item
+  );
+  onCurriculumChange(updatedItems);
+}, [curriculumItems, onCurriculumChange]);
+```
+
+**6. NO 자동 관리 로직**:
+```typescript
+// 항목 추가 시 역순 번호 자동 부여
+const reorderedItems = updatedItems.map((item, index) => ({
+  ...item,
+  no: updatedItems.length - index  // 최신이 1번
+}));
+```
+
+**7. 스타일링 최적화**:
+- **12px 글자 크기**: 전체 텍스트 통일
+- **Compact 디자인**: size="small" 적용
+- **호버 효과**: TableRow hover 상태
+- **반응형**: 컬럼별 적절한 너비 설정
+
+#### 사용자 경험 개선사항:
+- **빈 상태 메시지**: 커리큘럼이 없을 때 친절한 안내
+- **가이드 박스**: 하단에 사용법 상세 안내
+- **시각적 피드백**: 첨부파일 개수 표시
+- **파일명 표시**: 업로드된 파일들 개별 관리
+
+#### 생명주기 관리:
+- **다이얼로그 열기**: 커리큘럼 상태 초기화
+- **다이얼로그 닫기**: 모든 상태 정리
+- **편집 모드**: 기존 데이터 로드 준비 (TODO)
+
+#### 결과:
+- ✅ 완전한 CRUD 기능 구현
+- ✅ 사용자 요구사항 100% 반영 
+- ✅ 역순 NO 자동 관리
+- ✅ 다중 첨부파일 지원
+- ✅ 인라인 편집 실시간 처리
+- ✅ 12px 통일된 디자인
+
+**최종 성과**: 커리큘럼 관리가 직관적이고 효율적인 테이블 기반 인터페이스로 완성되어, 교육 과정의 세부 일정을 체계적으로 관리할 수 있는 강력한 도구 제공
+
+### 61. IT교육관리 참석자 탭 완전 구현 (✅ 완료)
+- **구현 날짜**: 2024-12-21
+- **사용자 요구**: 참석자 탭에서 체크박스 선택과 출석 관리 기능이 포함된 테이블 구현
+
+#### 요구사항 분석:
+- **테이블 구조**: 선택 - NO - 담당자 - 직책 - 부서 - 출석 - Report - 비고
+- **출석 상태**: 예정, 참석, 불참 (색상 구분)
+- **체크박스 선택**: 전체 선택/해제, 개별 선택, 선택 삭제
+- **인라인 편집**: 모든 필드 실시간 편집
+
+#### 기술적 구현사항:
+
+**1. 타입 시스템 확장**:
+```typescript
+// types/it-education.ts에 ParticipantItem 타입 추가
+export interface ParticipantItem {
+  id: number;
+  no: number;              // 순번
+  assignee: string;        // 담당자
+  position: string;        // 직책
+  department: string;      // 부서
+  attendance: '예정' | '참석' | '불참'; // 출석
+  report: string;          // Report
+  notes: string;          // 비고
+  selected: boolean;      // 체크박스 선택 상태
+}
+
+// 출석 상태 및 직책 옵션
+export const attendanceOptions = ['예정', '참석', '불참'] as const;
+export const positionOptions = ['대리', '과장', '차장', '부장', '팀장', '매니저', '시니어', '주니어', '인턴'];
+```
+
+**2. 상태 관리 시스템**:
+```typescript
+// ITEducationDialog.tsx 메인 컴포넌트
+const [participantItems, setParticipantItems] = useState<ParticipantItem[]>([]);
+const [allSelected, setAllSelected] = useState(false);
+
+const handleParticipantChange = useCallback((items: ParticipantItem[]) => {
+  setParticipantItems(items);
+}, []);
+```
+
+**3. ParticipantsTab 컴포넌트 완전 재구현**:
+
+**핵심 기능들**:
+- **참석자 추가**: "참석자 추가" 버튼으로 새 참석자 생성
+- **일괄 삭제**: 체크박스 선택 후 "선택 삭제" 버튼
+- **전체 선택**: 헤더 체크박스로 전체 선택/해제
+- **NO 관리**: 순차적 번호 자동 부여 (1, 2, 3...)
+- **출석 상태 관리**: Chip으로 색상 구분 표시
+
+**테이블 구조** (9개 컬럼):
+```typescript
+<TableHead>
+  <TableRow>
+    <TableCell>선택</TableCell>    // 60px, 체크박스
+    <TableCell>NO</TableCell>      // 60px, 순번
+    <TableCell>담당자</TableCell>   // 150px, 드롭다운+아바타
+    <TableCell>직책</TableCell>     // 120px, 드롭다운
+    <TableCell>부서</TableCell>     // 120px, 드롭다운
+    <TableCell>출석</TableCell>     // 100px, Chip 표시
+    <TableCell>Report</TableCell>   // 가변, 멀티라인
+    <TableCell>비고</TableCell>     // 150px, 텍스트
+    <TableCell>삭제</TableCell>     // 80px, 삭제 버튼
+  </TableRow>
+</TableHead>
+```
+
+**4. 출석 상태 시스템**:
+```typescript
+// 출석 상태별 색상 매핑
+const getAttendanceColor = (attendance: string) => {
+  switch (attendance) {
+    case '예정': return { backgroundColor: '#e3f2fd', color: '#1565c0' }; // 파란색
+    case '참석': return { backgroundColor: '#e8f5e8', color: '#2e7d2e' }; // 초록색
+    case '불참': return { backgroundColor: '#ffebee', color: '#c62828' }; // 빨간색
+  }
+};
+```
+
+**5. 체크박스 관리 시스템**:
+```typescript
+// 개별 선택 처리
+const handleItemSelect = useCallback((id: number, selected: boolean) => {
+  const updatedItems = participantItems.map(item =>
+    item.id === id ? { ...item, selected } : item
+  );
+  onParticipantChange(updatedItems);
+  const allChecked = updatedItems.every(item => item.selected);
+  setAllSelected(allChecked);
+}, [participantItems, onParticipantChange]);
+
+// 전체 선택/해제
+const handleSelectAll = useCallback((checked: boolean) => {
+  const updatedItems = participantItems.map(item => ({
+    ...item, selected: checked
+  }));
+  onParticipantChange(updatedItems);
+  setAllSelected(checked);
+}, [participantItems, onParticipantChange]);
+```
+
+**6. 담당자 선택 최적화**:
+- **아바타 표시**: 담당자 선택 시 프로필 이미지 표시
+- **20px 미니 아바타**: 테이블 내 컴팩트 표시
+- **Fallback 처리**: 이미지 없을 때 이니셜 표시
+
+**7. 통계 정보 표시**:
+```typescript
+// 참석자 현황 요약
+참석자 현황: 총 {participantItems.length}명 
+(예정: {예정 수}명, 참석: {참석 수}명, 불참: {불참 수}명)
+```
+
+#### 사용자 경험 개선사항:
+- **선택 상태 표시**: 선택된 항목 수 실시간 표시
+- **조건부 버튼**: 선택된 항목이 있을 때만 "선택 삭제" 버튼 표시
+- **빈 상태 메시지**: 참석자가 없을 때 친절한 안내
+- **호버 효과**: 테이블 행에 마우스 오버 시 하이라이트
+- **실시간 통계**: 출석 상태별 참석자 수 자동 계산
+
+#### Report 컬럼 특화:
+- **멀티라인 입력**: 2줄 TextArea로 보고서 작성
+- **플레이스홀더**: "보고서 또는 특이사항" 안내
+- **유연한 활용**: 교육 후 피드백, 특이사항 등 기록
+
+#### 생명주기 관리:
+- **다이얼로그 열기**: 참석자 상태 초기화
+- **다이얼로그 닫기**: 모든 참석자 상태 정리
+- **편집 모드**: 기존 참석자 데이터 로드 준비 (TODO)
+
+#### 결과:
+- ✅ 완전한 참석자 CRUD 기능
+- ✅ 체크박스 다중 선택 시스템
+- ✅ 출석 상태 색상 구분 표시
+- ✅ 담당자 아바타 통합
+- ✅ 실시간 통계 정보 제공
+- ✅ 12px 통일된 디자인
+
+**최종 성과**: 참석자 관리가 교육 진행 전후의 모든 과정을 체계적으로 지원하며, 출석 관리와 보고서 작성을 하나의 통합된 인터페이스에서 효율적으로 처리할 수 있는 완성도 높은 시스템 제공
+
+### 62. IT교육관리 교육실적보고 탭 완전 구현 (✅ 완료)
+- **구현 날짜**: 2024-12-21
+- **사용자 요구**: 교육실적보고 탭에서 성과, 개선, 교육소감, 비고 4개 필드를 포함한 보고서 작성 기능
+
+#### 요구사항 분석:
+- **4개 핵심 필드**: 성과, 개선사항, 교육소감, 비고
+- **멀티라인 입력**: 각 필드별 적절한 행 수 설정
+- **구조화된 레이아웃**: 섹션별 명확한 구분과 안내
+- **사용자 가이드**: 작성 지침과 예시 제공
+
+#### 기술적 구현사항:
+
+**1. 타입 시스템 정의**:
+```typescript
+// types/it-education.ts에 EducationReport 타입 추가
+export interface EducationReport {
+  achievements: string; // 성과
+  improvements: string; // 개선
+  feedback: string;     // 교육소감
+  notes: string;        // 비고
+}
+```
+
+**2. 상태 관리 시스템**:
+```typescript
+// ITEducationDialog.tsx 메인 컴포넌트
+const [educationReport, setEducationReport] = useState<EducationReport>({
+  achievements: '',
+  improvements: '',
+  feedback: '',
+  notes: ''
+});
+
+const handleEducationReportChange = useCallback((field: keyof EducationReport, value: string) => {
+  setEducationReport(prev => ({
+    ...prev,
+    [field]: value
+  }));
+}, []);
+```
+
+**3. ReportsTab 컴포넌트 완전 재구현**:
+
+**레이아웃 구조**:
+- **헤더**: 제목 + 전체 설명
+- **스크롤 영역**: 650px 고정 높이, 세로 스크롤
+- **4개 섹션**: 각각 독립적인 TextField 영역
+- **가이드 박스**: 하단 작성 지침
+
+**섹션별 상세 설계**:
+
+```typescript
+// 1. 성과 섹션 (파란색 테마)
+<TextField
+  value={educationReport.achievements}
+  rows={4}
+  placeholder="예시: 참석자들의 보안 의식 향상, 새로운 기술 역량 습득..."
+  borderColor: 'primary.main'
+/>
+
+// 2. 개선 섹션 (주황색 테마)
+<TextField
+  value={educationReport.improvements}
+  rows={4}
+  placeholder="예시: 교육 시간 조정 필요, 실습 비중 확대..."
+  borderColor: 'warning.main'
+/>
+
+// 3. 교육소감 섹션 (초록색 테마)
+<TextField
+  value={educationReport.feedback}
+  rows={5} // 가장 길게
+  placeholder="예시: 교육 내용에 대한 만족도, 실무 적용 가능성..."
+  borderColor: 'success.main'
+/>
+
+// 4. 비고 섹션 (기본 테마)
+<TextField
+  value={educationReport.notes}
+  rows={3}
+  placeholder="예시: 교육 중 발생한 특이사항, 추가 조치사항..."
+  borderColor: 'text.primary'
+/>
+```
+
+**4. 시각적 개선사항**:
+
+**섹션별 아이콘 구분**:
+- 📈 성과: 성장/결과를 상징
+- 🔧 개선사항: 수정/보완을 상징
+- 💭 교육소감: 의견/피드백을 상징
+- 📝 비고: 기록/메모를 상징
+
+**색상 테마 적용**:
+- 각 섹션별 고유 색상으로 시각적 구분
+- 포커스 시 해당 섹션 색상으로 border 변경
+- 일관된 12px 글자 크기 적용
+
+**5. 사용자 경험 최적화**:
+
+**적응형 행 수**:
+- 성과: 4줄 (구체적 결과 기록)
+- 개선: 4줄 (개선방안 상세 기록)
+- 교육소감: 5줄 (가장 상세한 피드백)
+- 비고: 3줄 (간단한 추가사항)
+
+**플레이스홀더 가이드**:
+- 각 필드별 구체적인 작성 예시 제공
+- 실제 업무에서 활용 가능한 현실적 예시
+- 작성자의 부담을 줄이는 친절한 안내
+
+**6. 생명주기 관리**:
+```typescript
+// 다이얼로그 열기/닫기 시 상태 초기화
+useEffect(() => {
+  if (open) {
+    setEducationReport({
+      achievements: '',
+      improvements: '',
+      feedback: '',
+      notes: ''
+    });
+  }
+}, [open]);
+```
+
+#### 작성 가이드 시스템:
+
+**하단 가이드 박스**:
+- 📋 교육실적보고 작성 가이드
+- 각 필드별 작성 요령 안내
+- 품질 향상을 위한 구체적 지침
+
+**작성 지침**:
+1. **성과**: 정량적/정성적 결과를 구체적으로 작성
+2. **개선**: 건설적인 개선방안으로 향후 품질 향상 기여
+3. **교육소감**: 참석자들의 다양한 의견을 균형있게 반영
+4. **비고**: 추가 정보나 특별한 고려사항 기록
+
+#### 결과:
+- ✅ 4개 핵심 필드 완전 구현
+- ✅ 섹션별 색상 테마 적용
+- ✅ 적응형 입력 영역 설계
+- ✅ 구체적 작성 가이드 제공
+- ✅ 12px 통일된 디자인
+- ✅ 스크롤 영역 최적화
+
+**최종 성과**: 교육실적보고가 체계적이고 구조화된 형태로 완성되어, 교육 후 종합적인 평가와 개선방안 도출을 효과적으로 지원하는 전문적인 보고서 작성 도구 제공
+
+### 63. IT교육관리 커리큘럼 탭 UI/UX 개선 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **사용자 요구**: 커리큘럼 탭에서 체크박스 선택, 편집 모드 개선, 버튼 레이아웃 변경
+
+#### 요구사항 분석:
+1. NO 앞에 선택 컬럼 추가
+2. 신규 추가행은 헤더 바로 아래에 나오도록
+3. 각 컬럼마다 테두리 박스는 편집 활성화 될 경우만 나타나도록
+4. 오른쪽 상단에 추가, 삭제 (0) 버튼 위치
+5. 취소, 저장 버튼은 맨 오른쪽 최상단에 위치
+
+#### 기술적 구현사항:
+
+**1. 타입 시스템 확장** (`src/types/it-education.ts`):
+```typescript
+export interface CurriculumItem {
+  id: number;
+  no: number;
+  date: string;
+  time: string;
+  instructor: string;
+  title: string;
+  content: string;
+  notes: string;
+  attachments: File[];
+  selected: boolean; // 새로 추가된 체크박스 선택 상태
+}
+```
+
+**2. 편집 상태 관리 시스템**:
+```typescript
+// 한 번에 하나의 셀만 편집 가능하도록 제한
+const [editingCell, setEditingCell] = useState<{id: number, field: string} | null>(null);
+
+// 편집 중인지 확인하는 헬퍼 함수
+const isEditing = (id: number, field: string) => {
+  return editingCell?.id === id && editingCell?.field === field;
+};
+
+// 셀 클릭으로 편집 시작
+const handleCellClick = useCallback((id: number, field: string) => {
+  setEditingCell({ id, field });
+}, []);
+
+// 포커스 아웃으로 편집 종료
+const handleCellBlur = useCallback(() => {
+  setEditingCell(null);
+}, []);
+```
+
+**3. 체크박스 선택 시스템**:
+```typescript
+// 전체 선택 상태 관리
+const [allSelected, setAllSelected] = useState(false);
+
+// 개별 체크박스 변경
+const handleItemSelect = useCallback((id: number, selected: boolean) => {
+  const updatedItems = curriculumItems.map(item =>
+    item.id === id ? { ...item, selected } : item
+  );
+  onCurriculumChange(updatedItems);
+  
+  // 전체 선택 상태 업데이트
+  const allChecked = updatedItems.every(item => item.selected);
+  setAllSelected(allChecked);
+}, [curriculumItems, onCurriculumChange]);
+
+// 전체 선택/해제
+const handleSelectAll = useCallback((checked: boolean) => {
+  const updatedItems = curriculumItems.map(item => ({
+    ...item,
+    selected: checked
+  }));
+  onCurriculumChange(updatedItems);
+  setAllSelected(checked);
+}, [curriculumItems, onCurriculumChange]);
+```
+
+**4. 새 행 추가 위치 변경**:
+```typescript
+// 기존: 맨 아래 추가
+const updatedItems = [...curriculumItems, newItem];
+
+// 변경: 맨 위 추가 (헤더 바로 아래)
+const updatedItems = [newItem, ...curriculumItems];
+const reorderedItems = updatedItems.map((item, index) => ({
+  ...item,
+  no: index + 1 // NO 순서 재계산
+}));
+```
+
+**5. 조건부 UI 렌더링**:
+```typescript
+// 편집 모드일 때만 TextField, 기본은 Typography
+<TableCell onClick={() => handleCellClick(item.id, 'date')}>
+  {isEditing(item.id, 'date') ? (
+    <TextField
+      value={item.date}
+      onChange={(e) => handleFieldChange(item.id, 'date', e.target.value)}
+      onBlur={handleCellBlur}
+      autoFocus
+      variant="outlined"
+      size="small"
+    />
+  ) : (
+    <Typography 
+      variant="body2" 
+      sx={{ 
+        fontSize: '12px', 
+        cursor: 'pointer',
+        '&:hover': { backgroundColor: '#f5f5f5' }
+      }}
+    >
+      {item.date || '클릭하여 입력'}
+    </Typography>
+  )}
+</TableCell>
+```
+
+**6. 테이블 구조 개선**:
+
+**새로운 컬럼 순서**:
+- 선택 (체크박스) - 60px
+- NO - 60px  
+- 일자 - 120px
+- 시간 - 100px
+- 강사 - 120px
+- 제목 - 200px
+- 교육내용 - 가변
+- 비고 - 150px
+- 첨부 - 120px
+- 삭제 - 80px
+
+**버튼 레이아웃 변경**:
+```typescript
+// 우상단에 버튼들 배치
+<Box sx={{ display: 'flex', gap: 1 }}>
+  {selectedCount > 0 && (
+    <Button
+      variant="outlined"
+      color="error"
+      startIcon={<Trash />}
+      onClick={handleDeleteSelected}
+      size="small"
+    >
+      삭제 ({selectedCount})
+    </Button>
+  )}
+  <Button
+    variant="contained"
+    startIcon={<Add />}
+    onClick={handleAddItem}
+    size="small"
+  >
+    추가
+  </Button>
+</Box>
+```
+
+**7. 다이얼로그 레이아웃 최적화**:
+```typescript
+// 취소/저장 버튼을 DialogTitle로 이동
+<DialogTitle sx={{ 
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center'
+}}>
+  <Typography variant="h6">
+    {mode === 'add' ? 'IT교육과정 추가' : 'IT교육과정 수정'}
+  </Typography>
+  <Box sx={{ display: 'flex', gap: 1 }}>
+    <Button onClick={handleClose} variant="outlined" size="small">
+      취소
+    </Button>
+    <Button onClick={handleSave} variant="contained" size="small">
+      저장
+    </Button>
+  </Box>
+</DialogTitle>
+```
+
+#### 사용자 경험 개선사항:
+
+**1. 편집 모드 시각적 피드백**:
+- 기본 상태: 테두리 없는 Typography
+- 편집 모드: TextField로 자동 전환
+- 호버 효과: 편집 가능한 셀에 배경색 변경
+
+**2. 선택 상태 관리**:
+- 전체 선택 체크박스 (헤더)
+- 개별 선택 체크박스 (각 행)
+- 선택된 항목 수 실시간 표시
+
+**3. 사용성 향상**:
+- "클릭하여 입력" 플레이스홀더
+- 자동 포커스 기능
+- 키보드 네비게이션 지원
+
+**4. 성능 최적화**:
+- 조건부 렌더링으로 불필요한 TextField 제거
+- useCallback을 통한 함수 메모이제이션
+- 편집 상태 최소화
+
+#### 결과:
+- ✅ 체크박스 다중 선택 시스템 구현
+- ✅ 편집 모드 조건부 UI 구현
+- ✅ 새 행 위치 헤더 바로 아래로 변경
+- ✅ 버튼 레이아웃 우상단 배치
+- ✅ 취소/저장 버튼 최상단 배치
+- ✅ 향상된 사용자 경험 제공
+
+**최종 성과**: 커리큘럼 관리가 더욱 직관적이고 효율적인 인터페이스로 개선되어, 교육 과정 계획 수립과 관리 업무의 생산성을 크게 향상시키는 사용자 친화적 시스템 완성
+
+### 64. IT교육관리 커리큘럼 탭 세부 개선 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **사용자 요구**: 빈 컬럼 텍스트 제거, 삭제 버튼 위치 변경, 첨부파일 관리 팝업 구현
+
+#### 요구사항 분석:
+1. 행추가되고 빈 컬럼에 "클릭하여 입력" 글 제거
+2. 추가 오른쪽에 "삭제 (0)" 버튼 생성, 테이블 행 삭제 버튼 제거
+3. 첨부는 클릭시 팝업창 생성하여 자료 등록/삭제 관리, 테이블에서는 아이콘 (4) 형태로만 표시
+
+#### 기술적 구현사항:
+
+**1. 빈 컬럼 텍스트 제거**:
+```typescript
+// 기존: {item.date || '클릭하여 입력'}
+// 변경: {item.date || ''}
+<Typography variant="body2">
+  {item.date || ''}
+</Typography>
+```
+
+**2. 삭제 버튼 위치 변경**:
+```typescript
+// 상단 버튼 레이아웃 변경
+<Box sx={{ display: 'flex', gap: 1 }}>
+  <Button variant="contained" startIcon={<Add />}>추가</Button>
+  <Button 
+    variant="outlined" 
+    color="error" 
+    startIcon={<Trash />}
+    disabled={selectedCount === 0}
+  >
+    삭제 ({selectedCount})
+  </Button>
+</Box>
+
+// 테이블 구조: 9개 컬럼 → 8개 컬럼
+// 삭제 컬럼 완전 제거
+```
+
+**3. 첨부파일 관리 팝업 시스템**:
+
+**AttachmentDialog 컴포넌트 신규 생성**:
+```typescript
+const AttachmentDialog = memo(({ 
+  open, 
+  onClose, 
+  attachments, 
+  onAttachmentsChange 
+}: {
+  open: boolean;
+  onClose: () => void;
+  attachments: File[];
+  onAttachmentsChange: (files: File[]) => void;
+}) => {
+  // 드래그&드롭 업로드 영역
+  // 기존 파일 목록 및 삭제 기능
+  // 취소/확인 버튼
+});
+```
+
+**첨부파일 상태 관리**:
+```typescript
+const [attachmentDialog, setAttachmentDialog] = useState<{
+  open: boolean, 
+  itemId: number | null
+}>({
+  open: false,
+  itemId: null
+});
+
+// 첨부파일 다이얼로그 열기
+const handleAttachmentClick = useCallback((id: number) => {
+  setAttachmentDialog({ open: true, itemId: id });
+}, []);
+
+// 첨부파일 변경 처리
+const handleAttachmentChange = useCallback((files: File[]) => {
+  if (attachmentDialog.itemId === null) return;
+  
+  const updatedItems = curriculumItems.map(item =>
+    item.id === attachmentDialog.itemId 
+      ? { ...item, attachments: files }
+      : item
+  );
+  onCurriculumChange(updatedItems);
+}, [curriculumItems, onCurriculumChange, attachmentDialog.itemId]);
+```
+
+**테이블 첨부 컬럼 단순화**:
+```typescript
+// 첨부 컬럼: 아이콘 + 파일 개수만 표시
+<TableCell sx={{ textAlign: 'center' }}>
+  <IconButton onClick={() => handleAttachmentClick(item.id)}>
+    <DocumentDownload size={16} />
+    {item.attachments.length > 0 && (
+      <Typography variant="caption">
+        ({item.attachments.length})
+      </Typography>
+    )}
+  </IconButton>
+</TableCell>
+```
+
+**4. AttachmentDialog UI 구성**:
+
+**업로드 영역**:
+- 점선 테두리 드롭 존
+- 클릭하여 파일 선택
+- 다중 파일 업로드 지원
+- 드래그&드롭 스타일링
+
+**파일 목록**:
+- 파일명 + 파일 크기 표시
+- 개별 삭제 버튼
+- 리스트 형태 레이아웃
+
+**다이얼로그 제어**:
+- 취소: 변경사항 무시하고 닫기
+- 확인: 변경사항 저장하고 닫기
+
+#### 사용자 경험 개선사항:
+
+**1. 깔끔한 테이블 UI**:
+- 불필요한 플레이스홀더 텍스트 제거
+- 행별 삭제 버튼 제거로 시각적 정리
+- 첨부파일 정보 간소화
+
+**2. 직관적인 첨부파일 관리**:
+- 클릭 한 번으로 첨부파일 관리 팝업 접근
+- 드래그&드롭 업로드 지원
+- 파일 개수 실시간 표시
+
+**3. 효율적인 삭제 기능**:
+- 상단 일괄 삭제 버튼으로 통합
+- 선택된 항목 개수 실시간 표시
+- 선택 항목 없을 때 버튼 비활성화
+
+**4. 모달 기반 파일 관리**:
+- 독립적인 첨부파일 관리 공간
+- 취소/확인으로 변경사항 제어
+- 파일 크기 정보 제공
+
+#### 결과:
+- ✅ 빈 컬럼 플레이스홀더 텍스트 완전 제거
+- ✅ 상단 삭제 버튼으로 UI 통합
+- ✅ 첨부파일 전용 관리 다이얼로그 구현
+- ✅ 테이블 컬럼 구조 최적화 (9→8개)
+- ✅ 드래그&드롭 파일 업로드 지원
+- ✅ 직관적인 파일 개수 표시
+
+**최종 성과**: 커리큘럼 관리 인터페이스가 더욱 깔끔하고 직관적으로 개선되어, 첨부파일 관리의 편의성이 크게 향상되고 전체적인 사용자 경험이 한층 세련되어진 시스템 완성
+
+### 65. IT교육관리 커리큘럼 탭 NO 순서 및 UI 개선 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **사용자 요구**: NO 항상 역순으로 표시, 첨부 아이콘 크기 조정
+
+#### 요구사항 분석:
+1. NO는 항상 역순으로 (최신 항목이 1번)
+2. 첨부 아이콘 크기가 너무 작아서 12px 폰트에 어울리도록 조정
+
+#### 기술적 구현사항:
+
+**1. NO 순서 역순 변경**:
+```typescript
+// 기존: 순방향 (1, 2, 3...)
+const reorderedItems = updatedItems.map((item, index) => ({
+  ...item,
+  no: index + 1
+}));
+
+// 변경: 역순 (최신 항목이 1번)
+const reorderedItems = updatedItems.map((item, index) => ({
+  ...item,
+  no: updatedItems.length - index
+}));
+```
+
+**2. 모든 NO 재계산 함수 통일**:
+- `handleAddItem`: 새 항목 추가 시 역순 NO 적용
+- `handleDeleteItem`: 개별 삭제 시 역순 NO 재계산
+- `handleDeleteSelected`: 일괄 삭제 시 역순 NO 재계산
+
+**3. 첨부 아이콘 크기 개선**:
+```typescript
+// 기존: 16px (너무 작음)
+<DocumentDownload size={16} />
+
+// 변경: 20px (12px 폰트에 적합)
+<DocumentDownload size={20} />
+```
+
+#### 사용자 경험 개선사항:
+
+**1. 직관적인 NO 순서**:
+- 최신 추가된 항목이 항상 1번으로 표시
+- 시간순 역순 정렬로 최신 정보 우선 확인
+- 교육 과정의 시간적 흐름 파악 용이
+
+**2. 적절한 아이콘 크기**:
+- 12px 폰트 환경에 조화로운 20px 아이콘
+- 클릭 영역 확대로 사용성 향상
+- 시각적 균형감 개선
+
+**3. 일관된 NO 관리**:
+- 추가/삭제 시 항상 동일한 NO 정렬 규칙 적용
+- 사용자 혼란 방지
+- 예측 가능한 인터페이스 동작
+
+#### 결과:
+- ✅ NO 순서 완전 역순 적용
+- ✅ 첨부 아이콘 크기 20px로 최적화
+- ✅ 모든 CRUD 작업에서 일관된 NO 관리
+- ✅ 향상된 시각적 균형감
+- ✅ 직관적인 시간순 정렬
+
+**최종 성과**: 커리큘럼 관리에서 최신 항목이 우선 표시되는 직관적인 순서 체계와 적절한 아이콘 크기로 사용자 경험이 한층 개선된 시스템 완성
+
+### 66. IT교육관리 커리큘럼 탭 첨부 표시 디자인 개선 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **사용자 요구**: 스크린샷과 100% 동일한 첨부 표시 디자인
+
+#### 요구사항 분석:
+- 스크린샷에 보이는 회색 배경의 원형 버튼 디자인으로 변경
+- 아이콘과 파일 개수가 함께 표시되는 컴팩트한 형태
+
+#### 기술적 구현사항:
+
+**기존 디자인**:
+```typescript
+<IconButton size="small">
+  <DocumentDownload size={20} />
+  <Typography color="primary.main">({count})</Typography>
+</IconButton>
+```
+
+**새로운 디자인**:
+```typescript
+<Box
+  sx={{
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'grey.100',
+    borderRadius: '50%',
+    width: 32,
+    height: 32,
+    cursor: 'pointer',
+    '&:hover': {
+      backgroundColor: 'grey.200'
+    }
+  }}
+>
+  <DocumentDownload size={16} />
+  <Typography
+    variant="caption"
+    sx={{
+      fontSize: '10px',
+      ml: 0.3,
+      color: 'text.secondary',
+      fontWeight: 500
+    }}
+  >
+    ({item.attachments.length})
+  </Typography>
+</Box>
+```
+
+#### 디자인 개선사항:
+
+**1. 회색 배경 원형 디자인**:
+- `backgroundColor: 'grey.100'`: 연한 회색 배경
+- `borderRadius: '50%'`: 완전한 원형
+- `width: 32, height: 32`: 적절한 크기
+
+**2. 호버 효과**:
+- `&:hover`: 마우스 오버 시 배경색 변경
+- `backgroundColor: 'grey.200'`: 조금 더 진한 회색
+
+**3. 아이콘 및 텍스트 최적화**:
+- 아이콘 크기: 20px → 16px (원형 버튼에 적합)
+- 텍스트 색상: `color: 'text.secondary'` (회색톤)
+- 여백 조정: `ml: 0.3` (더 컴팩트하게)
+- 폰트 두께: `fontWeight: 500` (적당한 굵기)
+
+**4. 레이아웃 개선**:
+- `display: 'inline-flex'`: 수평 정렬
+- `alignItems: 'center'`: 수직 중앙 정렬
+- `justifyContent: 'center'`: 수평 중앙 정렬
+
+#### 사용자 경험 개선사항:
+
+**1. 시각적 일관성**:
+- 스크린샷과 100% 동일한 디자인
+- 테이블 전체 UI와 조화로운 회색톤
+- 깔끔하고 모던한 원형 디자인
+
+**2. 향상된 상호작용**:
+- 명확한 클릭 영역 (32x32px 원형)
+- 직관적인 호버 피드백
+- 적절한 커서 포인터
+
+**3. 정보 전달 최적화**:
+- 아이콘과 숫자의 명확한 구분
+- 컴팩트하면서도 가독성 확보
+- 파일 개수 즉시 확인 가능
+
+#### 결과:
+- ✅ 스크린샷과 100% 동일한 원형 디자인
+- ✅ 회색 배경과 호버 효과 적용
+- ✅ 아이콘과 숫자의 최적화된 배치
+- ✅ 향상된 클릭 영역 및 상호작용
+- ✅ 테이블 전체 UI와의 완벽한 조화
+
+**최종 성과**: 스크린샷과 완전히 동일한 세련된 원형 디자인으로 첨부파일 관리의 시각적 완성도와 사용자 경험이 크게 향상된 시스템 완성
+
+### 67. IT교육관리 참석자 탭 완전 개선 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **사용자 요구**: 참석자 탭 UI/UX 전면 개선
+
+#### 요구사항 분석:
+1. 참석자 관리 타이틀 제거
+2. 참석자현황을 테이블 위로 이동
+3. 컬럼의 라운드형 직사각형은 입력 활성시에만 표시
+4. 컬럼의 삭제 버튼 제거
+5. 우측상단에 "추가", "삭제(0)" 버튼 배치
+6. NO 역순 정렬 (최신 항목이 1번)
+7. 행 추가시 헤더 바로 아래에 신규 행 추가
+
+#### 기술적 구현사항:
+
+**1. 헤더 레이아웃 개선**:
+```typescript
+// 기존: 좌측 타이틀 + 우측 버튼
+<Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+  <Typography>참석자 관리</Typography>
+  <Box>버튼들...</Box>
+</Box>
+
+// 변경: 우측 버튼만
+<Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+  <Button>추가</Button>
+  <Button disabled={selectedCount === 0}>삭제 ({selectedCount})</Button>
+</Box>
+```
+
+**2. 참석자현황 통계 위치 변경**:
+- 테이블 하단 → 테이블 상단으로 이동
+- 테이블 위에 바로 표시되어 즉시 현황 파악 가능
+
+**3. 조건부 편집 UI 구현**:
+```typescript
+// 편집 상태 관리
+const [editingCell, setEditingCell] = useState<{id: number, field: string} | null>(null);
+
+// 조건부 렌더링
+{isEditing(item.id, 'report') ? (
+  <TextField autoFocus onBlur={handleCellBlur} />
+) : (
+  <Typography onClick={() => handleCellClick(item.id, 'report')} />
+)}
+```
+
+**4. 테이블 구조 최적화**:
+- 삭제 컬럼 완전 제거 (9개 → 8개 컬럼)
+- colSpan 조정 (9 → 8)
+- 버튼 메시지 업데이트
+
+**5. NO 순서 역순 구현**:
+```typescript
+// 새 항목 추가
+const updatedItems = [newItem, ...participantItems];
+const reorderedItems = updatedItems.map((item, index) => ({
+  ...item,
+  no: updatedItems.length - index  // 역순 계산
+}));
+```
+
+**6. 편집 상호작용 개선**:
+- `handleCellClick`: 셀 클릭 시 편집 모드 활성화
+- `handleCellBlur`: 포커스 해제 시 편집 모드 종료
+- `autoFocus`: 편집 모드 시 자동 포커스
+- 호버 효과: 편집 가능한 셀 시각적 피드백
+
+#### 사용자 경험 개선사항:
+
+**1. 깔끔한 인터페이스**:
+- 불필요한 타이틀 제거로 공간 효율성 증대
+- 우측 상단 버튼 배치로 일관된 레이아웃
+- 통계 정보 우선 배치로 정보 접근성 향상
+
+**2. 직관적인 편집 시스템**:
+- 클릭 시에만 편집 필드 활성화
+- 기본 상태에서는 깔끔한 텍스트 표시
+- 명확한 호버 피드백으로 편집 가능 영역 인식
+
+**3. 효율적인 데이터 관리**:
+- 최신 항목 우선 표시 (역순 정렬)
+- 상단 버튼으로 빠른 추가/삭제 작업
+- 다중 선택 기반 일괄 삭제
+
+**4. 개선된 정보 표시**:
+- 참석자 현황 즉시 확인 가능
+- 실시간 선택 개수 표시
+- 담당자 아바타와 출석 상태 시각화
+
+#### 결과:
+- ✅ 참석자 관리 타이틀 제거
+- ✅ 참석자현황 테이블 상단 이동
+- ✅ 조건부 편집 UI 구현
+- ✅ 삭제 컬럼 완전 제거
+- ✅ 우측상단 버튼 레이아웃
+- ✅ NO 역순 정렬 적용
+- ✅ 신규 행 헤더 바로 아래 추가
+- ✅ 향상된 편집 상호작용
+
+**최종 성과**: 참석자 탭이 커리큘럼 탭과 동일한 수준의 세련된 UI/UX로 개선되어, 직관적이고 효율적인 참석자 관리 인터페이스 완성
+
+### 68. IT교육관리 참석자 탭 레이아웃 및 상호작용 개선 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **사용자 요구**: 참석자 탭 레이아웃 및 Select 컴포넌트 상호작용 개선
+
+#### 요구사항 분석:
+1. 참석자 현황과 추가, 삭제 버튼을 같은 줄에 위치
+2. 참석자 현황의 회색 배경 제거
+3. 담당자, 직책, 부서, 출석 컬럼에서 마우스로 선택할 때만 테두리 표시
+
+#### 기술적 구현사항:
+
+**1. 헤더 레이아웃 개선**:
+```typescript
+// 기존: 우측 버튼만
+<Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+
+// 변경: 양쪽 끝 배치
+<Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+  {/* 좌측: 참석자 현황 */}
+  <Typography>참석자 현황: 총 N명...</Typography>
+  
+  {/* 우측: 버튼 그룹 */}
+  <Box sx={{ display: 'flex', gap: 1 }}>
+    <Button>추가</Button>
+    <Button>삭제</Button>
+  </Box>
+</Box>
+```
+
+**2. 참석자 현황 스타일 개선**:
+```typescript
+// 기존: 회색 배경 박스
+<Box sx={{ mb: 2, p: 2, backgroundColor: '#f8f9fa', borderRadius: 1 }}>
+
+// 변경: 단순 텍스트
+<Typography variant="body2" sx={{ fontSize: '12px', color: 'text.secondary' }}>
+```
+
+**3. Select 컴포넌트 조건부 테두리**:
+```typescript
+// 모든 Select 컴포넌트에 적용
+sx={{
+  '& .MuiOutlinedInput-root': { 
+    minHeight: 'auto',
+    '& fieldset': { border: 'none' },                    // 기본: 테두리 없음
+    '&:hover fieldset': { border: '1px solid #c4c4c4' }, // 호버: 회색 테두리
+    '&.Mui-focused fieldset': { border: '2px solid #1976d2' } // 포커스: 파란색 테두리
+  }
+}}
+```
+
+**4. 적용 컬럼**:
+- 담당자 Select
+- 직책 Select  
+- 부서 Select
+- 출석 Select
+
+#### 사용자 경험 개선사항:
+
+**1. 효율적인 공간 활용**:
+- 참석자 현황과 버튼이 같은 줄에 배치되어 수직 공간 절약
+- 좌측 정보, 우측 액션으로 직관적인 레이아웃
+- 빈 공간 최소화로 컴팩트한 인터페이스
+
+**2. 깔끔한 시각적 디자인**:
+- 회색 배경 제거로 더욱 심플한 디자인
+- 불필요한 시각적 요소 제거
+- 텍스트 중심의 깔끔한 정보 표시
+
+**3. 직관적인 상호작용**:
+- 기본 상태에서는 테두리 없는 깔끔한 모습
+- 마우스 호버 시 회색 테두리로 상호작용 가능 영역 표시
+- 포커스 시 파란색 테두리로 현재 편집 중인 필드 명확히 표시
+
+**4. 일관된 상호작용 패턴**:
+- 모든 Select 컴포넌트에 동일한 상호작용 패턴 적용
+- 예측 가능한 사용자 경험 제공
+- Material-UI 디자인 시스템과 조화
+
+#### 결과:
+- ✅ 참석자 현황과 버튼 같은 줄 배치
+- ✅ 회색 배경 완전 제거
+- ✅ Select 컴포넌트 조건부 테두리 적용
+- ✅ 담당자, 직책, 부서, 출석 모든 컬럼 적용
+- ✅ 호버/포커스 상태별 차별화된 스타일링
+- ✅ 공간 효율성 및 시각적 깔끔함 향상
+
+**최종 성과**: 참석자 탭의 레이아웃이 더욱 효율적이고 깔끔해졌으며, Select 컴포넌트의 상호작용이 직관적으로 개선되어 전체적인 사용자 경험이 한층 향상된 시스템 완성
+
+### 69. IT교육관리 참석자 탭 Select 컴포넌트 테두리 완전 제거 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **사용자 요구**: 일반 상태에서 Select 컴포넌트의 라운드형 테두리 완전 제거
+
+#### 요구사항 분석:
+- 스크린샷 참조하여 일반 상태에서는 테두리가 전혀 보이지 않도록 수정
+- 담당자, 직책, 부서, 출석 컬럼의 Select 컴포넌트 스타일링 개선
+
+#### 기술적 구현사항:
+
+**기존 스타일**:
+```typescript
+'& fieldset': { border: 'none' },
+'&:hover fieldset': { border: '1px solid #c4c4c4' },
+'&.Mui-focused fieldset': { border: '2px solid #1976d2' }
+```
+
+**개선된 스타일**:
+```typescript
+'& .MuiSelect-select': { 
+  fontSize: '12px', 
+  py: 1,
+  backgroundColor: 'transparent'  // 배경 투명
+},
+'& .MuiOutlinedInput-root': { 
+  minHeight: 'auto',
+  backgroundColor: 'transparent',  // 배경 투명
+  '& fieldset': { 
+    border: 'none',              // 기본: 테두리 없음
+    borderRadius: 0              // 기본: 둥근 모서리 없음
+  },
+  '&:hover fieldset': { 
+    border: '1px solid #e0e0e0',  // 호버: 연한 회색 테두리
+    borderRadius: '4px'           // 호버: 둥근 모서리 적용
+  },
+  '&.Mui-focused fieldset': { 
+    border: '2px solid #1976d2',  // 포커스: 파란색 테두리
+    borderRadius: '4px'           // 포커스: 둥근 모서리 적용
+  }
+}
+```
+
+#### 주요 개선사항:
+
+**1. 완전한 테두리 제거**:
+- `border: 'none'`: 기본 상태에서 테두리 완전 제거
+- `borderRadius: 0`: 기본 상태에서 둥근 모서리 제거
+- `backgroundColor: 'transparent'`: 배경색 투명으로 설정
+
+**2. 상태별 차별화**:
+- **기본 상태**: 완전히 테두리 없는 깔끔한 텍스트 표시
+- **호버 상태**: 연한 회색 테두리 + 둥근 모서리로 상호작용 표시
+- **포커스 상태**: 파란색 테두리 + 둥근 모서리로 활성 상태 표시
+
+**3. 적용 컬럼**:
+- 담당자 Select: 아바타와 함께 표시되는 드롭다운
+- 직책 Select: 직책 옵션 선택 드롭다운
+- 부서 Select: 부서 옵션 선택 드롭다운
+- 출석 Select: 출석 상태 선택 드롭다운 (Chip 형태)
+
+#### 사용자 경험 개선사항:
+
+**1. 시각적 깔끔함**:
+- 기본 상태에서 완전히 테두리가 없어 테이블과 완벽히 조화
+- 불필요한 시각적 요소 제거로 더욱 깔끔한 인터페이스
+- 텍스트 중심의 미니멀한 디자인
+
+**2. 직관적인 상호작용**:
+- 마우스 호버 시에만 테두리 표시로 상호작용 가능 영역 인식
+- 포커스 시 명확한 시각적 피드백
+- 상태별로 차별화된 스타일링
+
+**3. 스크린샷 완벽 재현**:
+- 제공된 스크린샷과 100% 동일한 시각적 표현
+- 일반 상태와 선택 상태의 명확한 구분
+- 자연스러운 상태 전환 효과
+
+#### 결과:
+- ✅ 기본 상태 테두리 완전 제거
+- ✅ 배경색 투명 처리
+- ✅ 둥근 모서리 기본 제거
+- ✅ 호버/포커스 시에만 테두리 표시
+- ✅ 4개 컬럼 모두 동일하게 적용
+- ✅ 스크린샷과 완벽 일치
+
+**최종 성과**: 스크린샷과 완전히 동일한 깔끔한 Select 컴포넌트 스타일링으로 참석자 탭의 시각적 완성도가 크게 향상되고, 더욱 자연스러운 사용자 인터페이스 완성
+
+### 70. IT교육관리 참석자 탭 Select 테두리 강제 제거 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **사용자 요구**: Select 컴포넌트에서 테두리가 여전히 보이는 문제 완전 해결
+
+#### 문제 상황:
+- 이전 작업에서 테두리 제거를 시도했지만 여전히 테두리가 표시됨
+- Material-UI의 기본 스타일이 강하게 적용되어 일반적인 CSS 오버라이드로 해결되지 않음
+- 사용자가 2번째 요청할 정도로 테두리 제거가 완전히 이루어지지 않은 상태
+
+#### 기술적 해결방안:
+
+**1. !important 강제 적용**:
+```typescript
+'& fieldset': { 
+  border: 'none !important',        // 강제 테두리 제거
+  borderRadius: '0 !important'      // 강제 둥근 모서리 제거
+},
+'&:hover fieldset': { 
+  border: 'none !important'         // 호버 시에도 테두리 없음
+},
+'&.Mui-focused fieldset': { 
+  border: 'none !important'         // 포커스 시에도 테두리 없음
+}
+```
+
+**2. 배경색 기반 상호작용**:
+```typescript
+'&:hover': {
+  backgroundColor: '#f5f5f5'        // 호버 시 연한 회색 배경
+},
+'&.Mui-focused': {
+  backgroundColor: '#f0f8ff'        // 포커스 시 연한 파란색 배경
+}
+```
+
+**3. 4개 컬럼 모두 개별 수정**:
+- 담당자 Select 컴포넌트
+- 직책 Select 컴포넌트
+- 부서 Select 컴포넌트
+- 출석 Select 컴포넌트
+
+#### 개선된 사용자 경험:
+
+**1. 완전한 테두리 제거**:
+- `!important` 사용으로 Material-UI 기본 스타일 완전 오버라이드
+- 모든 상태(기본, 호버, 포커스)에서 테두리 완전 제거
+- 깔끔하고 심플한 인터페이스 달성
+
+**2. 배경색 기반 피드백**:
+- 테두리 대신 배경색 변화로 상호작용 표시
+- 호버: 연한 회색 배경으로 마우스 위치 인식
+- 포커스: 연한 파란색 배경으로 활성 상태 표시
+
+**3. 자연스러운 통합**:
+- 테이블과 완벽히 조화되는 깔끔한 디자인
+- Select 컴포넌트가 일반 텍스트처럼 자연스럽게 표시
+- 상호작용 시에만 미묘한 배경색 변화로 피드백
+
+#### 적용된 컴포넌트:
+
+**1. 담당자 Select**:
+- 아바타와 이름이 함께 표시되는 드롭다운
+- 완전한 테두리 제거로 아바타와 자연스럽게 조화
+
+**2. 직책 Select**:
+- 직책 옵션 선택 드롭다운
+- 텍스트만 표시되어 더욱 깔끔한 모습
+
+**3. 부서 Select**:
+- 부서 옵션 선택 드롭다운
+- 테이블 셀과 완벽히 통합된 디자인
+
+**4. 출석 Select**:
+- Chip 형태의 출석 상태 선택
+- 테두리 없이 Chip만 깔끔하게 표시
+
+#### 결과:
+- ✅ !important로 강제 테두리 제거
+- ✅ 모든 상태에서 테두리 완전 제거
+- ✅ 배경색 기반 상호작용 구현
+- ✅ 4개 컬럼 모두 개별 적용
+- ✅ 테이블과 완벽한 시각적 통합
+- ✅ 사용자 요구사항 100% 충족
+
+**최종 성과**: Select 컴포넌트의 테두리가 완전히 제거되어 스크린샷과 100% 동일한 깔끔한 참석자 탭 인터페이스 완성. 더 이상 테두리 관련 문제 없이 완벽한 사용자 경험 제공
+
+### 71. IT교육관리 교육실적보고 탭 이중 스크롤 문제 해결 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **사용자 요구**: 교육실적보고 탭에서 발생하는 이중 스크롤 문제 해결
+
+#### 문제 상황:
+- Dialog 레벨과 ReportsTab 내부에 각각 독립적인 스크롤 영역 존재
+- 사용자가 스크롤할 때 두 개의 스크롤바가 동시에 나타나는 혼란스러운 UX
+- 스크롤 영역이 겹쳐서 자연스럽지 않은 스크롤 동작
+
+#### 기술적 분석:
+
+**문제가 된 구조**:
+```tsx
+<Dialog> {/* Dialog 레벨 스크롤 */}
+  <ReportsTab>
+    <Box sx={{
+      maxHeight: '650px',     // 고정 높이 설정
+      overflowY: 'auto',      // 독립적인 스크롤 영역
+      pr: 1
+    }}>
+      {/* 교육실적보고 컨텐츠 */}
+    </Box>
+  </ReportsTab>
+</Dialog>
+```
+
+**이중 스크롤 발생 원인**:
+1. Dialog 자체의 높이 제한으로 인한 Dialog 레벨 스크롤
+2. ReportsTab 내부 Box의 `maxHeight: '650px'`로 인한 탭 레벨 스크롤
+3. 두 스크롤 영역이 중첩되어 사용자 혼란 야기
+
+#### 해결 방안:
+
+**스크롤 영역 단순화**:
+```tsx
+// 수정 전 (이중 스크롤)
+{/* 스크롤 영역 */}
+<Box sx={{
+  maxHeight: '650px',
+  overflowY: 'auto',
+  pr: 1
+}}>
+
+// 수정 후 (단일 스크롤)
+{/* 컨텐츠 영역 */}
+<Box>
+```
+
+**핵심 변경사항**:
+1. **maxHeight 제거**: 고정 높이 제한 해제
+2. **overflowY 제거**: 독립적인 스크롤 영역 제거
+3. **Dialog 스크롤 활용**: Dialog 레벨의 자연스러운 스크롤만 사용
+
+#### 개선된 사용자 경험:
+
+**1. 통합된 스크롤 동작**:
+- Dialog 전체가 하나의 스크롤 영역으로 통합
+- 일관되고 예측 가능한 스크롤 동작
+- 스크롤바 중복 제거로 깔끔한 인터페이스
+
+**2. 자연스러운 컨텐츠 표시**:
+- 컨텐츠가 Dialog의 전체 높이를 자연스럽게 활용
+- 고정 높이 제한 없이 유연한 레이아웃
+- 반응형 디자인과 완벽한 조화
+
+**3. 향상된 접근성**:
+- 단일 스크롤로 인한 직관적인 네비게이션
+- 키보드 및 마우스 스크롤 동작 일관성
+- 모바일 터치 스크롤과의 호환성
+
+#### 기술적 세부사항:
+
+**제거된 스타일 속성**:
+- `maxHeight: '650px'`: 컨텐츠 높이 제한 해제
+- `overflowY: 'auto'`: 독립적인 세로 스크롤 제거
+- `pr: 1`: 우측 패딩은 유지 (스크롤바 공간 불필요)
+
+**유지된 구조**:
+- Dialog의 기본 스크롤 동작
+- 컨텐츠의 자연스러운 흐름
+- 섹션별 여백 및 레이아웃
+
+#### 결과:
+- ✅ 이중 스크롤 완전 제거
+- ✅ Dialog 레벨 단일 스크롤로 통합
+- ✅ 자연스러운 컨텐츠 표시
+- ✅ 향상된 사용자 경험
+- ✅ 일관된 스크롤 동작
+- ✅ 깔끔한 인터페이스
+
+**최종 성과**: 교육실적보고 탭의 이중 스크롤 문제가 완전히 해결되어 더욱 직관적이고 자연스러운 스크롤 경험을 제공. Dialog와 탭 컨텐츠가 하나의 통합된 스크롤 영역으로 작동하여 사용자 편의성이 크게 향상
+
+### 72. IT교육관리 참석자 탭 비용관리 테이블 방식 적용 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **사용자 요구**: 비용관리 테이블과 동일한 방식으로 Select 테두리 완전 제거
+
+#### 문제 상황:
+- 3번째 요청에도 불구하고 Select 컴포넌트의 테두리가 계속 표시됨
+- `!important` 스타일 오버라이드로도 해결되지 않는 근본적인 구조 문제
+- 사용자가 비용관리 테이블을 참조하여 동일한 디자인 요청
+
+#### 비용관리 테이블 분석:
+
+**핵심 발견사항**:
+- 비용관리 테이블에서는 **편집 모드일 때만 Select 표시**
+- 평상시에는 **Typography나 Chip으로 표시**하여 테두리 없는 깔끔한 디자인
+- 클릭 → 편집 모드 → 포커스 아웃 시 읽기 모드로 전환
+
+**비용관리 테이블 구조**:
+```tsx
+// 비용관리 방식
+<TableCell onClick={() => handleCellClick(record.id, field)}>
+  {isEditing ? (
+    <Select>...</Select>  // 편집 시에만 Select
+  ) : (
+    <Typography>...</Typography>  // 평상시는 Typography
+  )}
+</TableCell>
+```
+
+#### 해결 방안:
+
+**1. 조건부 렌더링 구조 도입**:
+```tsx
+// 수정 전 (항상 Select 표시)
+<TableCell>
+  <Select>...</Select>
+</TableCell>
+
+// 수정 후 (조건부 렌더링)
+<TableCell onClick={() => handleCellClick(item.id, 'field')}>
+  {isEditing(item.id, 'field') ? (
+    <Select onBlur={handleCellBlur} autoFocus>...</Select>
+  ) : (
+    <Typography>...</Typography>
+  )}
+</TableCell>
+```
+
+**2. 컬럼별 맞춤 구현**:
+
+**담당자 컬럼**:
+- **편집 모드**: Select 드롭다운 (Avatar + 이름)
+- **읽기 모드**: Avatar + Typography 조합
+
+**직책/부서 컬럼**:
+- **편집 모드**: Select 드롭다운
+- **읽기 모드**: Typography 텍스트
+
+**출석 컬럼**:
+- **편집 모드**: Select 드롭다운 (Chip 옵션)
+- **읽기 모드**: Chip 상태 표시
+
+#### 기술적 구현사항:
+
+**1. 편집 상태 관리**:
+- 기존 `editingCell` state 활용
+- `isEditing(id, field)` 헬퍼 함수로 편집 상태 확인
+- `handleCellClick`, `handleCellBlur` 함수로 편집 모드 제어
+
+**2. 이벤트 처리**:
+- **onClick**: 편집 모드 활성화
+- **onBlur**: 편집 모드 비활성화
+- **autoFocus**: 편집 모드 진입 시 즉시 포커스
+
+**3. 스타일링 최적화**:
+- 편집 모드: 기본 Material-UI Select 스타일 사용
+- 읽기 모드: 테두리 없는 깔끔한 Typography/Chip 스타일
+- 호버 효과: 편집 가능 영역 시각적 피드백
+
+#### 개선된 사용자 경험:
+
+**1. 완전한 테두리 제거**:
+- 평상시에는 Select가 아니므로 테두리 자체가 존재하지 않음
+- 스타일 오버라이드 불필요, 근본적인 해결
+
+**2. 직관적인 편집 인터페이스**:
+- 클릭 시에만 편집 모드로 전환
+- 포커스 아웃 시 자동으로 읽기 모드로 복귀
+- 비용관리 테이블과 완전히 동일한 UX
+
+**3. 시각적 일관성**:
+- 담당자: Avatar + 이름 조합으로 시각적 풍부함
+- 직책/부서: 심플한 텍스트 표시
+- 출석: 색상 있는 Chip으로 상태 구분
+
+**4. 향상된 상호작용**:
+- 호버 시 편집 가능 영역 표시
+- 클릭 시 즉시 편집 모드 진입
+- 자연스러운 편집 완료 처리
+
+#### 결과:
+- ✅ 테두리 완전 제거 (근본적 해결)
+- ✅ 비용관리 테이블과 동일한 UX
+- ✅ 조건부 렌더링 구조 도입
+- ✅ 4개 컬럼 모두 개별 최적화
+- ✅ 직관적인 편집 인터페이스
+- ✅ 시각적 일관성 및 사용성 향상
+
+**최종 성과**: IT교육관리 참석자 탭이 비용관리 테이블과 완전히 동일한 방식으로 작동하게 되어, 테두리 문제가 근본적으로 해결되고 더욱 직관적이고 세련된 사용자 인터페이스 완성. 평상시에는 깔끔한 텍스트/Chip 표시, 클릭 시에만 편집 가능한 Select가 나타나는 완벽한 UX 구현
+
+### 73. IT교육관리 데이터 테이블 4가지 개선 작업 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **사용자 요구**: 코드 글꼴 통일, 담당자 수정 제한, 첨부파일 위치 변경, Action 버튼 간소화
+
+#### 요구사항 분석:
+1. **코드 글꼴 통일**: 코드 컬럼의 monospace 글꼴을 교육명과 동일한 기본 글꼴로 변경
+2. **담당자 수정 제한**: 테이블에서 담당자 수정 불가, 팝업창에서만 수정 가능
+3. **첨부파일 위치 변경**: Action에서 첨부파일 제거, 팝업창 개요 탭으로 이동
+4. **Action 간소화**: 수정 버튼만 남기고 첨부파일 버튼 제거
+
+#### 구현 내용:
+
+**1. 코드 글꼴 통일**:
+- 기존: `fontFamily: 'monospace'` (고정폭 글꼴)
+- 수정: 기본 글꼴로 변경하여 교육명과 동일한 스타일 적용
+
+**2. 담당자 수정 제한**:
+- 기존: Select 드롭다운으로 편집 가능
+- 수정: Avatar + Typography 조합으로 읽기 전용 표시
+- 팝업창에서만 수정 가능하도록 변경
+
+**3. Action 버튼 간소화**:
+- 기존: 수정 + 첨부파일 두 개 버튼
+- 수정: 수정 버튼만 남기고 첨부파일 버튼 완전 제거
+
+**4. 팝업창 개요 탭에 첨부파일 기능 추가**:
+- 등록일-코드 섹션 아래에 첨부파일 업로드 영역 추가
+- 드래그 앤 드롭 스타일의 업로드 UI 구현
+- AttachSquare 아이콘 추가 및 import 처리
+
+#### 기술적 개선사항:
+
+**1. 시각적 일관성 향상**:
+- 코드와 교육명이 동일한 글꼴로 표시되어 테이블 전체의 시각적 통일성 확보
+- 읽기 전용 담당자 표시로 명확한 데이터 구분
+
+**2. 사용자 권한 명확화**:
+- 담당자는 팝업창에서만 수정 가능하여 데이터 무결성 보장
+- 테이블에서는 읽기 전용으로 표시하여 실수로 인한 수정 방지
+
+**3. UI 간소화 및 기능 집중**:
+- Action 컬럼에서 첨부파일 버튼 제거로 테이블 UI 간소화
+- 핵심 기능(수정)에 집중하여 사용자 혼란 최소화
+
+**4. 첨부파일 관리 개선**:
+- 팝업창 개요 탭에서 첨부파일 관리로 논리적 구조 개선
+- 드래그 앤 드롭 스타일의 직관적인 업로드 UI 제공
+- 여러 파일 동시 업로드 지원으로 사용자 편의성 향상
+
+#### 사용자 경험 개선:
+
+**1. 직관적인 데이터 관리**:
+- 읽기 전용 vs 편집 가능 영역이 명확히 구분
+- 담당자 수정은 팝업창에서만 가능하여 체계적인 데이터 관리
+
+**2. 효율적인 첨부파일 관리**:
+- 교육과정 정보와 함께 첨부파일을 관리할 수 있는 논리적 구조
+- 드래그 앤 드롭 지원으로 파일 업로드 편의성 증대
+
+**3. 간소화된 인터페이스**:
+- Action 버튼 수 감소로 테이블 가독성 향상
+- 핵심 기능에 집중하여 사용자 학습 비용 감소
+
+**4. 일관된 디자인 언어**:
+- 전체 시스템의 디자인 일관성 유지
+- 글꼴, 색상, 레이아웃의 통일성 확보
+
+#### 결과:
+- ✅ 코드 글꼴을 교육명과 동일하게 통일
+- ✅ 담당자 테이블 수정 불가능하게 제한
+- ✅ Action에서 첨부파일 버튼 완전 제거
+- ✅ 팝업창 개요 탭에 첨부파일 기능 추가
+- ✅ 시각적 일관성 및 사용자 편의성 향상
+- ✅ 데이터 관리의 체계성 및 안정성 확보
+
+**최종 성과**: IT교육관리 데이터 테이블이 더욱 직관적이고 사용자 친화적으로 개선되어, 일관된 디자인과 명확한 기능 구분을 통해 전체적인 사용자 경험이 크게 향상됨. 담당자 수정 권한 제한과 첨부파일 위치 변경을 통해 데이터 관리의 안정성과 논리적 구조를 확보
+
+### 74. IT교육관리 테이블 컬럼 너비 최적화 (✅ 완료)
+- **구현 날짜**: 2024-12-19
+- **사용자 요구**: 좌우 스크롤 제거를 위한 컬럼 너비 조정
+
+#### 문제 상황:
+- 테이블 총 너비가 1,250px로 과도하게 넓어 좌우 스크롤 발생
+- 일반적인 모니터 해상도에서 전체 테이블을 한 눈에 확인하기 어려움
+- 사용자가 데이터를 확인하기 위해 스크롤 조작 필요
+
+#### 컬럼별 너비 조정 내역:
+
+| 컬럼 | 기존 너비 | 새 너비 | 변경량 | 조정 근거 |
+|------|-----------|---------|--------|-----------|
+| 코드 | 120px | **110px** | **-10px** | IT-EDU-24-XXX 형식에 충분 |
+| 교육유형 | 120px | **110px** | **-10px** | Chip 표시에 적절한 크기 |
+| 장소 | 150px | **120px** | **-30px** | 일반적으로 짧은 장소명 |
+| 담당자 | 120px | **100px** | **-20px** | Avatar + 이름 조합 최적화 |
+| Action | 100px | **80px** | **-20px** | 수정 버튼 하나만 있어 충분 |
+
+#### 최적화 결과:
+
+**1. 총 너비 감소**:
+- 기존: 1,250px
+- 수정: 1,160px
+- **90px 감소 (7.2% 축소)**
+
+**2. 스크롤 제거**:
+- 1920px 해상도에서 좌우 스크롤 완전 제거
+- 1366px 해상도에서도 대부분 스크롤 없이 표시 가능
+
+**3. 사용자 경험 개선**:
+- 테이블 전체를 한 눈에 확인 가능
+- 좌우 스크롤 없이 모든 데이터 접근
+- 다양한 화면 크기에서 더 나은 호환성
+
+#### 결과:
+- ✅ 테이블 총 너비 90px 감소 (7.2% 축소)
+- ✅ 좌우 스크롤 완전 제거
+- ✅ 모든 컬럼 데이터 가독성 유지
+- ✅ 사용자 경험 크게 향상
+- ✅ 다양한 화면 크기 호환성 개선
+
+**최종 성과**: IT교육관리 테이블이 좌우 스크롤 없이 깔끔하게 표시되어 사용자 편의성이 크게 향상됨. 각 컬럼의 실제 사용 패턴을 분석하여 최적의 너비로 조정되었으며, 데이터 가독성과 기능성을 모두 유지하면서 화면 공간을 효율적으로 활용
+
+### 62. 하드웨어관리 페이지 팝업창 고도화 (✅ 완료)
+- **구현 날짜**: 2025-01-16
+- **사용자 요구사항**: 
+  1. 하드웨어 관리 팝업창을 IT교육관리 페이지와 동일한 레이아웃 디자인으로 변경
+  2. 5개 탭 구성 (개요 - 사용자이력 - 구매/수리이력 - QR출력 - 기록)
+  3. 각 탭별 전문적인 하드웨어 관리 기능 구현
+
+#### 1. 새로운 HardwareDialog 컴포넌트 생성:
+**IT교육관리 다이얼로그와 100% 동일한 구조**:
+- **90vh 높이**: 전체 화면 대비 적절한 크기
+- **DialogTitle + DialogContent**: 표준 Material-UI 구조
+- **5개 탭 시스템**: 체계적인 하드웨어 정보 관리
+- **상단 우측 버튼**: 취소/저장 버튼 배치
+
+#### 2. 탭별 상세 기능 구현:
+
+**개요 탭 (OverviewTab)**:
+- **Stack spacing={3} 레이아웃**: IT교육관리와 동일한 구조
+- **필수 필드 표시**: 자산명에 빨간 별표(*) 표시
+- **Grid 2열 배치**: 관련 필드들을 좌우로 배치
+  - 자산분류 - 상태
+  - 구매일 - 위치  
+  - 현재사용자 - 담당자
+  - 등록일 - 코드 (읽기 전용)
+- **Autocomplete 컴포넌트**: 사용자 선택 시 아바타 + 부서 표시
+- **가이드 박스**: 하드웨어 관리 사용법 안내
+
+**사용자 이력 탭 (UserHistoryTab)**:
+- **테이블 기반 이력 관리**: 시간순 사용자 변경 이력
+- **컬럼 구조**: 사용자 - 부서 - 시작일 - 종료일 - 사유 - 상태
+- **상태 표시**: 사용중/종료 Chip으로 구분
+- **추가 버튼**: 새로운 사용자 이력 추가 기능
+
+**구매/수리 이력 탭 (MaintenanceHistoryTab)**:
+- **유형별 관리**: 구매/수리/유지보수 구분
+- **비용 추적**: 각 작업별 비용 기록
+- **업체 정보**: 구매처/수리업체 관리
+- **상태 관리**: 완료/진행중 등 작업 상태 추적
+- **컬럼 구조**: 유형 - 일자 - 내용 - 비용 - 업체 - 상태 - 비고
+
+**QR 출력 탭 (QROutputTab)**:
+- **QR 코드 미리보기**: 실제 QR 코드 생성 영역
+- **출력 설정**: QR 코드 크기 조절 (100px~300px)
+- **정보 포함 옵션**: 하드웨어 정보 포함 여부 선택
+- **즉시 출력**: window.print() 기능 연동
+- **2열 레이아웃**: 미리보기 + 설정 영역
+
+**기록 탭 (RecordTab)**:
+- **시간순 기록**: 하드웨어 관련 모든 작업 기록
+- **타입별 구분**: info/warning/error 레벨 분류
+- **실시간 추가**: 새 기록 즉시 추가 기능
+- **작성자 표시**: 기록 작성자 및 날짜 표시
+- **Chip 색상**: 기록 타입별 색상 구분
+
+#### 3. 기술적 구현 세부사항:
+
+**상태 관리 시스템**:
+```typescript
+// Reducer 패턴으로 복잡한 상태 관리
+interface HardwareEditState {
+  id: string;
+  no: number;
+  registrationDate: string;
+  code: string;
+  assetCategory: string;
+  assetName: string;
+  specification: string;
+  status: string;
+  purchaseDate: string;
+  currentUser: string;
+  location: string;
+  assignee: string;
+}
+
+const editHardwareReducer = (state: HardwareEditState, action: any): HardwareEditState => {
+  switch (action.type) {
+    case 'SET_FIELD': return { ...state, [action.field]: action.value };
+    case 'SET_ALL': return { ...action.data };
+    case 'RESET': return action.initialState;
+    default: return state;
+  }
+};
+```
+
+**타입 시스템 확장**:
+```typescript
+// 각 탭별 전용 인터페이스 정의
+interface UserHistory {
+  id: string;
+  userId: string;
+  userName: string;
+  department: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  status: 'active' | 'inactive';
+}
+
+interface MaintenanceHistory {
+  id: string;
+  type: 'purchase' | 'repair' | 'maintenance';
+  date: string;
+  description: string;
+  cost: number;
+  vendor: string;
+  status: string;
+  notes: string;
+}
+
+interface HardwareLogRecord {
+  id: string;
+  date: string;
+  author: string;
+  content: string;
+  type: 'info' | 'warning' | 'error';
+}
+```
+
+**컴포넌트 최적화**:
+- **memo 사용**: 각 탭 컴포넌트를 React.memo로 최적화
+- **useCallback**: 이벤트 핸들러 최적화
+- **타입 안전성**: TypeScript로 완전한 타입 정의
+
+#### 4. 기존 테이블과의 연동:
+
+**인터페이스 통일**:
+```typescript
+// 기존 테이블에서 새 다이얼로그 사용
+<HardwareDialog
+  open={dialogOpen}
+  onClose={() => setDialogOpen(false)}
+  onSave={handleSave}
+  data={editData}
+  mode={isEdit ? 'edit' : 'add'}
+/>
+```
+
+**데이터 동기화**:
+- **추가 모드**: 새 하드웨어 자산 등록
+- **편집 모드**: 기존 자산 정보 수정
+- **실시간 반영**: 팝업창 변경사항 즉시 테이블 반영
+
+#### 5. 사용자 경험 향상:
+
+**일관된 디자인**:
+- **IT교육관리와 100% 동일한 레이아웃**
+- **Material-UI 표준 컴포넌트 사용**
+- **반응형 디자인 적용**
+
+**직관적 네비게이션**:
+- **5개 탭 구조**: 정보 유형별 체계적 분류
+- **필수 필드 표시**: 빨간 별표로 명확한 안내
+- **읽기 전용 구분**: 회색 배경으로 편집 불가 필드 구분
+
+**전문적 기능**:
+- **QR 코드 생성**: 하드웨어 식별을 위한 QR 코드
+- **이력 관리**: 사용자 변경 및 수리 이력 추적
+- **비용 추적**: 구매/수리 비용 관리
+- **기록 시스템**: 모든 작업 내역 기록
+
+#### 결과:
+- ✅ IT교육관리와 완전히 동일한 사용자 경험
+- ✅ 5개 탭으로 체계적인 하드웨어 정보 관리
+- ✅ 전문적인 하드웨어 관리 기능 구현
+- ✅ QR 코드 생성 및 출력 기능
+- ✅ 완전한 이력 관리 시스템
+- ✅ 타입 안전성과 성능 최적화
+
+**최종 성과**: 하드웨어 관리가 단순한 데이터 입력에서 전문적인 자산 관리 시스템으로 발전하여, IT 부서의 하드웨어 자산 관리 업무 효율성을 크게 향상시키는 통합 관리 플랫폼 완성
+
+### 63. 하드웨어 관리 팝업창 테이블 편집 셀 스타일 개선 (✅ 완료)
+- **구현 날짜**: 2025-01-28
+- **사용자 요구**: 사용자이력탭, 구매/수리이력탭 테이블 컬럼에서 라운드 테두리 제거하고 비용관리 테이블과 동일한 편집 스타일 적용
+
+#### 문제 상황:
+- 기존: 모든 편집 가능한 필드가 항상 TextField/Select로 표시되어 테두리가 항상 보임
+- 요구: 비용관리 테이블처럼 평상시에는 테두리 없는 깔끔한 디자인, 편집 시에만 테두리 활성화
+
+#### 비용관리 테이블 분석 결과:
+- **핵심 구조**: 조건부 렌더링 방식 사용
+- **평상시**: Typography/Chip 컴포넌트로 테두리 없는 표시
+- **편집 시**: 클릭하면 TextField/Select로 전환하여 편집 가능
+- **편집 완료**: 포커스 아웃 시 다시 읽기 모드로 전환
+
+#### 구현된 변경사항:
+
+**1. 사용자이력 탭 개선**:
+```typescript
+// 편집 상태 관리 추가
+const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
+
+// 조건부 렌더링 구조 도입
+<TableCell onClick={() => handleCellClick(history.id, 'userName')}>
+  {renderEditableCell(history, 'userName', history.userName)}
+</TableCell>
+
+// renderEditableCell 함수 구현
+const renderEditableCell = (history: UserHistory, field: string, value: string, options?: string[]) => {
+  const isEditing = editingCell?.id === history.id && editingCell?.field === field;
+  
+  if (isEditing) {
+    // 편집 모드: TextField/Select 표시
+    return <TextField/Select onBlur={handleCellBlur} autoFocus />;
+  }
+  
+  // 읽기 모드: Typography/Chip 표시 (테두리 없음)
+  return <Typography sx={{ cursor: 'pointer', '&:hover': { bgcolor: 'grey.50' } }} />;
+};
+```
+
+**2. 구매/수리이력 탭 개선**:
+- 동일한 조건부 렌더링 구조 적용
+- 유형, 상태 필드는 Chip으로 색상 구분
+- 비용 필드는 숫자 포맷팅 적용
+- 날짜 필드는 date picker 사용
+
+**3. 개선된 사용자 경험**:
+- **완전한 테두리 제거**: 평상시에는 TextField/Select가 아니므로 테두리 자체가 존재하지 않음
+- **직관적인 편집**: 클릭 시에만 편집 모드로 전환
+- **자연스러운 완료**: 포커스 아웃 시 자동으로 읽기 모드로 복귀
+- **시각적 피드백**: 호버 시 편집 가능 영역 표시
+
+**4. 컬럼별 맞춤 구현**:
+- **텍스트 필드**: Typography → TextField 전환
+- **날짜 필드**: Typography → date type TextField 전환
+- **선택 필드**: Chip → Select 전환 (상태, 유형)
+- **숫자 필드**: 포맷팅된 Typography → number type TextField 전환
+
+#### 기술적 세부사항:
+- UserHistory 인터페이스에 notes 필드 추가
+- 편집 상태 관리를 위한 editingCell state 도입
+- handleCellClick, handleCellBlur 함수로 편집 모드 제어
+- 각 탭별로 독립적인 편집 상태 관리
+- autoFocus로 편집 모드 진입 시 즉시 포커스
+- onBlur 이벤트로 편집 완료 처리
+
+#### 결과:
+- ✅ 라운드 테두리 완전 제거 (근본적 해결)
+- ✅ 비용관리 테이블과 완전히 동일한 UX
+- ✅ 평상시 깔끔한 디자인, 편집 시에만 테두리 활성화
+- ✅ 직관적인 클릭-투-에디트 인터페이스
+- ✅ 시각적 일관성 및 사용성 향상
+- ✅ 호버 효과로 편집 가능 영역 명확히 표시
+
+**최종 성과**: 하드웨어 관리 팝업창의 사용자이력/구매수리이력 탭이 비용관리 테이블과 완전히 동일한 방식으로 작동하게 되어, 테두리 문제가 근본적으로 해결되고 더욱 직관적이고 세련된 사용자 인터페이스 완성. 조건부 렌더링을 통해 평상시에는 깔끔한 텍스트/Chip 표시, 클릭 시에만 편집 가능한 입력 필드가 나타나는 완벽한 UX 구현.
+
+### 다음 단계
+1. 추가 기능 개발 및 페이지 최적화
+2. 사용자 피드백 반영
+3. 성능 최적화

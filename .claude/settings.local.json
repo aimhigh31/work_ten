@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell:*)",
+      "Bash(echo $env:APPDATAClaudesettings.json)",
+      "Read(//c/Users/11/.claude/**)",
+      "Read(//c/Users/11/AppData/Local/**)",
+      "Bash(notepad:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Read(//c/Users/11/AppData/Roaming/Claude/**)"
+    ],
+    "deny": [
+      "mcp__chrome-devtools__*"
+    ],
+    "ask": []
+  }
+}

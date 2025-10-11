@@ -1,0 +1,1027 @@
+# 업무관리 페이지 기본 템플릿 가이드 (BasicForm.mdc)
+
+## 📋 **개요**
+이 문서는 업무관리 페이지를 기본 템플릿으로 하여 다른 페이지 개발 시 참고할 수 있도록 모든 디자인, 형태, 구조를 상세히 정리한 가이드입니다.
+
+---
+
+## 🏗️ **전체 아키텍처**
+
+### 1. 파일 구조
+```
+src/
+├── views/apps/TaskTable.tsx         # 메인 테이블 컴포넌트
+├── components/TaskEditDialog.tsx    # 편집 팝업 다이얼로그
+├── data/task.ts                     # 샘플 데이터 및 설정
+├── types/task.ts                    # 타입 정의
+└── hooks/useDebounce.ts            # 성능 최적화 훅
+```
+
+### 2. 기술 스택
+- **UI Framework**: Material-UI v5
+- **Table Library**: TanStack Table v8
+- **State Management**: React useState, useReducer
+- **Performance**: React.memo, useCallback, useMemo
+- **TypeScript**: 완전한 타입 안정성
+
+---
+
+## 📊 **데이터 구조 설계**
+
+### 1. 기본 데이터 타입
+```typescript
+export interface TaskData {
+  id: number;                    // 고유 식별자
+  no: number;                    // 순번 (사용자 표시용)
+  registrationDate: string;      // 등록일 (YYYY-MM-DD)
+  code: string;                  // 자동생성 코드 (TSK-001)
+  team: TaskTeam;               // 팀 (enum)
+  department: TaskDepartment;    // 부서 (enum)
+  workContent: string;          // 업무 내용 (필수)
+  status: TaskStatus;           // 상태 (enum)
+  assignee: string;             // 담당자
+  completedDate: string;        // 완료일
+  attachments: string[];        // 첨부파일 목록
+}
+
+// 확장 타입 (테이블 전용)
+export interface TaskTableData extends TaskData {
+  isEditing?: boolean;          // 편집 모드 여부
+  originalData?: TaskData;      // 원본 데이터 백업
+}
+```
+
+### 2. Enum 타입 정의
+```typescript
+export type TaskStatus = '대기' | '진행' | '완료' | '홀딩';
+export type TaskTeam = '개발팀' | '디자인팀' | '기획팀' | '마케팅팀';
+export type TaskDepartment = 'IT' | '기획';
+```
+
+### 3. 색상 매핑 시스템
+```typescript
+// 상태별 색상
+export const statusColors = {
+  대기: 'warning',    // 주황색
+  진행: 'info',       // 파란색
+  완료: 'success',    // 초록색
+  홀딩: 'error'       // 빨간색
+} as const;
+
+// 팀별 색상
+export const teamColors = {
+  개발팀: 'primary',     // 기본 테마색
+  디자인팀: 'secondary', // 보조 테마색
+  기획팀: 'info',        // 정보색
+  마케팅팀: 'success'    // 성공색
+} as const;
+```
+
+---
+
+## 🎨 **UI 컴포넌트 구조**
+
+### 1. 메인 테이블 레이아웃
+```tsx
+<MainCard
+  title={헤더_영역}
+  content={false}
+  secondary={필터_및_액션_영역}
+>
+  <Divider />
+  <Box sx={{ overflowX: 'auto' }}>
+    {테이블_영역}
+  </Box>
+  <Box sx={{ p: 2 }}>
+    {페이지네이션_영역}
+  </Box>
+  {편집_다이얼로그}
+</MainCard>
+```
+
+### 2. 헤더 영역 구성
+```tsx
+title={
+  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+    <Typography variant="h4">업무관리</Typography>
+    {selectedRows.size > 0 && (
+      <Chip 
+        label={`${selectedRows.size}개 선택됨`} 
+        color="primary" 
+        size="small" 
+      />
+    )}
+  </Box>
+}
+```
+
+### 3. 필터 및 액션 영역
+```tsx
+secondary={
+  <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
+    {/* 팀 필터 */}
+    <FormControl size="small" sx={{ minWidth: 120 }}>
+      <InputLabel>팀</InputLabel>
+      <Select multiple value={teamFilter} onChange={handleTeamFilterChange}>
+        {/* 다중 선택 드롭다운 */}
+      </Select>
+    </FormControl>
+    
+    {/* 검색창 */}
+    <TextField
+      placeholder="검색..."
+      value={globalFilter}
+      onChange={(e) => setGlobalFilter(e.target.value)}
+      size="small"
+      sx={{ minWidth: 200, flexGrow: 1 }}
+    />
+    
+    {/* 액션 버튼들 */}
+    <Button variant="contained" startIcon={<Add />} onClick={addNewTask}>
+      새 업무 추가
+    </Button>
+    
+    <Button variant="outlined" color="error" startIcon={<Trash />}>
+      삭제 ({selectedRows.size})
+    </Button>
+    
+    <CSVExport data={filteredData} filename="task-data.csv" />
+  </Stack>
+}
+```
+
+---
+
+## 📋 **테이블 컬럼 설계**
+
+### 1. 컬럼 구성
+```tsx
+const columns = useMemo<ColumnDef<TaskTableData, any>[]>(() => [
+  // 1. 선택 컬럼 (체크박스)
+  columnHelper.display({
+    id: 'select',
+    header: 전체선택_체크박스,
+    cell: 개별선택_체크박스,
+    size: 50,
+    enableSorting: false
+  }),
+  
+  // 2. NO 컬럼 (순번)
+  columnHelper.accessor('no', {
+    header: 'NO',
+    cell: ({ getValue }) => (
+      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+        {getValue()}
+      </Typography>
+    ),
+    size: 60
+  }),
+  
+  // 3. 등록일 컬럼 (읽기 전용)
+  columnHelper.accessor('registrationDate', {
+    header: '등록일',
+    cell: 날짜_표시,
+    size: 100
+  }),
+  
+  // 4. 코드 컬럼 (자동생성, 읽기 전용)
+  columnHelper.accessor('code', {
+    header: '코드',
+    cell: ({ getValue }) => (
+      <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+        {getValue()}
+      </Typography>
+    ),
+    size: 120
+  }),
+  
+  // 5. 팀 컬럼 (드롭다운 편집)
+  columnHelper.accessor('team', {
+    header: '팀',
+    cell: 드롭다운_Chip_컴포넌트,
+    size: 100
+  }),
+  
+  // 6. 담당자 컬럼 (아바타 + 이름)
+  columnHelper.accessor('assignee', {
+    header: '담당자',
+    cell: ({ getValue }) => (
+      <Stack direction="row" spacing={1} alignItems="center">
+        <Avatar src={assigneeAvatars[getValue()]} sx={{ width: 24, height: 24 }}>
+          {getValue()?.charAt(0)}
+        </Avatar>
+        <Typography variant="body2">{getValue()}</Typography>
+      </Stack>
+    ),
+    size: 120
+  }),
+  
+  // 7. 업무내용 컬럼 (말줄임표 처리)
+  columnHelper.accessor('workContent', {
+    header: '업무내용',
+    cell: ({ getValue }) => (
+      <Typography variant="body2" sx={{ 
+        maxWidth: 200, 
+        overflow: 'hidden', 
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap'
+      }}>
+        {getValue()}
+      </Typography>
+    ),
+    size: 200
+  }),
+  
+  // 8. 상태 컬럼 (색상 코딩 Chip)
+  columnHelper.accessor('status', {
+    header: '상태',
+    cell: ({ getValue }) => (
+      <Chip
+        label={getValue()}
+        color={statusColors[getValue()]}
+        size="small"
+        sx={{ minWidth: 60 }}
+      />
+    ),
+    size: 80
+  }),
+  
+  // 9. 액션 컬럼 (편집, 첨부파일 버튼)
+  columnHelper.display({
+    id: 'actions',
+    header: 'Action',
+    cell: ({ row }) => (
+      <Stack direction="row" spacing={0.5}>
+        <Tooltip title="편집">
+          <IconButton color="primary" onClick={() => handleEdit(row.original)}>
+            <Edit size={16} />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="첨부파일">
+          <IconButton color="secondary" onClick={() => handleAttachment(row.index)}>
+            <DocumentDownload size={16} />
+          </IconButton>
+        </Tooltip>
+      </Stack>
+    ),
+    size: 100,
+    enableSorting: false
+  })
+], [selectedRows, filteredData]);
+```
+
+### 2. 드롭다운 편집 컴포넌트
+```tsx
+// 팀/부서/상태 컬럼용 드롭다운 Chip 컴포넌트
+const DropdownChip = ({ value, options, colors, onChange, rowIndex, field }) => {
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  return (
+    <Box sx={{ position: 'relative' }}>
+      <Chip
+        label={value}
+        color={colors[value]}
+        size="small"
+        onClick={(e) => handleChipClick(e, rowIndex, field)}
+        sx={{
+          cursor: 'pointer',
+          transition: 'all 0.2s ease-in-out',
+          border: isMenuOpen ? '1px solid' : 'none',
+          '&:hover': {
+            transform: 'scale(1.02)',
+            border: '1px solid',
+            borderColor: 'primary.main'
+          }
+        }}
+      />
+      
+      <Popper open={isMenuOpen} anchorEl={anchorEl} placement="bottom-start">
+        <Paper elevation={3}>
+          <ClickAwayListener onClickAway={() => handleMenuClose()}>
+            <MenuList>
+              {options.map((option) => (
+                <MenuItem 
+                  key={option} 
+                  onClick={() => handleMenuItemClick(option)}
+                  selected={option === value}
+                >
+                  <Chip 
+                    label={option} 
+                    color={colors[option]} 
+                    size="small"
+                    variant={option === value ? 'filled' : 'outlined'}
+                  />
+                </MenuItem>
+              ))}
+            </MenuList>
+          </ClickAwayListener>
+        </Paper>
+      </Popper>
+    </Box>
+  );
+};
+```
+
+---
+
+## 🎯 **필터링 시스템**
+
+### 1. 필터 상태 관리
+```tsx
+// 필터 상태
+const [teamFilter, setTeamFilter] = useState<string[]>([]);
+const [departmentFilter, setDepartmentFilter] = useState<string[]>([]);
+const [statusFilter, setStatusFilter] = useState<string[]>([]);
+const [assigneeFilter, setAssigneeFilter] = useState<string[]>([]);
+const [globalFilter, setGlobalFilter] = useState('');
+
+// 필터링된 데이터
+const filteredData = useMemo(() => {
+  return data.filter((task) => {
+    const teamMatch = teamFilter.length === 0 || teamFilter.includes(task.team);
+    const departmentMatch = departmentFilter.length === 0 || departmentFilter.includes(task.department);
+    const statusMatch = statusFilter.length === 0 || statusFilter.includes(task.status);
+    const assigneeMatch = assigneeFilter.length === 0 || assigneeFilter.includes(task.assignee);
+    
+    return teamMatch && departmentMatch && statusMatch && assigneeMatch;
+  });
+}, [data, teamFilter, departmentFilter, statusFilter, assigneeFilter]);
+```
+
+### 2. 다중 선택 필터 컴포넌트
+```tsx
+<FormControl size="small" sx={{ minWidth: 120 }}>
+  <InputLabel>팀</InputLabel>
+  <Select
+    multiple
+    value={teamFilter}
+    onChange={handleTeamFilterChange}
+    input={<OutlinedInput label="팀" />}
+    renderValue={(selected) => (
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+        {(selected as string[]).map((value) => (
+          <Chip
+            key={value}
+            label={value}
+            size="small"
+            onDelete={() => removeFromFilter('team', value)}
+            onMouseDown={(event) => event.stopPropagation()}
+          />
+        ))}
+      </Box>
+    )}
+  >
+    {teams.map((team) => (
+      <MenuItem key={team} value={team}>
+        <Checkbox checked={teamFilter.includes(team)} />
+        <ListItemText primary={team} />
+      </MenuItem>
+    ))}
+  </Select>
+</FormControl>
+```
+
+---
+
+## 📱 **편집 다이얼로그 구조**
+
+### 1. 다이얼로그 레이아웃
+```tsx
+<Dialog 
+  open={editDialog} 
+  onClose={handleClose}
+  maxWidth="lg"
+  fullWidth
+  PaperProps={{
+    sx: { 
+      height: '840px',
+      maxHeight: '840px',
+      overflow: 'hidden'
+    }
+  }}
+>
+  <DialogTitle sx={{ pb: 1 }}>
+    {/* 제목 + 닫기 버튼 */}
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+      <Typography variant="h6">
+        {task ? '업무 편집' : '새 업무 추가'}
+      </Typography>
+      <IconButton onClick={handleClose}>
+        <CloseCircle />
+      </IconButton>
+    </Box>
+    
+    {/* 액션 버튼 (상단 오른쪽) */}
+    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mr: 2, mt: 1 }}>
+      <Button onClick={handleClose} variant="outlined" size="small">
+        취소
+      </Button>
+      <Button onClick={handleSave} variant="contained" size="small">
+        저장
+      </Button>
+    </Box>
+    
+    {/* 에러 메시지 */}
+    {validationError && (
+      <Alert severity="error" sx={{ mt: 2, mr: 2 }}>
+        {validationError}
+      </Alert>
+    )}
+  </DialogTitle>
+
+  <DialogContent sx={{ p: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+    {/* 탭 헤더 */}
+    <Box sx={{ borderBottom: 1, borderColor: 'divider', flexShrink: 0 }}>
+      <Tabs value={activeTab} onChange={handleTabChange}>
+        {tabLabels.map((label, index) => (
+          <Tab key={index} label={label} />
+        ))}
+      </Tabs>
+    </Box>
+    
+    {/* 탭 컨텐츠 */}
+    <Box sx={{ flex: 1, overflow: 'hidden' }}>
+      {activeTab === 0 && <OverviewTab {...props} />}
+      {activeTab === 1 && <PlanTab {...props} />}
+      {activeTab === 2 && <RecordTab {...props} />}
+    </Box>
+  </DialogContent>
+</Dialog>
+```
+
+### 2. 탭 구조
+```tsx
+// 1. 개요 탭 - 기본 정보 입력
+const OverviewTab = () => (
+  <Box sx={{ height: '100%', overflowY: 'auto', pr: 1, px: 3, py: 3 }}>
+    <Stack spacing={3}>
+      {/* 제목 (필수) */}
+      <TextField
+        fullWidth
+        label={<span>제목 <span style={{ color: 'red' }}>*</span></span>}
+        value={taskState.workContent}
+        onChange={(e) => onFieldChange('workContent', e.target.value)}
+        variant="outlined"
+        InputLabelProps={{ shrink: true }}
+      />
+      
+      {/* 설명 (선택) */}
+      <TextField
+        fullWidth
+        label="설명"
+        multiline
+        rows={4}
+        value={taskState.description}
+        onChange={(e) => onFieldChange('description', e.target.value)}
+        variant="outlined"
+        InputLabelProps={{ shrink: true }}
+      />
+      
+      {/* 담당자와 상태 (좌우 배치) */}
+      <Stack direction="row" spacing={2}>
+        <FormControl fullWidth>
+          <InputLabel>담당자</InputLabel>
+          <Select value={taskState.assignee} onChange={handleAssigneeChange}>
+            {assignees.map((assignee) => (
+              <MenuItem key={assignee} value={assignee}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Avatar src={assigneeAvatars[assignee]} sx={{ width: 24, height: 24 }}>
+                    {assignee?.charAt(0)}
+                  </Avatar>
+                  <Typography variant="body2">{assignee}</Typography>
+                </Stack>
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        
+        <FormControl fullWidth>
+          <InputLabel>상태</InputLabel>
+          <Select value={taskState.status} onChange={handleStatusChange}>
+            {statusOptions.map((status) => (
+              <MenuItem key={status} value={status}>
+                <Chip label={status} color={statusColors[status]} size="small" />
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Stack>
+      
+      {/* 등록일과 완료일 (읽기 전용 + 편집 가능) */}
+      <Stack direction="row" spacing={2}>
+        <TextField
+          fullWidth
+          label="등록일"
+          type="date"
+          value={taskState.registrationDate}
+          InputLabelProps={{ shrink: true }}
+          InputProps={{ readOnly: true }}
+          sx={{
+            '& .MuiOutlinedInput-root': {
+              backgroundColor: '#f5f5f5',
+              '& fieldset': { borderColor: '#e0e0e0' }
+            }
+          }}
+        />
+        
+        <TextField
+          fullWidth
+          label="완료일"
+          type="date"
+          value={taskState.completedDate}
+          onChange={(e) => onFieldChange('completedDate', e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          variant="outlined"
+        />
+      </Stack>
+    </Stack>
+  </Box>
+);
+
+// 2. 계획 탭 - 체크리스트 관리
+const PlanTab = () => (
+  <Box sx={{ height: '100%', overflowY: 'auto', pr: 1, px: 3, py: 3 }}>
+    {/* 드래그 앤 드롭 체크리스트 */}
+    {/* 계층 구조 지원 */}
+    {/* 접기/펼치기 기능 */}
+  </Box>
+);
+
+// 3. 기록 탭 - 코멘트 시스템
+const RecordTab = () => (
+  <Box sx={{ height: '100%', overflowY: 'auto', pr: 1, px: 3, py: 3 }}>
+    {/* 코멘트 목록 */}
+    {/* 코멘트 추가/편집/삭제 */}
+  </Box>
+);
+```
+
+---
+
+## ⚡ **성능 최적화 패턴**
+
+### 1. 컴포넌트 메모이제이션
+```tsx
+// 체크리스트 아이템 컴포넌트 최적화
+const ChecklistItem = memo<ChecklistItemProps>(({ 
+  item, 
+  editingId, 
+  editingText, 
+  onTextChange, 
+  onCheckedChange, 
+  onEdit, 
+  onSaveEdit, 
+  onCancelEdit, 
+  onDelete, 
+  onEditTextChange 
+}) => {
+  // useCallback으로 이벤트 핸들러 최적화
+  const handleCheckedChange = useCallback((checked: boolean) => {
+    onCheckedChange(item.id, 'checked', checked);
+  }, [item.id, onCheckedChange]);
+
+  const handleEdit = useCallback(() => {
+    onEdit(item.id, item.text);
+  }, [item.id, item.text, onEdit]);
+
+  return (
+    <Box sx={{ /* 스타일 */ }}>
+      {/* 컴포넌트 내용 */}
+    </Box>
+  );
+});
+```
+
+### 2. 디바운스 입력 최적화
+```tsx
+// 커스텀 훅: useOptimizedInput
+export const useOptimizedInput = (initialValue: string, delay: number = 300) => {
+  const [inputValue, setInputValue] = useState(initialValue);
+  const [debouncedValue, setDebouncedValue] = useState(initialValue);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedValue(inputValue);
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [inputValue, delay]);
+
+  const handleChange = useCallback((value: string) => {
+    setInputValue(value);
+  }, []);
+
+  const reset = useCallback((value: string) => {
+    setInputValue(value);
+    setDebouncedValue(value);
+  }, []);
+
+  return {
+    inputValue,
+    debouncedValue,
+    handleChange,
+    reset
+  };
+};
+
+// 사용 예시
+const workContentInput = useOptimizedInput(taskState.workContent, 150);
+```
+
+### 3. 테이블 최적화
+```tsx
+// TanStack Table 설정
+const table = useReactTable({
+  data: filteredData,
+  columns,
+  state: { sorting, globalFilter, pagination },
+  onSortingChange: setSorting,
+  onGlobalFilterChange: setGlobalFilter,
+  onPaginationChange: setPagination,
+  getCoreRowModel: getCoreRowModel(),
+  getFilteredRowModel: getFilteredRowModel(),
+  getSortedRowModel: getSortedRowModel(),
+  getPaginationRowModel: getPaginationRowModel(),
+  debugTable: false // 프로덕션에서는 false
+});
+```
+
+---
+
+## 🎨 **스타일링 가이드라인**
+
+### 1. 색상 시스템
+```tsx
+// 상태별 색상 매핑
+const statusColors = {
+  대기: 'warning',    // #ff9800 (주황)
+  진행: 'info',       // #2196f3 (파랑)
+  완료: 'success',    // #4caf50 (초록)
+  홀딩: 'error'       // #f44336 (빨강)
+};
+
+// 팀별 색상 매핑
+const teamColors = {
+  개발팀: 'primary',     // 기본 테마색
+  디자인팀: 'secondary', // 보조 테마색
+  기획팀: 'info',        // 정보색
+  마케팅팀: 'success'    // 성공색
+};
+```
+
+### 2. 간격 시스템
+```tsx
+// 일관된 간격 사용
+const spacing = {
+  xs: 0.5,    // 4px
+  sm: 1,      // 8px
+  md: 2,      // 16px
+  lg: 3,      // 24px
+  xl: 4       // 32px
+};
+
+// 사용 예시
+<Stack spacing={2}>     // 16px 간격
+<Box sx={{ p: 3 }}>     // 24px 패딩
+<Box sx={{ mb: 2 }}>    // 16px 하단 마진
+```
+
+### 3. 타이포그래피
+```tsx
+// 텍스트 스타일 가이드
+<Typography variant="h4">페이지 제목</Typography>      // 32px, bold
+<Typography variant="h6">섹션 제목</Typography>       // 20px, medium
+<Typography variant="body1">본문 텍스트</Typography>   // 16px, regular
+<Typography variant="body2">보조 텍스트</Typography>   // 14px, regular
+<Typography variant="caption">캡션</Typography>       // 12px, regular
+```
+
+### 4. 반응형 디자인
+```tsx
+// Grid 시스템 사용
+<Grid container spacing={2}>
+  <Grid xs={12} md={6}>        // 모바일: 전체, 데스크톱: 절반
+    <TextField fullWidth />
+  </Grid>
+  <Grid xs={12} md={6}>
+    <TextField fullWidth />
+  </Grid>
+</Grid>
+
+// 반응형 Stack
+<Stack 
+  direction={{ xs: 'column', md: 'row' }}  // 모바일: 세로, 데스크톱: 가로
+  spacing={2}
+  flexWrap="wrap"
+>
+```
+
+---
+
+## 🔧 **상태 관리 패턴**
+
+### 1. useReducer 패턴
+```tsx
+// 편집 상태 관리용 리듀서
+interface EditTaskState {
+  workContent: string;
+  description: string;
+  assignee: string;
+  status: TaskStatus;
+  code: string;
+  registrationDate: string;
+  completedDate: string;
+  team: string;
+  department: string;
+}
+
+type EditTaskAction = 
+  | { type: 'SET_FIELD'; field: keyof EditTaskState; value: string }
+  | { type: 'SET_TASK'; task: TaskTableData }
+  | { type: 'RESET' }
+  | { type: 'INIT_NEW_TASK'; code: string; registrationDate: string };
+
+const editTaskReducer = (state: EditTaskState, action: EditTaskAction): EditTaskState => {
+  switch (action.type) {
+    case 'SET_FIELD':
+      return { ...state, [action.field]: action.value };
+    case 'SET_TASK':
+      return {
+        workContent: action.task.workContent,
+        description: action.task.description || '',
+        assignee: action.task.assignee,
+        status: action.task.status,
+        // ... 기타 필드
+      };
+    case 'INIT_NEW_TASK':
+      return {
+        workContent: '',
+        description: '',
+        assignee: '',
+        status: '대기',
+        code: action.code,
+        registrationDate: action.registrationDate,
+        // ... 기타 기본값
+      };
+    case 'RESET':
+      return initialState;
+    default:
+      return state;
+  }
+};
+```
+
+### 2. 로컬 상태 관리
+```tsx
+// 테이블 관련 상태
+const [data, setData] = useState<TaskTableData[]>(taskData);
+const [globalFilter, setGlobalFilter] = useState('');
+const [sorting, setSorting] = useState<SortingState>([]);
+const [pagination, setPagination] = useState<PaginationState>({
+  pageIndex: 0,
+  pageSize: 10
+});
+
+// 필터 상태
+const [teamFilter, setTeamFilter] = useState<string[]>([]);
+const [statusFilter, setStatusFilter] = useState<string[]>([]);
+
+// UI 상태
+const [editDialog, setEditDialog] = useState(false);
+const [editingTask, setEditingTask] = useState<TaskTableData | null>(null);
+const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+```
+
+---
+
+## 📋 **이벤트 핸들링 패턴**
+
+### 1. CRUD 작업
+```tsx
+// 새 항목 추가
+const addNewTask = () => {
+  setEditingTask(null);
+  setEditingTaskId(null);
+  setEditDialog(true);
+};
+
+// 편집
+const handleEdit = (task: TaskTableData) => {
+  setEditingTask(task);
+  setEditingTaskId(task.no);
+  setEditDialog(true);
+};
+
+// 저장
+const handleSave = (updatedTask: TaskTableData) => {
+  const existingIndex = data.findIndex(task => task.no === updatedTask.no);
+  
+  if (existingIndex !== -1) {
+    // 기존 항목 업데이트
+    const updatedData = [...data];
+    updatedData[existingIndex] = updatedTask;
+    setData(updatedData);
+  } else {
+    // 새 항목 추가
+    const newTask = {
+      ...updatedTask,
+      no: Math.max(...data.map(t => t.no), 0) + 1,
+      id: Date.now()
+    };
+    setData([...data, newTask]);
+  }
+  
+  setEditDialog(false);
+  setEditingTask(null);
+};
+
+// 삭제
+const handleDelete = () => {
+  const updatedData = data.filter(task => !selectedRows.has(task.no));
+  setData(updatedData);
+  setSelectedRows(new Set());
+};
+```
+
+### 2. 필터링
+```tsx
+// 필터 변경 핸들러
+const handleTeamFilterChange = (event: SelectChangeEvent<string[]>) => {
+  const value = event.target.value;
+  setTeamFilter(typeof value === 'string' ? value.split(',') : value);
+};
+
+// 필터에서 항목 제거
+const removeFromFilter = (filterType: string, value: string) => {
+  switch (filterType) {
+    case 'team':
+      setTeamFilter(prev => prev.filter(item => item !== value));
+      break;
+    case 'status':
+      setStatusFilter(prev => prev.filter(item => item !== value));
+      break;
+  }
+};
+```
+
+---
+
+## 📁 **파일 첨부 시스템**
+
+### 1. 첨부파일 관리
+```tsx
+// 첨부파일 상태
+const [attachmentDialog, setAttachmentDialog] = useState(false);
+const [currentTaskIndex, setCurrentTaskIndex] = useState<number>(-1);
+const fileInputRef = useRef<HTMLInputElement>(null);
+
+// 파일 업로드 핸들러
+const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const files = event.target.files;
+  if (files && files.length > 0 && currentTaskIndex !== -1) {
+    const newFiles = Array.from(files).map(file => file.name);
+    const updatedData = [...data];
+    updatedData[currentTaskIndex] = {
+      ...updatedData[currentTaskIndex],
+      attachments: [...updatedData[currentTaskIndex].attachments, ...newFiles]
+    };
+    setData(updatedData);
+  }
+  
+  // 파일 입력 초기화
+  if (fileInputRef.current) {
+    fileInputRef.current.value = '';
+  }
+};
+
+// 첨부파일 다이얼로그
+const AttachmentDialog = () => (
+  <Dialog open={attachmentDialog} onClose={() => setAttachmentDialog(false)}>
+    <DialogTitle>첨부파일 관리</DialogTitle>
+    <DialogContent>
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileUpload}
+        multiple
+        style={{ display: 'none' }}
+      />
+      <Button onClick={() => fileInputRef.current?.click()}>
+        파일 선택
+      </Button>
+      
+      <List>
+        {currentTask?.attachments.map((fileName, index) => (
+          <ListItem key={index}>
+            <ListItemText primary={fileName} />
+            <ListItemSecondaryAction>
+              <IconButton onClick={() => handleAttachmentDelete(fileName)}>
+                <Trash />
+              </IconButton>
+            </ListItemSecondaryAction>
+          </ListItem>
+        ))}
+      </List>
+    </DialogContent>
+  </Dialog>
+);
+```
+
+---
+
+## 🚀 **배포 및 최적화**
+
+### 1. 번들 최적화
+```tsx
+// 동적 임포트 사용
+const TaskEditDialog = lazy(() => import('components/TaskEditDialog'));
+
+// 사용 시 Suspense 래핑
+<Suspense fallback={<CircularProgress />}>
+  <TaskEditDialog {...props} />
+</Suspense>
+```
+
+### 2. 메모리 최적화
+```tsx
+// 불필요한 리렌더링 방지
+const MemoizedTableRow = memo(({ row }) => (
+  <tr>
+    {row.getVisibleCells().map(cell => (
+      <td key={cell.id}>
+        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+      </td>
+    ))}
+  </tr>
+));
+
+// 이벤트 핸들러 최적화
+const handleRowClick = useCallback((rowId: number) => {
+  // 클릭 핸들링 로직
+}, []);
+```
+
+---
+
+## 📋 **체크리스트 - 새 페이지 개발 시**
+
+### ✅ **기본 구조**
+- [ ] 메인 테이블 컴포넌트 생성
+- [ ] 편집 다이얼로그 컴포넌트 생성
+- [ ] 데이터 타입 정의 (types/*.ts)
+- [ ] 샘플 데이터 생성 (data/*.ts)
+
+### ✅ **테이블 기능**
+- [ ] TanStack Table 설정
+- [ ] 컬럼 정의 및 렌더링
+- [ ] 정렬 기능
+- [ ] 페이지네이션
+- [ ] 전역 검색
+- [ ] 필터링 (다중 선택)
+- [ ] 행 선택 (체크박스)
+- [ ] 액션 버튼 (편집, 삭제, 내보내기)
+
+### ✅ **편집 다이얼로그**
+- [ ] 3탭 구조 (개요, 계획, 기록)
+- [ ] 폼 유효성 검사
+- [ ] 자동 코드 생성
+- [ ] 읽기 전용 필드 처리
+- [ ] 에러 메시지 표시
+
+### ✅ **성능 최적화**
+- [ ] React.memo 적용
+- [ ] useCallback/useMemo 사용
+- [ ] 디바운스 입력 처리
+- [ ] 불필요한 리렌더링 방지
+
+### ✅ **스타일링**
+- [ ] 일관된 색상 시스템
+- [ ] 반응형 디자인
+- [ ] 적절한 간격 및 타이포그래피
+- [ ] 호버/포커스 상태
+
+### ✅ **접근성**
+- [ ] 키보드 네비게이션
+- [ ] 스크린 리더 지원
+- [ ] 적절한 ARIA 라벨
+- [ ] 색상 대비 확인
+
+---
+
+## 🎯 **결론**
+
+이 basicform.mdc 가이드는 업무관리 페이지의 모든 구성 요소를 상세히 분석하여 향후 다른 페이지 개발 시 참고할 수 있는 완전한 템플릿을 제공합니다. 
+
+**핵심 특징:**
+- 📊 완전한 CRUD 기능
+- 🎨 일관된 디자인 시스템
+- ⚡ 최적화된 성능
+- 📱 반응형 디자인
+- 🔧 확장 가능한 구조
+
+이 가이드를 기반으로 KPI관리, 프로젝트관리, 비용관리 등 다른 페이지들을 효율적으로 개발할 수 있습니다.
+description:
+globs:
+alwaysApply: false
+---

@@ -1,0 +1,1387 @@
+
+> able-pro-material-next-ts@3.0.0 dev
+> next dev -p 3200
+
+   ▲ Next.js 15.1.6
+   - Local:        http://localhost:3200
+   - Network:      http://10.255.255.254:3200
+   - Environments: .env
+
+ ✓ Starting...
+ ✓ Ready in 1187ms
+ ○ Compiling /admin-panel/system-settings ...
+request to https://fonts.gstatic.com/s/inter/v19/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa2JL7W0Q5n-wU.woff2 failed, reason: 
+
+Retrying 1/3...
+request to https://fonts.gstatic.com/s/inter/v19/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa0ZL7W0Q5n-wU.woff2 failed, reason: 
+
+Retrying 1/3...
+request to https://fonts.gstatic.com/s/inter/v19/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa2ZL7W0Q5n-wU.woff2 failed, reason: 
+
+Retrying 1/3...
+ ✓ Compiled /admin-panel/system-settings in 13.3s (8320 modules)
+ HEAD /admin-panel/system-settings 200 in 11200ms
+ GET /admin-panel/system-settings 200 in 15416ms
+ ○ Compiling /api/auth/protected ...
+ ✓ Compiled /api/auth/protected in 5.6s (8623 modules)
+ GET /favicon.ico 200 in 5660ms
+ GET /api/auth/protected 200 in 5489ms
+ GET /api/auth/protected 200 in 24ms
+ GET /api/auth/session 200 in 6195ms
+ GET /api/auth/session 200 in 84ms
+ GET /api/auth/protected 200 in 87ms
+ GET /api/auth/session 200 in 26ms
+ GET /api/auth/session 200 in 39ms
+ GET /api/auth/protected 200 in 35ms
+ ○ Compiling /dashboard/default ...
+ ✓ Compiled /dashboard/default in 1143ms (8664 modules)
+ GET /dashboard/default 200 in 1285ms
+ ○ Compiling /admin-panel/access-control/roles ...
+ ✓ Compiled /admin-panel/access-control/roles in 974ms (8762 modules)
+ GET /admin-panel/access-control/roles 200 in 1149ms
+ ○ Compiling /admin-panel/department-management ...
+ ✓ Compiled /admin-panel/department-management in 2s (8770 modules)
+ GET /admin-panel/department-management 200 in 2096ms
+ GET /admin-panel/access-control/roles 200 in 53ms
+ GET /admin-panel/department-management 200 in 39ms
+ ○ Compiling /admin-panel/user-management ...
+ ✓ Compiled /admin-panel/user-management in 990ms (8778 modules)
+ GET /admin-panel/user-management 200 in 1085ms
+ ○ Compiling /admin-panel/analytics/user-activity ...
+ ✓ Compiled /admin-panel/analytics/user-activity in 919ms (8420 modules)
+ GET /admin-panel/analytics/user-activity 200 in 1056ms
+ ○ Compiling /admin-panel/checklist ...
+ ✓ Compiled /admin-panel/checklist in 2.6s (8437 modules)
+ GET /admin-panel/checklist 200 in 2753ms
+ ✓ Compiled in 1651ms (8414 modules)
+ ✓ Compiled in 674ms (8414 modules)
+ ✓ Compiled in 1546ms (8414 modules)
+ ✓ Compiled in 1693ms (8414 modules)
+ ✓ Compiled in 1580ms (8414 modules)
+ ✓ Compiled in 1570ms (8414 modules)
+ ✓ Compiled in 3.1s (8414 modules)
+ GET /admin-panel/checklist 200 in 1075ms
+ ○ Compiling /favicon.ico ...
+ ✓ Compiled /api/auth/protected in 1053ms (4629 modules)
+ ✓ Compiled (4643 modules)
+ GET /favicon.ico 200 in 1968ms
+ GET /api/auth/protected 200 in 1718ms
+ GET /api/auth/session 200 in 2187ms
+ GET /api/auth/protected 200 in 57ms
+ GET /api/auth/session 200 in 56ms
+ GET /api/auth/protected 200 in 37ms
+ GET /api/auth/session 200 in 21ms
+ GET /api/auth/session 200 in 23ms
+ GET /api/auth/protected 200 in 28ms
+ ✓ Compiled in 1914ms (8787 modules)
+ ✓ Compiled in 736ms (8414 modules)
+ ✓ Compiled in 756ms (8414 modules)
+ GET /admin-panel/user-management 200 in 131ms
+ GET /admin-panel/analytics/user-activity 200 in 492ms
+ GET /admin-panel/checklist 200 in 36ms
+ ○ Compiling /admin-panel/master-code ...
+ ✓ Compiled /admin-panel/master-code in 3.4s (8432 modules)
+ GET /admin-panel/master-code 200 in 3510ms
+ GET /admin-panel/checklist 200 in 41ms
+ GET /admin-panel/master-code 200 in 27ms
+ GET /admin-panel/checklist 200 in 32ms
+ ✓ Compiled in 2.2s (8426 modules)
+ ✓ Compiled in 589ms (8426 modules)
+ ✓ Compiled in 1061ms (8426 modules)
+ ✓ Compiled in 739ms (8426 modules)
+ ✓ Compiled in 690ms (8426 modules)
+ ✓ Compiled in 733ms (8426 modules)
+ ○ Compiling / ...
+ ✓ Compiled / in 3.6s (8433 modules)
+ GET / 200 in 4653ms
+ ○ Compiling /login ...
+ ✓ Compiled /login in 1052ms (4639 modules)
+ ✓ Compiled in 4.4s (4159 modules)
+ GET /api/auth/session 200 in 6130ms
+ GET /login 200 in 6197ms
+ GET /api/auth/session 200 in 46ms
+ GET /login 200 in 56ms
+ GET /api/auth/session 200 in 84ms
+ ○ Compiling /api/auth/protected ...
+ ✓ Compiled /api/auth/protected in 591ms (4673 modules)
+ GET /api/auth/protected 200 in 728ms
+ GET /api/auth/protected 200 in 28ms
+ GET /api/auth/protected 200 in 23ms
+ ○ Compiling /dashboard/default ...
+ ✓ Compiled /dashboard/default in 616ms (4696 modules)
+ GET /dashboard/default 200 in 791ms
+ GET /dashboard/default 200 in 39ms
+ GET /api/auth/protected 200 in 38ms
+ GET /api/auth/protected 200 in 25ms
+ GET /api/auth/session 200 in 55ms
+ GET /api/auth/session 200 in 24ms
+ GET /api/auth/session 200 in 24ms
+ GET /api/auth/protected 200 in 22ms
+ GET /admin-panel/checklist 200 in 65ms
+ ✓ Compiled in 2.7s (8451 modules)
+ ✓ Compiled in 751ms (8451 modules)
+ ✓ Compiled in 746ms (8451 modules)
+ ✓ Compiled in 711ms (8451 modules)
+ ✓ Compiled in 766ms (8451 modules)
+ ✓ Compiled in 869ms (8451 modules)
+ ✓ Compiled in 682ms (8451 modules)
+ ✓ Compiled in 1336ms (8451 modules)
+ ✓ Compiled in 722ms (8451 modules)
+ ✓ Compiled in 2.3s (8451 modules)
+ ✓ Compiled in 807ms (8451 modules)
+ ○ Compiling /admin-panel/access-control/roles ...
+ ✓ Compiled /admin-panel/access-control/roles in 4.2s (8457 modules)
+ GET /admin-panel/access-control/roles 200 in 4340ms
+ ○ Compiling /admin-panel/department-management ...
+ ✓ Compiled /admin-panel/department-management in 1839ms (8463 modules)
+ GET /admin-panel/department-management 200 in 1935ms
+ GET /admin-panel/user-management 200 in 48ms
+ GET /admin-panel/analytics/user-activity 200 in 65ms
+ GET /admin-panel/checklist 200 in 40ms
+ GET /admin-panel/department-management 200 in 46ms
+ ✓ Compiled in 763ms (8452 modules)
+ GET /admin-panel/checklist 200 in 81ms
+ ✓ Compiled in 805ms (8429 modules)
+ ○ Compiling /api/auth/[...nextauth] ...
+ ✓ Compiled /api/auth/[...nextauth] in 4.3s (4629 modules)
+ GET /api/auth/session 200 in 4537ms
+ GET /api/auth/session 200 in 36ms
+ ✓ Compiled /api/auth/protected in 463ms (4641 modules)
+ GET /api/auth/protected 200 in 601ms
+ GET /api/auth/protected 200 in 13ms
+ ✓ Compiled in 1764ms (8800 modules)
+ ✓ Compiled in 4.5s (8428 modules)
+ ✓ Compiled in 713ms (8428 modules)
+ ✓ Compiled in 865ms (8428 modules)
+ ✓ Compiled in 1027ms (8428 modules)
+ ✓ Compiled in 751ms (8428 modules)
+ ✓ Compiled in 4.5s (8429 modules)
+ GET /admin-panel/access-control/roles 200 in 184ms
+ GET /admin-panel/checklist 200 in 51ms
+ GET /admin-panel/access-control/roles 200 in 42ms
+ GET /admin-panel/checklist 200 in 27ms
+ ✓ Compiled in 2.4s (8429 modules)
+ ✓ Compiled in 745ms (8429 modules)
+ ✓ Compiled in 682ms (8429 modules)
+ ✓ Compiled in 688ms (8429 modules)
+ ○ Compiling /api/auth/[...nextauth] ...
+ ✓ Compiled /api/auth/[...nextauth] in 2s (4639 modules)
+ ✓ Compiled (4641 modules)
+ GET /api/auth/session 200 in 3363ms
+ GET /api/auth/protected 200 in 3391ms
+ GET /api/auth/protected 200 in 58ms
+ GET /api/auth/session 200 in 59ms
+ GET /api/auth/protected 200 in 32ms
+ GET /api/auth/session 200 in 52ms
+ GET /api/auth/protected 200 in 50ms
+ GET /api/auth/session 200 in 25ms
+ GET /api/auth/session 200 in 31ms
+ GET /api/auth/protected 200 in 16ms
+ GET /api/auth/protected 200 in 19ms
+ GET /api/auth/protected 200 in 36ms
+ GET /api/auth/session 200 in 78ms
+ GET /api/auth/protected 200 in 88ms
+ GET /api/auth/session 200 in 55ms
+ GET /api/auth/protected 200 in 33ms
+ GET /api/auth/protected 200 in 18ms
+ GET /admin-panel/access-control/roles 200 in 74ms
+ GET /admin-panel/checklist 200 in 61ms
+ GET /admin-panel/access-control/roles 200 in 38ms
+ GET /admin-panel/checklist 200 in 39ms
+ GET /admin-panel/access-control/roles 200 in 27ms
+ GET /admin-panel/checklist 200 in 41ms
+ GET /admin-panel/access-control/roles 200 in 31ms
+ GET /admin-panel/department-management 200 in 41ms
+ GET /admin-panel/user-management 200 in 74ms
+ GET /admin-panel/analytics/user-activity 200 in 76ms
+ GET /admin-panel/analytics/user-activity 200 in 84ms
+ GET /admin-panel/checklist 200 in 44ms
+ ○ Compiling /admin-panel/master-code ...
+ ✓ Compiled /admin-panel/master-code in 3.4s (4281 modules)
+ GET /admin-panel/master-code 200 in 3547ms
+ GET /admin-panel/access-control/roles 200 in 66ms
+ ✓ Compiled in 2.4s (8434 modules)
+ GET /admin-panel/checklist 200 in 134ms
+ GET /admin-panel/master-code 200 in 57ms
+ GET /admin-panel/checklist 200 in 51ms
+ GET /admin-panel/master-code 200 in 77ms
+ GET /admin-panel/department-management 200 in 49ms
+ ○ Compiling /admin-panel/user-management ...
+ ✓ Compiled /admin-panel/user-management in 2.2s (4281 modules)
+ GET /admin-panel/user-management 200 in 2255ms
+ ✓ Compiled in 1523ms (8440 modules)
+ GET /admin-panel/master-code 200 in 69ms
+ GET /admin-panel/master-code 200 in 25ms
+ GET /admin-panel/checklist 200 in 54ms
+ ✓ Compiled in 5.5s (8440 modules)
+ GET /admin-panel/master-code 200 in 147ms
+ GET /admin-panel/checklist 200 in 73ms
+ GET /admin-panel/master-code 200 in 43ms
+ GET /admin-panel/checklist 200 in 30ms
+ GET /admin-panel/master-code 200 in 81ms
+ GET /admin-panel/checklist 200 in 70ms
+ ✓ Compiled in 4.7s (8434 modules)
+ GET /admin-panel/master-code 200 in 551ms
+ ✓ Compiled in 1182ms (8434 modules)
+ GET /admin-panel/checklist 200 in 1092ms
+ ✓ Compiled in 792ms (8434 modules)
+ ○ Compiling /api/auth/protected ...
+ ✓ Compiled /api/auth/protected in 3.8s (8803 modules)
+ GET /api/auth/protected 200 in 3979ms
+ GET /api/auth/protected 200 in 26ms
+ GET /admin-panel/master-code 200 in 81ms
+ GET /admin-panel/checklist 200 in 62ms
+ ✓ Compiled in 2.7s (8432 modules)
+ ✓ Compiled in 3.8s (8432 modules)
+ ○ Compiling /api/auth/[...nextauth] ...
+ ✓ Compiled /api/auth/[...nextauth] in 546ms (4643 modules)
+ ✓ Compiled (4645 modules)
+ GET /api/auth/session 200 in 3606ms
+ GET /api/auth/protected 200 in 3621ms
+ GET /api/auth/protected 200 in 51ms
+ GET /api/auth/session 200 in 50ms
+ GET /api/auth/protected 200 in 32ms
+ GET /api/auth/session 200 in 52ms
+ GET /api/auth/protected 200 in 29ms
+ GET /api/auth/session 200 in 21ms
+ GET /api/auth/session 200 in 29ms
+ ✓ Compiled in 872ms (8803 modules)
+ GET /api/auth/protected 200 in 101ms
+ GET /api/auth/protected 200 in 26ms
+ GET /api/auth/protected 200 in 14ms
+ GET /api/auth/protected 200 in 73ms
+ GET /api/auth/session 200 in 126ms
+ GET /api/auth/session 200 in 76ms
+ GET /api/auth/protected 200 in 59ms
+ GET /api/auth/protected 200 in 24ms
+ GET /admin-panel/master-code 200 in 93ms
+ GET /admin-panel/access-control/roles 200 in 94ms
+ GET /admin-panel/master-code 200 in 65ms
+ GET /admin-panel/access-control/roles 200 in 58ms
+ GET /admin-panel/access-control/roles 200 in 47ms
+ GET /admin-panel/department-management 200 in 68ms
+ ○ Compiling /admin-panel/user-management ...
+ ✓ Compiled /admin-panel/user-management in 7.2s (4280 modules)
+ GET /admin-panel/user-management 200 in 7304ms
+ ○ Compiling /api/auth/[...nextauth] ...
+ ✓ Compiled /api/auth/[...nextauth] in 511ms (4639 modules)
+ GET /api/auth/session 200 in 680ms
+ GET /api/auth/session 200 in 47ms
+ ✓ Compiled /api/auth/protected in 453ms (4651 modules)
+ GET /api/auth/protected 200 in 597ms
+ GET /api/auth/protected 200 in 28ms
+ ✓ Compiled in 5.6s (8429 modules)
+ GET /admin-panel/access-control/roles 200 in 315ms
+ GET /admin-panel/user-management 200 in 77ms
+ GET /admin-panel/department-management 200 in 97ms
+ GET /admin-panel/access-control/roles 200 in 58ms
+ GET /admin-panel/department-management 200 in 54ms
+ GET /admin-panel/user-management 200 in 50ms
+ ○ Compiling /admin-panel/analytics/user-activity ...
+ ✓ Compiled /admin-panel/analytics/user-activity in 2.5s (4280 modules)
+ GET /admin-panel/analytics/user-activity 200 in 2631ms
+ GET /admin-panel/analytics/user-activity 200 in 26ms
+ GET /admin-panel/analytics/user-activity 200 in 24ms
+ GET /admin-panel/analytics/user-activity 200 in 20ms
+ GET /admin-panel/analytics/user-activity 200 in 61ms
+ GET /admin-panel/checklist 200 in 57ms
+ GET /admin-panel/user-management 200 in 84ms
+ GET /admin-panel/checklist 200 in 1365ms
+ ○ Compiling /admin-panel/system-settings ...
+ ✓ Compiled /dashboard/default in 5.7s (4279 modules)
+ ✓ Compiled (4302 modules)
+ GET /admin-panel/system-settings 200 in 8314ms
+ GET /dashboard/default 200 in 4634ms
+ ✓ Compiled in 7s (8460 modules)
+ ✓ Compiled in 1882ms (8460 modules)
+ ✓ Compiled /api/auth/[...nextauth] in 4.5s (8451 modules)
+ ✓ Compiled (8822 modules)
+ GET /api/auth/session 200 in 4016ms
+ GET /api/auth/protected 200 in 4332ms
+ GET /api/auth/protected 200 in 53ms
+ GET /api/auth/session 200 in 53ms
+ GET /api/auth/protected 200 in 33ms
+ GET /api/auth/session 200 in 49ms
+ GET /api/auth/protected 200 in 50ms
+ GET /api/auth/session 200 in 26ms
+ GET /api/auth/session 200 in 26ms
+ GET /api/auth/protected 200 in 23ms
+ GET /api/auth/protected 200 in 19ms
+ GET /api/auth/protected 200 in 24ms
+ GET /api/auth/session 200 in 88ms
+ GET /api/auth/session 200 in 32ms
+ GET /api/auth/session 200 in 30ms
+ GET /api/auth/protected 200 in 31ms
+ GET /api/auth/protected 200 in 26ms
+ GET /api/auth/protected 200 in 32ms
+ GET /api/auth/protected 200 in 31ms
+ GET /api/auth/session 200 in 127ms
+ GET /api/auth/protected 200 in 115ms
+ GET /api/auth/session 200 in 82ms
+ GET /api/auth/protected 200 in 37ms
+ GET /api/auth/session 200 in 116ms
+ GET /api/auth/session 200 in 85ms
+ GET /api/auth/protected 200 in 87ms
+ GET /api/auth/protected 200 in 44ms
+ GET /admin-panel/user-management 200 in 118ms
+ GET /api/auth/session 200 in 140ms
+ GET /api/auth/session 200 in 81ms
+ GET /api/auth/protected 200 in 54ms
+ GET /api/auth/protected 200 in 31ms
+ ○ Compiling /admin-panel/master-code ...
+ ✓ Compiled /admin-panel/master-code in 1725ms (4669 modules)
+ GET /admin-panel/master-code 200 in 1824ms
+ GET /admin-panel/checklist 200 in 60ms
+ ⨯ ./src/views/apps/ChecklistManagement.tsx
+Error:   [31mx[0m Unexpected token `Grid`. Expected jsx identifier
+    ,-[[36;1;4m/home/gurunamu/NEXWORK/mainly/src/views/apps/ChecklistManagement.tsx[0m:44:1]
+ [2m41[0m |   }
+ [2m42[0m | 
+ [2m43[0m |   return (
+ [2m44[0m |     <Grid container spacing={GRID_COMMON_SPACING}>
+    : [35;1m     ^^^^[0m
+ [2m45[0m |       {/* 페이지 헤더 */}
+ [2m46[0m |       <Grid size={12}>
+ [2m47[0m |         <Card>
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/views/apps/ChecklistManagement.tsx
+./src/app/(dashboard)/admin-panel/checklist/page.tsx
+ ⨯ ./src/views/apps/ChecklistManagement.tsx
+Error:   [31mx[0m Unexpected token `Grid`. Expected jsx identifier
+    ,-[[36;1;4m/home/gurunamu/NEXWORK/mainly/src/views/apps/ChecklistManagement.tsx[0m:44:1]
+ [2m41[0m |   }
+ [2m42[0m | 
+ [2m43[0m |   return (
+ [2m44[0m |     <Grid container spacing={GRID_COMMON_SPACING}>
+    : [35;1m     ^^^^[0m
+ [2m45[0m |       {/* 페이지 헤더 */}
+ [2m46[0m |       <Grid size={12}>
+ [2m47[0m |         <Card>
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/views/apps/ChecklistManagement.tsx
+./src/app/(dashboard)/admin-panel/checklist/page.tsx
+ ⨯ ./src/views/apps/ChecklistManagement.tsx
+Error:   [31mx[0m Unexpected token `Grid`. Expected jsx identifier
+    ,-[[36;1;4m/home/gurunamu/NEXWORK/mainly/src/views/apps/ChecklistManagement.tsx[0m:44:1]
+ [2m41[0m |   }
+ [2m42[0m | 
+ [2m43[0m |   return (
+ [2m44[0m |     <Grid container spacing={GRID_COMMON_SPACING}>
+    : [35;1m     ^^^^[0m
+ [2m45[0m |       {/* 페이지 헤더 */}
+ [2m46[0m |       <Grid size={12}>
+ [2m47[0m |         <Card>
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/views/apps/ChecklistManagement.tsx
+./src/app/(dashboard)/admin-panel/checklist/page.tsx
+ ○ Compiling /_error ...
+ ⨯ ./src/views/apps/ChecklistManagement.tsx
+Error:   [31mx[0m Unexpected token `Grid`. Expected jsx identifier
+    ,-[[36;1;4m/home/gurunamu/NEXWORK/mainly/src/views/apps/ChecklistManagement.tsx[0m:44:1]
+ [2m41[0m |   }
+ [2m42[0m | 
+ [2m43[0m |   return (
+ [2m44[0m |     <Grid container spacing={GRID_COMMON_SPACING}>
+    : [35;1m     ^^^^[0m
+ [2m45[0m |       {/* 페이지 헤더 */}
+ [2m46[0m |       <Grid size={12}>
+ [2m47[0m |         <Card>
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/views/apps/ChecklistManagement.tsx
+./src/app/(dashboard)/admin-panel/checklist/page.tsx
+ ⨯ ./src/views/apps/ChecklistManagement.tsx
+Error:   [31mx[0m Unexpected token `Grid`. Expected jsx identifier
+    ,-[[36;1;4m/home/gurunamu/NEXWORK/mainly/src/views/apps/ChecklistManagement.tsx[0m:44:1]
+ [2m41[0m |   }
+ [2m42[0m | 
+ [2m43[0m |   return (
+ [2m44[0m |     <Grid container spacing={GRID_COMMON_SPACING}>
+    : [35;1m     ^^^^[0m
+ [2m45[0m |       {/* 페이지 헤더 */}
+ [2m46[0m |       <Grid size={12}>
+ [2m47[0m |         <Card>
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/views/apps/ChecklistManagement.tsx
+./src/app/(dashboard)/admin-panel/checklist/page.tsx
+ GET /api/auth/session 500 in 5980ms
+ GET /admin-panel/checklist 500 in 2185ms
+ GET /dashboard/default 500 in 2184ms
+ ⨯ ./src/views/apps/ChecklistManagement.tsx
+Error:   [31mx[0m Unexpected token `Grid`. Expected jsx identifier
+    ,-[[36;1;4m/home/gurunamu/NEXWORK/mainly/src/views/apps/ChecklistManagement.tsx[0m:44:1]
+ [2m41[0m |   }
+ [2m42[0m | 
+ [2m43[0m |   return (
+ [2m44[0m |     <Grid container spacing={GRID_COMMON_SPACING}>
+    : [35;1m     ^^^^[0m
+ [2m45[0m |       {/* 페이지 헤더 */}
+ [2m46[0m |       <Grid size={12}>
+ [2m47[0m |         <Card>
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/views/apps/ChecklistManagement.tsx
+./src/app/(dashboard)/admin-panel/checklist/page.tsx
+ POST /api/auth/_log 500 in 1497ms
+ GET /api/auth/session 500 in 1518ms
+ GET /api/auth/protected 500 in 1524ms
+ GET /admin-panel/checklist 500 in 1486ms
+ GET /dashboard/default 500 in 1487ms
+ POST /api/auth/_log 500 in 63ms
+ GET /api/auth/protected 500 in 60ms
+ GET /admin-panel/checklist 500 in 62ms
+ GET /dashboard/default 500 in 62ms
+ ⨯ ./src/views/apps/ChecklistManagement.tsx
+Error:   [31mx[0m Unexpected token `Grid`. Expected jsx identifier
+    ,-[[36;1;4m/home/gurunamu/NEXWORK/mainly/src/views/apps/ChecklistManagement.tsx[0m:42:1]
+ [2m39[0m |   }
+ [2m40[0m | 
+ [2m41[0m |   return (
+ [2m42[0m |     <Grid container spacing={GRID_COMMON_SPACING}>
+    : [35;1m     ^^^^[0m
+ [2m43[0m |       {/* 페이지 헤더 */}
+ [2m44[0m |       <Grid size={12}>
+ [2m45[0m |         <Card>
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/views/apps/ChecklistManagement.tsx
+./src/app/(dashboard)/admin-panel/checklist/page.tsx
+ ✓ Compiled /[...not_found] in 1827ms (4344 modules)
+ ○ Compiling /_not-found ...
+ ⨯ ./src/views/apps/ChecklistManagement.tsx
+Error:   [31mx[0m Unexpected token `Grid`. Expected jsx identifier
+    ,-[[36;1;4m/home/gurunamu/NEXWORK/mainly/src/views/apps/ChecklistManagement.tsx[0m:42:1]
+ [2m39[0m |   }
+ [2m40[0m | 
+ [2m41[0m |   return (
+ [2m42[0m |     <Grid container spacing={GRID_COMMON_SPACING}>
+    : [35;1m     ^^^^[0m
+ [2m43[0m |       {/* 페이지 헤더 */}
+ [2m44[0m |       <Grid size={12}>
+ [2m45[0m |         <Card>
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/views/apps/ChecklistManagement.tsx
+./src/app/(dashboard)/admin-panel/checklist/page.tsx
+ GET /_next/static/webpack/eac90773a7c59bab.webpack.hot-update.json 500 in 5308ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /_next/static/webpack/eac90773a7c59bab.webpack.hot-update.json 500 in 43ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET /admin-panel/checklist 500 in 43ms
+ GET /dashboard/default 500 in 30ms
+ ⨯ ./src/views/apps/ChecklistManagement.tsx
+Error:   [31mx[0m Unexpected token `Grid`. Expected jsx identifier
+    ,-[[36;1;4m/home/gurunamu/NEXWORK/mainly/src/views/apps/ChecklistManagement.tsx[0m:42:1]
+ [2m39[0m |   }
+ [2m40[0m | 
+ [2m41[0m |   return (
+ [2m42[0m |     <Grid container spacing={GRID_COMMON_SPACING}>
+    : [35;1m     ^^^^[0m
+ [2m43[0m |       {/* 페이지 헤더 */}
+ [2m44[0m |       <Grid size={12}>
+ [2m45[0m |         <Card>
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/views/apps/ChecklistManagement.tsx
+./src/app/(dashboard)/admin-panel/checklist/page.tsx
+ ⨯ ./src/views/apps/ChecklistManagement.tsx
+Error:   [31mx[0m Unexpected token `Grid`. Expected jsx identifier
+    ,-[[36;1;4m/home/gurunamu/NEXWORK/mainly/src/views/apps/ChecklistManagement.tsx[0m:42:1]
+ [2m39[0m |   }
+ [2m40[0m | 
+ [2m41[0m |   return (
+ [2m42[0m |     <Grid container spacing={GRID_COMMON_SPACING}>
+    : [35;1m     ^^^^[0m
+ [2m43[0m |       {/* 페이지 헤더 */}
+ [2m44[0m |       <Grid size={12}>
+ [2m45[0m |         <Card>
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/views/apps/ChecklistManagement.tsx
+./src/app/(dashboard)/admin-panel/checklist/page.tsx
+ GET /_next/static/webpack/eac90773a7c59bab.webpack.hot-update.json 500 in 1918ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET /_next/static/webpack/eac90773a7c59bab.webpack.hot-update.json 500 in 59ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET /admin-panel/checklist 500 in 64ms
+ GET /dashboard/default 500 in 67ms
+ ⨯ ./src/views/apps/ChecklistManagement.tsx
+Error:   [31mx[0m Unexpected token `Grid`. Expected jsx identifier
+    ,-[[36;1;4m/home/gurunamu/NEXWORK/mainly/src/views/apps/ChecklistManagement.tsx[0m:42:1]
+ [2m39[0m |   }
+ [2m40[0m | 
+ [2m41[0m |   return (
+ [2m42[0m |     <Grid container spacing={GRID_COMMON_SPACING}>
+    : [35;1m     ^^^^[0m
+ [2m43[0m |       {/* 페이지 헤더 */}
+ [2m44[0m |       <Grid size={12}>
+ [2m45[0m |         <Card>
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/views/apps/ChecklistManagement.tsx
+./src/app/(dashboard)/admin-panel/checklist/page.tsx
+ ⨯ ./src/views/apps/ChecklistManagement.tsx
+Error:   [31mx[0m Unexpected token `Grid`. Expected jsx identifier
+    ,-[[36;1;4m/home/gurunamu/NEXWORK/mainly/src/views/apps/ChecklistManagement.tsx[0m:42:1]
+ [2m39[0m |   }
+ [2m40[0m | 
+ [2m41[0m |   return (
+ [2m42[0m |     <Grid container spacing={GRID_COMMON_SPACING}>
+    : [35;1m     ^^^^[0m
+ [2m43[0m |       {/* 페이지 헤더 */}
+ [2m44[0m |       <Grid size={12}>
+ [2m45[0m |         <Card>
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/views/apps/ChecklistManagement.tsx
+./src/app/(dashboard)/admin-panel/checklist/page.tsx
+ GET /_next/static/webpack/eac90773a7c59bab.webpack.hot-update.json 500 in 951ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET /_next/static/webpack/eac90773a7c59bab.webpack.hot-update.json 500 in 54ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET /admin-panel/checklist 500 in 56ms
+ GET /dashboard/default 500 in 28ms
+ ⨯ ./src/views/apps/ChecklistManagement.tsx
+Error:   [31mx[0m Unexpected token `Grid`. Expected jsx identifier
+    ,-[[36;1;4m/home/gurunamu/NEXWORK/mainly/src/views/apps/ChecklistManagement.tsx[0m:42:1]
+ [2m39[0m |   }
+ [2m40[0m | 
+ [2m41[0m |   return (
+ [2m42[0m |     <Grid container spacing={GRID_COMMON_SPACING}>
+    : [35;1m     ^^^^[0m
+ [2m43[0m |       {/* 페이지 헤더 */}
+ [2m44[0m |       <Grid xs={12}>
+ [2m45[0m |         <Card>
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/views/apps/ChecklistManagement.tsx
+./src/app/(dashboard)/admin-panel/checklist/page.tsx
+ ⨯ ./src/views/apps/ChecklistManagement.tsx
+Error:   [31mx[0m Unexpected token `Grid`. Expected jsx identifier
+    ,-[[36;1;4m/home/gurunamu/NEXWORK/mainly/src/views/apps/ChecklistManagement.tsx[0m:42:1]
+ [2m39[0m |   }
+ [2m40[0m | 
+ [2m41[0m |   return (
+ [2m42[0m |     <Grid container spacing={GRID_COMMON_SPACING}>
+    : [35;1m     ^^^^[0m
+ [2m43[0m |       {/* 페이지 헤더 */}
+ [2m44[0m |       <Grid xs={12}>
+ [2m45[0m |         <Card>
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/views/apps/ChecklistManagement.tsx
+./src/app/(dashboard)/admin-panel/checklist/page.tsx
+ GET /_next/static/webpack/eac90773a7c59bab.webpack.hot-update.json 500 in 935ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET /_next/static/webpack/eac90773a7c59bab.webpack.hot-update.json 500 in 50ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET /admin-panel/checklist 500 in 44ms
+ GET /dashboard/default 500 in 30ms
+ ⨯ ./src/views/apps/ChecklistManagement.tsx
+Error:   [31mx[0m Unexpected token `Grid`. Expected jsx identifier
+    ,-[[36;1;4m/home/gurunamu/NEXWORK/mainly/src/views/apps/ChecklistManagement.tsx[0m:42:1]
+ [2m39[0m |   }
+ [2m40[0m | 
+ [2m41[0m |   return (
+ [2m42[0m |     <Grid container spacing={GRID_COMMON_SPACING}>
+    : [35;1m     ^^^^[0m
+ [2m43[0m |       {/* 페이지 헤더 */}
+ [2m44[0m |       <Grid xs={12}>
+ [2m45[0m |         <Card>
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/views/apps/ChecklistManagement.tsx
+./src/app/(dashboard)/admin-panel/checklist/page.tsx
+ ⨯ ./src/views/apps/ChecklistManagement.tsx
+Error:   [31mx[0m Unexpected token `Grid`. Expected jsx identifier
+    ,-[[36;1;4m/home/gurunamu/NEXWORK/mainly/src/views/apps/ChecklistManagement.tsx[0m:42:1]
+ [2m39[0m |   }
+ [2m40[0m | 
+ [2m41[0m |   return (
+ [2m42[0m |     <Grid container spacing={GRID_COMMON_SPACING}>
+    : [35;1m     ^^^^[0m
+ [2m43[0m |       {/* 페이지 헤더 */}
+ [2m44[0m |       <Grid xs={12}>
+ [2m45[0m |         <Card>
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/views/apps/ChecklistManagement.tsx
+./src/app/(dashboard)/admin-panel/checklist/page.tsx
+ GET /_next/static/webpack/eac90773a7c59bab.webpack.hot-update.json 500 in 976ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET /_next/static/webpack/eac90773a7c59bab.webpack.hot-update.json 500 in 55ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET /admin-panel/checklist 500 in 63ms
+ GET /dashboard/default 500 in 30ms
+ ⨯ ./src/views/apps/ChecklistManagement.tsx
+Error:   [31mx[0m Unexpected token `Box`. Expected jsx identifier
+    ,-[[36;1;4m/home/gurunamu/NEXWORK/mainly/src/views/apps/ChecklistManagement.tsx[0m:42:1]
+ [2m39[0m |   }
+ [2m40[0m | 
+ [2m41[0m |   return (
+ [2m42[0m |     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+    : [35;1m     ^^^[0m
+ [2m43[0m |       {/* 페이지 헤더 */}
+ [2m44[0m |       <Card>
+ [2m45[0m |         <CardContent sx={{ py: 3, px: 3 }}>
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/views/apps/ChecklistManagement.tsx
+./src/app/(dashboard)/admin-panel/checklist/page.tsx
+ ⨯ ./src/views/apps/ChecklistManagement.tsx
+Error:   [31mx[0m Unexpected token `Box`. Expected jsx identifier
+    ,-[[36;1;4m/home/gurunamu/NEXWORK/mainly/src/views/apps/ChecklistManagement.tsx[0m:42:1]
+ [2m39[0m |   }
+ [2m40[0m | 
+ [2m41[0m |   return (
+ [2m42[0m |     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+    : [35;1m     ^^^[0m
+ [2m43[0m |       {/* 페이지 헤더 */}
+ [2m44[0m |       <Card>
+ [2m45[0m |         <CardContent sx={{ py: 3, px: 3 }}>
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/views/apps/ChecklistManagement.tsx
+./src/app/(dashboard)/admin-panel/checklist/page.tsx
+ GET /_next/static/webpack/eac90773a7c59bab.webpack.hot-update.json 500 in 1144ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET /_next/static/webpack/eac90773a7c59bab.webpack.hot-update.json 500 in 42ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /dashboard/default 500 in 44ms
+ GET /admin-panel/checklist 500 in 31ms
+ ✓ Compiled /favicon.ico in 15.3s (8715 modules)
+ GET /_next/static/webpack/eac90773a7c59bab.webpack.hot-update.json 200 in 17127ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /_next/static/webpack/eac90773a7c59bab.webpack.hot-update.json 200 in 1795ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET /admin-panel/checklist 200 in 1789ms
+ GET /dashboard/default 200 in 849ms
+ ○ Compiling /api/auth/[...nextauth] ...
+ ✓ Compiled /api/auth/protected in 3.6s (4718 modules)
+ ✓ Compiled (4720 modules)
+ GET /api/auth/protected 200 in 3573ms
+ GET /api/auth/session 200 in 4384ms
+ GET /api/auth/protected 200 in 55ms
+ GET /api/auth/session 200 in 58ms
+ GET /api/auth/protected 200 in 45ms
+ GET /api/auth/session 200 in 52ms
+ GET /api/auth/protected 200 in 46ms
+ GET /api/auth/session 200 in 53ms
+ GET /api/auth/protected 200 in 46ms
+ GET /api/auth/session 200 in 62ms
+ GET /api/auth/protected 200 in 55ms
+ GET /api/auth/session 200 in 24ms
+ GET /api/auth/session 200 in 30ms
+ GET /api/auth/protected 200 in 37ms
+ GET /api/auth/session 200 in 23ms
+ GET /api/auth/session 200 in 20ms
+ GET /api/auth/session 200 in 84ms
+ GET /api/auth/protected 200 in 69ms
+ GET /api/auth/protected 200 in 20ms
+ GET /api/auth/session 200 in 104ms
+ GET /api/auth/session 200 in 76ms
+ GET /api/auth/protected 200 in 35ms
+ GET /api/auth/protected 200 in 23ms
+ GET /admin-panel/user-management 200 in 137ms
+ GET /admin-panel/checklist 200 in 68ms
+ ○ Compiling /admin-panel/master-code ...
+ ✓ Compiled /admin-panel/master-code in 5.8s (4713 modules)
+ GET /admin-panel/master-code 200 in 5940ms
+ GET /admin-panel/master-code 200 in 17ms
+ GET /api/auth/session 200 in 268ms
+ GET /api/auth/session 200 in 89ms
+ GET /api/auth/protected 200 in 95ms
+ GET /api/auth/protected 200 in 42ms
+ ✓ Compiled in 4.4s (8686 modules)
+ ○ Compiling /api/auth/[...nextauth] ...
+ ✓ Compiled /api/auth/[...nextauth] in 1911ms (4694 modules)
+ GET /api/auth/session 200 in 2096ms
+ GET /api/auth/session 200 in 49ms
+ ○ Compiling /api/auth/protected ...
+ ✓ Compiled /api/auth/protected in 529ms (4706 modules)
+ GET /api/auth/protected 200 in 651ms
+ GET /api/auth/protected 200 in 19ms
+ ○ Compiling /api/auth/[...nextauth] ...
+ ✓ Compiled /api/auth/[...nextauth] in 4s (9043 modules)
+ GET /api/auth/session 200 in 2122ms
+ GET /api/auth/session 200 in 47ms
+ ○ Compiling /api/auth/protected ...
+ ✓ Compiled /api/auth/protected in 613ms (4705 modules)
+ GET /api/auth/protected 200 in 744ms
+ GET /api/auth/protected 200 in 19ms
+ GET /api/auth/session 200 in 101ms
+ GET /api/auth/session 200 in 108ms
+ GET /api/auth/protected 200 in 69ms
+ GET /api/auth/protected 200 in 39ms
+ GET /admin-panel/user-management 200 in 154ms
+ GET /admin-panel/analytics/user-activity 200 in 56ms
+ ○ Compiling /admin-panel/department-management ...
+ ✓ Compiled /admin-panel/department-management in 7.8s (4711 modules)
+ GET /admin-panel/department-management 200 in 7947ms
+ GET /admin-panel/department-management 200 in 30ms
+ GET /admin-panel/department-management 200 in 37ms
+ GET /api/auth/session 200 in 265ms
+ GET /api/auth/session 200 in 62ms
+ GET /api/auth/protected 200 in 52ms
+ GET /api/auth/protected 200 in 32ms
+ GET /admin-panel/user-management 200 in 80ms
+ GET /admin-panel/analytics/user-activity 200 in 87ms
+ GET /admin-panel/checklist 200 in 68ms
+ GET /admin-panel/master-code 200 in 65ms
+ GET /api/auth/session 200 in 150ms
+ GET /api/auth/protected 200 in 133ms
+ GET /api/auth/session 200 in 97ms
+ GET /api/auth/protected 200 in 44ms
+ ✓ Compiled in 5.8s (8681 modules)
+ ✓ Compiled in 1208ms (8681 modules)
+ ○ Compiling /security/incident ...
+ ✓ Compiled /security/incident in 9.6s (8700 modules)
+ GET /security/incident 200 in 9809ms
+ ○ Compiling /it/voc ...
+ ✓ Compiled /it/voc in 6.1s (8707 modules)
+ GET /it/voc 200 in 6219ms
+ ○ Compiling /it/solution ...
+ ✓ Compiled /it/solution in 1078ms (8722 modules)
+ GET /it/solution 200 in 1191ms
+ ○ Compiling /it/hardware ...
+ ✓ Compiled /it/hardware in 7.4s (8765 modules)
+ GET /it/hardware 200 in 7455ms
+ GET /it/hardware 200 in 23ms
+ ○ Compiling /[...not_found] ...
+ ✓ Compiled /[...not_found] in 680ms (4375 modules)
+ GET /it/software 200 in 860ms
+ ✓ Compiled in 3.6s (8748 modules)
+ ○ Compiling /api/auth/protected ...
+ ✓ Compiled /api/auth/protected in 3.4s (4712 modules)
+ GET /api/auth/protected 200 in 3608ms
+ GET /api/auth/protected 200 in 32ms
+ ○ Compiling /security/regulation ...
+ ✓ Compiled /security/regulation in 2.2s (9117 modules)
+ GET /security/regulation 200 in 2393ms
+ ○ Compiling /security/inspection ...
+ ✓ Compiled /security/inspection in 9.1s (9136 modules)
+ GET /security/inspection 200 in 9243ms
+ ○ Compiling /security/incident ...
+ ✓ Compiled /security/incident in 3.2s (4733 modules)
+ GET /security/incident 200 in 3362ms
+ ✓ Compiled in 5.2s (8752 modules)
+ ✓ Compiled in 11.5s (8752 modules)
+ GET /security/incident 200 in 1518ms
+ ○ Compiling /api/auth/[...nextauth] ...
+ ✓ Compiled /api/auth/protected in 1876ms (4705 modules)
+ ✓ Compiled (4717 modules)
+ GET /api/auth/protected 200 in 1736ms
+ GET /api/auth/session 200 in 2646ms
+ GET /api/auth/protected 200 in 56ms
+ GET /api/auth/session 200 in 56ms
+ GET /api/auth/protected 200 in 29ms
+ GET /api/auth/session 200 in 25ms
+ GET /api/auth/protected 200 in 30ms
+ GET /api/auth/session 200 in 18ms
+ GET /api/auth/session 200 in 25ms
+ GET /api/auth/protected 200 in 34ms
+ ✓ Compiled in 3.9s (8752 modules)
+ ✓ Compiled in 6.6s (8752 modules)
+ ✓ Compiled in 934ms (8752 modules)
+ ○ Compiling /security/regulation ...
+ ✓ Compiled /security/regulation in 7.1s (4356 modules)
+ GET /security/regulation 200 in 7733ms
+ GET /security/inspection 200 in 5626ms
+ GET /security/incident 200 in 69ms
+ ✓ Compiled in 3.9s (8752 modules)
+ ✓ Compiled in 1019ms (8752 modules)
+ ○ Compiling /api/auth/[...nextauth] ...
+ ✓ Compiled /api/auth/[...nextauth] in 6.3s (4705 modules)
+ GET /api/auth/session 200 in 6512ms
+ GET /api/auth/session 200 in 39ms
+ ✓ Compiled /api/auth/protected in 479ms (4717 modules)
+ GET /api/auth/protected 200 in 624ms
+ GET /api/auth/protected 200 in 19ms
+ ○ Compiling /admin-panel/master-code ...
+ ✓ Compiled /admin-panel/master-code in 4.4s (4726 modules)
+ GET /admin-panel/master-code 200 in 4552ms
+ GET /admin-panel/master-code 200 in 62ms
+ ○ Compiling /admin-panel/checklist ...
+ ✓ Compiled /admin-panel/checklist in 6.6s (4713 modules)
+ GET /admin-panel/checklist 200 in 6668ms
+ GET /admin-panel/master-code 200 in 42ms
+ GET /security/incident 200 in 75ms
+ ✓ Compiled in 5.2s (8737 modules)
+ ✓ Compiled in 4.1s (8737 modules)
+ ✓ Compiled in 1037ms (8737 modules)
+ ✓ Compiled in 6.4s (8737 modules)
+ ✓ Compiled in 4s (8737 modules)
+ ✓ Compiled in 4.1s (8737 modules)
+ ✓ Compiled in 1020ms (8737 modules)
+ ✓ Compiled in 1106ms (8737 modules)
+ ✓ Compiled in 2.3s (8737 modules)
+ ✓ Compiled in 1018ms (8737 modules)
+ ✓ Compiled in 1048ms (8737 modules)
+ ✓ Compiled in 2.4s (8737 modules)
+ ✓ Compiled in 1126ms (8737 modules)
+ ✓ Compiled in 946ms (8737 modules)
+ ✓ Compiled in 2.4s (8737 modules)
+ ✓ Compiled in 986ms (8737 modules)
+ ✓ Compiled in 892ms (8737 modules)
+ ○ Compiling /api/auth/[...nextauth] ...
+ ✓ Compiled /api/auth/[...nextauth] in 6.6s (4690 modules)
+ GET /api/auth/session 200 in 6801ms
+ GET /api/auth/session 200 in 49ms
+ ○ Compiling /api/auth/protected ...
+ ✓ Compiled /api/auth/protected in 537ms (4702 modules)
+ GET /api/auth/protected 200 in 1144ms
+ GET /api/auth/session 200 in 1115ms
+ GET /api/auth/protected 200 in 22ms
+ GET /api/auth/protected 200 in 20ms
+ GET /api/auth/session 200 in 171ms
+ GET /api/auth/session 200 in 108ms
+ GET /api/auth/protected 200 in 85ms
+ GET /api/auth/protected 200 in 39ms
+ GET /api/auth/session 200 in 195ms
+ GET /api/auth/session 200 in 119ms
+ GET /api/auth/protected 200 in 124ms
+ GET /api/auth/protected 200 in 55ms
+ GET /api/auth/session 200 in 332ms
+ GET /api/auth/protected 200 in 113ms
+ GET /api/auth/session 200 in 225ms
+ GET /api/auth/protected 200 in 78ms
+ GET /api/auth/session 200 in 314ms
+ GET /api/auth/protected 200 in 70ms
+ GET /security/incident 200 in 988ms
+ ✓ Compiled in 17.6s (8737 modules)
+ ✓ Compiled in 4s (8737 modules)
+ ○ Compiling /security/partners ...
+ ✓ Compiled /security/partners in 9.5s (8746 modules)
+ GET /security/partners 200 in 9861ms
+ GET /security/partners 200 in 52ms
+ GET /security/partners 200 in 25ms
+ GET /security/partners 200 in 48ms
+ GET /security/incident 200 in 60ms
+ ✓ Compiled in 1323ms (8746 modules)
+ ✓ Compiled in 1626ms (8746 modules)
+ ✓ Compiled in 1274ms (8746 modules)
+ ✓ Compiled in 1244ms (8746 modules)
+ ✓ Compiled in 1496ms (8740 modules)
+ ✓ Compiled in 1126ms (8740 modules)
+ ✓ Compiled in 1013ms (8740 modules)
+ ✓ Compiled in 1349ms (8740 modules)
+ ✓ Compiled in 1108ms (8740 modules)
+ ✓ Compiled in 1218ms (8740 modules)
+ ✓ Compiled in 947ms (8740 modules)
+ ✓ Compiled in 2.4s (8740 modules)
+ ○ Compiling /admin-panel/system-settings ...
+ ✓ Compiled /apps/cost in 7.4s (4338 modules)
+ ✓ Compiled in 6.8s (4413 modules)
+ GET /admin-panel/system-settings 200 in 14499ms
+ GET /apps/cost 200 in 9020ms
+ ✓ Compiled in 4s (8737 modules)
+ ✓ Compiled in 889ms (8737 modules)
+ ✓ Compiled in 1035ms (8737 modules)
+ ✓ Compiled in 933ms (8737 modules)
+ ✓ Compiled in 1412ms (8737 modules)
+ ✓ Compiled in 1020ms (8737 modules)
+ ✓ Compiled in 4s (8737 modules)
+ ○ Compiling /api/auth/protected ...
+ ✓ Compiled /api/auth/protected in 4.8s (4691 modules)
+ GET /api/auth/protected 200 in 5165ms
+ ✓ Compiled in 8.9s (9104 modules)
+ ○ Compiling /api/auth/[...nextauth] ...
+ ✓ Compiled /api/auth/[...nextauth] in 4.3s (4681 modules)
+ GET /api/auth/session 200 in 4616ms
+ ○ Compiling /api/auth/protected ...
+ ✓ Compiled /api/auth/protected in 655ms (4693 modules)
+ GET /api/auth/protected 200 in 816ms
+ GET /api/auth/session 200 in 320ms
+ GET /api/auth/protected 200 in 80ms
+ GET /api/auth/session 200 in 176ms
+ GET /api/auth/protected 200 in 104ms
+ GET /api/auth/session 200 in 118ms
+ GET /api/auth/protected 200 in 67ms
+ GET /api/auth/session 200 in 348ms
+ GET /api/auth/protected 200 in 115ms
+ GET /api/auth/session 200 in 342ms
+ GET /api/auth/protected 200 in 105ms
+ ✓ Compiled in 14.1s (8737 modules)
+ ✓ Compiled in 4.3s (8737 modules)
+ ✓ Compiled in 4.3s (8737 modules)
+ ✓ Compiled in 4.2s (8737 modules)
+ ✓ Compiled in 1184ms (8737 modules)
+ ✓ Compiled in 4.3s (8737 modules)
+ ⨯ ./src/views/apps/CostDataTable.tsx
+Module parse failed: Identifier 'Paper' has already been declared (5:311)
+| import React, { useState, useMemo } from 'react';
+| // Material-UI
+> import { Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Checkbox, Button, TextField, Select, MenuItem, Typography, Pagination, Dialog, DialogTitle, DialogContent, DialogActions, List, ListItem, IconButton, Chip, FormControl, InputLabel, Avatar, Tooltip, Divider, Tabs, Tab, Grid, Paper, Stack } from "__barrel_optimize__?names=Avatar,Box,Button,Checkbox,Chip,Dialog,DialogActions,DialogContent,DialogTitle,Divider,FormControl,Grid,IconButton,InputLabel,List,ListItem,MenuItem,Pagination,Paper,Select,Stack,Tab,Table,TableBody,TableCell,TableContainer,TableHead,TableRow,Tabs,TextField,Tooltip,Typography!=!@mui/material";
+| import { useTheme } from '@mui/material/styles';
+| // Icons
+
+Import trace for requested module:
+./src/views/apps/CostDataTable.tsx
+./src/views/apps/CostManagement.tsx
+ ✓ Compiled in 10s (8737 modules)
+ ○ Compiling /api/auth/protected ...
+ ✓ Compiled /api/auth/protected in 2.1s (4691 modules)
+ GET /api/auth/protected 200 in 2501ms
+ ○ Compiling /api/auth/[...nextauth] ...
+ ✓ Compiled /api/auth/[...nextauth] in 3.7s (4681 modules)
+ GET /api/auth/session 200 in 3965ms
+ ○ Compiling /api/auth/protected ...
+ ✓ Compiled /api/auth/protected in 519ms (4693 modules)
+ GET /api/auth/protected 200 in 639ms
+ GET /api/auth/session 200 in 812ms
+ GET /api/auth/session 200 in 121ms
+ GET /api/auth/protected 200 in 49ms
+ GET /api/auth/protected 200 in 15ms
+ ✓ Compiled in 4.3s (8737 modules)
+ ✓ Compiled in 4.9s (8737 modules)
+ ○ Compiling /apps/education ...
+ ✓ Compiled /apps/education in 11.5s (8751 modules)
+ GET /apps/education 200 in 11884ms
+ ○ Compiling /api/auth/[...nextauth] ...
+ ✓ Compiled /api/auth/[...nextauth] in 2.3s (4675 modules)
+ GET /api/auth/session 200 in 2592ms
+ ○ Compiling /api/auth/protected ...
+ ✓ Compiled /api/auth/protected in 4.7s (4687 modules)
+ GET /api/auth/protected 200 in 4970ms
+ ○ Compiling /dashboard/default ...
+ ✓ Compiled /dashboard/default in 7.9s (4708 modules)
+ GET /dashboard/default 200 in 8132ms
+ ○ Compiling /planning/sales ...
+ ✓ Compiled /planning/sales in 2.9s (9135 modules)
+ GET /planning/sales 200 in 3029ms
+ GET /security/inspection 200 in 118ms
+ GET /dashboard/default 200 in 75ms
+ GET /api/auth/session 200 in 203ms
+ GET /api/auth/protected 200 in 49ms
+ GET /api/auth/session 200 in 136ms
+ GET /api/auth/protected 200 in 55ms
+ GET /api/auth/session 200 in 142ms
+ GET /api/auth/protected 200 in 56ms
+ GET /planning/sales 200 in 60ms
+ ○ Compiling /planning/inventory ...
+ ✓ Compiled /planning/inventory in 4.5s (9123 modules)
+ GET /planning/inventory 200 in 4653ms
+ GET /planning/inventory 200 in 1301ms
+ GET /api/auth/session 200 in 110ms
+ GET /api/auth/session 200 in 34ms
+ GET /api/auth/protected 200 in 22ms
+ GET /api/auth/protected 200 in 44ms
+ GET /api/auth/session 200 in 17ms
+ GET /api/auth/session 200 in 17ms
+ GET /planning/sales 200 in 54ms
+ GET /api/auth/session 200 in 82ms
+ GET /api/auth/protected 200 in 32ms
+ ⨯ ./src/views/apps/SalesChangeLog.tsx:36:1
+Module not found: Can't resolve 'lucide-react'
+  34 |
+  35 | // Icons
+> 36 | import { 
+     | ^
+  37 |   History, 
+  38 |   Plus, 
+  39 |   Edit, 
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+ GET /api/auth/session 500 in 599ms
+ POST /api/auth/_log 500 in 156ms
+ GET /api/auth/protected 500 in 122ms
+ ⨯ ./src/views/apps/SalesChangeLog.tsx:36:1
+Module not found: Can't resolve 'lucide-react'
+  34 |
+  35 | // Icons
+> 36 | import { 
+     | ^
+  37 |   History, 
+  38 |   Plus, 
+  39 |   Edit, 
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+ ⨯ ./src/views/apps/SalesChangeLog.tsx:36:1
+Module not found: Can't resolve 'lucide-react'
+  34 |
+  35 | // Icons
+> 36 | import { 
+     | ^
+  37 |   History, 
+  38 |   Plus, 
+  39 |   Edit, 
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+ ⨯ ./src/views/apps/SalesChangeLog.tsx:36:1
+Module not found: Can't resolve 'lucide-react'
+  34 |
+  35 | // Icons
+> 36 | import { 
+     | ^
+  37 |   History, 
+  38 |   Plus, 
+  39 |   Edit, 
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+ ⨯ ./src/views/apps/SalesChangeLog.tsx:36:1
+Module not found: Can't resolve 'lucide-react'
+  34 |
+  35 | // Icons
+> 36 | import { 
+     | ^
+  37 |   History, 
+  38 |   Plus, 
+  39 |   Edit, 
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+ ⨯ ./src/views/apps/SalesChangeLog.tsx:36:1
+Module not found: Can't resolve 'lucide-react'
+  34 |
+  35 | // Icons
+> 36 | import { 
+     | ^
+  37 |   History, 
+  38 |   Plus, 
+  39 |   Edit, 
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+ ⨯ ./src/views/apps/SalesChangeLog.tsx:36:1
+Module not found: Can't resolve 'lucide-react'
+  34 |
+  35 | // Icons
+> 36 | import { 
+     | ^
+  37 |   History, 
+  38 |   Plus, 
+  39 |   Edit, 
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+ ⨯ ./src/views/apps/SalesChangeLog.tsx:36:1
+Module not found: Can't resolve 'lucide-react'
+  34 |
+  35 | // Icons
+> 36 | import { 
+     | ^
+  37 |   History, 
+  38 |   Plus, 
+  39 |   Edit, 
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+ ⨯ ./src/views/apps/SalesReport.tsx
+Error:   [31mx[0m Unexpected token `Box`. Expected jsx identifier
+     ,-[[36;1;4m/home/gurunamu/NEXWORK/mainly/src/views/apps/SalesReport.tsx[0m:133:1]
+ [2m130[0m |   };
+ [2m131[0m | 
+ [2m132[0m |   return (
+ [2m133[0m |     <Box sx={{ p: 3 }}>
+     : [35;1m     ^^^[0m
+ [2m134[0m |       <Grid container spacing={3}>
+ [2m135[0m |         {/* 리포트 생성 */}
+ [2m136[0m |         <Grid item xs={12} lg={6}>
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/views/apps/SalesReport.tsx
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+ ⨯ ./src/views/apps/SalesReport.tsx
+Error:   [31mx[0m Unexpected token `Box`. Expected jsx identifier
+     ,-[[36;1;4m/home/gurunamu/NEXWORK/mainly/src/views/apps/SalesReport.tsx[0m:133:1]
+ [2m130[0m |   };
+ [2m131[0m | 
+ [2m132[0m |   return (
+ [2m133[0m |     <Box sx={{ p: 3 }}>
+     : [35;1m     ^^^[0m
+ [2m134[0m |       <Grid container spacing={3}>
+ [2m135[0m |         {/* 리포트 생성 */}
+ [2m136[0m |         <Grid item xs={12} lg={6}>
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/views/apps/SalesReport.tsx
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+ ○ Compiling / ...
+ ⨯ ./src/views/apps/SalesReport.tsx
+Error:   [31mx[0m Unexpected token `Box`. Expected jsx identifier
+     ,-[[36;1;4m/home/gurunamu/NEXWORK/mainly/src/views/apps/SalesReport.tsx[0m:133:1]
+ [2m130[0m |   };
+ [2m131[0m | 
+ [2m132[0m |   return (
+ [2m133[0m |     <Box sx={{ p: 3 }}>
+     : [35;1m     ^^^[0m
+ [2m134[0m |       <Grid container spacing={3}>
+ [2m135[0m |         {/* 리포트 생성 */}
+ [2m136[0m |         <Grid item xs={12} lg={6}>
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/views/apps/SalesReport.tsx
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+ ⨯ ./src/views/apps/SalesReport.tsx
+Error:   [31mx[0m Unexpected token `Box`. Expected jsx identifier
+     ,-[[36;1;4m/home/gurunamu/NEXWORK/mainly/src/views/apps/SalesReport.tsx[0m:133:1]
+ [2m130[0m |   };
+ [2m131[0m | 
+ [2m132[0m |   return (
+ [2m133[0m |     <Box sx={{ p: 3 }}>
+     : [35;1m     ^^^[0m
+ [2m134[0m |       <Grid container spacing={3}>
+ [2m135[0m |         {/* 리포트 생성 */}
+ [2m136[0m |         <Grid item xs={12} lg={6}>
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/views/apps/SalesReport.tsx
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+ GET /planning/sales 500 in 17ms
+ GET /planning/sales 500 in 41ms
+
+Could not open SalesReport.tsx in the editor.
+The editor process exited with an error: Terminal editors can only be used on macOS.
+
+To set up the editor integration, add something like REACT_EDITOR=atom to the .env.local file in your project folder and restart the development server.
+
+
+Could not open SalesReport.tsx in the editor.
+The editor process exited with an error: Terminal editors can only be used on macOS.
+
+To set up the editor integration, add something like REACT_EDITOR=atom to the .env.local file in your project folder and restart the development server.
+
+ ⚠ ./src/views/apps/SalesReport.tsx
+Attempted import error: 'Download' is not exported from '@wandersonalwes/iconsax-react' (imported as 'Download').
+
+Import trace for requested module:
+./src/views/apps/SalesReport.tsx
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+
+./src/views/apps/SalesReport.tsx
+Attempted import error: 'Download' is not exported from '@wandersonalwes/iconsax-react' (imported as 'Download').
+
+Import trace for requested module:
+./src/views/apps/SalesReport.tsx
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+ ⚠ ./src/views/apps/SalesReport.tsx
+Attempted import error: 'Download' is not exported from '@wandersonalwes/iconsax-react' (imported as 'Download').
+
+Import trace for requested module:
+./src/views/apps/SalesReport.tsx
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+
+./src/views/apps/SalesReport.tsx
+Attempted import error: 'Download' is not exported from '@wandersonalwes/iconsax-react' (imported as 'Download').
+
+Import trace for requested module:
+./src/views/apps/SalesReport.tsx
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+ ⚠ ./src/views/apps/SalesReport.tsx
+Attempted import error: 'Download' is not exported from '@wandersonalwes/iconsax-react' (imported as 'Download').
+
+Import trace for requested module:
+./src/views/apps/SalesReport.tsx
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+
+./src/views/apps/SalesReport.tsx
+Attempted import error: 'Download' is not exported from '@wandersonalwes/iconsax-react' (imported as 'Download').
+
+Import trace for requested module:
+./src/views/apps/SalesReport.tsx
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+ GET /_next/static/webpack/eac90773a7c59bab.webpack.hot-update.json 200 in 2791ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /planning/sales 200 in 1186ms
+ ⚠ ./src/views/apps/SalesReport.tsx
+Attempted import error: 'Download' is not exported from '@wandersonalwes/iconsax-react' (imported as 'Download').
+
+Import trace for requested module:
+./src/views/apps/SalesReport.tsx
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+
+./src/views/apps/SalesReport.tsx
+Attempted import error: 'Download' is not exported from '@wandersonalwes/iconsax-react' (imported as 'Download').
+
+Import trace for requested module:
+./src/views/apps/SalesReport.tsx
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+ ⚠ ./src/views/apps/SalesReport.tsx
+Attempted import error: 'Download' is not exported from '@wandersonalwes/iconsax-react' (imported as 'Download').
+
+Import trace for requested module:
+./src/views/apps/SalesReport.tsx
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+
+./src/views/apps/SalesReport.tsx
+Attempted import error: 'Download' is not exported from '@wandersonalwes/iconsax-react' (imported as 'Download').
+
+Import trace for requested module:
+./src/views/apps/SalesReport.tsx
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+ ⚠ ./src/views/apps/SalesReport.tsx
+Attempted import error: 'Download' is not exported from '@wandersonalwes/iconsax-react' (imported as 'Download').
+
+Import trace for requested module:
+./src/views/apps/SalesReport.tsx
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+
+./src/views/apps/SalesReport.tsx
+Attempted import error: 'Download' is not exported from '@wandersonalwes/iconsax-react' (imported as 'Download').
+
+Import trace for requested module:
+./src/views/apps/SalesReport.tsx
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+ ⚠ ./src/views/apps/SalesReport.tsx
+Attempted import error: 'Download' is not exported from '@wandersonalwes/iconsax-react' (imported as 'Download').
+
+Import trace for requested module:
+./src/views/apps/SalesReport.tsx
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+
+./src/views/apps/SalesReport.tsx
+Attempted import error: 'Download' is not exported from '@wandersonalwes/iconsax-react' (imported as 'Download').
+
+Import trace for requested module:
+./src/views/apps/SalesReport.tsx
+./src/views/apps/SalesManagement.tsx
+./src/app/(dashboard)/planning/sales/page.tsx
+ GET /api/auth/protected 200 in 2313ms
+ GET /api/auth/session 200 in 3960ms
+ GET /api/auth/protected 200 in 65ms
+ GET /api/auth/session 200 in 42ms
+ GET /api/auth/protected 200 in 46ms
+ GET /api/auth/session 200 in 23ms
+ GET /api/auth/protected 200 in 31ms
+ GET /api/auth/session 200 in 47ms
+ GET /api/auth/session 200 in 157ms
+ GET /api/auth/protected 200 in 80ms
+ GET /planning/sales 200 in 7123ms
+[?25h

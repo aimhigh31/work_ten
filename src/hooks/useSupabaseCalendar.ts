@@ -1,0 +1,224 @@
+import { useState, useEffect, useCallback } from 'react';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+export interface CalendarEvent {
+  id: number;
+  event_id: string;
+  title: string;
+  description?: string;
+  team?: string;
+  assignee?: string;
+  attendees?: string;
+  color?: string;
+  text_color?: string;
+  all_day: boolean;
+  start_date: string;
+  end_date: string;
+  event_code?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CalendarEventInput {
+  event_id?: string;
+  title: string;
+  description?: string;
+  team?: string;
+  assignee?: string;
+  attendees?: string;
+  color?: string;
+  text_color?: string;
+  all_day: boolean;
+  start_date: Date | string;
+  end_date: Date | string;
+}
+
+export function useSupabaseCalendar() {
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // 전체 이벤트 조회
+  const fetchEvents = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { data, error: fetchError } = await supabase
+        .from('main_calendar_data')
+        .select('*')
+        .order('start_date', { ascending: true });
+
+      if (fetchError) {
+        console.error('이벤트 조회 오류:', fetchError);
+        setError(fetchError.message);
+        return [];
+      }
+
+      setEvents(data || []);
+      return data || [];
+    } catch (err: any) {
+      console.error('이벤트 조회 예외:', err);
+      setError(err.message);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // 다음 이벤트 코드 생성
+  const generateNextEventCode = useCallback(async () => {
+    try {
+      const currentYear = new Date().getFullYear().toString().slice(-2);
+      const yearPrefix = `MAIN-CALENDAR-${currentYear}-`;
+
+      // 현재 연도의 최대 일련번호 조회
+      const { data, error } = await supabase
+        .from('main_calendar_data')
+        .select('event_code')
+        .like('event_code', `${yearPrefix}%`)
+        .order('event_code', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error('코드 조회 오류:', error);
+        return `${yearPrefix}001`;
+      }
+
+      if (!data || data.length === 0) {
+        return `${yearPrefix}001`;
+      }
+
+      // 마지막 일련번호 추출 및 증가
+      const lastCode = data[0].event_code;
+      const lastSerial = parseInt(lastCode.split('-').pop() || '0', 10);
+      const nextSerial = (lastSerial + 1).toString().padStart(3, '0');
+
+      return `${yearPrefix}${nextSerial}`;
+    } catch (err) {
+      console.error('코드 생성 예외:', err);
+      const currentYear = new Date().getFullYear().toString().slice(-2);
+      return `MAIN-CALENDAR-${currentYear}-001`;
+    }
+  }, []);
+
+  // 이벤트 생성
+  const createEvent = useCallback(async (eventData: CalendarEventInput) => {
+    try {
+      const event_id = eventData.event_id || `event_${Date.now()}`;
+      const event_code = await generateNextEventCode();
+
+      const { data, error: createError } = await supabase
+        .from('main_calendar_data')
+        .insert([
+          {
+            event_id,
+            title: eventData.title,
+            description: eventData.description,
+            team: eventData.team,
+            assignee: eventData.assignee,
+            attendees: eventData.attendees,
+            color: eventData.color,
+            text_color: eventData.text_color || '#000000',
+            all_day: eventData.all_day,
+            start_date: new Date(eventData.start_date).toISOString(),
+            end_date: new Date(eventData.end_date).toISOString(),
+            event_code
+          }
+        ])
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('이벤트 생성 오류:', createError);
+        throw createError;
+      }
+
+      console.log('이벤트 생성 성공:', data);
+      await fetchEvents(); // 목록 새로고침
+      return data;
+    } catch (err: any) {
+      console.error('이벤트 생성 예외:', err);
+      throw err;
+    }
+  }, [fetchEvents, generateNextEventCode]);
+
+  // 이벤트 수정
+  const updateEvent = useCallback(async (event_id: string, eventData: Partial<CalendarEventInput>) => {
+    try {
+      const updatePayload: any = {};
+
+      if (eventData.title !== undefined) updatePayload.title = eventData.title;
+      if (eventData.description !== undefined) updatePayload.description = eventData.description;
+      if (eventData.team !== undefined) updatePayload.team = eventData.team;
+      if (eventData.assignee !== undefined) updatePayload.assignee = eventData.assignee;
+      if (eventData.attendees !== undefined) updatePayload.attendees = eventData.attendees;
+      if (eventData.color !== undefined) updatePayload.color = eventData.color;
+      if (eventData.text_color !== undefined) updatePayload.text_color = eventData.text_color;
+      if (eventData.all_day !== undefined) updatePayload.all_day = eventData.all_day;
+      if (eventData.start_date !== undefined) updatePayload.start_date = new Date(eventData.start_date).toISOString();
+      if (eventData.end_date !== undefined) updatePayload.end_date = new Date(eventData.end_date).toISOString();
+
+      updatePayload.updated_at = new Date().toISOString();
+
+      const { data, error: updateError } = await supabase
+        .from('main_calendar_data')
+        .update(updatePayload)
+        .eq('event_id', event_id)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('이벤트 수정 오류:', updateError);
+        throw updateError;
+      }
+
+      console.log('이벤트 수정 성공:', data);
+      await fetchEvents(); // 목록 새로고침
+      return data;
+    } catch (err: any) {
+      console.error('이벤트 수정 예외:', err);
+      throw err;
+    }
+  }, [fetchEvents]);
+
+  // 이벤트 삭제
+  const deleteEvent = useCallback(async (event_id: string) => {
+    try {
+      const { error: deleteError } = await supabase
+        .from('main_calendar_data')
+        .delete()
+        .eq('event_id', event_id);
+
+      if (deleteError) {
+        console.error('이벤트 삭제 오류:', deleteError);
+        throw deleteError;
+      }
+
+      console.log('이벤트 삭제 성공:', event_id);
+      await fetchEvents(); // 목록 새로고침
+    } catch (err: any) {
+      console.error('이벤트 삭제 예외:', err);
+      throw err;
+    }
+  }, [fetchEvents]);
+
+  // 초기 로드
+  useEffect(() => {
+    fetchEvents();
+  }, [fetchEvents]);
+
+  return {
+    events,
+    loading,
+    error,
+    fetchEvents,
+    createEvent,
+    updateEvent,
+    deleteEvent
+  };
+}

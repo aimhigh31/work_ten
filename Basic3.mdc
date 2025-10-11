@@ -1,0 +1,500 @@
+# Basic3.mdc - 비용관리 페이지 구조 분석 및 설계 가이드
+
+## 📋 개요
+비용관리 페이지는 Material-UI 기반의 완전한 CRUD 테이블 시스템으로, 탭 구조와 필터링, 페이지네이션, 인라인 편집 등의 고급 기능을 포함합니다. 이 문서는 향후 비슷한 페이지를 빠르게 개발할 수 있도록 구조를 상세히 분석합니다.
+
+## 🏗️ 전체 아키텍처
+
+### 1. 파일 구조
+```
+src/
+├── app/(dashboard)/apps/cost/
+│   └── page.tsx                    # 페이지 진입점
+├── views/apps/
+│   ├── CostManagement.tsx         # 메인 컨테이너 컴포넌트
+│   └── CostDataTable.tsx          # 테이블 컴포넌트
+├── types/
+│   └── cost.ts                    # 타입 정의
+├── data/
+│   └── cost.ts                    # 샘플 데이터 & 유틸리티
+├── api/
+│   └── cost.ts                    # API 인터페이스
+└── utils/locales/
+    └── ko.json                    # 다국어 지원
+```
+
+### 2. 컴포넌트 계층 구조
+```
+CostManagement (메인 컨테이너)
+├── MainCard (외부 컨테이너)
+│   ├── Header (제목 + 필터)
+│   │   ├── 연도 필터
+│   │   ├── 팀 필터
+│   │   └── 상태 필터
+│   ├── Tabs (탭 네비게이션)
+│   │   ├── 데이터 탭
+│   │   └── 대시보드 탭
+│   └── TabPanel (탭 내용)
+│       ├── CostDataTable (데이터 탭)
+│       └── Dashboard (대시보드 탭)
+└── CostDataTable (테이블 컴포넌트)
+    ├── ActionBar (추가/삭제 버튼)
+    ├── TableContainer (테이블)
+    │   ├── TableHead (헤더)
+    │   └── TableBody (데이터 행)
+    ├── Pagination (페이지네이션)
+    └── AttachmentDialog (첨부파일 다이얼로그)
+```
+
+## 🎨 디자인 시스템
+
+### 1. 색상 체계
+```typescript
+// 상태별 색상 매핑
+const statusColors = {
+  '대기': { bgcolor: '#fff8e1', color: '#f57f17' },
+  '진행': { bgcolor: '#fff3e0', color: '#f57c00' },
+  '완료': { bgcolor: '#e8f5e8', color: '#388e3c' },
+  '취소': { bgcolor: '#ffebee', color: '#d32f2f' }
+};
+
+// 팀별 색상 매핑
+const teamColors = {
+  'IT팀': 'primary',
+  '마케팅팀': 'secondary',
+  '영업팀': 'info',
+  '기획팀': 'success',
+  '인사팀': 'warning'
+};
+```
+
+### 2. 스타일 가이드
+```typescript
+// 테이블 스타일
+const tableStyles = {
+  borderRadius: 2,
+  overflowX: 'auto',
+  // 커스텀 스크롤바
+  '&::-webkit-scrollbar': {
+    width: '10px',
+    height: '10px'
+  },
+  '&::-webkit-scrollbar-track': {
+    backgroundColor: '#f8f9fa',
+    borderRadius: '4px'
+  },
+  '&::-webkit-scrollbar-thumb': {
+    backgroundColor: '#e9ecef',
+    borderRadius: '4px',
+    border: '2px solid #f8f9fa'
+  }
+};
+
+// 컬럼 너비 정의
+const columnWidths = {
+  checkbox: 50,
+  no: 60,
+  registrationDate: 100,
+  code: 120,
+  team: 80,
+  assignee: 120,
+  costType: 100,
+  content: 250,
+  quantity: 80,
+  unitPrice: 120,
+  amount: 120,
+  status: 90,
+  completionDate: 100,
+  attachment: 80
+};
+```
+
+## 📊 데이터 구조
+
+### 1. 메인 데이터 타입
+```typescript
+interface CostRecord {
+  id: number;
+  registrationDate: string;        // 자동 생성 (읽기 전용)
+  code: string;                   // 자동 생성 (읽기 전용)
+  team: string;                   // 드롭다운 편집
+  assignee: string;               // 드롭다운 편집
+  costType: '솔루션' | '하드웨어' | '출장경비' | '행사경비' | '사무경비';
+  content: string;                // 텍스트 편집
+  quantity: number;               // 숫자 편집
+  unitPrice: number;              // 숫자 편집
+  amount: number;                 // 자동 계산 (읽기 전용)
+  status: '대기' | '진행' | '완료' | '취소';
+  completionDate: string;         // 날짜 편집
+  attachment: boolean;            // 첨부파일 여부
+  attachmentCount: number;        // 첨부파일 개수
+  attachments: AttachmentFile[];  // 첨부파일 목록
+  isNew?: boolean;               // 신규 행 표시
+}
+```
+
+### 2. 첨부파일 타입
+```typescript
+interface AttachmentFile {
+  id: number;
+  name: string;
+  type: string;
+  size: string;
+  uploadDate: string;
+}
+```
+
+## 🔧 핵심 기능 구현
+
+### 1. 필터링 시스템
+```typescript
+// 필터 상태 관리
+const [selectedTeam, setSelectedTeam] = useState('전체');
+const [selectedStatus, setSelectedStatus] = useState('전체');
+const [selectedYear, setSelectedYear] = useState('전체');
+
+// 필터링 로직
+const filteredRecords = useMemo(() => {
+  const filtered = records.filter(record => {
+    if (selectedTeam !== '전체' && record.team !== selectedTeam) return false;
+    if (selectedStatus !== '전체' && record.status !== selectedStatus) return false;
+    if (selectedYear !== '전체') {
+      const recordYear = new Date(record.registrationDate).getFullYear().toString();
+      if (recordYear !== selectedYear) return false;
+    }
+    return true;
+  });
+  
+  return filtered.sort((a, b) => 
+    new Date(b.registrationDate).getTime() - new Date(a.registrationDate).getTime()
+  );
+}, [records, selectedTeam, selectedStatus, selectedYear]);
+```
+
+### 2. 인라인 편집 시스템
+```typescript
+// 편집 상태 관리
+const [editingCell, setEditingCell] = useState<{rowId: number, field: string} | null>(null);
+
+// 셀 클릭 핸들러
+const handleCellClick = (rowId: number, field: string) => {
+  if (!['registrationDate', 'code', 'amount'].includes(field)) {
+    setEditingCell({ rowId, field });
+  }
+};
+
+// 편집 가능한 셀 렌더링
+const renderEditableCell = (record: CostRecord, field: string, value: any) => {
+  const isEditing = editingCell?.rowId === record.id && editingCell?.field === field;
+  
+  if (isEditing) {
+    switch (field) {
+      case 'team':
+      case 'assignee':
+      case 'costType':
+      case 'status':
+        return <Select>; // 드롭다운 편집
+      case 'content':
+        return <TextField>; // 텍스트 편집
+      case 'quantity':
+      case 'unitPrice':
+        return <TextField type="number">; // 숫자 편집
+      case 'completionDate':
+        return <TextField type="date">; // 날짜 편집
+    }
+  }
+  
+  return <Typography>; // 읽기 전용 표시
+};
+```
+
+### 3. 페이지네이션 시스템
+```typescript
+// 페이지네이션 상태
+const [page, setPage] = useState(0);
+const [rowsPerPage, setRowsPerPage] = useState(10);
+const [goToPage, setGoToPage] = useState('');
+
+// 페이지네이션된 데이터
+const paginatedRecords = useMemo(() => {
+  const startIndex = page * rowsPerPage;
+  return filteredRecords.slice(startIndex, startIndex + rowsPerPage);
+}, [filteredRecords, page, rowsPerPage]);
+
+// 페이지네이션 컴포넌트
+<Pagination
+  count={Math.ceil(filteredRecords.length / rowsPerPage)}
+  page={page + 1}
+  onChange={handlePageChange}
+  color="primary"
+  size="small"
+  showFirstButton
+  showLastButton
+/>
+```
+
+### 4. 첨부파일 관리 시스템
+```typescript
+// 첨부파일 다이얼로그 상태
+const [attachmentDialog, setAttachmentDialog] = useState<{
+  open: boolean;
+  recordId: number | null;
+}>({ open: false, recordId: null });
+
+// 파일 업로드 핸들러
+const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const files = event.target.files;
+  if (files && attachmentDialog.recordId) {
+    // 파일 업로드 로직
+  }
+};
+
+// 첨부파일 다이얼로그
+<Dialog open={attachmentDialog.open} maxWidth="md" fullWidth>
+  <DialogTitle>첨부파일 관리</DialogTitle>
+  <DialogContent>
+    <input type="file" multiple onChange={handleFileUpload} />
+    <List>
+      {/* 첨부파일 목록 */}
+    </List>
+  </DialogContent>
+</Dialog>
+```
+
+## 🎯 탭 시스템 구현
+
+### 1. 탭 구조
+```typescript
+// 탭 상태 관리
+const [value, setValue] = useState(0);
+
+// 탭 네비게이션
+<Tabs value={value} onChange={handleChange}>
+  <Tab
+    icon={<TableDocument size={20} />}
+    iconPosition="start"
+    label="데이터"
+  />
+  <Tab
+    icon={<Chart size={20} />}
+    iconPosition="start"
+    label="대시보드"
+  />
+</Tabs>
+
+// 탭 패널
+<TabPanel value={value} index={0}>
+  <CostDataTable />
+</TabPanel>
+<TabPanel value={value} index={1}>
+  <Dashboard />
+</TabPanel>
+```
+
+### 2. 탭 패널 컴포넌트
+```typescript
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+  
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`cost-tabpanel-${index}`}
+      aria-labelledby={`cost-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ pt: 2 }}>{children}</Box>}
+    </div>
+  );
+}
+```
+
+## 🔄 상태 관리 패턴
+
+### 1. 레코드 상태 관리
+```typescript
+// 메인 데이터 상태
+const [records, setRecords] = useState<CostRecord[]>(costData);
+
+// 선택된 레코드 상태
+const [selectedRecords, setSelectedRecords] = useState<number[]>([]);
+
+// 편집 상태
+const [editingCell, setEditingCell] = useState<{rowId: number, field: string} | null>(null);
+```
+
+### 2. UI 상태 관리
+```typescript
+// 페이지네이션 상태
+const [page, setPage] = useState(0);
+const [rowsPerPage, setRowsPerPage] = useState(10);
+
+// 필터 상태
+const [selectedTeam, setSelectedTeam] = useState('전체');
+const [selectedStatus, setSelectedStatus] = useState('전체');
+const [selectedYear, setSelectedYear] = useState('전체');
+
+// 다이얼로그 상태
+const [attachmentDialog, setAttachmentDialog] = useState({
+  open: false,
+  recordId: null
+});
+```
+
+## 📱 반응형 디자인
+
+### 1. 테이블 반응형 처리
+```typescript
+// 테이블 컨테이너 스타일
+<TableContainer
+  sx={{
+    overflowX: 'auto',
+    '& .MuiTable-root': {
+      minWidth: 1400  // 최소 너비 설정
+    }
+  }}
+>
+```
+
+### 2. 필터 반응형 처리
+```typescript
+// 필터 컨테이너 스타일
+<Box sx={{ 
+  display: 'flex', 
+  gap: 2, 
+  alignItems: 'center', 
+  flexWrap: 'wrap'  // 작은 화면에서 줄바꿈
+}}>
+```
+
+## 🚀 성능 최적화
+
+### 1. 메모이제이션
+```typescript
+// 필터링된 데이터 메모이제이션
+const filteredRecords = useMemo(() => {
+  // 필터링 로직
+}, [records, selectedTeam, selectedStatus, selectedYear]);
+
+// 페이지네이션된 데이터 메모이제이션
+const paginatedRecords = useMemo(() => {
+  // 페이지네이션 로직
+}, [filteredRecords, page, rowsPerPage]);
+```
+
+### 2. 가상화 (대용량 데이터 처리)
+```typescript
+// 필요시 react-window 또는 react-virtualized 사용
+// 현재는 페이지네이션으로 충분하지만 대용량 데이터 시 고려
+```
+
+## 🎨 UI/UX 개선 사항
+
+### 1. 사용자 피드백
+```typescript
+// 로딩 상태 표시
+const [loading, setLoading] = useState(false);
+
+// 에러 상태 표시
+const [error, setError] = useState<string | null>(null);
+
+// 성공 메시지 표시
+const [successMessage, setSuccessMessage] = useState<string | null>(null);
+```
+
+### 2. 접근성 개선
+```typescript
+// ARIA 레이블
+aria-label="비용관리 탭"
+role="tabpanel"
+id={`cost-tabpanel-${index}`}
+aria-labelledby={`cost-tab-${index}`}
+
+// 키보드 네비게이션
+onKeyPress={(e) => {
+  if (e.key === 'Enter') {
+    handleGoToPage();
+  }
+}}
+```
+
+## 🔧 개발 가이드라인
+
+### 1. 새로운 컬럼 추가 시
+1. `types/cost.ts`에 타입 정의 추가
+2. `data/cost.ts`에 샘플 데이터 추가
+3. `columnWidths` 객체에 너비 정의 추가
+4. `TableHead`에 헤더 셀 추가
+5. `TableBody`에 데이터 셀 추가
+6. `renderEditableCell` 함수에 편집 로직 추가
+
+### 2. 새로운 필터 추가 시
+1. 상태 변수 추가: `const [selectedX, setSelectedX] = useState('전체');`
+2. 필터 UI 추가: `<FormControl><Select></Select></FormControl>`
+3. 필터링 로직 추가: `filteredRecords` useMemo 수정
+4. 옵션 데이터 정의: `const xOptions = [...]`
+
+### 3. 새로운 액션 추가 시
+1. 액션 함수 정의: `const handleNewAction = () => {}`
+2. 버튼 UI 추가: `<Button onClick={handleNewAction}>`
+3. 필요시 다이얼로그 추가
+4. 상태 업데이트 로직 구현
+
+## 📋 체크리스트 (새 페이지 생성 시)
+
+### 필수 구현 사항
+- [ ] 기본 CRUD 기능 (Create, Read, Update, Delete)
+- [ ] 필터링 시스템
+- [ ] 페이지네이션
+- [ ] 인라인 편집
+- [ ] 정렬 기능
+- [ ] 검색 기능
+- [ ] 다국어 지원
+- [ ] 반응형 디자인
+- [ ] 접근성 지원
+
+### 선택적 구현 사항
+- [ ] 탭 시스템
+- [ ] 첨부파일 관리
+- [ ] 대시보드/차트
+- [ ] 데이터 내보내기
+- [ ] 벌크 액션
+- [ ] 실시간 업데이트
+- [ ] 드래그 앤 드롭
+
+### 성능 최적화
+- [ ] 메모이제이션 적용
+- [ ] 가상화 (대용량 데이터)
+- [ ] 레이지 로딩
+- [ ] 캐싱 전략
+- [ ] 디바운싱/쓰로틀링
+
+## 🏆 결론
+
+비용관리 페이지는 완전한 기능을 갖춘 데이터 관리 시스템의 모범 사례입니다. 이 구조를 기반으로 하여:
+
+1. **재사용성**: 컴포넌트 구조를 그대로 활용
+2. **확장성**: 새로운 기능을 쉽게 추가 가능
+3. **일관성**: 동일한 디자인 패턴 적용
+4. **성능**: 최적화된 상태 관리 및 렌더링
+
+이 가이드를 참고하여 향후 유사한 페이지를 빠르고 효율적으로 개발할 수 있습니다.
+
+## 📚 참고 자료
+
+- Material-UI Documentation
+- React Hook 패턴
+- TypeScript 타입 정의
+- 접근성 가이드라인
+- 성능 최적화 기법
+description:
+globs:
+alwaysApply: false
+---
