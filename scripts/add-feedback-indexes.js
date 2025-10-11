@@ -34,7 +34,7 @@ async function addIndexes() {
     console.log('🚀 Phase 3-1: DB 인덱스 추가 시작...\n');
 
     // SQL 파일 읽기
-    const sqlPath = path.join(__dirname, 'add-feedback-indexes.sql');
+    const sqlPath = path.join(__dirname, '../supabase/migrations/add_feedback_indexes.sql');
     const sql = fs.readFileSync(sqlPath, 'utf8');
 
     console.log('📝 실행할 SQL:');

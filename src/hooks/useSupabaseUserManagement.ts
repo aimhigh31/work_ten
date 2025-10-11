@@ -58,7 +58,7 @@ export interface UpdateUserProfileRequest extends CreateUserProfileRequest {
 // 캐시 키
 const USERS_CACHE_KEY = 'nexwork_users_cache';
 const CACHE_TIMESTAMP_KEY = 'nexwork_users_cache_timestamp';
-const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5분
+const CACHE_EXPIRY_MS = 30 * 60 * 1000; // 30분 (성능 최적화)
 
 export function useSupabaseUserManagement() {
   const [users, setUsers] = useState<UserProfile[]>([]);

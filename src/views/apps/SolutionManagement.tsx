@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
 
 // third-party
 import ReactApexChart, { Props as ChartProps } from 'react-apexcharts';
@@ -38,14 +39,19 @@ import {
   TableRow,
   TextField,
   Pagination,
-  Button
+  Button,
+  Skeleton
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 
 // Project imports
 import SolutionTable from 'views/apps/SolutionTable';
-import SolutionEditDialog from 'components/SolutionEditDialog';
+// Code splitting: Dialog 컴포넌트는 필요할 때만 로드 (성능 최적화)
+const SolutionEditDialog = dynamic(() => import('components/SolutionEditDialog'), {
+  ssr: false,
+  loading: () => null
+});
 import { solutionData, solutionStatusColors, assigneeAvatars, assignees, teams, solutionStatusOptions } from 'data/solution';
 import { SolutionTableData, SolutionStatus, DbSolutionData } from 'types/solution';
 import { useSupabaseSolution } from '../../hooks/useSupabaseSolution';
@@ -53,6 +59,7 @@ import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
 import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { ThemeMode } from 'config';
+import { TableSkeleton, KanbanSkeleton } from 'components/skeleton';
 
 // 변경로그 타입 정의
 interface ChangeLog {

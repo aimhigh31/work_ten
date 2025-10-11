@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 
 // third-party
 import ReactApexChart, { Props as ChartProps } from 'react-apexcharts';
@@ -37,14 +38,19 @@ import {
   TableRow,
   TextField,
   Pagination,
-  Button
+  Button,
+  Skeleton
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 
 // Project imports
 import HardwareTable from 'views/apps/HardwareTable';
-import HardwareEditDialog from 'components/HardwareEditDialog';
+// Code splitting: Dialog 컴포넌트는 필요할 때만 로드 (성능 최적화)
+const HardwareEditDialog = dynamic(() => import('components/HardwareEditDialog'), {
+  ssr: false,
+  loading: () => null
+});
 import { hardwareData, hardwareStatusColors, assigneeAvatars } from 'data/hardware';
 import { HardwareTableData, HardwareStatus, HardwareRecord } from 'types/hardware';
 import { ThemeMode } from 'config';
@@ -54,6 +60,7 @@ import { useSupabaseHardware, HardwareData } from 'hooks/useSupabaseHardware';
 import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
 import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
+import { TableSkeleton, KanbanSkeleton } from 'components/skeleton';
 
 // 변경로그 타입 정의
 interface ChangeLog {

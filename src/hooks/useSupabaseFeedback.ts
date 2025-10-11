@@ -66,9 +66,13 @@ export function useSupabaseFeedback(page: string, recordId?: string | number) {
   const supabase = createClient();
 
   // Phase 2-1: SWR로 캐싱 적용
-  // Phase 2-2: recordId가 없으면 데이터를 가져오지 않음 (쿼리 최적화)
-  const swrKey = normalizedRecordId ? `feedbacks|${page}|${normalizedRecordId}` : null;
-  console.log('🔍 SWR Key:', swrKey);
+  // Phase 2-2: recordId가 없거나 유효하지 않으면 데이터를 가져오지 않음 (쿼리 최적화, 성능 개선)
+  // 조건: normalizedRecordId가 존재하고, 'undefined' 문자열이 아니고, 빈 문자열이 아닌 경우에만 fetch
+  const isValidRecordId = normalizedRecordId &&
+                          normalizedRecordId !== 'undefined' &&
+                          normalizedRecordId.trim() !== '';
+  const swrKey = isValidRecordId ? `feedbacks|${page}|${normalizedRecordId}` : null;
+  console.log('🔍 SWR Key:', swrKey, '| 유효한 recordId:', isValidRecordId);
   const { data: feedbacks = [], error, mutate, isLoading, isValidating } = useSWR<FeedbackData[]>(
     swrKey,
     feedbackFetcher,
@@ -78,7 +82,7 @@ export function useSupabaseFeedback(page: string, recordId?: string | number) {
 
       revalidateOnFocus: false, // 포커스 시 재검증 비활성화
       revalidateOnReconnect: false, // 재연결 시 재검증 비활성화
-      dedupingInterval: 5000, // 5초 내 중복 요청 제거
+      dedupingInterval: 60000, // 60초 내 중복 요청 제거 (성능 최적화)
 
       // Phase 2-2: 초기 로딩 시에만 데이터 가져오기 (자동 재검증 최소화)
       revalidateIfStale: false, // stale 데이터여도 재검증 안 함

@@ -6,6 +6,11 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// 캐시 키
+const MASTERCODE_CACHE_KEY = 'nexwork_mastercode_cache';
+const CACHE_TIMESTAMP_KEY = 'nexwork_mastercode_cache_timestamp';
+const CACHE_EXPIRY_MS = 30 * 60 * 1000; // 30분 (성능 최적화)
+
 // 플랫 구조 데이터 타입 정의
 export interface MasterCodeFlat {
   id: number;
@@ -73,6 +78,84 @@ export const useSupabaseMasterCode3 = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 캐시에서 데이터 로드
+  const loadFromCache = useCallback(() => {
+    try {
+      const cachedData = sessionStorage.getItem(MASTERCODE_CACHE_KEY);
+      const cachedTimestamp = sessionStorage.getItem(CACHE_TIMESTAMP_KEY);
+
+      if (cachedData && cachedTimestamp) {
+        const timestamp = parseInt(cachedTimestamp, 10);
+        const now = Date.now();
+
+        // 캐시가 유효한 경우
+        if (now - timestamp < CACHE_EXPIRY_MS) {
+          const parsedData = JSON.parse(cachedData) as MasterCodeFlat[];
+          console.log('✅ 캐시에서 마스터코드 데이터 로드:', parsedData.length, '개');
+
+          // allData 설정
+          setAllData(parsedData);
+
+          // groups 설정
+          const groupRecords = parsedData.filter((item) => item.codetype === 'group') || [];
+          const groupList: GroupInfo[] = groupRecords.map((item) => {
+            const subcodeCount =
+              parsedData.filter((subItem) => subItem.codetype === 'subcode' && subItem.group_code === item.group_code).length || 0;
+            return {
+              group_code: item.group_code,
+              group_code_name: item.group_code_name,
+              group_code_description: item.group_code_description,
+              group_code_status: item.group_code_status,
+              group_code_order: item.group_code_order,
+              subcode_count: subcodeCount,
+              created_at: item.created_at,
+              updated_at: item.updated_at
+            };
+          });
+          setGroups(groupList.sort((a, b) => a.group_code_order - b.group_code_order));
+
+          // subCodes 설정
+          const subcodeRecords = parsedData.filter((item) => item.codetype === 'subcode') || [];
+          const subCodeList: SubCodeInfo[] = subcodeRecords.map((item) => ({
+            id: item.id,
+            group_code: item.group_code,
+            subcode: item.subcode,
+            subcode_name: item.subcode_name,
+            subcode_description: item.subcode_description,
+            subcode_status: item.subcode_status,
+            subcode_remark: item.subcode_remark,
+            subcode_order: item.subcode_order,
+            is_active: item.is_active,
+            created_at: item.created_at,
+            updated_at: item.updated_at,
+            created_by: item.created_by,
+            updated_by: item.updated_by
+          }));
+          setSubCodes(subCodeList);
+
+          return true;
+        } else {
+          console.log('⏰ 마스터코드 캐시 만료됨');
+        }
+      }
+      return false;
+    } catch (err) {
+      console.error('❌ 마스터코드 캐시 로드 실패:', err);
+      return false;
+    }
+  }, []);
+
+  // 캐시에 데이터 저장
+  const saveToCache = useCallback((data: MasterCodeFlat[]) => {
+    try {
+      sessionStorage.setItem(MASTERCODE_CACHE_KEY, JSON.stringify(data));
+      sessionStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+      console.log('💾 마스터코드 데이터 캐시 저장:', data.length, '개');
+    } catch (err) {
+      console.error('❌ 마스터코드 캐시 저장 실패:', err);
+    }
+  }, []);
+
   // 전체 데이터 로드 - codetype 활용
   const fetchAllData = useCallback(async () => {
     setLoading(true);
@@ -137,6 +220,10 @@ export const useSupabaseMasterCode3 = () => {
       }));
 
       setSubCodes(subCodeList);
+
+      // 캐시에 저장
+      saveToCache(data || []);
+
       console.log('✅ 데이터 로드 완료');
     } catch (err) {
       console.error('❌ fetchAllData 오류:', err);
@@ -144,7 +231,7 @@ export const useSupabaseMasterCode3 = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [saveToCache]);
 
   // 다음 그룹 코드 생성 함수
   const generateNextGroupCode = useCallback(async () => {
@@ -538,10 +625,20 @@ export const useSupabaseMasterCode3 = () => {
     [subCodes]
   );
 
-  // 컴포넌트 마운트 시 데이터 로드
+  // 컴포넌트 마운트 시 데이터 로드 (캐시 우선 전략)
   useEffect(() => {
+    // 1. 캐시에서 먼저 로드 (즉시 표시)
+    const hasCachedData = loadFromCache();
+
+    if (hasCachedData) {
+      // 캐시 데이터가 있으면 로딩 상태 해제
+      setLoading(false);
+      console.log('⚡ 마스터코드 캐시 데이터 즉시 표시 (깜빡임 방지)');
+    }
+
+    // 2. 백그라운드에서 최신 데이터 가져오기 (항상 실행)
     fetchAllData();
-  }, [fetchAllData]);
+  }, [fetchAllData, loadFromCache]);
 
   return {
     allData,
