@@ -56,6 +56,7 @@ export const PAGE_IDENTIFIERS = {
   TASK: 'main_task',
   CHECKLIST: 'checklist',
   SECURITY_INCIDENT: 'security_incident',
+  SECURITY_ACCIDENT: 'security_accident',
   SECURITY_INSPECTION: 'security_inspection',
   SECURITY_REGULATION: 'security_regulation'
 } as const;

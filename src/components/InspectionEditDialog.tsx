@@ -41,8 +41,10 @@ import { useSupabaseChecklistManagement } from '../hooks/useSupabaseChecklistMan
 import { useSupabaseChecklistEditor } from '../hooks/useSupabaseChecklistEditor';
 import { useSupabaseSecurityInspectionChecksheet } from '../hooks/useSupabaseSecurityInspectionChecksheet';
 import { useSupabaseFeedback } from '../hooks/useSupabaseFeedback';
+import { useSupabaseFiles } from '../hooks/useSupabaseFiles';
 import { InspectionTableData, InspectionStatus } from '../types/inspection';
 import { PAGE_IDENTIFIERS, FeedbackData } from '../types/feedback';
+import { FileData } from '../types/files';
 import { assignees, assigneeAvatars, inspectionStatusColors, inspectionTypeOptions, inspectionTargetOptions } from '../data/inspection';
 import { ChecklistRecord, ChecklistEditorItem } from '../types/checklist';
 import { sampleChecklistData, checklistItemTemplates } from '../data/checklist';
@@ -396,6 +398,329 @@ const RecordTab = memo(
 
 RecordTab.displayName = 'RecordTab';
 
+// 자료 탭 컴포넌트 - DB 기반 (보안교육관리와 동일 패턴)
+const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | string; currentUser?: any }) => {
+  // 파일 관리 훅
+  const {
+    files,
+    loading: filesLoading,
+    uploadFile,
+    updateFile,
+    deleteFile,
+    isUploading,
+    isDeleting
+  } = useSupabaseFiles(PAGE_IDENTIFIERS.SECURITY_INSPECTION, recordId);
+
+  const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
+  const [editingMaterialText, setEditingMaterialText] = useState('');
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const uploadedFiles = event.target.files;
+      if (!uploadedFiles || uploadedFiles.length === 0) return;
+
+      // recordId가 없으면 업로드 불가
+      if (!recordId) {
+        alert('파일을 업로드하려면 먼저 점검을 저장해주세요.');
+        return;
+      }
+
+      // 각 파일을 순차적으로 업로드
+      for (const file of Array.from(uploadedFiles)) {
+        const result = await uploadFile(file, {
+          page: PAGE_IDENTIFIERS.SECURITY_INSPECTION,
+          record_id: String(recordId),
+          // user_id는 UUID 타입이므로 숫자형 ID는 전달하지 않음
+          user_id: undefined,
+          user_name: currentUser?.user_name || '알 수 없음',
+          team: currentUser?.department
+        });
+
+        if (!result.success) {
+          alert(`파일 업로드 실패: ${result.error}`);
+        }
+      }
+
+      // 파일 입력 초기화
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    },
+    [recordId, uploadFile, currentUser]
+  );
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const getFileIcon = (type: string): string => {
+    if (type.startsWith('image/')) return '🖼️';
+    if (type.startsWith('video/')) return '🎥';
+    if (type.startsWith('audio/')) return '🎵';
+    if (type.includes('pdf')) return '📄';
+    if (type.includes('word') || type.includes('document')) return '📝';
+    if (type.includes('excel') || type.includes('spreadsheet')) return '📊';
+    if (type.includes('powerpoint') || type.includes('presentation')) return '📋';
+    if (type.includes('zip') || type.includes('rar') || type.includes('archive')) return '📦';
+    return '📄';
+  };
+
+  const handleUploadClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleEditMaterial = useCallback((materialId: string, currentName: string) => {
+    setEditingMaterialId(materialId);
+    setEditingMaterialText(currentName);
+  }, []);
+
+  const handleSaveEditMaterial = useCallback(async () => {
+    if (editingMaterialId && editingMaterialText.trim()) {
+      const result = await updateFile(editingMaterialId, {
+        file_name: editingMaterialText.trim()
+      });
+
+      if (result.success) {
+        setEditingMaterialId(null);
+        setEditingMaterialText('');
+      } else {
+        alert(`파일명 수정 실패: ${result.error}`);
+      }
+    }
+  }, [editingMaterialId, editingMaterialText, updateFile]);
+
+  const handleCancelEditMaterial = useCallback(() => {
+    setEditingMaterialId(null);
+    setEditingMaterialText('');
+  }, []);
+
+  const handleDeleteMaterial = useCallback(
+    async (materialId: string) => {
+      if (!confirm('파일을 삭제하시겠습니까?')) return;
+
+      const result = await deleteFile(materialId);
+      if (!result.success) {
+        alert(`파일 삭제 실패: ${result.error}`);
+      }
+    },
+    [deleteFile]
+  );
+
+  const handleDownloadMaterial = useCallback((fileData: FileData) => {
+    // file_url로 다운로드
+    const link = document.createElement('a');
+    link.href = fileData.file_url;
+    link.download = fileData.file_name;
+    link.target = '_blank';
+    link.click();
+  }, []);
+
+  return (
+    <Box sx={{ height: '650px', px: '5%' }}>
+      {/* 파일 업로드 영역 */}
+      <Box sx={{ mb: 3, pt: 2 }}>
+        <input type="file" ref={fileInputRef} onChange={handleFileUpload} multiple style={{ display: 'none' }} accept="*/*" />
+
+        {/* 업로드 버튼과 드래그 앤 드롭 영역 */}
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 3,
+            textAlign: 'center',
+            borderStyle: 'dashed',
+            borderColor: 'primary.main',
+            backgroundColor: 'primary.50',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease-in-out',
+            '&:hover': {
+              borderColor: 'primary.dark',
+              backgroundColor: 'primary.100'
+            }
+          }}
+          onClick={handleUploadClick}
+        >
+          <Stack spacing={2} alignItems="center">
+            <Typography fontSize="48px">📁</Typography>
+            <Typography variant="h6" color="primary.main">
+              파일을 업로드하세요
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              클릭하거나 파일을 여기로 드래그하세요
+            </Typography>
+            <Button variant="contained" size="small" startIcon={<Typography>📤</Typography>}>
+              파일 선택
+            </Button>
+          </Stack>
+        </Paper>
+      </Box>
+
+      {/* 자료 항목들 */}
+      <Box sx={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+        {filesLoading && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+            <Typography>파일 목록을 불러오는 중...</Typography>
+          </Box>
+        )}
+        <Stack spacing={2}>
+          {files.map((fileData) => (
+            <Paper
+              key={`material-${fileData.id}`}
+              variant="outlined"
+              sx={{
+                p: 2,
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: 'grey.300',
+                backgroundColor: 'background.paper',
+                transition: 'all 0.2s ease-in-out',
+                '&:hover': {
+                  borderColor: 'primary.light',
+                  boxShadow: 1
+                }
+              }}
+            >
+              <Stack direction="row" spacing={2} alignItems="center">
+                {/* 파일 아이콘 */}
+                <Box
+                  sx={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 1,
+                    backgroundColor: 'primary.50',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <Typography fontSize="24px">{getFileIcon(fileData.file_type || '')}</Typography>
+                </Box>
+
+                {/* 파일 정보 영역 */}
+                <Box sx={{ flexGrow: 1 }}>
+                  {editingMaterialId === fileData.id ? (
+                    <TextField
+                      fullWidth
+                      value={editingMaterialText}
+                      onChange={(e) => setEditingMaterialText(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') handleSaveEditMaterial();
+                        if (e.key === 'Escape') handleCancelEditMaterial();
+                      }}
+                      variant="outlined"
+                      size="small"
+                      autoFocus
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  ) : (
+                    <Typography
+                      variant="body1"
+                      sx={{
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        '&:hover': {
+                          backgroundColor: 'action.hover',
+                          borderRadius: 1,
+                          px: 1
+                        }
+                      }}
+                      onClick={() => handleEditMaterial(fileData.id, fileData.file_name)}
+                    >
+                      {fileData.file_name}
+                    </Typography>
+                  )}
+                  <Typography variant="caption" color="text.secondary">
+                    {fileData.file_type} • {fileData.file_size ? formatFileSize(fileData.file_size) : '알 수 없음'}
+                    {fileData.created_at && ` • ${new Date(fileData.created_at).toLocaleDateString()}`}
+                  </Typography>
+                </Box>
+
+                {/* 액션 버튼들 */}
+                <Stack direction="row" spacing={1}>
+                  {editingMaterialId === fileData.id ? (
+                    <>
+                      <IconButton size="small" onClick={handleSaveEditMaterial} color="success" sx={{ p: 0.5 }} title="저장">
+                        <Typography fontSize="14px">✓</Typography>
+                      </IconButton>
+                      <IconButton size="small" onClick={handleCancelEditMaterial} color="error" sx={{ p: 0.5 }} title="취소">
+                        <Typography fontSize="14px">✕</Typography>
+                      </IconButton>
+                    </>
+                  ) : (
+                    <>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleDownloadMaterial(fileData)}
+                        color="primary"
+                        sx={{ p: 0.5 }}
+                        title="다운로드"
+                      >
+                        <Typography fontSize="14px">⬇️</Typography>
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleEditMaterial(fileData.id, fileData.file_name)}
+                        color="primary"
+                        sx={{ p: 0.5 }}
+                        title="수정"
+                      >
+                        <Typography fontSize="14px">✏️</Typography>
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleDeleteMaterial(fileData.id)}
+                        color="error"
+                        sx={{ p: 0.5 }}
+                        title="삭제"
+                        disabled={isDeleting}
+                      >
+                        <Typography fontSize="14px">🗑️</Typography>
+                      </IconButton>
+                    </>
+                  )}
+                </Stack>
+              </Stack>
+            </Paper>
+          ))}
+
+          {!filesLoading && files.length === 0 && (
+            <Box
+              sx={{
+                p: 2.5,
+                mt: 2,
+                borderRadius: 2,
+                backgroundColor: '#f8f9fa',
+                border: '1px solid #e9ecef'
+              }}
+            >
+              <Typography
+                variant="body2"
+                sx={{
+                  color: '#6c757d',
+                  lineHeight: 1.6,
+                  fontSize: '0.875rem',
+                  textAlign: 'center'
+                }}
+              >
+                📁 아직 업로드된 파일이 없습니다.
+                <br />
+                위의 업로드 영역을 클릭하여 파일을 업로드해보세요.
+              </Typography>
+            </Box>
+          )}
+        </Stack>
+      </Box>
+    </Box>
+  );
+});
+
+MaterialTab.displayName = 'MaterialTab';
+
 export default function InspectionEditDialog({
   open,
   onClose,
@@ -432,18 +757,12 @@ export default function InspectionEditDialog({
   const feedbacksInitializedRef = useRef(false);
   const feedbacksRef = useRef<FeedbackData[]>([]);
 
-  // 자료탭 상태 관리
-  const [materials, setMaterials] = useState<Array<{ id: number; name: string; type: string; size: string; uploadDate: string }>>([]);
-  const [editingMaterialId, setEditingMaterialId] = useState<number | null>(null);
-  const [editingMaterialText, setEditingMaterialText] = useState('');
-
   // OPL 관련 상태
   const [oplItems, setOplItems] = useState<OPLItem[]>([]);
   const [editingOplId, setEditingOplId] = useState<number | null>(null);
   const [editingOplField, setEditingOplField] = useState<string | null>(null);
   const [editingOplText, setEditingOplText] = useState('');
   const [selectedOplItems, setSelectedOplItems] = useState<Set<number>>(new Set());
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Supabase OPL 훅
   const {
@@ -1012,31 +1331,6 @@ export default function InspectionEditDialog({
     setPendingFeedbacks(prev => prev.filter(fb => fb.id !== id));
   }, []);
 
-  // 자료탭 핸들러 함수들
-  const handleAddMaterial = useCallback((material: any) => {
-    setMaterials((prev) => [...prev, material]);
-  }, []);
-
-  const handleEditMaterial = useCallback((id: number, name: string) => {
-    setEditingMaterialId(id);
-    setEditingMaterialText(name);
-  }, []);
-
-  const handleSaveEditMaterial = useCallback(() => {
-    if (editingMaterialId && editingMaterialText.trim()) {
-      setMaterials((prev) =>
-        prev.map((material) => (material.id === editingMaterialId ? { ...material, name: editingMaterialText.trim() } : material))
-      );
-      setEditingMaterialId(null);
-      setEditingMaterialText('');
-    }
-  }, [editingMaterialId, editingMaterialText]);
-
-  const handleCancelEditMaterial = useCallback(() => {
-    setEditingMaterialId(null);
-    setEditingMaterialText('');
-  }, []);
-
   // OPL 관련 핸들러 함수들 (Supabase 연동)
   const handleAddOplItem = useCallback(async () => {
     if (!inspection?.id) {
@@ -1146,37 +1440,6 @@ export default function InspectionEditDialog({
       setSelectedOplItems(new Set(oplItems.map((item) => item.id)));
     }
   }, [selectedOplItems.size, oplItems]);
-
-  const handleDeleteMaterial = useCallback((id: number) => {
-    setMaterials((prev) => prev.filter((material) => material.id !== id));
-  }, []);
-
-  const handleDownloadMaterial = useCallback((material: any) => {
-    // 파일 다운로드 로직 (실제 구현에서는 서버에서 파일을 다운로드)
-    console.log('다운로드:', material.name);
-  }, []);
-
-  // 파일 크기 포맷 함수
-  const formatFileSize = useCallback((bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  }, []);
-
-  // 파일 아이콘 함수
-  const getFileIcon = useCallback((type: string): string => {
-    if (type.startsWith('image/')) return '🖼️';
-    if (type.startsWith('video/')) return '🎥';
-    if (type.startsWith('audio/')) return '🎵';
-    if (type.includes('pdf')) return '📄';
-    if (type.includes('word') || type.includes('document')) return '📝';
-    if (type.includes('excel') || type.includes('spreadsheet')) return '📊';
-    if (type.includes('powerpoint') || type.includes('presentation')) return '📋';
-    if (type.includes('zip') || type.includes('rar') || type.includes('archive')) return '📦';
-    return '📄';
-  }, []);
 
   // OPL 아이템 추가 핸들러
   const handleAddOPLItem = useCallback(() => {
@@ -2532,221 +2795,7 @@ export default function InspectionEditDialog({
         );
 
       case 5: // 자료 탭
-        const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-          const files = event.target.files;
-          if (!files || files.length === 0) return;
-
-          Array.from(files).forEach((file) => {
-            const material = {
-              id: Date.now() + Math.random(),
-              name: file.name,
-              type: file.type || 'application/octet-stream',
-              size: formatFileSize(file.size),
-              uploadDate: new Date().toISOString().split('T')[0]
-            };
-            handleAddMaterial(material);
-          });
-
-          // 파일 입력 초기화
-          if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-          }
-        };
-
-        const handleUploadClick = () => {
-          fileInputRef.current?.click();
-        };
-
-        return (
-          <Box sx={{ height: '650px', px: '5%' }}>
-            {/* 파일 업로드 영역 */}
-            <Box sx={{ mb: 3, pt: 2 }}>
-              <input type="file" ref={fileInputRef} onChange={handleFileUpload} multiple style={{ display: 'none' }} accept="*/*" />
-
-              {/* 업로드 버튼과 드래그 앤 드롭 영역 */}
-              <Paper
-                variant="outlined"
-                sx={{
-                  p: 3,
-                  textAlign: 'center',
-                  borderStyle: 'dashed',
-                  borderColor: 'primary.main',
-                  backgroundColor: 'primary.50',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease-in-out',
-                  '&:hover': {
-                    borderColor: 'primary.dark',
-                    backgroundColor: 'primary.100'
-                  }
-                }}
-                onClick={handleUploadClick}
-              >
-                <Stack spacing={2} alignItems="center">
-                  <Typography fontSize="48px">📁</Typography>
-                  <Typography variant="h6" color="primary.main">
-                    파일을 업로드하세요
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    클릭하거나 파일을 여기로 드래그하세요
-                  </Typography>
-                  <Button variant="contained" size="small" startIcon={<Typography>📤</Typography>}>
-                    파일 선택
-                  </Button>
-                </Stack>
-              </Paper>
-            </Box>
-
-            {/* 자료 항목들 */}
-            <Box sx={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-              <Stack spacing={2}>
-                {materials.map((material) => (
-                  <Paper
-                    key={material.id}
-                    variant="outlined"
-                    sx={{
-                      p: 2,
-                      borderRadius: 2,
-                      border: '1px solid',
-                      borderColor: 'grey.300',
-                      backgroundColor: 'background.paper',
-                      transition: 'all 0.2s ease-in-out',
-                      '&:hover': {
-                        borderColor: 'primary.light',
-                        boxShadow: 1
-                      }
-                    }}
-                  >
-                    <Stack direction="row" spacing={2} alignItems="center">
-                      {/* 파일 아이콘 */}
-                      <Box
-                        sx={{
-                          width: 48,
-                          height: 48,
-                          borderRadius: 1,
-                          backgroundColor: 'primary.50',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        <Typography fontSize="24px">{getFileIcon(material.type || '')}</Typography>
-                      </Box>
-
-                      {/* 파일 정보 영역 */}
-                      <Box sx={{ flexGrow: 1 }}>
-                        {editingMaterialId === material.id ? (
-                          <TextField
-                            fullWidth
-                            value={editingMaterialText}
-                            onChange={(e) => setEditingMaterialText(e.target.value)}
-                            onKeyPress={(e) => {
-                              if (e.key === 'Enter') handleSaveEditMaterial();
-                              if (e.key === 'Escape') handleCancelEditMaterial();
-                            }}
-                            variant="outlined"
-                            size="small"
-                            autoFocus
-                          />
-                        ) : (
-                          <Typography
-                            variant="body1"
-                            sx={{
-                              fontWeight: 500,
-                              cursor: 'pointer',
-                              '&:hover': {
-                                backgroundColor: 'action.hover',
-                                borderRadius: 1,
-                                px: 1
-                              }
-                            }}
-                            onClick={() => handleEditMaterial(material.id, material.name)}
-                          >
-                            {material.name}
-                          </Typography>
-                        )}
-                        <Typography variant="caption" color="text.secondary">
-                          {material.type} • {material.size}
-                          {material.uploadDate && ` • ${material.uploadDate}`}
-                        </Typography>
-                      </Box>
-
-                      {/* 액션 버튼들 */}
-                      <Stack direction="row" spacing={1}>
-                        {editingMaterialId === material.id ? (
-                          <>
-                            <IconButton size="small" onClick={handleSaveEditMaterial} color="success" sx={{ p: 0.5 }}>
-                              <Typography fontSize="14px">✓</Typography>
-                            </IconButton>
-                            <IconButton size="small" onClick={handleCancelEditMaterial} color="error" sx={{ p: 0.5 }}>
-                              <Typography fontSize="14px">✕</Typography>
-                            </IconButton>
-                          </>
-                        ) : (
-                          <>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleDownloadMaterial(material)}
-                              color="primary"
-                              sx={{ p: 0.5 }}
-                              title="다운로드"
-                            >
-                              <Typography fontSize="14px">⬇️</Typography>
-                            </IconButton>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleEditMaterial(material.id, material.name)}
-                              color="primary"
-                              sx={{ p: 0.5 }}
-                              title="수정"
-                            >
-                              <Typography fontSize="14px">✏️</Typography>
-                            </IconButton>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleDeleteMaterial(material.id)}
-                              color="error"
-                              sx={{ p: 0.5 }}
-                              title="삭제"
-                            >
-                              <Typography fontSize="14px">🗑️</Typography>
-                            </IconButton>
-                          </>
-                        )}
-                      </Stack>
-                    </Stack>
-                  </Paper>
-                ))}
-              </Stack>
-
-              {/* 빈 상태 메시지 */}
-              {materials.length === 0 && (
-                <Box
-                  sx={{
-                    p: 2.5,
-                    mt: 2,
-                    borderRadius: 2,
-                    backgroundColor: '#f8f9fa',
-                    border: '1px solid #e9ecef'
-                  }}
-                >
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      color: '#6c757d',
-                      lineHeight: 1.6,
-                      fontSize: '0.875rem',
-                      textAlign: 'center'
-                    }}
-                  >
-                    📁 아직 업로드된 파일이 없습니다.
-                    <br />
-                    위의 업로드 영역을 클릭하여 파일을 업로드해보세요.
-                  </Typography>
-                </Box>
-              )}
-            </Box>
-          </Box>
-        );
+        return <MaterialTab recordId={inspection?.id} currentUser={currentUser} />;
 
       default:
         return null;
