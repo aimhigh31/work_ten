@@ -21,7 +21,8 @@ import {
   Stack,
   Divider,
   Switch,
-  Chip
+  Chip,
+  Alert
 } from '@mui/material';
 import { CloseSquare } from '@wandersonalwes/iconsax-react';
 
@@ -115,6 +116,7 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
   // 유효성 검증 상태
   const [emailError, setEmailError] = useState<string>('');
   const [phoneError, setPhoneError] = useState<string>('');
+  const [validationError, setValidationError] = useState<string>('');
 
   // 중복체크 상태
   const [userAccountCheckResult, setUserAccountCheckResult] = useState<{
@@ -530,59 +532,59 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
   const handleSave = async () => {
     // 필수값 검증
     if (!formData.email || !formData.email.trim()) {
-      alert('이메일은 필수 입력 항목입니다.');
+      setValidationError('이메일은 필수 입력 항목입니다.');
       return;
     }
 
     if (!formData.profileImage && !tempImageFile) {
-      alert('프로필 사진은 필수 입력 항목입니다.');
+      setValidationError('프로필 사진은 필수 입력 항목입니다.');
       return;
     }
 
     if (!formData.department || !formData.department.trim()) {
-      alert('부서는 필수 선택 항목입니다.');
+      setValidationError('부서는 필수 선택 항목입니다.');
       return;
     }
 
     if (!formData.position || !formData.position.trim()) {
-      alert('직급은 필수 선택 항목입니다.');
+      setValidationError('직급은 필수 선택 항목입니다.');
       return;
     }
 
     if (!formData.role || !formData.role.trim()) {
-      alert('직책은 필수 선택 항목입니다.');
+      setValidationError('직책은 필수 선택 항목입니다.');
       return;
     }
 
     // 중복체크 필수 검증
     if (!userAccountCheckResult || !userAccountCheckResult.checked) {
-      alert('사용자계정 중복체크를 해주세요.');
+      setValidationError('사용자계정 중복체크를 해주세요.');
       return;
     }
 
     if (userAccountCheckResult.isDuplicate) {
-      alert('사용자계정이 중복됩니다. 다른 계정을 사용해주세요.');
+      setValidationError('사용자계정이 중복됩니다. 다른 계정을 사용해주세요.');
       return;
     }
 
     if (!emailCheckResult || !emailCheckResult.checked) {
-      alert('이메일 중복체크를 해주세요.');
+      setValidationError('이메일 중복체크를 해주세요.');
       return;
     }
 
     if (emailCheckResult.isDuplicate) {
-      alert('이메일이 중복됩니다. 다른 이메일을 사용해주세요.');
+      setValidationError('이메일이 중복됩니다. 다른 이메일을 사용해주세요.');
       return;
     }
 
     // 유효성 검증
     if (formData.email && !validateEmail(formData.email)) {
-      alert('올바른 이메일 형식을 입력해주세요.');
+      setValidationError('올바른 이메일 형식을 입력해주세요.');
       return;
     }
 
     if (formData.phone && formData.phone.replace(/[\-\s]/g, '').length < 10) {
-      alert('전화번호는 최소 10자리 숫자를 입력해주세요.');
+      setValidationError('전화번호는 최소 10자리 숫자를 입력해주세요.');
       return;
     }
 
@@ -594,7 +596,7 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
       const uploadResult = await uploadProfileImage(tempImageFile, userId);
 
       if (uploadResult.error) {
-        alert(`이미지 업로드 실패: ${uploadResult.error}`);
+        setValidationError(`이미지 업로드 실패: ${uploadResult.error}`);
         return;
       }
 
@@ -730,6 +732,7 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
 
   const handleClose = () => {
     setTabValue(0);
+    setValidationError('');
     onClose();
   };
 
@@ -1558,6 +1561,13 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
         </Box>
       </DialogContent>
 
+      {validationError && (
+        <Box sx={{ px: 2, pb: 2 }}>
+          <Alert severity="error" sx={{ mt: 1 }}>
+            {validationError}
+          </Alert>
+        </Box>
+      )}
     </Dialog>
 
     {/* 비밀번호 변경 다이얼로그 */}

@@ -140,10 +140,23 @@ interface TabPanelProps {
 
 function TabPanel(props: TabPanelProps) {
   const { children, value, index, ...other } = props;
+
+  // QR출력 탭(index 3)은 인쇄 시 표시, 나머지는 숨김
+  const printStyle = index === 3
+    ? { '@media print': { display: 'block !important' } }
+    : { '@media print': { display: 'none !important' } };
+
   return (
-    <div role="tabpanel" hidden={value !== index} id={`hardware-tabpanel-${index}`} aria-labelledby={`hardware-tab-${index}`} {...other}>
+    <Box
+      role="tabpanel"
+      hidden={value !== index}
+      id={`hardware-tabpanel-${index}`}
+      aria-labelledby={`hardware-tab-${index}`}
+      sx={printStyle}
+      {...other}
+    >
       {value === index && children}
-    </div>
+    </Box>
   );
 }
 
@@ -297,7 +310,11 @@ const OverviewTab = memo(
             />
             <TextField
               fullWidth
-              label="구매처"
+              label={
+                <span>
+                  구매처 <span style={{ color: 'red' }}>*</span>
+                </span>
+              }
               value={hardwareState.vendor}
               onChange={(e) => onFieldChange('vendor', e.target.value)}
               variant="outlined"
@@ -308,7 +325,9 @@ const OverviewTab = memo(
           {/* 자산분류-현재사용자-상태 (3열) */}
           <Stack direction="row" spacing={2}>
             <FormControl fullWidth>
-              <InputLabel shrink>자산분류</InputLabel>
+              <InputLabel shrink>
+                자산분류 <span style={{ color: 'red' }}>*</span>
+              </InputLabel>
               <Select value={hardwareState.assetCategory} onChange={(e) => onFieldChange('assetCategory', e.target.value)} label="자산분류" displayEmpty>
                 <MenuItem value="">선택</MenuItem>
                 {assetCategories.map((category) => (
@@ -375,7 +394,11 @@ const OverviewTab = memo(
             />
             <TextField
               fullWidth
-              label="구매일"
+              label={
+                <span>
+                  구매일 <span style={{ color: 'red' }}>*</span>
+                </span>
+              }
               type="date"
               value={hardwareState.purchaseDate}
               onChange={(e) => onFieldChange('purchaseDate', e.target.value)}
@@ -1907,25 +1930,18 @@ MaintenanceHistoryTab.displayName = 'MaintenanceHistoryTab';
 // QR 출력 탭 컴포넌트
 const QROutputTab = memo(({ hardwareState }: { hardwareState: HardwareEditState }) => {
   const [layoutScale, setLayoutScale] = useState(1); // 전체 레이아웃 스케일
+  const [labelText, setLabelText] = useState('하드웨어 자산라벨'); // QR 하단 제목 텍스트
   const printRef = useRef<HTMLDivElement>(null);
 
   const handlePrint = () => {
-    if (printRef.current) {
-      const printContent = printRef.current.innerHTML;
-      const originalContent = document.body.innerHTML;
-
-      document.body.innerHTML = printContent;
-      window.print();
-      document.body.innerHTML = originalContent;
-      window.location.reload(); // 페이지 복원
-    }
+    window.print();
   };
 
   // QR 코드에 포함될 데이터 - 자산코드만 포함
   const qrData = hardwareState.code;
 
   // 전체 레이아웃 크기 계산
-  const baseQRSize = 200;
+  const baseQRSize = 150;
   const baseLayoutWidth = 450;
   const baseLayoutHeight = 250;
 
@@ -1939,23 +1955,151 @@ const QROutputTab = memo(({ hardwareState }: { hardwareState: HardwareEditState 
   };
 
   return (
-    <Box sx={{ height: '650px', overflowY: 'auto', p: 3 }}>
-      <Typography variant="h6" sx={{ fontSize: '16px', fontWeight: 600, mb: 3 }}>
+    <Box
+      sx={{
+        height: '650px',
+        overflowY: 'auto',
+        p: 3,
+        '@media print': {
+          height: 'auto',
+          overflow: 'visible',
+          p: 0
+        }
+      }}
+    >
+      <Typography
+        variant="h6"
+        sx={{
+          fontSize: '16px',
+          fontWeight: 600,
+          mb: 3,
+          '@media print': {
+            display: 'none'
+          }
+        }}
+      >
         QR 코드 출력
       </Typography>
 
-      <Card>
-        <CardContent>
-          {/* 출력될 QR 코드 영역 */}
-          <div ref={printRef}>
+      <Grid container spacing={3}>
+        {/* 왼쪽: 출력 설정 영역 */}
+        <Grid
+          item
+          xs={12}
+          md={5}
+          sx={{
+            '@media print': {
+              display: 'none'
+            }
+          }}
+        >
+          <Card>
+            <CardContent>
+              <Stack spacing={3}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  출력 설정
+                </Typography>
+
+                {/* 제목 설정 */}
+                <Box>
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                    제목 설정
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    value={labelText}
+                    onChange={(e) => setLabelText(e.target.value)}
+                    placeholder="하드웨어 자산라벨"
+                    variant="outlined"
+                  />
+                </Box>
+
+                {/* 출력 사이즈 */}
+                <Box>
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                    출력 사이즈: {Math.round(layoutScale * 100)}% (전체 {scaledLayoutWidth}×{scaledLayoutHeight}px)
+                  </Typography>
+                  <Box sx={{ px: 2 }}>
+                    <input
+                      type="range"
+                      min="0.5"
+                      max="2.0"
+                      step="0.1"
+                      value={layoutScale}
+                      onChange={(e) => setLayoutScale(Number(e.target.value))}
+                      style={{ width: '100%' }}
+                    />
+                  </Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                    * 외곽 테두리를 포함한 전체 레이아웃 크기가 조절됩니다 (50%~200%)
+                  </Typography>
+                </Box>
+
+                <Button variant="contained" onClick={handlePrint} fullWidth>
+                  QR 코드 출력
+                </Button>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* 오른쪽: QR 코드 미리보기 */}
+        <Grid
+          item
+          xs={12}
+          md={7}
+          sx={{
+            '@media print': {
+              display: 'block',
+              width: '100%',
+              maxWidth: 'none'
+            }
+          }}
+        >
+          <Card
+            sx={{
+              '@media print': {
+                boxShadow: 'none',
+                border: 'none'
+              }
+            }}
+          >
+            <CardContent
+              sx={{
+                '@media print': {
+                  p: 0
+                }
+              }}
+            >
+              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2, '@media print': { display: 'none' } }}>
+                QR 코드 미리보기
+              </Typography>
+
+              {/* 출력될 QR 코드 영역 */}
+              <Box
+                ref={printRef}
+                sx={{
+                  '@media print': {
+                    position: 'fixed',
+                    top: '50%',
+                    left: '50%',
+                    transform: `translate(-50%, -50%) scale(${layoutScale})`,
+                    width: 'auto',
+                    height: 'auto'
+                  }
+                }}
+              >
             <Box
               sx={{
-                border: `${Math.round(2 * layoutScale)}px solid #333`,
-                borderRadius: Math.round(2 * layoutScale),
-                padding: Math.round(3 * layoutScale),
+                border: '2px solid #333',
+                borderRadius: '2px',
+                padding: '3px',
                 backgroundColor: 'white',
-                width: scaledLayoutWidth,
-                height: scaledLayoutHeight,
+                width: baseLayoutWidth,
+                height: baseLayoutHeight,
+                display: 'flex',
+                flexDirection: 'column',
                 '@media print': {
                   margin: 0,
                   padding: `${Math.round(20 * layoutScale)}px`,
@@ -1963,7 +2107,7 @@ const QROutputTab = memo(({ hardwareState }: { hardwareState: HardwareEditState 
                 }
               }}
             >
-              <Stack direction="row" spacing={Math.round(4 * layoutScale)} alignItems="flex-start" sx={{ height: '100%' }}>
+              <Stack direction="row" spacing={4} alignItems="flex-start" sx={{ flex: 1 }}>
                 {/* QR 코드 영역 */}
                 <Box
                   sx={{
@@ -1971,18 +2115,18 @@ const QROutputTab = memo(({ hardwareState }: { hardwareState: HardwareEditState 
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    gap: Math.round(1 * layoutScale),
+                    gap: 1,
                     height: '100%',
                     justifyContent: 'center'
                   }}
                 >
                   <Box
                     sx={{
-                      width: scaledQRSize,
-                      height: scaledQRSize,
-                      padding: Math.round(2 * layoutScale),
+                      width: baseQRSize,
+                      height: baseQRSize,
+                      padding: '2px',
                       backgroundColor: 'white',
-                      borderRadius: Math.round(1 * layoutScale),
+                      borderRadius: '1px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center'
@@ -1990,7 +2134,7 @@ const QROutputTab = memo(({ hardwareState }: { hardwareState: HardwareEditState 
                   >
                     <QRCode
                       value={qrData}
-                      size={scaledQRSize - Math.round(16 * layoutScale)} // 패딩 고려
+                      size={baseQRSize - 16}
                       level="M"
                       style={{
                         height: 'auto',
@@ -1999,27 +2143,42 @@ const QROutputTab = memo(({ hardwareState }: { hardwareState: HardwareEditState 
                       }}
                     />
                   </Box>
+                  {/* QR 코드 아래 자산코드 표시 */}
+                  <Typography
+                    sx={{
+                      fontSize: '12px',
+                      fontFamily: 'monospace',
+                      color: '#333',
+                      textAlign: 'center',
+                      mt: 1
+                    }}
+                  >
+                    {hardwareState.code || ''}
+                  </Typography>
                 </Box>
 
                 {/* 하드웨어 정보 영역 */}
                 <Box
                   sx={{
                     flex: 1,
-                    pl: Math.round(2 * layoutScale),
+                    pl: 2,
                     height: '100%',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'center'
                   }}
                 >
-                  <Stack spacing={Math.round(1.5 * layoutScale)}>
+                  <Stack spacing={0.8}>
                     <Typography
                       variant="h6"
                       sx={{
                         fontWeight: 600,
-                        fontSize: `${getTextSize(24)}px`,
-                        lineHeight: 1.2,
-                        mb: Math.round(2 * layoutScale)
+                        fontSize: '24px',
+                        lineHeight: 1.1,
+                        mb: 1,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
                       }}
                     >
                       {hardwareState.assetName || '자산명'}
@@ -2027,8 +2186,11 @@ const QROutputTab = memo(({ hardwareState }: { hardwareState: HardwareEditState 
                     <Typography
                       variant="body1"
                       sx={{
-                        fontSize: `${getTextSize(16)}px`,
-                        lineHeight: 1.6
+                        fontSize: '16px',
+                        lineHeight: 1.3,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
                       }}
                     >
                       자산분류 : {hardwareState.assetCategory || '-'}
@@ -2036,8 +2198,11 @@ const QROutputTab = memo(({ hardwareState }: { hardwareState: HardwareEditState 
                     <Typography
                       variant="body1"
                       sx={{
-                        fontSize: `${getTextSize(16)}px`,
-                        lineHeight: 1.6
+                        fontSize: '16px',
+                        lineHeight: 1.3,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
                       }}
                     >
                       자산코드 : {hardwareState.code || '-'}
@@ -2045,8 +2210,11 @@ const QROutputTab = memo(({ hardwareState }: { hardwareState: HardwareEditState 
                     <Typography
                       variant="body1"
                       sx={{
-                        fontSize: `${getTextSize(16)}px`,
-                        lineHeight: 1.6
+                        fontSize: '16px',
+                        lineHeight: 1.3,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
                       }}
                     >
                       시리얼넘버 : {hardwareState.serialNumber || '-'}
@@ -2054,8 +2222,11 @@ const QROutputTab = memo(({ hardwareState }: { hardwareState: HardwareEditState 
                     <Typography
                       variant="body1"
                       sx={{
-                        fontSize: `${getTextSize(16)}px`,
-                        lineHeight: 1.6
+                        fontSize: '16px',
+                        lineHeight: 1.3,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
                       }}
                     >
                       구매일 : {hardwareState.purchaseDate || '-'}
@@ -2063,43 +2234,25 @@ const QROutputTab = memo(({ hardwareState }: { hardwareState: HardwareEditState 
                   </Stack>
                 </Box>
               </Stack>
-            </Box>
-          </div>
 
-          <Divider sx={{ my: 3 }} />
-
-          {/* 출력 설정 */}
-          <Stack spacing={3}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-              출력 설정
-            </Typography>
-
-            <Box>
-              <Typography variant="body2" sx={{ mb: 1 }}>
-                출력 사이즈: {Math.round(layoutScale * 100)}% (전체 {scaledLayoutWidth}×{scaledLayoutHeight}px)
-              </Typography>
-              <Box sx={{ px: 2 }}>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="2.0"
-                  step="0.1"
-                  value={layoutScale}
-                  onChange={(e) => setLayoutScale(Number(e.target.value))}
-                  style={{ width: '100%' }}
-                />
-              </Box>
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                * 외곽 테두리를 포함한 전체 레이아웃 크기가 조절됩니다 (50%~200%)
+              {/* 하드웨어 자산라벨 - 네모박스 하단 중앙 */}
+              <Typography
+                sx={{
+                  fontSize: '11px',
+                  color: '#666',
+                  textAlign: 'center',
+                  mt: 0.5,
+                  pt: 0.8
+                }}
+              >
+                {labelText}
               </Typography>
             </Box>
-
-            <Button variant="contained" onClick={handlePrint} sx={{ width: 200 }}>
-              QR 코드 출력
-            </Button>
-          </Stack>
-        </CardContent>
-      </Card>
+          </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
     </Box>
   );
 });
@@ -3065,11 +3218,28 @@ export default function HardwareDialog({ open, onClose, onSave, data, mode, stat
 
   // 저장 핸들러
   const handleSave = async () => {
-    if (!hardwareState.assetName) {
-      setValidationError('자산명을 입력해주세요.');
+    // 필수 입력 검증
+    if (!hardwareState.assetName || !hardwareState.assetName.trim()) {
+      setValidationError('자산명은 필수 입력 항목입니다.');
       return;
     }
 
+    if (!hardwareState.assetCategory || !hardwareState.assetCategory.trim()) {
+      setValidationError('자산분류는 필수 입력 항목입니다.');
+      return;
+    }
+
+    if (!hardwareState.purchaseDate || !hardwareState.purchaseDate.trim()) {
+      setValidationError('구매일은 필수 입력 항목입니다.');
+      return;
+    }
+
+    if (!hardwareState.vendor || !hardwareState.vendor.trim()) {
+      setValidationError('구매처는 필수 입력 항목입니다.');
+      return;
+    }
+
+    // 에러 초기화
     setValidationError('');
 
     try {
@@ -3245,7 +3415,13 @@ export default function HardwareDialog({ open, onClose, onSave, data, mode, stat
       PaperProps={{
         sx: {
           height: '90vh',
-          maxHeight: '90vh'
+          maxHeight: '90vh',
+          '@media print': {
+            height: 'auto',
+            maxHeight: 'none',
+            boxShadow: 'none',
+            margin: 0
+          }
         }
       }}
     >
@@ -3254,7 +3430,10 @@ export default function HardwareDialog({ open, onClose, onSave, data, mode, stat
           pb: 2,
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'flex-start'
+          alignItems: 'flex-start',
+          '@media print': {
+            display: 'none'
+          }
         }}
       >
         <Box>
@@ -3271,20 +3450,28 @@ export default function HardwareDialog({ open, onClose, onSave, data, mode, stat
           <Button onClick={handleClose} variant="outlined" size="small">
             취소
           </Button>
-          <Button onClick={handleSave} variant="contained" size="small" disabled={!hardwareState.assetName}>
+          <Button onClick={handleSave} variant="contained" size="small">
             저장
           </Button>
         </Box>
       </DialogTitle>
 
-      <DialogContent sx={{ p: 0, overflow: 'hidden' }}>
-        {validationError && (
-          <Alert severity="error" sx={{ m: 2 }}>
-            {validationError}
-          </Alert>
-        )}
-
-        <Box>
+      <DialogContent
+        sx={{
+          p: 0,
+          overflow: 'hidden',
+          '@media print': {
+            overflow: 'visible'
+          }
+        }}
+      >
+        <Box
+          sx={{
+            '@media print': {
+              display: 'none'
+            }
+          }}
+        >
           <Tabs value={value} onChange={handleChange} aria-label="하드웨어 관리 탭" sx={{ borderBottom: 1, borderColor: 'divider' }}>
             <Tab label="개요" {...a11yProps(0)} />
             <Tab label="사용자이력" {...a11yProps(1)} />
@@ -3367,6 +3554,15 @@ export default function HardwareDialog({ open, onClose, onSave, data, mode, stat
           />
         </TabPanel>
       </DialogContent>
+
+      {/* 에러 메시지 표시 */}
+      {validationError && (
+        <Box sx={{ px: 2, pb: 2 }}>
+          <Alert severity="error" sx={{ mt: 1 }}>
+            {validationError}
+          </Alert>
+        </Box>
+      )}
     </Dialog>
   );
 }

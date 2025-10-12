@@ -101,6 +101,7 @@ export default function NavItem({ item, level, isParents = false, setSelectedID 
           <ListItemButton
             component={Link}
             href={item.url!}
+            prefetch={true}
             target={itemTarget}
             disabled={item.disabled}
             selected={isSelected}
@@ -244,6 +245,7 @@ export default function NavItem({ item, level, isParents = false, setSelectedID 
         <ListItemButton
           component={Link}
           href={item.url!}
+          prefetch={true}
           target={itemTarget}
           disabled={item.disabled}
           selected={isSelected}

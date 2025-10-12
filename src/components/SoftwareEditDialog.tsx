@@ -2848,53 +2848,43 @@ const SoftwareEditDialog = memo(
     }, []);
 
     const handleSave = useCallback(async () => {
-      // 저장 직전에 현재 입력 값들을 softwareState에 강제 반영
-      const getCurrentInputValues = () => {
-        if ((window as any).getOverviewTabCurrentValues) {
-          return (window as any).getOverviewTabCurrentValues();
-        }
-        return { softwareName: softwareState.softwareName, description: softwareState.description };
-      };
-
-      const currentValues = getCurrentInputValues();
-
-      // 필수 입력 검증
-      if (!currentValues.softwareName.trim()) {
-        setValidationError('소프트웨어명을 입력해주세요.');
-        return;
-      }
-
-      if (!softwareState.assignee.trim()) {
-        setValidationError('담당자를 선택해주세요.');
-        return;
-      }
-
-      if (!softwareState.softwareCategory || !softwareState.softwareCategory.trim()) {
-        setValidationError('소프트웨어분류를 선택해주세요.');
-        return;
-      }
-
-      if (!softwareState.solutionProvider || !softwareState.solutionProvider.trim()) {
-        setValidationError('솔루션업체를 입력해주세요.');
-        return;
-      }
-
-      if (!softwareState.licenseType || !softwareState.licenseType.trim()) {
-        setValidationError('라이센스유형을 선택해주세요.');
-        return;
-      }
-
-      // 에러 초기화
-      setValidationError('');
-
       try {
+        // 필수 입력 검증
+        if (!softwareState.softwareName || !softwareState.softwareName.trim()) {
+          setValidationError('소프트웨어명은 필수 입력 항목입니다.');
+          return;
+        }
+
+        if (!softwareState.assignee || !softwareState.assignee.trim()) {
+          setValidationError('담당자를 선택해주세요.');
+          return;
+        }
+
+        if (!softwareState.softwareCategory || !softwareState.softwareCategory.trim()) {
+          setValidationError('소프트웨어분류를 선택해주세요.');
+          return;
+        }
+
+        if (!softwareState.solutionProvider || !softwareState.solutionProvider.trim()) {
+          setValidationError('솔루션업체를 입력해주세요.');
+          return;
+        }
+
+        if (!softwareState.licenseType || !softwareState.licenseType.trim()) {
+          setValidationError('라이센스유형을 선택해주세요.');
+          return;
+        }
+
+        // 에러 초기화
+        setValidationError('');
+
         console.log('💾 소프트웨어 데이터 저장 시작...');
 
         // Supabase에 저장할 데이터 준비
         const softwareData: Partial<SoftwareData> = {
-          software_name: currentValues.softwareName?.trim() || '',
-          work_content: currentValues.softwareName?.trim() || '',
-          description: currentValues.description?.trim() || '',
+          software_name: softwareState.softwareName?.trim() || '',
+          work_content: softwareState.softwareName?.trim() || '',
+          description: softwareState.description?.trim() || '',
           software_category: softwareState.softwareCategory?.trim() || '',
           spec: softwareState.spec?.trim() || '',
           status: softwareState.status || '대기',
@@ -3003,15 +2993,15 @@ const SoftwareEditDialog = memo(
         const resultTask: TaskTableData = {
           id: savedData.id || task?.id || Date.now(),
           no: savedData.no || Date.now(),
-          workContent: currentValues.softwareName,
+          workContent: softwareState.softwareName,
           assignee: softwareState.assignee,
           status: softwareState.status as any,
           code: softwareState.code,
           registrationDate: savedData.registration_date || softwareState.registrationDate,
           startDate: softwareState.startDate || new Date().toISOString().split('T')[0],
           completedDate: softwareState.completedDate,
-          description: currentValues.description,
-          softwareName: currentValues.softwareName,
+          description: softwareState.description,
+          softwareName: softwareState.softwareName,
           softwareCategory: softwareState.softwareCategory,
           spec: softwareState.spec,
           currentUser: softwareState.currentUser,
@@ -3031,7 +3021,7 @@ const SoftwareEditDialog = memo(
         console.error('❌ 소프트웨어 저장 실패:', error);
         setValidationError(error.message || '저장 중 오류가 발생했습니다.');
       }
-    }, [task, softwareState, onSave, onClose, createSoftware, updateSoftware]);
+    }, [task, softwareState, onSave, onClose, createSoftware, updateSoftware, currentUserHistories, saveUserHistories, purchaseHistory, savePurchaseHistories]);
 
     const handleClose = useCallback(() => {
       setEditTab(0);

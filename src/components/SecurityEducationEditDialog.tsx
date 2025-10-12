@@ -3106,6 +3106,8 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
   const [modifiedComments, setModifiedComments] = useState<{[key: string]: string}>({});
   // 삭제된 기록 ID들
   const [deletedCommentIds, setDeletedCommentIds] = useState<string[]>([]);
+  // 유효성 검사 에러
+  const [validationError, setValidationError] = useState<string>('');
 
   // Supabase feedbacks를 RecordTab 형식으로 변환하고 pendingComments와 합치기
   const comments = useMemo(() => {
@@ -3374,7 +3376,17 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
   const handleSave = useCallback(async () => {
     // 유효성 검사
     if (!educationState.educationType || !educationState.educationType.trim()) {
-      alert('교육유형을 선택해주세요.');
+      setValidationError('교육유형을 선택해주세요.');
+      return;
+    }
+
+    if (!educationState.educationName || !educationState.educationName.trim()) {
+      setValidationError('교육명은 필수 입력 항목입니다.');
+      return;
+    }
+
+    if (!educationState.location || !educationState.location.trim()) {
+      setValidationError('장소는 필수 입력 항목입니다.');
       return;
     }
 
@@ -3449,13 +3461,13 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
       // ID가 유효한지 확인
       if (mode === 'add' && (!savedEducation?.id || isNaN(savedEducation.id))) {
         console.error('❌ 저장된 교육 ID가 유효하지 않음:', savedEducation?.id);
-        alert('교육 데이터 저장에 실패했습니다. ID가 생성되지 않았습니다.');
+        setValidationError('교육 데이터 저장에 실패했습니다. ID가 생성되지 않았습니다.');
         return;
       }
     } catch (error) {
       console.error('❌ 메인 교육 데이터 저장 실패:', error);
       if (mode === 'add') {
-        alert('교육 데이터 저장에 실패했습니다.');
+        setValidationError('교육 데이터 저장에 실패했습니다.');
         return;
       }
       savedEducation = educationData; // edit 모드에서는 fallback 사용
@@ -3791,6 +3803,7 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
     setNewComment('');
     setEditingCommentId(null);
     setEditingCommentText('');
+    setValidationError('');
   }, [onClose, mode]);
 
   return (
@@ -3829,7 +3842,6 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
             variant="contained"
             size="small"
             sx={{ minWidth: '60px' }}
-            disabled={!educationState.educationName || !educationState.executionDate || !educationState.location}
           >
             저장
           </Button>
@@ -3902,6 +3914,14 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
           <MaterialTab />
         </TabPanel>
       </DialogContent>
+
+      {validationError && (
+        <Box sx={{ px: 2, pb: 2 }}>
+          <Alert severity="error" sx={{ mt: 1 }}>
+            {validationError}
+          </Alert>
+        </Box>
+      )}
     </Dialog>
   );
 }

@@ -49,7 +49,8 @@ import {
   Checkbox,
   SelectChangeEvent,
   Avatar,
-  CircularProgress
+  CircularProgress,
+  Skeleton
 } from '@mui/material';
 
 // 아이콘을 텍스트로 대체 (Material-UI Icons 패키지 미설치로 인함)
@@ -267,7 +268,7 @@ interface FolderTreeProps {
 
 const FolderTree = React.memo(({ data, level = 0, selectedItem, onSelectItem, onDeleteItem }: FolderTreeProps) => {
   const theme = useTheme();
-  const [expandedFolders, setExpandedFolders] = React.useState<Set<string>>(new Set(['1', '2', '3']));
+  const [expandedFolders, setExpandedFolders] = React.useState<Set<string>>(new Set([]));
 
   const toggleFolder = React.useCallback((folderId: string) => {
     setExpandedFolders((prev) => {
@@ -5720,20 +5721,23 @@ export default function TaskManagement() {
               {/* 폴더 탭 */}
               <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 1.5 }}>
                 {isDataLoading ? (
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      height: '100%',
-                      flexDirection: 'column',
-                      gap: 2
-                    }}
-                  >
-                    <CircularProgress size={40} />
-                    <Typography variant="body2" color="text.secondary">
-                      데이터를 불러오는 중입니다...
-                    </Typography>
+                  <Box sx={{ p: 2 }}>
+                    {/* 폴더 구조 헤더 스켈레톤 */}
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                      <Skeleton variant="text" width={100} height={30} />
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Skeleton variant="rounded" width={90} height={32} />
+                        <Skeleton variant="rounded" width={90} height={32} />
+                      </Box>
+                    </Box>
+
+                    {/* 폴더/파일 아이템 스켈레톤 */}
+                    {[1, 2, 3, 4, 5, 6].map((item) => (
+                      <Box key={item} sx={{ display: 'flex', alignItems: 'center', mb: 1.5, ml: item % 2 === 0 ? 3 : 0 }}>
+                        <Skeleton variant="circular" width={20} height={20} sx={{ mr: 1 }} />
+                        <Skeleton variant="text" width={`${Math.random() * 40 + 40}%`} height={32} />
+                      </Box>
+                    ))}
                   </Box>
                 ) : (
                   <FolderView

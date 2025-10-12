@@ -1411,28 +1411,18 @@ const VOCEditDialog = memo(
     }, []);
 
     const handleSave = useCallback(async () => {
-      // 저장 직전에 현재 입력 값들을 vocState에 강제 반영
-      const getCurrentInputValues = () => {
-        if ((window as any).getOverviewTabCurrentValues) {
-          return (window as any).getOverviewTabCurrentValues();
-        }
-        return { content: vocState.content, responseContent: vocState.responseContent };
-      };
-
-      const currentValues = getCurrentInputValues();
-
       // 필수 입력 검증
-      if (!currentValues.content.trim()) {
-        setValidationError('요청내용을 입력해주세요.');
+      if (!vocState.content || !vocState.content.trim()) {
+        setValidationError('요청내용은 필수 입력 항목입니다.');
         return;
       }
 
-      if (!vocState.customerName.trim()) {
+      if (!vocState.customerName || !vocState.customerName.trim()) {
         setValidationError('VOC요청자를 입력해주세요.');
         return;
       }
 
-      if (!vocState.vocType.trim()) {
+      if (!vocState.vocType || !vocState.vocType.trim()) {
         setValidationError('VOC유형을 선택해주세요.');
         return;
       }
@@ -1444,14 +1434,6 @@ const VOCEditDialog = memo(
 
       // 에러 초기화
       setValidationError('');
-
-      // 현재 입력 값들을 vocState에 즉시 반영
-      if (currentValues.content !== vocState.content) {
-        dispatch({ type: 'SET_FIELD', field: 'content', value: currentValues.content });
-      }
-      if (currentValues.responseContent !== vocState.responseContent) {
-        dispatch({ type: 'SET_FIELD', field: 'responseContent', value: currentValues.responseContent });
-      }
 
       // 🔄 기록 탭 변경사항 DB 저장
       console.log('💾 기록 탭 변경사항 저장 시작');

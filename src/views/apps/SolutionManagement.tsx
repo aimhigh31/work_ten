@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import dynamic from 'next/dynamic';
 
 // third-party
 import ReactApexChart, { Props as ChartProps } from 'react-apexcharts';
@@ -39,19 +38,14 @@ import {
   TableRow,
   TextField,
   Pagination,
-  Button,
-  Skeleton
+  Button
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 
 // Project imports
 import SolutionTable from 'views/apps/SolutionTable';
-// Code splitting: Dialog 컴포넌트는 필요할 때만 로드 (성능 최적화)
-const SolutionEditDialog = dynamic(() => import('components/SolutionEditDialog'), {
-  ssr: false,
-  loading: () => null
-});
+import SolutionEditDialog from 'components/SolutionEditDialog';
 import { solutionData, solutionStatusColors, assigneeAvatars, assignees, teams, solutionStatusOptions } from 'data/solution';
 import { SolutionTableData, SolutionStatus, DbSolutionData } from 'types/solution';
 import { useSupabaseSolution } from '../../hooks/useSupabaseSolution';
@@ -59,7 +53,6 @@ import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
 import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { ThemeMode } from 'config';
-import { TableSkeleton, KanbanSkeleton } from 'components/skeleton';
 
 // 변경로그 타입 정의
 interface ChangeLog {
@@ -2360,18 +2353,17 @@ export default function SolutionManagement() {
   }, [getSubCodesByGroup]);
 
   const [solutions, setSolutions] = useState<SolutionTableData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // 즉시 UI 렌더링을 위해 false로 설정
 
   // 편집 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);
   const [editingSolution, setEditingSolution] = useState<SolutionTableData | null>(null);
 
-  // 초기 데이터 로드
+  // 초기 데이터 로드 (즉시 렌더링)
   useEffect(() => {
     const loadSolutions = async () => {
       try {
         console.log('🔄 솔루션 데이터 로드 시작');
-        setLoading(true);
 
         const dbSolutions = await getSolutions();
         console.log('📊 DB에서 로드된 솔루션:', dbSolutions.length + '개');
@@ -2387,8 +2379,6 @@ export default function SolutionManagement() {
         console.error('❌ 솔루션 데이터 로드 실패:', error);
         // 실패 시 기본 데이터 사용
         setSolutions(solutionData);
-      } finally {
-        setLoading(false);
       }
     };
 

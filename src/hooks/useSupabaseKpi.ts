@@ -35,7 +35,7 @@ export interface KpiData {
 
 export const useSupabaseKpi = () => {
   const [kpis, setKpis] = useState<KpiData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // 즉시 UI 렌더링을 위해 false로 설정
   const [error, setError] = useState<string | null>(null);
 
   // KPI 목록 조회

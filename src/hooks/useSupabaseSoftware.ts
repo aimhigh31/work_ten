@@ -37,7 +37,7 @@ export interface SoftwareData {
 
 export const useSupabaseSoftware = () => {
   const [software, setSoftware] = useState<SoftwareData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // 즉시 UI 렌더링을 위해 false로 설정
   const [error, setError] = useState<string | null>(null);
 
   // 소프트웨어 목록 조회

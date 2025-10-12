@@ -314,10 +314,12 @@ export default function DepartmentManagementTable({
       const deletedDepartments = data.filter((dept) => selected.includes(dept.id));
 
       for (const dept of deletedDepartments) {
-        const success = await deleteDepartment(dept.id.toString());
+        const result = await deleteDepartment(dept.id);
 
-        if (success && addChangeLog) {
+        if (result.success && addChangeLog) {
           addChangeLog('부서 삭제', dept.code || `DEPT-${dept.id}`, `${dept.departmentName || '부서'} 삭제`);
+        } else if (result.error) {
+          console.error('부서 삭제 에러:', result.error);
         }
       }
 
@@ -349,10 +351,14 @@ export default function DepartmentManagementTable({
         display_order: updatedDept.no || 0
       };
 
-      const success = await updateDepartment(updateData);
+      const result = await updateDepartment(updateData);
 
-      if (success && addChangeLog) {
+      if (result.success && addChangeLog) {
         addChangeLog('부서 정보 수정', updatedDept.code || `DEPT-${updatedDept.id}`, `${updatedDept.departmentName || '부서'} 정보 수정`);
+      } else if (result.error) {
+        console.error('부서 수정 에러:', result.error);
+        alert(result.error);
+        return;
       }
     } else {
       // 새 부서 추가
@@ -376,10 +382,14 @@ export default function DepartmentManagementTable({
         display_order: supabaseDepartments.length + 1
       };
 
-      const success = await createDepartment(newDepartmentData);
+      const result = await createDepartment(newDepartmentData);
 
-      if (success && addChangeLog) {
+      if (result.success && addChangeLog) {
         addChangeLog('새 부서 생성', departmentCode, `${updatedDept.departmentName || '새 부서'} 생성`);
+      } else if (result.error) {
+        console.error('부서 생성 에러:', result.error);
+        alert(result.error);
+        return;
       }
     }
 

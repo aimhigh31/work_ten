@@ -3986,43 +3986,43 @@ const TaskEditDialog = memo(
 
       // 필수 입력 검증
       if (!currentValues.workContent.trim()) {
-        alert('주요과제를 입력해주세요.');
+        setValidationError('주요과제를 입력해주세요.');
         return;
       }
 
       if (!currentValues.managementCategory || !currentValues.managementCategory.trim()) {
-        alert('관리분류를 선택해주세요.');
+        setValidationError('관리분류를 선택해주세요.');
         return;
       }
 
       if (!currentValues.targetKpi || !currentValues.targetKpi.trim()) {
-        alert('목표KPI를 입력해주세요.');
+        setValidationError('목표KPI를 입력해주세요.');
         return;
       }
 
       if (!currentValues.currentKpi || !currentValues.currentKpi.trim()) {
-        alert('현재KPI를 입력해주세요.');
+        setValidationError('현재KPI를 입력해주세요.');
         return;
       }
 
       if (!taskState.department || !taskState.department.trim()) {
-        alert('업무분류를 선택해주세요.');
+        setValidationError('업무분류를 선택해주세요.');
         return;
       }
 
       if (taskState.progress === undefined || taskState.progress === null || taskState.progress === '') {
-        alert('진행율을 입력해주세요.');
+        setValidationError('진행율을 입력해주세요.');
         return;
       }
 
       const startDateValue = taskState.startDate || taskState.registrationDate;
       if (!startDateValue || !startDateValue.trim()) {
-        alert('시작일을 선택해주세요.');
+        setValidationError('시작일을 선택해주세요.');
         return;
       }
 
       if (!taskState.completedDate || !taskState.completedDate.trim()) {
-        alert('완료일을 선택해주세요.');
+        setValidationError('완료일을 선택해주세요.');
         return;
       }
 

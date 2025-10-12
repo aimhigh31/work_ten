@@ -27,8 +27,7 @@ import {
   Tooltip,
   LinearProgress,
   Backdrop,
-  CircularProgress,
-  Skeleton
+  CircularProgress
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 
@@ -88,7 +87,6 @@ interface SecurityIncidentTableProps {
   tasks: SecurityIncidentRecord[];
   setTasks: React.Dispatch<React.SetStateAction<SecurityIncidentRecord[]>>;
   addChangeLog: (action: string, target: string, description: string, team?: string) => void;
-  loading?: boolean;
   error?: string | null;
   onDataRefresh?: () => Promise<void>;
 }
@@ -101,7 +99,6 @@ export default function SecurityIncidentTable({
   tasks,
   setTasks,
   addChangeLog,
-  loading = false,
   error = null,
   onDataRefresh
 }: SecurityIncidentTableProps) {
@@ -606,55 +603,7 @@ export default function SecurityIncidentTable({
             </TableRow>
           </TableHead>
           <TableBody>
-            {loading && tasks.length === 0 ? (
-              // Skeleton 로딩 상태 (데이터가 없을 때만)
-              Array.from(new Array(5)).map((_, index) => (
-                <TableRow key={`skeleton-${index}`}>
-                  <TableCell padding="checkbox">
-                    <Skeleton variant="rectangular" width={20} height={20} />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton variant="text" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton variant="text" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton variant="text" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton variant="text" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton variant="text" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton variant="text" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton variant="text" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton variant="circular" width={30} height={30} />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton variant="text" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton variant="rectangular" width={60} height={24} />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton variant="text" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton variant="text" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton variant="rectangular" width={30} height={30} />
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : paginatedData.length > 0 ? (
+            {paginatedData.length > 0 ? (
               paginatedData.map((task) => (
                 <TableRow
                   key={task.id}

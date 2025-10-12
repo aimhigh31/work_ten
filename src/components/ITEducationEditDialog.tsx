@@ -2845,6 +2845,9 @@ export default function ITEducationDialog({ open, onClose, onSave, recordId, tas
   const data = recordId ? tasks.find(task => task.id === recordId) : null;
   const [value, setValue] = useState(0);
 
+  // 유효성 검증 에러 상태
+  const [validationError, setValidationError] = useState<string>('');
+
   // Supabase 훅 사용
   const {
     loading,
@@ -3195,11 +3198,29 @@ export default function ITEducationDialog({ open, onClose, onSave, recordId, tas
 
   const handleSave = useCallback(async () => {
     try {
-      // 유효성 검사
-      if (!educationState.educationType || !educationState.educationType.trim()) {
-        alert('교육유형을 선택해주세요.');
+      // 필수 입력 검증
+      if (!educationState.educationName || !educationState.educationName.trim()) {
+        setValidationError('교육명을 입력해주세요.');
         return;
       }
+
+      if (!educationState.executionDate || !educationState.executionDate.trim()) {
+        setValidationError('실시일을 선택해주세요.');
+        return;
+      }
+
+      if (!educationState.location || !educationState.location.trim()) {
+        setValidationError('실시장소를 입력해주세요.');
+        return;
+      }
+
+      if (!educationState.educationType || !educationState.educationType.trim()) {
+        setValidationError('교육유형을 선택해주세요.');
+        return;
+      }
+
+      // 에러 초기화
+      setValidationError('');
 
       // sessionStorage에서 최신 교육실적보고 데이터 확인
       let finalEducationReport = educationReport;
@@ -3385,6 +3406,7 @@ export default function ITEducationDialog({ open, onClose, onSave, recordId, tas
   }, [educationState, data, mode, onSave, onClose, addItEducation, updateItEducation, saveCurriculumByEducationId, saveAttendeesByEducationId, pendingFeedbacks, initialFeedbacks, feedbacks, addFeedback, updateFeedback, deleteFeedback]);
 
   const handleClose = useCallback(() => {
+    setValidationError(''); // 에러 상태 초기화
     onClose();
     dispatch({ type: 'RESET' });
     setEducationReport({
@@ -3440,7 +3462,7 @@ export default function ITEducationDialog({ open, onClose, onSave, recordId, tas
             onClick={handleSave}
             variant="contained"
             size="small"
-            disabled={loading || !educationState.educationName || !educationState.executionDate || !educationState.location}
+            disabled={loading}
           >
             {loading ? '저장 중...' : '저장'}
           </Button>
@@ -3457,11 +3479,6 @@ export default function ITEducationDialog({ open, onClose, onSave, recordId, tas
           </Box>
         ) : (
           <>
-            {error && (
-              <Alert severity="error" sx={{ m: 2 }}>
-                {error}
-              </Alert>
-            )}
             <Box>
               <Tabs value={value} onChange={handleChange} aria-label="교육관리 탭" sx={{ borderBottom: 1, borderColor: 'divider' }}>
                 <Tab label="개요" {...a11yProps(0)} />
@@ -3524,6 +3541,15 @@ export default function ITEducationDialog({ open, onClose, onSave, recordId, tas
           </>
         )}
       </DialogContent>
+
+      {/* 에러 메시지 표시 */}
+      {validationError && (
+        <Box sx={{ px: 2, pb: 2 }}>
+          <Alert severity="error" sx={{ mt: 1 }}>
+            {validationError}
+          </Alert>
+        </Box>
+      )}
     </Dialog>
   );
 }

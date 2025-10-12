@@ -29,7 +29,8 @@ import {
   Chip,
   InputLabel,
   Checkbox,
-  Pagination
+  Pagination,
+  Alert
 } from '@mui/material';
 import { Add, Trash, AttachSquare } from '@wandersonalwes/iconsax-react';
 import { useSupabaseMasterCode3 } from '../hooks/useSupabaseMasterCode3';
@@ -404,6 +405,9 @@ export default function InspectionEditDialog({
   inspectionTypes = []
 }: InspectionEditDialogProps) {
   const [activeTab, setActiveTab] = useState(0);
+
+  // 유효성 검증 에러 상태
+  const [validationError, setValidationError] = useState<string>('');
 
   // 체크리스트 상태 관리
   const [selectedChecklistId, setSelectedChecklistId] = useState<number | string>('');
@@ -1227,29 +1231,32 @@ export default function InspectionEditDialog({
 
     // 필수 필드 검증
     if (!formData.inspectionContent.trim()) {
-      alert('점검내용을 입력해주세요.');
+      setValidationError('점검내용을 입력해주세요.');
       return;
     }
 
     if (!formData.team.trim()) {
-      alert('팀 정보가 없습니다.');
+      setValidationError('팀 정보가 없습니다.');
       return;
     }
 
     if (!formData.assignee.trim()) {
-      alert('담당자를 선택해주세요.');
+      setValidationError('담당자를 선택해주세요.');
       return;
     }
 
     if (!formData.inspectionType.trim()) {
-      alert('점검유형을 선택해주세요.');
+      setValidationError('점검유형을 선택해주세요.');
       return;
     }
 
     if (!formData.inspectionTarget.trim()) {
-      alert('점검대상을 선택해주세요.');
+      setValidationError('점검대상을 선택해주세요.');
       return;
     }
+
+    // 에러 초기화
+    setValidationError('');
 
     // 코드 생성 (새로운 항목인 경우)
     let inspectionCode = formData.code;
@@ -1356,6 +1363,7 @@ export default function InspectionEditDialog({
   // 닫기 핸들러
   const handleClose = useCallback(() => {
     setActiveTab(0);
+    setValidationError(''); // 에러 상태 초기화
     // 🔄 기록 탭 임시 데이터 초기화
     setPendingFeedbacks([]);
     setInitialFeedbacks([]);
@@ -2920,6 +2928,15 @@ export default function InspectionEditDialog({
         </Box>
 
         <DialogContent sx={{ p: 0, overflow: 'hidden' }}>{renderTabContent()}</DialogContent>
+
+        {/* 에러 메시지 표시 */}
+        {validationError && (
+          <Box sx={{ px: 2, pb: 2 }}>
+            <Alert severity="error" sx={{ mt: 1 }}>
+              {validationError}
+            </Alert>
+          </Box>
+        )}
       </Dialog>
     </>
   );

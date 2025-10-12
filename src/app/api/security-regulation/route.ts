@@ -45,8 +45,11 @@ export async function GET(request: NextRequest) {
       query = query.eq('type', type);
     }
 
-    // 정렬: sort_order 우선, 그 다음 이름
+    // 정렬: type (폴더 우선) → sort_order → name
+    // PostgreSQL에서 type='folder'를 먼저 오도록 하려면 CASE WHEN 사용 또는
+    // 간단하게 type DESC (folder가 file보다 알파벳 순서상 뒤)를 활용
     query = query
+      .order('type', { ascending: true }) // 'file' < 'folder' 이므로 folder가 나중에 오게 됨
       .order('sort_order', { ascending: true })
       .order('name', { ascending: true });
 
@@ -65,7 +68,7 @@ export async function GET(request: NextRequest) {
 
     console.log('✅ 조회 성공:', data?.length || 0, '개 항목');
 
-    // 폴더를 파일보다 먼저 오도록 정렬 (클라이언트 측에서 처리)
+    // 폴더를 파일보다 먼저 오도록 정렬 (서버에서 처리 완료했지만 확실하게 한번 더)
     const sortedData = data?.sort((a, b) => {
       if (a.type === 'folder' && b.type === 'file') return -1;
       if (a.type === 'file' && b.type === 'folder') return 1;

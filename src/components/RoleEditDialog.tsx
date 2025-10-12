@@ -26,7 +26,8 @@ import {
   TableRow,
   Paper,
   Checkbox,
-  CircularProgress
+  CircularProgress,
+  Alert
 } from '@mui/material';
 import {
   CloseSquare,
@@ -90,6 +91,7 @@ interface RoleEditDialogProps {
 
 export default function RoleEditDialog({ open, onClose, role, onSave }: RoleEditDialogProps) {
   const [tabValue, setTabValue] = useState(0);
+  const [validationError, setValidationError] = useState<string>('');
   const [formData, setFormData] = useState<RoleData>({
     id: 0,
     no: 0,
@@ -392,6 +394,15 @@ export default function RoleEditDialog({ open, onClose, role, onSave }: RoleEdit
   };
 
   const handleSave = async () => {
+    // 필수값 검증
+    if (!formData.role || !formData.role.trim()) {
+      setValidationError('역할명은 필수 입력 항목입니다.');
+      return;
+    }
+
+    // 검증 통과 시 에러 초기화
+    setValidationError('');
+
     // 기본 역할 정보 저장을 먼저 수행
     const updatedRole = { ...formData };
 
@@ -454,6 +465,7 @@ export default function RoleEditDialog({ open, onClose, role, onSave }: RoleEdit
 
   const handleClose = () => {
     setTabValue(0);
+    setValidationError('');
     onClose();
   };
 
@@ -960,6 +972,14 @@ export default function RoleEditDialog({ open, onClose, role, onSave }: RoleEdit
           </Box>
         </TabPanel>
       </DialogContent>
+
+      {validationError && (
+        <Box sx={{ px: 2, pb: 2 }}>
+          <Alert severity="error" sx={{ mt: 1 }}>
+            {validationError}
+          </Alert>
+        </Box>
+      )}
     </Dialog>
   );
 }

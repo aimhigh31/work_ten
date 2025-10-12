@@ -273,11 +273,11 @@ export default function RoleManagementTable({
         setSelected([]);
       } else {
         console.error('❌ 역할 삭제 실패:', result.error);
-        console.error('삭제 실패:', result.error);
+        alert(result.error || '역할 삭제에 실패했습니다.');
       }
     } catch (error) {
       console.error('❌ 역할 삭제 중 오류:', error);
-      console.error('삭제 중 오류가 발생했습니다.');
+      alert('삭제 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
@@ -325,7 +325,8 @@ export default function RoleManagementTable({
           await fetchRoles();
         } else {
           console.error('❌ 역할 업데이트 실패:', result.error);
-          console.error('업데이트 실패:', result.error);
+          alert(result.error || '역할 업데이트에 실패했습니다.');
+          return;
         }
       } else {
         // 새 역할 추가 - API에서 고유한 role_code 자동 생성
@@ -363,7 +364,8 @@ export default function RoleManagementTable({
           await fetchRoles();
         } else {
           console.error('❌ 역할 생성 실패:', result.error);
-          console.error('생성 실패:', result.error);
+          alert(result.error || '역할 생성에 실패했습니다.');
+          return;
         }
       }
 
@@ -371,7 +373,7 @@ export default function RoleManagementTable({
       setEditingRole(null);
     } catch (error) {
       console.error('❌ 역할 저장 중 오류:', error);
-      console.error('저장 중 오류가 발생했습니다.');
+      alert('저장 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }

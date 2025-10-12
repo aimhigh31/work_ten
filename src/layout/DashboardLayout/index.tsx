@@ -16,6 +16,7 @@ import HorizontalBar from './Drawer/HorizontalBar';
 import Breadcrumbs from 'components/@extended/Breadcrumbs';
 import Loader from 'components/Loader';
 import AddCustomer from 'sections/apps/customer/AddCustomer';
+import PageTransition from 'components/PageTransition';
 
 import { handlerDrawerOpen, useGetMenuMaster } from 'api/menu';
 import { DRAWER_WIDTH, MenuOrientation } from 'config';
@@ -84,15 +85,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           }}
         >
           <Breadcrumbs />
-          <Box
-            sx={{
-              flex: 1,
-              overflow: 'hidden',
-              minHeight: 0
-            }}
-          >
-            {children}
-          </Box>
+          <PageTransition>{children}</PageTransition>
         </Box>
       </Box>
       <AddCustomer />

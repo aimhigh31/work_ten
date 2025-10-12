@@ -16,6 +16,7 @@ import Notistack from 'components/third-party/Notistack';
 import Customization from 'components/customization';
 import Snackbar from 'components/@extended/Snackbar';
 import ErrorBoundary from 'components/ErrorBoundary';
+import NProgressBar from 'components/NProgressBar';
 
 // ==============================|| PROVIDER WRAPPER  ||============================== //
 
@@ -179,6 +180,7 @@ export default function ProviderWrapper({ children }: { children: ReactElement }
   return (
     <ErrorBoundary>
       <div style={{ height: '100vh', overflow: 'hidden' }}>
+        <NProgressBar />
         <ConfigProvider>
           <ThemeCustomization>
             <RTLLayout>

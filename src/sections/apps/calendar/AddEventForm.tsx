@@ -26,6 +26,7 @@ import Typography from '@mui/material/Typography';
 import Autocomplete from '@mui/material/Autocomplete';
 import Chip from '@mui/material/Chip';
 import Avatar from '@mui/material/Avatar';
+import Alert from '@mui/material/Alert';
 
 import { LocalizationProvider, DateTimePicker } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3';
@@ -116,6 +117,9 @@ export default function AddEventFrom({ event, range, onCancel, modalCallback, cr
   const { createEvent: createEventHook, updateEvent: updateEventHook, deleteEvent: deleteEventHook } = useSupabaseCalendar();
   const { departments } = useSupabaseDepartments();
   const { users } = useSupabaseUsers();
+
+  // 에러 상태
+  const [validationError, setValidationError] = React.useState<string>('');
 
   // props로 받은 함수가 있으면 사용, 없으면 hook에서 가져온 것 사용
   const createEvent = createEventProp || createEventHook;
@@ -209,16 +213,22 @@ export default function AddEventFrom({ event, range, onCancel, modalCallback, cr
   });
 
   const deleteHandler = async () => {
-    await deleteEvent(event?.id);
-    openSnackbar({
-      open: true,
-      message: '일정이 성공적으로 삭제되었습니다.',
-      variant: 'alert',
-      alert: {
-        color: 'success'
-      }
-    } as SnackbarProps);
-    modalCallback(false);
+    try {
+      await deleteEvent(event?.id);
+      openSnackbar({
+        open: true,
+        message: '일정이 성공적으로 삭제되었습니다.',
+        variant: 'alert',
+        alert: {
+          color: 'success'
+        }
+      } as SnackbarProps);
+      setValidationError(''); // 에러 초기화
+      modalCallback(false);
+    } catch (error) {
+      console.error('일정 삭제 오류:', error);
+      setValidationError('일정 삭제 중 오류가 발생했습니다. 다시 시도해주세요.');
+    }
   };
 
   const formik = useFormik({
@@ -264,14 +274,35 @@ export default function AddEventFrom({ event, range, onCancel, modalCallback, cr
         }
 
         setSubmitting(false);
+        setValidationError(''); // 성공 시 에러 초기화
         // eslint-disable-next-line
       } catch (error) {
         console.error('일정 저장 오류:', error);
+        setValidationError('일정 저장 중 오류가 발생했습니다. 다시 시도해주세요.');
+        setSubmitting(false);
       }
     }
   });
 
   const { values, errors, touched, handleSubmit, isSubmitting, getFieldProps, setFieldValue } = formik;
+
+  // 커스텀 submit 핸들러 (validation 에러를 하단 Alert로 표시)
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Formik validation 체크
+    if (errors.title) {
+      setValidationError(errors.title as string);
+      return;
+    }
+    if (errors.end) {
+      setValidationError(errors.end as string);
+      return;
+    }
+
+    // 에러 없으면 기존 submit 실행
+    handleSubmit(e);
+  };
 
   // 팀을 로그인한 사용자의 부서로 자동 설정
   React.useEffect(() => {
@@ -291,10 +322,22 @@ export default function AddEventFrom({ event, range, onCancel, modalCallback, cr
     }
   }, [currentUser, event]);
 
+  // 모달이 열릴 때 에러 초기화
+  React.useEffect(() => {
+    setValidationError('');
+  }, [event, range]);
+
+  // 입력 값 변경 시 에러 초기화
+  React.useEffect(() => {
+    if (validationError) {
+      setValidationError('');
+    }
+  }, [values.title, values.end]);
+
   return (
     <FormikProvider value={formik}>
       <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ko}>
-        <Form autoComplete="off" noValidate onSubmit={handleSubmit}>
+        <Form autoComplete="off" noValidate onSubmit={handleFormSubmit}>
           <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', pb: 0 }}>
             <Box>
               <Typography variant="h6" component="div" sx={{ fontSize: '14px', color: 'rgba(0, 0, 0, 0.75)', fontWeight: 500 }}>
@@ -352,7 +395,16 @@ export default function AddEventFrom({ event, range, onCancel, modalCallback, cr
             </Stack>
           </DialogTitle>
           <Divider sx={{ mt: 1 }} />
-          <DialogContent sx={{ px: 3, pb: 3, pt: 2 }}>
+          <DialogContent
+            sx={{
+              px: 3,
+              pb: 1,
+              pt: 2,
+              height: 'calc(840px - 80px - 60px)', // Dialog 높이 - Header - Alert 공간
+              maxHeight: 'calc(840px - 80px - 60px)',
+              overflow: 'auto'
+            }}
+          >
             <Grid container spacing={2.4}>
               {/* 제목 */}
               <Grid size={12}>
@@ -362,8 +414,6 @@ export default function AddEventFrom({ event, range, onCancel, modalCallback, cr
                   label="제목"
                   placeholder="일정 제목을 입력하세요"
                   {...getFieldProps('title')}
-                  error={Boolean(touched.title && errors.title)}
-                  helperText={touched.title && errors.title}
                   InputLabelProps={{ shrink: true }}
                 />
               </Grid>
@@ -378,8 +428,6 @@ export default function AddEventFrom({ event, range, onCancel, modalCallback, cr
                   rows={3}
                   placeholder="일정 관련 상세 내용을 입력하세요"
                   {...getFieldProps('description')}
-                  error={Boolean(touched.description && errors.description)}
-                  helperText={touched.description && errors.description}
                   InputLabelProps={{ shrink: true }}
                 />
               </Grid>
@@ -438,8 +486,6 @@ export default function AddEventFrom({ event, range, onCancel, modalCallback, cr
                     textField: {
                       id: 'cal-start',
                       fullWidth: true,
-                      error: Boolean(touched.start && errors.start),
-                      helperText: touched.start && errors.start ? (errors.start as string) : '',
                       InputLabelProps: { shrink: true }
                     }
                   }}
@@ -458,8 +504,6 @@ export default function AddEventFrom({ event, range, onCancel, modalCallback, cr
                     textField: {
                       id: 'cal-end',
                       fullWidth: true,
-                      error: Boolean(touched.end && errors.end),
-                      helperText: touched.end && errors.end ? (errors.end as string) : '',
                       InputLabelProps: { shrink: true }
                     }
                   }}
@@ -586,6 +630,15 @@ export default function AddEventFrom({ event, range, onCancel, modalCallback, cr
               </Grid>
             </Grid>
           </DialogContent>
+
+          {/* 에러 메시지 표시 */}
+          {validationError && (
+            <Box sx={{ px: 3, pb: 2, pt: 0 }}>
+              <Alert severity="error">
+                {validationError}
+              </Alert>
+            </Box>
+          )}
         </Form>
       </LocalizationProvider>
     </FormikProvider>

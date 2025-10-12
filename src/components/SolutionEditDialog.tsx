@@ -1424,19 +1424,9 @@ const SolutionEditDialog = memo(
     }, []);
 
     const handleSave = useCallback(async () => {
-      // 저장 직전에 현재 입력 값들을 solutionState에 강제 반영
-      const getCurrentInputValues = () => {
-        if ((window as any).getOverviewTabCurrentValues) {
-          return (window as any).getOverviewTabCurrentValues();
-        }
-        return { title: solutionState.title, detailContent: solutionState.detailContent };
-      };
-
-      const currentValues = getCurrentInputValues();
-
       // 필수 입력 검증
-      if (!currentValues.title.trim()) {
-        setValidationError('제목을 입력해주세요.');
+      if (!solutionState.title || !solutionState.title.trim()) {
+        setValidationError('제목은 필수 입력 항목입니다.');
         return;
       }
 
@@ -1463,14 +1453,6 @@ const SolutionEditDialog = memo(
 
       // 에러 초기화
       setValidationError('');
-
-      // 현재 입력 값들을 solutionState에 즉시 반영
-      if (currentValues.title !== solutionState.title) {
-        dispatch({ type: 'SET_FIELD', field: 'title', value: currentValues.title });
-      }
-      if (currentValues.detailContent !== solutionState.detailContent) {
-        dispatch({ type: 'SET_FIELD', field: 'detailContent', value: currentValues.detailContent });
-      }
 
       // 🔄 기록 탭 변경사항 DB 저장
       console.log('💾 기록 탭 변경사항 저장 시작');
@@ -1530,8 +1512,8 @@ const SolutionEditDialog = memo(
           const newSolution: SolutionTableData = {
             id: Date.now(),
             no: 0, // createSolution에서 자동 생성
-            title: currentValues.title,
-            detailContent: currentValues.detailContent,
+            title: solutionState.title,
+            detailContent: solutionState.detailContent,
             assignee: solutionState.assignee,
             status: solutionState.status,
             code: solutionState.code,
@@ -1551,8 +1533,8 @@ const SolutionEditDialog = memo(
           // 기존 Solution 수정
           const updatedSolution: SolutionTableData = {
             ...solution,
-            title: currentValues.title,
-            detailContent: currentValues.detailContent,
+            title: solutionState.title,
+            detailContent: solutionState.detailContent,
             assignee: solutionState.assignee,
             status: solutionState.status,
             startDate: solution.startDate || new Date().toISOString().split('T')[0], // 기존 시작일 유지 또는 오늘 날짜

@@ -17,7 +17,8 @@ import {
   MenuItem,
   IconButton,
   Stack,
-  Chip
+  Chip,
+  Alert
 } from '@mui/material';
 import { CloseSquare } from '@wandersonalwes/iconsax-react';
 
@@ -74,6 +75,7 @@ interface DepartmentEditDialogProps {
 
 export default function DepartmentEditDialog({ open, onClose, department, onSave, existingDepartments }: DepartmentEditDialogProps) {
   const [tabValue, setTabValue] = useState(0);
+  const [validationError, setValidationError] = useState<string>('');
   const [formData, setFormData] = useState<DepartmentData>({
     id: 0,
     no: 0,
@@ -159,11 +161,20 @@ export default function DepartmentEditDialog({ open, onClose, department, onSave
   };
 
   const handleSave = () => {
+    // 필수값 검증
+    if (!formData.departmentName || !formData.departmentName.trim()) {
+      setValidationError('부서명은 필수 입력 항목입니다.');
+      return;
+    }
+
+    // 검증 통과 시 에러 초기화 후 저장
+    setValidationError('');
     onSave(formData);
   };
 
   const handleClose = () => {
     setTabValue(0);
+    setValidationError('');
     onClose();
   };
 
@@ -370,6 +381,14 @@ export default function DepartmentEditDialog({ open, onClose, department, onSave
           </Stack>
         </Box>
       </DialogContent>
+
+      {validationError && (
+        <Box sx={{ px: 2, pb: 2 }}>
+          <Alert severity="error" sx={{ mt: 1 }}>
+            {validationError}
+          </Alert>
+        </Box>
+      )}
     </Dialog>
   );
 }

@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import dynamic from 'next/dynamic';
 
 // third-party
 import ReactApexChart, { Props as ChartProps } from 'react-apexcharts';
@@ -38,25 +37,19 @@ import {
   TableRow,
   TextField,
   Pagination,
-  Button,
-  Skeleton
+  Button
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 
 // Project imports
 import SecurityIncidentTable from 'views/apps/SecurityIncidentTable';
-// Code splitting: Dialog 컴포넌트는 필요할 때만 로드 (성능 최적화)
-const SecurityIncidentEditDialog = dynamic(() => import('components/SecurityIncidentEditDialog'), {
-  ssr: false,
-  loading: () => null
-});
+import SecurityIncidentEditDialog from 'components/SecurityIncidentEditDialog';
 import { SecurityIncidentRecord } from 'types/security-incident';
 import { useSupabaseSecurityAccident } from 'hooks/useSupabaseSecurityAccident';
 import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
 import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
-import { TableSkeleton, KanbanSkeleton } from 'components/skeleton';
 
 // 임시 데이터 매핑
 const teams = ['보안팀', 'IT팀', '운영팀', '관리팀'];
@@ -2399,13 +2392,10 @@ export default function SecurityIncidentManagement() {
   const [value, setValue] = useState(0);
 
   // Supabase 연동 (병렬 호출 최적화)
-  const { items, loading, error, fetchAccidents } = useSupabaseSecurityAccident();
-  const { users, loading: usersLoading } = useSupabaseUserManagement();
-  const { departments, loading: departmentsLoading, fetchDepartments } = useSupabaseDepartmentManagement();
-  const { getSubCodesByGroup, loading: masterCodeLoading } = useSupabaseMasterCode3();
-
-  // 통합 로딩 상태
-  const isInitialLoading = loading || usersLoading || departmentsLoading || masterCodeLoading;
+  const { items, error, fetchAccidents } = useSupabaseSecurityAccident();
+  const { users } = useSupabaseUserManagement();
+  const { departments, fetchDepartments } = useSupabaseDepartmentManagement();
+  const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
   // 컴포넌트 마운트 시 부서 목록 로드
   React.useEffect(() => {
@@ -2613,25 +2603,6 @@ export default function SecurityIncidentManagement() {
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
   };
-
-  // 로딩 중일 때 Skeleton UI 표시 (체감 속도 향상)
-  if (isInitialLoading) {
-    return (
-      <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', p: 3 }}>
-        <Box sx={{ mb: 3 }}>
-          <Skeleton variant="text" width="30%" height={40} animation="wave" />
-          <Skeleton variant="text" width="20%" height={20} animation="wave" sx={{ mt: 1 }} />
-        </Box>
-        <Box sx={{ mb: 2 }}>
-          <Skeleton variant="rectangular" width="100%" height={48} animation="wave" />
-        </Box>
-        <Box sx={{ flex: 1 }}>
-          {value === 0 && <TableSkeleton rows={10} columns={8} />}
-          {value === 1 && <KanbanSkeleton columns={4} cardsPerColumn={4} />}
-        </Box>
-      </Box>
-    );
-  }
 
   return (
     <Box
@@ -2967,7 +2938,6 @@ export default function SecurityIncidentManagement() {
                   tasks={tasks}
                   setTasks={setTasks}
                   addChangeLog={addChangeLog}
-                  loading={loading}
                   error={error}
                   onDataRefresh={fetchAccidents}
                 />

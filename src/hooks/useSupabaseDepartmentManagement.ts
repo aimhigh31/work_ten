@@ -119,7 +119,7 @@ export function useSupabaseDepartmentManagement() {
 
   // 부서 생성
   const createDepartment = useCallback(
-    async (departmentData: CreateDepartmentRequest): Promise<boolean> => {
+    async (departmentData: CreateDepartmentRequest): Promise<{ success: boolean; error?: string }> => {
       try {
         const response = await fetch('/api/departments', {
           method: 'POST',
@@ -134,16 +134,14 @@ export function useSupabaseDepartmentManagement() {
         if (result.success) {
           // 목록 새로고침
           await fetchDepartments();
-          return true;
+          return { success: true };
         } else {
           console.error('부서 생성 실패:', result.error);
-          alert(result.error || '부서 생성에 실패했습니다.');
-          return false;
+          return { success: false, error: result.error || '부서 생성에 실패했습니다.' };
         }
       } catch (err) {
         console.error('부서 생성 실패:', err);
-        alert('부서 생성에 실패했습니다.');
-        return false;
+        return { success: false, error: '부서 생성에 실패했습니다.' };
       }
     },
     [fetchDepartments]
@@ -151,7 +149,7 @@ export function useSupabaseDepartmentManagement() {
 
   // 부서 수정
   const updateDepartment = useCallback(
-    async (departmentData: UpdateDepartmentRequest): Promise<boolean> => {
+    async (departmentData: UpdateDepartmentRequest): Promise<{ success: boolean; error?: string }> => {
       try {
         const response = await fetch('/api/departments', {
           method: 'PUT',
@@ -166,16 +164,14 @@ export function useSupabaseDepartmentManagement() {
         if (result.success) {
           // 목록 새로고침
           await fetchDepartments();
-          return true;
+          return { success: true };
         } else {
           console.error('부서 수정 실패:', result.error);
-          alert(result.error || '부서 수정에 실패했습니다.');
-          return false;
+          return { success: false, error: result.error || '부서 수정에 실패했습니다.' };
         }
       } catch (err) {
         console.error('부서 수정 실패:', err);
-        alert('부서 수정에 실패했습니다.');
-        return false;
+        return { success: false, error: '부서 수정에 실패했습니다.' };
       }
     },
     [fetchDepartments]
@@ -183,7 +179,7 @@ export function useSupabaseDepartmentManagement() {
 
   // 부서 삭제
   const deleteDepartment = useCallback(
-    async (id: number): Promise<boolean> => {
+    async (id: number): Promise<{ success: boolean; error?: string }> => {
       try {
         const response = await fetch(`/api/departments?id=${id}`, {
           method: 'DELETE'
@@ -194,16 +190,14 @@ export function useSupabaseDepartmentManagement() {
         if (result.success) {
           // 목록 새로고침
           await fetchDepartments();
-          return true;
+          return { success: true };
         } else {
           console.error('부서 삭제 실패:', result.error);
-          alert(result.error || '부서 삭제에 실패했습니다.');
-          return false;
+          return { success: false, error: result.error || '부서 삭제에 실패했습니다.' };
         }
       } catch (err) {
         console.error('부서 삭제 실패:', err);
-        alert('부서 삭제에 실패했습니다.');
-        return false;
+        return { success: false, error: '부서 삭제에 실패했습니다.' };
       }
     },
     [fetchDepartments]
@@ -211,7 +205,7 @@ export function useSupabaseDepartmentManagement() {
 
   // 부서 상태 토글
   const toggleDepartmentStatus = useCallback(
-    async (id: number): Promise<boolean> => {
+    async (id: number): Promise<{ success: boolean; error?: string }> => {
       try {
         const response = await fetch('/api/departments/toggle-status', {
           method: 'PUT',
@@ -226,16 +220,14 @@ export function useSupabaseDepartmentManagement() {
         if (result.success) {
           // 목록 새로고침
           await fetchDepartments();
-          return true;
+          return { success: true };
         } else {
           console.error('부서 상태 변경 실패:', result.error);
-          alert(result.error || '부서 상태 변경에 실패했습니다.');
-          return false;
+          return { success: false, error: result.error || '부서 상태 변경에 실패했습니다.' };
         }
       } catch (err) {
         console.error('부서 상태 변경 실패:', err);
-        alert('부서 상태 변경에 실패했습니다.');
-        return false;
+        return { success: false, error: '부서 상태 변경에 실패했습니다.' };
       }
     },
     [fetchDepartments]

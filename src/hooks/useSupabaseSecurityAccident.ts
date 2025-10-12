@@ -67,57 +67,14 @@ export interface CreateSecurityAccidentRequest {
   attachment_count?: number;
 }
 
-// 캐시 키
-const ACCIDENTS_CACHE_KEY = 'nexwork_accidents_cache';
-const CACHE_TIMESTAMP_KEY = 'nexwork_accidents_cache_timestamp';
-const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5분
-
 export function useSupabaseSecurityAccident() {
   const [items, setItems] = useState<SecurityAccidentItem[]>([]);
-  const [loading, setLoading] = useState(true); // 초기 로딩 상태를 true로 설정하여 깜빡임 방지
+  const [loading, setLoading] = useState(false); // 즉시 UI 렌더링을 위해 false로 설정
   const [error, setError] = useState<string | null>(null);
 
   // 에러 클리어
   const clearError = useCallback(() => {
     setError(null);
-  }, []);
-
-  // 캐시에서 데이터 로드
-  const loadFromCache = useCallback(() => {
-    try {
-      const cachedData = sessionStorage.getItem(ACCIDENTS_CACHE_KEY);
-      const cachedTimestamp = sessionStorage.getItem(CACHE_TIMESTAMP_KEY);
-
-      if (cachedData && cachedTimestamp) {
-        const timestamp = parseInt(cachedTimestamp, 10);
-        const now = Date.now();
-
-        // 캐시가 유효한 경우
-        if (now - timestamp < CACHE_EXPIRY_MS) {
-          const parsedData = JSON.parse(cachedData) as SecurityAccidentItem[];
-          console.log('✅ 캐시에서 보안사고 데이터 로드:', parsedData.length, '건');
-          setItems(parsedData);
-          return true;
-        } else {
-          console.log('⏰ 캐시 만료됨');
-        }
-      }
-      return false;
-    } catch (err) {
-      console.error('❌ 캐시 로드 실패:', err);
-      return false;
-    }
-  }, []);
-
-  // 캐시에 데이터 저장
-  const saveToCache = useCallback((data: SecurityAccidentItem[]) => {
-    try {
-      sessionStorage.setItem(ACCIDENTS_CACHE_KEY, JSON.stringify(data));
-      sessionStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
-      console.log('💾 보안사고 데이터 캐시 저장:', data.length, '건');
-    } catch (err) {
-      console.error('❌ 캐시 저장 실패:', err);
-    }
   }, []);
 
   // 전체 보안사고 목록 조회
@@ -138,14 +95,13 @@ export function useSupabaseSecurityAccident() {
       console.log('🟡 fetchAccidents 응답:', accidentData);
       console.log('🟡 데이터 설정:', accidentData?.length, '개');
       setItems(accidentData || []);
-      saveToCache(accidentData || []); // 캐시에 저장
     } catch (error) {
       console.error('🔴 fetchAccidents 오류:', error);
       setError('데이터 조회에 실패했습니다.');
     } finally {
       setLoading(false);
     }
-  }, [saveToCache]);
+  }, []);
 
   // 특정 보안사고 상세 데이터 조회
   const fetchAccidentDetail = useCallback(async (id: number): Promise<SecurityAccidentItem | null> => {
@@ -314,20 +270,10 @@ export function useSupabaseSecurityAccident() {
     [fetchAccidents]
   );
 
-  // 컴포넌트 마운트 시 데이터 로드 (캐시 우선 전략)
+  // 컴포넌트 마운트 시 데이터 로드
   useEffect(() => {
-    // 1. 캐시에서 먼저 로드 (즉시 표시)
-    const hasCachedData = loadFromCache();
-
-    if (hasCachedData) {
-      // 캐시 데이터가 있으면 로딩 상태 해제
-      setLoading(false);
-      console.log('⚡ 캐시 데이터 즉시 표시 (깜빡임 방지)');
-    }
-
-    // 2. 백그라운드에서 최신 데이터 가져오기 (항상 실행)
     fetchAccidents();
-  }, [fetchAccidents, loadFromCache]);
+  }, [fetchAccidents]);
 
   return {
     items,

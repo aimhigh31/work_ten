@@ -2019,6 +2019,9 @@ function InvestmentEditDialog({
   const [editingMaterialId, setEditingMaterialId] = useState<number | null>(null);
   const [editingMaterialText, setEditingMaterialText] = useState('');
 
+  // 유효성 검증 에러 상태
+  const [validationError, setValidationError] = useState<string>('');
+
   // 투자금액탭의 총합 계산
   const [totalInvestmentAmount, setTotalInvestmentAmount] = useState(0);
 
@@ -2124,6 +2127,7 @@ function InvestmentEditDialog({
 
   const handleClose = useCallback(() => {
     setTabValue(0);
+    setValidationError(''); // 에러 상태 초기화
     onClose();
   }, [onClose]);
 
@@ -2238,12 +2242,43 @@ function InvestmentEditDialog({
   );
 
   const handleSave = useCallback(async () => {
+    // 개요탭의 현재 입력 값 가져오기
+    const getCurrentInputValues = () => {
+      if ((window as any).getInvestmentOverviewTabCurrentValues) {
+        return (window as any).getInvestmentOverviewTabCurrentValues();
+      }
+      return { investmentName: investmentState.investmentName, description: investmentState.description };
+    };
+
+    const currentValues = getCurrentInputValues();
+
+    // 필수 입력 검증
+    if (!currentValues.investmentName.trim()) {
+      setValidationError('투자명을 입력해주세요.');
+      return;
+    }
+
+    if (!investmentState.assignee.trim()) {
+      setValidationError('담당자를 선택해주세요.');
+      return;
+    }
+
+    if (!investmentState.investmentType.trim()) {
+      setValidationError('투자유형을 선택해주세요.');
+      return;
+    }
+
+    // 에러 초기화
+    setValidationError('');
+
     // progress는 DB에 저장하지 않으므로 제외
     const { progress, ...stateWithoutProgress } = investmentState;
 
     const savedData = {
       ...investment,
       ...stateWithoutProgress,
+      investmentName: currentValues.investmentName, // 현재 입력 값 반영
+      description: currentValues.description, // 현재 입력 값 반영
       id: investment?.id || Date.now(),
       no: investment?.no || 0,
       code: investment?.code || '',
@@ -2364,6 +2399,15 @@ function InvestmentEditDialog({
           )}
         </Box>
       </DialogContent>
+
+      {/* 에러 메시지 표시 */}
+      {validationError && (
+        <Box sx={{ px: 2, pb: 2 }}>
+          <Alert severity="error" sx={{ mt: 1 }}>
+            {validationError}
+          </Alert>
+        </Box>
+      )}
     </Dialog>
   );
 }

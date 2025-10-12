@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import dynamic from 'next/dynamic';
 
 // third-party
 import ReactApexChart from 'react-apexcharts';
@@ -36,24 +35,18 @@ import {
   TableRow,
   TextField,
   Pagination,
-  Button,
-  Skeleton
+  Button
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 
 // Project imports
 import VOCDataTable from 'views/apps/VOCDataTable';
-// Code splitting: Dialog 컴포넌트는 필요할 때만 로드 (성능 최적화)
-const VOCEditDialog = dynamic(() => import('components/VOCEditDialog'), {
-  ssr: false,
-  loading: () => null
-});
+import VOCEditDialog from 'components/VOCEditDialog';
 import { vocData, vocStatusColors, assigneeAvatars, assignees, teams, vocStatusOptions } from 'data/voc';
 import { VOCTableData, VOCStatus } from 'types/voc';
 import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
 import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
-import { TableSkeleton, CardSkeleton, KanbanSkeleton, ChartSkeleton } from 'components/skeleton';
 
 // 변경로그 타입 정의
 interface ChangeLog {
@@ -2279,13 +2272,10 @@ export default function VOCManagement() {
   const theme = useTheme();
   const [value, setValue] = useState(0);
 
-  // Supabase 훅 사용 (병렬 호출 최적화 - 모든 hook이 동시에 초기화됨)
-  const { users, loading: usersLoading } = useSupabaseUserManagement();
-  const { departments, loading: departmentsLoading, fetchDepartments } = useSupabaseDepartmentManagement();
-  const { getSubCodesByGroup, loading: masterCodeLoading } = useSupabaseMasterCode3();
-
-  // 통합 로딩 상태 (모든 필수 데이터가 로드될 때까지)
-  const isInitialLoading = usersLoading || departmentsLoading || masterCodeLoading;
+  // Supabase 훅 사용 (즉시 렌더링 - loading 상태 제거)
+  const { users } = useSupabaseUserManagement();
+  const { departments, fetchDepartments } = useSupabaseDepartmentManagement();
+  const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
   // 부서 데이터 로드 (useEffect는 이미 병렬로 실행됨)
   React.useEffect(() => {
@@ -2437,25 +2427,6 @@ export default function VOCManagement() {
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
   };
-
-  // 로딩 중일 때 Skeleton UI 표시 (체감 속도 향상)
-  if (isInitialLoading) {
-    return (
-      <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', p: 3 }}>
-        <Box sx={{ mb: 3 }}>
-          <Skeleton variant="text" width="30%" height={40} animation="wave" />
-          <Skeleton variant="text" width="20%" height={20} animation="wave" sx={{ mt: 1 }} />
-        </Box>
-        <Box sx={{ mb: 2 }}>
-          <Skeleton variant="rectangular" width="100%" height={48} animation="wave" />
-        </Box>
-        <Box sx={{ flex: 1 }}>
-          {value === 0 && <TableSkeleton rows={10} columns={8} />}
-          {value === 1 && <KanbanSkeleton columns={4} cardsPerColumn={4} />}
-        </Box>
-      </Box>
-    );
-  }
 
   return (
     <Box

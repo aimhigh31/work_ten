@@ -38,7 +38,8 @@ import {
   Tabs,
   Tab,
   Grid,
-  Stack
+  Stack,
+  Alert
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 
@@ -570,6 +571,7 @@ export default function CostDataTable({
   // 상태 관리
   const [selectedRecords, setSelectedRecords] = useState<number[]>([]);
   const [tabValue, setTabValue] = useState(0);
+  const [validationError, setValidationError] = useState<string>('');
 
   // 기록 탭을 위한 상태
   const [newComment, setNewComment] = useState<string>('');
@@ -917,7 +919,7 @@ export default function CostDataTable({
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Excel 다운로드 중 오류 발생:', error);
-      alert('Excel 다운로드 중 오류가 발생했습니다.');
+      setValidationError('Excel 다운로드 중 오류가 발생했습니다.');
     }
   };
 
@@ -958,6 +960,7 @@ export default function CostDataTable({
     setModifiedComments({});
     setDeletedCommentIds([]);
     setMaterials([]);
+    setValidationError('');
     setEditingMaterialId(null);
     setEditingMaterialText('');
     setSelectedAmountItems([]);
@@ -993,19 +996,19 @@ export default function CostDataTable({
   const handleSaveRecord = async () => {
     // 필수값 검증
     if (!overviewData.title?.trim()) {
-      alert('제목을 입력해주세요.');
+      setValidationError('제목을 입력해주세요.');
       return;
     }
     if (!overviewData.costType) {
-      alert('비용유형을 선택해주세요.');
+      setValidationError('비용유형을 선택해주세요.');
       return;
     }
     if (!overviewData.startDate) {
-      alert('시작일을 선택해주세요.');
+      setValidationError('시작일을 선택해주세요.');
       return;
     }
     if (!overviewData.completionDate) {
-      alert('완료일을 선택해주세요.');
+      setValidationError('완료일을 선택해주세요.');
       return;
     }
 
@@ -1189,10 +1192,11 @@ export default function CostDataTable({
         setPage(0);
       }
 
+      setValidationError('');
       handleCloseDialog();
     } catch (error) {
       console.error('레코드 저장 중 오류 발생:', error);
-      // 오류가 발생해도 다이얼로그는 닫지 않아서 사용자가 다시 시도할 수 있게 함
+      setValidationError('레코드 저장 중 오류가 발생했습니다. 다시 시도해주세요.');
     }
   };
 
@@ -2122,7 +2126,15 @@ export default function CostDataTable({
             </Box>
           </Box>
         </DialogTitle>
-        <DialogContent sx={{ p: 0, overflow: 'hidden' }}>
+        <DialogContent
+          sx={{
+            p: 0,
+            pb: 1,
+            height: 'calc(840px - 80px - 60px)',
+            maxHeight: 'calc(840px - 80px - 60px)',
+            overflow: 'auto'
+          }}
+        >
           <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
             <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)}>
               <Tab label="개요" />
@@ -2827,6 +2839,13 @@ export default function CostDataTable({
             />
           )}
         </DialogContent>
+        {validationError && (
+          <Box sx={{ px: 3, pb: 2, pt: 0 }}>
+            <Alert severity="error">
+              {validationError}
+            </Alert>
+          </Box>
+        )}
       </Dialog>
     </Box>
   );

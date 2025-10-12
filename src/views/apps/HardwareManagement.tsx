@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import dynamic from 'next/dynamic';
 
 // third-party
 import ReactApexChart, { Props as ChartProps } from 'react-apexcharts';
@@ -38,19 +37,14 @@ import {
   TableRow,
   TextField,
   Pagination,
-  Button,
-  Skeleton
+  Button
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 
 // Project imports
 import HardwareTable from 'views/apps/HardwareTable';
-// Code splitting: Dialog 컴포넌트는 필요할 때만 로드 (성능 최적화)
-const HardwareEditDialog = dynamic(() => import('components/HardwareEditDialog'), {
-  ssr: false,
-  loading: () => null
-});
+import HardwareEditDialog from 'components/HardwareEditDialog';
 import { hardwareData, hardwareStatusColors, assigneeAvatars } from 'data/hardware';
 import { HardwareTableData, HardwareStatus, HardwareRecord } from 'types/hardware';
 import { ThemeMode } from 'config';
@@ -60,7 +54,6 @@ import { useSupabaseHardware, HardwareData } from 'hooks/useSupabaseHardware';
 import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
 import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
-import { TableSkeleton, KanbanSkeleton } from 'components/skeleton';
 
 // 변경로그 타입 정의
 interface ChangeLog {
@@ -2297,8 +2290,8 @@ export default function HardwareManagement() {
   const theme = useTheme();
   const [value, setValue] = useState(0);
 
-  // Supabase 훅 사용
-  const { hardware, loading, error, fetchHardware, createHardware, updateHardware, deleteHardware, deleteMultipleHardware } = useSupabaseHardware();
+  // Supabase 훅 사용 (즉시 렌더링 - loading 상태 제거)
+  const { hardware, error, fetchHardware, createHardware, updateHardware, deleteHardware, deleteMultipleHardware } = useSupabaseHardware();
   const { users } = useSupabaseUserManagement();
   const { departments, fetchDepartments } = useSupabaseDepartmentManagement();
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
@@ -2364,21 +2357,18 @@ export default function HardwareManagement() {
     return converted;
   };
 
-  // Supabase 데이터가 변경되면 tasks 상태 업데이트
+  // Supabase 데이터가 변경되면 tasks 상태 업데이트 (즉시 렌더링)
   useEffect(() => {
     console.log('🔍 Supabase 하드웨어 데이터 상태:', {
       length: hardware.length,
-      loading,
       error,
       sampleData: hardware.slice(0, 2)
     });
 
-    if (!loading) {
-      const convertedTasks = hardware.map(convertHardwareToTask);
-      setTasks(convertedTasks);
-      console.log('🔄 Supabase 하드웨어 데이터를 HardwareTableData로 변환 완료:', convertedTasks.length + '개');
-    }
-  }, [hardware, loading, error]);
+    const convertedTasks = hardware.map(convertHardwareToTask);
+    setTasks(convertedTasks);
+    console.log('🔄 Supabase 하드웨어 데이터를 HardwareTableData로 변환 완료:', convertedTasks.length + '개');
+  }, [hardware, error]);
 
   // 변경로그 페이지네이션 상태
   const [changeLogPage, setChangeLogPage] = useState(0);

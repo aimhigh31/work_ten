@@ -1237,17 +1237,17 @@ const SecurityIncidentEditDialog = memo(
         });
 
         if (!currentValues.workContent.trim()) {
-          alert('사고내용을 입력해주세요.');
+          setValidationError('사고내용을 입력해주세요.');
           return;
         }
 
         if (!taskState.assignee || !taskState.assignee.trim()) {
-          alert('담당자를 선택해주세요.');
+          setValidationError('담당자를 선택해주세요.');
           return;
         }
 
         if (!taskState.incidentType.trim()) {
-          alert('사고유형을 선택해주세요.');
+          setValidationError('사고유형을 선택해주세요.');
           return;
         }
 

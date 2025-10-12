@@ -899,13 +899,6 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
         </Box>
       </DialogTitle>
 
-      {/* 유효성 검사 에러 메시지 */}
-      {validationError && (
-        <Alert severity="error" sx={{ mx: 2, mt: 2 }}>
-          {validationError}
-        </Alert>
-      )}
-
       <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2, backgroundColor: 'background.paper' }}>
         <Tabs value={value} onChange={handleChange}>
           <Tab label="개요" />
@@ -914,7 +907,16 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
         </Tabs>
       </Box>
 
-      <DialogContent sx={{ p: 1, pt: 1, overflow: 'hidden' }}>
+      <DialogContent
+        sx={{
+          p: 1,
+          pt: 1,
+          pb: 1,
+          height: 'calc(840px - 80px - 60px)',
+          maxHeight: 'calc(840px - 80px - 60px)',
+          overflow: 'auto'
+        }}
+      >
         {formData && (
           <>
             <TabPanel value={value} index={0}>
@@ -1564,6 +1566,15 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
           </>
         )}
       </DialogContent>
+
+      {/* 에러 메시지 표시 */}
+      {validationError && (
+        <Box sx={{ px: 2, pb: 2 }}>
+          <Alert severity="error" sx={{ mt: 1 }}>
+            {validationError}
+          </Alert>
+        </Box>
+      )}
     </Dialog>
   );
 };
