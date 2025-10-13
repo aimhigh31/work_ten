@@ -86,7 +86,7 @@ interface SecurityIncidentTableProps {
   selectedAssignee?: string;
   tasks: SecurityIncidentRecord[];
   setTasks: React.Dispatch<React.SetStateAction<SecurityIncidentRecord[]>>;
-  addChangeLog: (action: string, target: string, description: string, team?: string) => void;
+  addChangeLog: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string) => void;
   error?: string | null;
   onDataRefresh?: () => Promise<void>;
 }
@@ -243,7 +243,17 @@ export default function SecurityIncidentTable({
       if (addChangeLog) {
         const deletedTasks = tasks.filter((task) => selected.includes(task.id));
         deletedTasks.forEach((task) => {
-          addChangeLog('보안사고 삭제', task.code || `INC-${task.id}`, `${task.mainContent || '보안사고'} 삭제`, task.team || '미분류');
+          const incidentCode = task.code || `INC-${task.id}`;
+          const incidentTitle = task.mainContent || '보안사고';
+          addChangeLog(
+            '삭제',
+            incidentCode,
+            `보안사고관리 ${incidentTitle}(${incidentCode}) 데이터가 삭제 되었습니다.`,
+            task.team || '미분류',
+            '',
+            '',
+            '-'
+          );
         });
       }
 
@@ -311,30 +321,112 @@ export default function SecurityIncidentTable({
 
         const success = await updateAccident(updatedIncident.id, supabaseData);
         if (success) {
-          // 변경로그 추가 - 변경된 필드 확인
+          // 변경로그 추가 - 각 필드별로 개별 로그 생성
           if (addChangeLog) {
-            const changes: string[] = [];
             const incidentCode = updatedIncident.code || `INC-${updatedIncident.id}`;
+            const incidentTitle = updatedIncident.mainContent || '보안사고';
 
+            // 상태 변경
             if (originalIncident.status !== updatedIncident.status) {
-              changes.push(`상태: "${originalIncident.status}" → "${updatedIncident.status}"`);
-            }
-            if (originalIncident.assignee !== updatedIncident.assignee) {
-              changes.push(`담당자: "${originalIncident.assignee || '미할당'}" → "${updatedIncident.assignee || '미할당'}"`);
-            }
-            if (originalIncident.mainContent !== updatedIncident.mainContent) {
-              changes.push(`사고내용 수정`);
-            }
-            if (originalIncident.completedDate !== updatedIncident.completedDate) {
-              changes.push(`완료일: "${originalIncident.completedDate || '미정'}" → "${updatedIncident.completedDate || '미정'}"`);
+              addChangeLog(
+                '수정',
+                incidentCode,
+                `보안사고관리 ${incidentTitle}(${incidentCode}) 정보 개요탭 상태가 ${originalIncident.status} → ${updatedIncident.status} 수정 되었습니다.`,
+                updatedIncident.team || '미분류',
+                originalIncident.status,
+                updatedIncident.status,
+                '상태'
+              );
             }
 
-            if (changes.length > 0) {
+            // 담당자 변경
+            if (originalIncident.assignee !== updatedIncident.assignee) {
               addChangeLog(
-                '보안사고 정보 수정',
+                '수정',
                 incidentCode,
-                `${updatedIncident.mainContent || '보안사고'} - ${changes.join(', ')}`,
-                updatedIncident.team || '미분류'
+                `보안사고관리 ${incidentTitle}(${incidentCode}) 정보 개요탭 담당자가 ${originalIncident.assignee || '미할당'} → ${updatedIncident.assignee || '미할당'} 수정 되었습니다.`,
+                updatedIncident.team || '미분류',
+                originalIncident.assignee || '미할당',
+                updatedIncident.assignee || '미할당',
+                '담당자'
+              );
+            }
+
+            // 사고내용 변경
+            if (originalIncident.mainContent !== updatedIncident.mainContent) {
+              addChangeLog(
+                '수정',
+                incidentCode,
+                `보안사고관리 ${incidentTitle}(${incidentCode}) 정보 개요탭 사고내용이 ${originalIncident.mainContent} → ${updatedIncident.mainContent} 수정 되었습니다.`,
+                updatedIncident.team || '미분류',
+                originalIncident.mainContent || '',
+                updatedIncident.mainContent || '',
+                '사고내용'
+              );
+            }
+
+            // 완료일 변경
+            if (originalIncident.completedDate !== updatedIncident.completedDate) {
+              addChangeLog(
+                '수정',
+                incidentCode,
+                `보안사고관리 ${incidentTitle}(${incidentCode}) 정보 개요탭 완료일이 ${originalIncident.completedDate || '미정'} → ${updatedIncident.completedDate || '미정'} 수정 되었습니다.`,
+                updatedIncident.team || '미분류',
+                originalIncident.completedDate || '미정',
+                updatedIncident.completedDate || '미정',
+                '완료일'
+              );
+            }
+
+            // 팀 변경
+            if (originalIncident.team !== updatedIncident.team) {
+              addChangeLog(
+                '수정',
+                incidentCode,
+                `보안사고관리 ${incidentTitle}(${incidentCode}) 정보 개요탭 팀이 ${originalIncident.team || '미분류'} → ${updatedIncident.team || '미분류'} 수정 되었습니다.`,
+                updatedIncident.team || '미분류',
+                originalIncident.team || '미분류',
+                updatedIncident.team || '미분류',
+                '팀'
+              );
+            }
+
+            // 사고유형 변경
+            if (originalIncident.incidentType !== updatedIncident.incidentType) {
+              addChangeLog(
+                '수정',
+                incidentCode,
+                `보안사고관리 ${incidentTitle}(${incidentCode}) 정보 개요탭 사고유형이 ${originalIncident.incidentType} → ${updatedIncident.incidentType} 수정 되었습니다.`,
+                updatedIncident.team || '미분류',
+                originalIncident.incidentType,
+                updatedIncident.incidentType,
+                '사고유형'
+              );
+            }
+
+            // 대응조치 변경
+            if (originalIncident.responseAction !== updatedIncident.responseAction) {
+              addChangeLog(
+                '수정',
+                incidentCode,
+                `보안사고관리 ${incidentTitle}(${incidentCode}) 정보 개요탭 대응조치가 ${originalIncident.responseAction || '-'} → ${updatedIncident.responseAction || '-'} 수정 되었습니다.`,
+                updatedIncident.team || '미분류',
+                originalIncident.responseAction || '',
+                updatedIncident.responseAction || '',
+                '대응조치'
+              );
+            }
+
+            // 시작일 변경
+            if (originalIncident.startDate !== updatedIncident.startDate) {
+              addChangeLog(
+                '수정',
+                incidentCode,
+                `보안사고관리 ${incidentTitle}(${incidentCode}) 정보 개요탭 시작일이 ${originalIncident.startDate || '미정'} → ${updatedIncident.startDate || '미정'} 수정 되었습니다.`,
+                updatedIncident.team || '미분류',
+                originalIncident.startDate || '미정',
+                updatedIncident.startDate || '미정',
+                '시작일'
               );
             }
           }
@@ -394,11 +486,15 @@ export default function SecurityIncidentTable({
         if (newIncident) {
           // 변경로그 추가 - 새 보안사고 생성
           if (addChangeLog) {
+            const incidentTitle = updatedIncident.mainContent || '새 보안사고';
             addChangeLog(
-              '새 보안사고 생성',
+              '생성',
               newCode,
-              `${updatedIncident.mainContent || '새 보안사고'} 생성`,
-              updatedIncident.team || '미분류'
+              `보안사고관리 ${incidentTitle}(${newCode}) 데이터가 생성 되었습니다.`,
+              updatedIncident.team || '미분류',
+              '',
+              '',
+              '-'
             );
           }
           console.log('✅ 새 보안사고 추가 완료:', newIncident);

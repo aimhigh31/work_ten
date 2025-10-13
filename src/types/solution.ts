@@ -11,6 +11,7 @@ export interface SolutionData {
   team: '개발팀' | '디자인팀' | '기획팀' | '마케팅팀';
   assignee: string;
   status: '대기' | '진행' | '완료' | '홀딩';
+  progress: number;
   completedDate: string;
   attachments: string[];
 }

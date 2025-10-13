@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 
 // third-party
-import ReactApexChart, { Props as ChartProps } from 'react-apexcharts';
+import ReactApexChart from 'react-apexcharts';
 import { ApexOptions } from 'apexcharts';
 
 // project imports
@@ -21,14 +21,12 @@ import {
   Grid,
   Card,
   CardContent,
-  CardHeader,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
   Paper,
   Chip,
-  Divider,
   Table,
   TableBody,
   TableCell,
@@ -40,28 +38,37 @@ import {
   Button
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import useMediaQuery from '@mui/material/useMediaQuery';
 
 // Project imports
 import KpiTable from 'views/apps/KpiTable';
 import KpiEditDialog from 'components/KpiEditDialog';
-import { taskData, taskStatusColors, assigneeAvatars } from 'data/kpi';
+import { taskStatusColors, assigneeAvatars } from 'data/kpi';
 import { TaskTableData, TaskStatus } from 'types/kpi';
 import { ThemeMode } from 'config';
 import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
 import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseKpi, KpiData } from 'hooks/useSupabaseKpi';
+import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
+import { ChangeLogData } from 'types/changelog';
+import { useSession } from 'next-auth/react';
+import useUser from 'hooks/useUser';
+import { createClient } from '@/lib/supabase/client';
 
-// 변경로그 타입 정의
+// 변경로그 타입 정의 (UI용)
 interface ChangeLog {
-  id: number;
+  id: string;
   dateTime: string;
+  title: string;
+  code: string;
+  action: string;
+  location: string;
+  changedField?: string;
+  beforeValue?: string;
+  afterValue?: string;
+  description: string;
   team: string;
   user: string;
-  action: string;
-  target: string;
-  description: string;
 }
 
 // Icons
@@ -1228,20 +1235,7 @@ function ChangeLogView({
 
   // 팀별 색상 매핑
   const getTeamColor = (team: string) => {
-    switch (team) {
-      case 'IT팀':
-        return '#FFF3E0';
-      case '개발팀':
-        return '#E8F5E8';
-      case '디자인팀':
-        return '#F3E5F5';
-      case '기획팀':
-        return '#E0F2F1';
-      case '마케팅팀':
-        return '#E3F2FD';
-      default:
-        return '#F5F5F5';
-    }
+    return { color: '#333333' };
   };
 
   return (
@@ -1253,7 +1247,7 @@ function ChangeLogView({
         </Typography>
       </Box>
 
-      {/* 변경로그 테이블 */}
+      {/* 변경로그 테이블 - 12컬럼 구조 */}
       <TableContainer
         sx={{
           flex: 1,
@@ -1263,6 +1257,9 @@ function ChangeLogView({
           overflowY: 'auto',
           boxShadow: 'none',
           minHeight: 0,
+          '& .MuiTable-root': {
+            minWidth: 1200
+          },
           // 스크롤바 스타일
           '&::-webkit-scrollbar': {
             width: '10px',
@@ -1290,12 +1287,16 @@ function ChangeLogView({
             <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
               <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
               <TableCell sx={{ fontWeight: 600, width: 130 }}>변경시간</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 100 }}>코드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 180 }}>업무내용</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 120 }}>변경분류</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 280 }}>변경 세부내용</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 180 }}>제목</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 140 }}>코드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경분류</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경위치</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90 }}>변경필드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 100 }}>변경전</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 100 }}>변경후</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 300 }}>변경 세부내용</TableCell>
               <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>담당자</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -1308,45 +1309,78 @@ function ChangeLogView({
                 }}
               >
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
                     {changeLogs.length - (page * rowsPerPage + index)}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.secondary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
                     {log.dateTime}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                    {log.target}
+                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                    {log.title}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                    {(() => {
-                      const task = tasks.find((task) => task.code === log.target);
-                      return task?.workContent || log.description.split(' - ')[0] || '업무내용 없음';
-                    })()}
+                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                    {log.code}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontSize: '13px',
-                      fontWeight: 500
-                    }}
-                  >
+                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
                     {log.action}
                   </Typography>
                 </TableCell>
                 <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                    {log.location}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                    {log.changedField || '-'}
+                  </Typography>
+                </TableCell>
+                <TableCell>
                   <Typography
                     variant="body2"
                     sx={{
                       fontSize: '13px',
-                      color: 'text.secondary',
+                      color: 'text.primary',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: 100
+                    }}
+                    title={log.beforeValue || '-'}
+                  >
+                    {log.beforeValue || '-'}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontSize: '13px',
+                      color: 'text.primary',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: 100
+                    }}
+                    title={log.afterValue || '-'}
+                  >
+                    {log.afterValue || '-'}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontSize: '13px',
+                      color: 'text.primary',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'normal',
@@ -1361,20 +1395,12 @@ function ChangeLogView({
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Chip
-                    label={log.team}
-                    size="small"
-                    sx={{
-                      height: 22,
-                      fontSize: '13px',
-                      backgroundColor: getTeamColor(log.team),
-                      color: '#333333',
-                      fontWeight: 500
-                    }}
-                  />
+                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                    {log.team}
+                  </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
                     {log.user}
                   </Typography>
                 </TableCell>
@@ -1421,10 +1447,10 @@ function ChangeLogView({
                 }
               }}
             >
-              <MenuItem value={5}>5</MenuItem>
-              <MenuItem value={10}>10</MenuItem>
-              <MenuItem value={25}>25</MenuItem>
-              <MenuItem value={50}>50</MenuItem>
+              <MenuItem key="rows-5" value={5}>5</MenuItem>
+              <MenuItem key="rows-10" value={10}>10</MenuItem>
+              <MenuItem key="rows-25" value={25}>25</MenuItem>
+              <MenuItem key="rows-50" value={50}>50</MenuItem>
             </Select>
           </FormControl>
 
@@ -1458,16 +1484,7 @@ function ChangeLogView({
                 }
               }}
             />
-            <Button
-              size="small"
-              onClick={handleGoToPage}
-              sx={{
-                minWidth: 'auto',
-                px: 1.5,
-                py: 0.5,
-                fontSize: '0.875rem'
-              }}
-            >
+            <Button size="small" onClick={handleGoToPage} sx={{ minWidth: 'auto', px: 1.5, py: 0.5, fontSize: '0.875rem' }}>
               Go
             </Button>
           </Box>
@@ -2411,10 +2428,25 @@ export default function KpiManagement() {
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
   const { kpis, loading: kpisLoading, addKpi, updateKpi, deleteKpi, deleteKpis, fetchKpis } = useSupabaseKpi();
 
+  // 변경로그 Hook (page='main_kpi')
+  const { logs: dbChangeLogs, loading: changeLogsLoading, fetchChangeLogs } = useSupabaseChangeLog('main_kpi');
+
+  // 사용자 정보
+  const { data: session } = useSession();
+  const { user: currentUser } = useUser();
+
   // 부서 데이터 로드
   React.useEffect(() => {
     fetchDepartments();
   }, [fetchDepartments]);
+
+  // 변경로그탭이 활성화될 때 데이터 강제 새로고침
+  React.useEffect(() => {
+    if (value === 4 && fetchChangeLogs) {
+      console.log('🔄 변경로그탭 활성화 - 데이터 새로고침');
+      fetchChangeLogs();
+    }
+  }, [value, fetchChangeLogs]);
 
   // 마스터코드에서 상태 옵션 가져오기
   const statusTypes = React.useMemo(() => {
@@ -2482,54 +2514,38 @@ export default function KpiManagement() {
   const [changeLogRowsPerPage, setChangeLogRowsPerPage] = useState(10);
   const [changeLogGoToPage, setChangeLogGoToPage] = useState('');
 
-  // 변경로그 상태 - 초기 데이터는 기존 샘플 데이터 사용
-  const [changeLogs, setChangeLogs] = useState<ChangeLog[]>([
-    {
-      id: 1,
-      dateTime: '2024-12-15 14:30',
-      team: '개발팀',
-      user: '김철수',
-      action: '업무 상태 변경',
-      target: 'TASK-24-010',
-      description: '웹사이트 리뉴얼 프로젝트 상태를 "진행"에서 "완료"로 변경'
-    },
-    {
-      id: 2,
-      dateTime: '2024-12-14 10:15',
-      team: '기획팀',
-      user: '이영희',
-      action: '새 업무 생성',
-      target: 'TASK-24-011',
-      description: '모바일 앱 UI/UX 개선 업무 신규 등록'
-    },
-    {
-      id: 3,
-      dateTime: '2024-12-13 16:45',
-      team: '마케팅팀',
-      user: '박민수',
-      action: '담당자 변경',
-      target: 'TASK-24-009',
-      description: '마케팅 캠페인 기획 담당자를 "최지연"에서 "박민수"로 변경'
-    },
-    {
-      id: 4,
-      dateTime: '2024-12-12 09:30',
-      team: '디자인팀',
-      user: '강민정',
-      action: '완료일 수정',
-      target: 'TASK-24-008',
-      description: '로고 디자인 작업의 완료 예정일을 2024-12-20으로 수정'
-    },
-    {
-      id: 5,
-      dateTime: '2024-12-11 15:20',
-      team: '개발팀',
-      user: '정현우',
-      action: '업무 삭제',
-      target: 'TASK-24-007',
-      description: '중복된 데이터베이스 최적화 업무 삭제'
-    }
-  ]);
+  // DB 변경로그를 UI 형식으로 변환
+  const changeLogs = React.useMemo(() => {
+    if (!dbChangeLogs) return [];
+
+    return dbChangeLogs.map((log: ChangeLogData) => {
+      // record_id로 해당 KPI 찾기 (record_id는 코드로 저장되어 있음)
+      const kpi = tasks.find(t => t.code === log.record_id);
+
+      const date = new Date(log.created_at);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hour = String(date.getHours()).padStart(2, '0');
+      const minute = String(date.getMinutes()).padStart(2, '0');
+      const formattedDateTime = `${year}.${month}.${day} ${hour}:${minute}`;
+
+      return {
+        id: String(log.id),
+        dateTime: formattedDateTime,
+        title: log.title || kpi?.workContent || log.record_id,
+        code: log.record_id,
+        action: log.action_type,
+        location: log.description.includes('개요탭') ? '개요탭' : log.description.includes('데이터탭') ? '데이터탭' : '-',
+        changedField: log.changed_field || '-',
+        beforeValue: log.before_value || '-',
+        afterValue: log.after_value || '-',
+        description: log.description,
+        team: log.team || log.user_department || '-',
+        user: log.user_name
+      } as ChangeLog;
+    });
+  }, [dbChangeLogs, tasks]);
 
   // 필터 상태
   const [selectedYear, setSelectedYear] = useState('전체');
@@ -2545,23 +2561,62 @@ export default function KpiManagement() {
     yearOptions.push(i.toString());
   }
 
-  // 변경로그 추가 함수
-  const addChangeLog = (action: string, target: string, description: string, team: string = '시스템') => {
-    const now = new Date();
-    const dateTime = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  // 변경로그 추가 함수 - Supabase 연동
+  const addChangeLog = React.useCallback(
+    async (
+      action: string,
+      target: string,
+      description: string,
+      team?: string,
+      beforeValue?: string,
+      afterValue?: string,
+      changedField?: string,
+      title?: string
+    ) => {
+      try {
+        const supabase = createClient();
+        const userName = currentUser?.user_name || session?.user?.name || '시스템';
 
-    const newLog: ChangeLog = {
-      id: Math.max(...changeLogs.map((log) => log.id), 0) + 1,
-      dateTime,
-      team,
-      user: '시스템', // 임시로 시스템으로 설정, 나중에 실제 사용자 정보로 교체 가능
-      action,
-      target,
-      description
-    };
+        const logData = {
+          page: 'main_kpi',
+          record_id: target,              // target → record_id
+          action_type: action,            // action → action_type
+          description: description,
+          before_value: beforeValue || null,
+          after_value: afterValue || null,
+          changed_field: changedField || null,
+          title: title || null,
+          user_name: userName,            // changed_by → user_name
+          team: currentUser?.department || team || '시스템',
+          user_department: currentUser?.department,
+          user_position: currentUser?.position,
+          user_profile_image: currentUser?.profile_image_url,
+          created_at: new Date().toISOString()
+        };
 
-    setChangeLogs((prev) => [newLog, ...prev]); // 최신순으로 정렬
-  };
+        console.log('📝 변경로그 저장 시도:', logData);
+
+        const { data, error } = await supabase.from('common_log_data').insert(logData).select();
+
+        if (error) {
+          console.error('❌ 변경로그 저장 실패:', error);
+          console.error('❌ 에러 상세:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code
+          });
+        } else {
+          console.log('✅ 변경로그 저장 성공:', data);
+          // 변경로그 목록 새로고침
+          await fetchChangeLogs();
+        }
+      } catch (err) {
+        console.error('🔴 변경로그 추가 중 예외:', err);
+      }
+    },
+    [currentUser, session, fetchChangeLogs]
+  );
 
   // 카드 클릭 핸들러
   const handleCardClick = (task: TaskTableData) => {
@@ -2615,20 +2670,79 @@ export default function KpiManagement() {
         console.log('📦 업데이트용 kpiData:', kpiData);
         await updateKpi(updatedTask.id, kpiData);
 
-        // 변경로그 추가
-        const changes = [];
-        if (originalTask.status !== updatedTask.status) {
-          changes.push(`상태: ${originalTask.status} → ${updatedTask.status}`);
-        }
-        if (originalTask.assignee !== updatedTask.assignee) {
-          changes.push(`담당자: ${originalTask.assignee} → ${updatedTask.assignee}`);
-        }
-        if (originalTask.completedDate !== updatedTask.completedDate) {
-          changes.push(`완료일: ${originalTask.completedDate} → ${updatedTask.completedDate}`);
-        }
+        // 변경로그 추가 - 필드별 추적
+        const fieldNameMap: Record<string, string> = {
+          workContent: '업무내용',
+          status: '상태',
+          assignee: '담당자',
+          completedDate: '완료일',
+          startDate: '시작일',
+          team: '팀',
+          department: '부서',
+          progress: '진행률',
+          description: '설명',
+          selectionBackground: '선정배경',
+          impact: '파급효과',
+          managementCategory: '관리분류',
+          targetKpi: '목표 KPI',
+          currentKpi: '현재 KPI'
+        };
 
+        // 변경된 필드 찾기
+        const changes: Array<{ field: string; fieldKorean: string; before: any; after: any }> = [];
+
+        // 일반 필드 비교
+        Object.keys(fieldNameMap).forEach((field) => {
+          const beforeVal = (originalTask as any)[field];
+          const afterVal = (updatedTask as any)[field];
+
+          // 값이 다른 경우만 추가
+          if (beforeVal !== afterVal) {
+            changes.push({
+              field,
+              fieldKorean: fieldNameMap[field],
+              before: beforeVal || '',
+              after: afterVal || ''
+            });
+          }
+        });
+
+        // 평가기준표 비교 (객체 형태)
+        const evaluationGrades = ['S', 'A', 'B', 'C', 'D'];
+        evaluationGrades.forEach((grade) => {
+          const beforeVal = (originalTask as any).evaluationCriteria?.[grade];
+          const afterVal = (updatedTask as any).evaluationCriteria?.[grade];
+
+          if (beforeVal !== afterVal) {
+            changes.push({
+              field: `evaluationCriteria.${grade}`,
+              fieldKorean: `평가기준 ${grade}`,
+              before: beforeVal || '',
+              after: afterVal || ''
+            });
+          }
+        });
+
+        console.log('🔍 변경 감지된 필드들:', changes);
+
+        const kpiTitle = updatedTask.workContent || 'KPI';
+
+        // 변경된 필드가 있으면 각각 로그 기록
         if (changes.length > 0) {
-          addChangeLog('KPI 수정', updatedTask.code, changes.join(', '), updatedTask.team);
+          for (const change of changes) {
+            const description = `KPI관리 ${kpiTitle}(${updatedTask.code}) 정보의 개요탭 ${change.fieldKorean}이 ${change.before} → ${change.after} 로 수정 되었습니다.`;
+
+            await addChangeLog(
+              '수정',
+              updatedTask.code,
+              description,
+              updatedTask.team || '시스템',
+              String(change.before),
+              String(change.after),
+              change.fieldKorean,
+              kpiTitle
+            );
+          }
         }
       } else {
         // 새로 생성
@@ -2660,7 +2774,18 @@ export default function KpiManagement() {
 
         console.log('📦 Supabase에 전송할 데이터:', kpiData);
         await addKpi(kpiData);
-        addChangeLog('KPI 생성', updatedTask.code, `새로운 KPI가 생성되었습니다: ${updatedTask.workContent}`, updatedTask.team);
+
+        const kpiTitle = updatedTask.workContent || 'KPI';
+        await addChangeLog(
+          '추가',
+          updatedTask.code,
+          `KPI관리 ${kpiTitle}(${updatedTask.code}) 정보의 개요탭 데이터가 추가 되었습니다.`,
+          updatedTask.team || '시스템',
+          '',
+          kpiTitle,
+          '개요탭',
+          kpiTitle
+        );
       }
 
       handleEditDialogClose();

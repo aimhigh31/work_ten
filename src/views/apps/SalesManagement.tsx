@@ -41,17 +41,27 @@ import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
 import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseSales } from 'hooks/useSupabaseSales';
+import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
+import { ChangeLogData } from 'types/changelog';
+import { createClient } from '@/lib/supabase/client';
+import { useSession } from 'next-auth/react';
+import useUser from 'hooks/useUser';
 import type { SalesRecord } from 'types/sales';
 
 // 변경로그 타입 정의
 interface ChangeLog {
-  id: number;
+  id: string;
   dateTime: string;
+  title: string;
+  code: string;
+  action: string;
+  location: string;
+  changedField?: string;
+  beforeValue?: string;
+  afterValue?: string;
+  description: string;
   team: string;
   user: string;
-  action: string;
-  target: string;
-  description: string;
 }
 
 // 변경로그 뷰 컴포넌트
@@ -164,13 +174,17 @@ function ChangeLogView({
           <TableHead>
             <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
               <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 130 }}>변경시간</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 100 }}>코드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 180 }}>매출내용</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 120 }}>변경분류</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 280 }}>변경 세부내용</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 110 }}>변경시간</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 150 }}>제목</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 120 }}>코드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경분류</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경위치</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 100 }}>변경필드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 120 }}>변경전</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 120 }}>변경후</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 330 }}>변경 세부내용</TableCell>
               <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>담당자</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -188,40 +202,50 @@ function ChangeLogView({
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.secondary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
                     {log.dateTime}
                   </Typography>
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                    {log.target}
+                    {log.title}
                   </Typography>
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                    {(() => {
-                      const sale = sales.find((sale) => sale.code === log.target);
-                      return sale?.customerName + ' - ' + sale?.itemName || log.description.split(' - ')[0] || '매출내용 없음';
-                    })()}
+                    {log.code}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontSize: '13px',
-                      fontWeight: 500
-                    }}
-                  >
+                  <Typography variant="body2" sx={{ fontSize: '13px', fontWeight: 500 }}>
                     {log.action}
                   </Typography>
                 </TableCell>
                 <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                    {log.location}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                    {log.changedField}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                    {log.beforeValue}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                    {log.afterValue}
+                  </Typography>
+                </TableCell>
+                <TableCell>
                   <Typography
                     variant="body2"
                     sx={{
                       fontSize: '13px',
-                      color: 'text.secondary',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'normal',
@@ -236,17 +260,9 @@ function ChangeLogView({
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Chip
-                    label={log.team}
-                    size="small"
-                    sx={{
-                      height: 22,
-                      fontSize: '13px',
-                      backgroundColor: getTeamColor(log.team),
-                      color: '#333333',
-                      fontWeight: 500
-                    }}
-                  />
+                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                    {log.team}
+                  </Typography>
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" sx={{ fontSize: '13px' }}>
@@ -1663,6 +1679,13 @@ export default function SalesManagement() {
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
   const { getSales, createSales, updateSales, loading: salesLoading, error: salesError } = useSupabaseSales();
 
+  // Supabase 변경로그 연동
+  const { data: session } = useSession();
+  const user = useUser();
+  const userName = user?.name || session?.user?.name || '시스템';
+  const currentUser = users.find((u) => u.email === session?.user?.email);
+  const { logs: changeLogData, fetchChangeLogs } = useSupabaseChangeLog('plan_sales');
+
   // 부서 데이터 로드
   React.useEffect(() => {
     fetchDepartments();
@@ -1701,54 +1724,45 @@ export default function SalesManagement() {
   const [changeLogRowsPerPage, setChangeLogRowsPerPage] = useState(10);
   const [changeLogGoToPage, setChangeLogGoToPage] = useState('');
 
-  // 변경로그 상태 - 초기 데이터는 기존 샘플 데이터 사용
-  const [changeLogs, setChangeLogs] = useState<ChangeLog[]>([
-    {
-      id: 1,
-      dateTime: '2024-12-15 14:30',
-      team: '영업팀',
-      user: '김철수',
-      action: '매출 데이터 수정',
-      target: 'SALES-24-010',
-      description: '12월 매출 데이터를 업데이트했습니다.'
-    },
-    {
-      id: 2,
-      dateTime: '2024-12-14 10:15',
-      team: '기획팀',
-      user: '이영희',
-      action: '새 매출 등록',
-      target: 'SALES-24-011',
-      description: '신규 고객 매출 데이터를 등록했습니다.'
-    },
-    {
-      id: 3,
-      dateTime: '2024-12-13 16:45',
-      team: '마케팅팀',
-      user: '박민수',
-      action: '담당자 변경',
-      target: 'SALES-24-009',
-      description: '매출 담당자를 "최지연"에서 "박민수"로 변경했습니다.'
-    },
-    {
-      id: 4,
-      dateTime: '2024-12-12 09:30',
-      team: '영업팀',
-      user: '강민정',
-      action: '매출 삭제',
-      target: 'SALES-24-008',
-      description: '중복된 매출 데이터를 삭제했습니다.'
-    },
-    {
-      id: 5,
-      dateTime: '2024-12-11 15:20',
-      team: '기획팀',
-      user: '정현우',
-      action: '매출 분석',
-      target: 'SALES-24-007',
-      description: '월간 매출 분석 리포트를 생성했습니다.'
+  // changeLogData를 ChangeLog 형식으로 변환
+  const changeLogs = React.useMemo<ChangeLog[]>(() => {
+    if (!changeLogData || !Array.isArray(changeLogData)) {
+      return [];
     }
-  ]);
+    return changeLogData.map((log) => ({
+      id: log.id,
+      dateTime: new Date(log.created_at).toLocaleString('ko-KR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }),
+      title: log.title || log.description.split(' ')[1]?.split('(')[0] || '-',
+      code: log.record_id,
+      action: log.action_type,
+      location: log.description.includes('개요탭') ? '개요탭' : log.description.includes('데이터탭') ? '데이터탭' : '-',
+      changedField: log.changed_field || '-',
+      beforeValue: log.before_value || '-',
+      afterValue: log.after_value || '-',
+      description: log.description,
+      team: log.team || '-',
+      user: log.user_name
+    }));
+  }, [changeLogData]);
+
+  // 변경로그 데이터 로드
+  useEffect(() => {
+    console.log('📋 매출관리 변경로그 데이터 로드 시작');
+    fetchChangeLogs();
+  }, [fetchChangeLogs]);
+
+  // 변경로그 데이터 디버깅
+  useEffect(() => {
+    console.log('📊 Sales changeLogData:', changeLogData);
+    console.log('📊 Sales changeLogs (변환된 데이터):', changeLogs);
+  }, [changeLogData, changeLogs]);
 
   // 필터 상태
   const [selectedYear, setSelectedYear] = useState('전체');
@@ -1764,39 +1778,46 @@ export default function SalesManagement() {
   }
 
   // 변경로그 추가 함수
-  const addChangeLog = (action: string, target: string, description: string, team: string = '시스템') => {
-    return new Promise<void>((resolve, reject) => {
-      try {
-        const now = new Date();
-        const dateTime = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const addChangeLog = React.useCallback(
+    async (
+      action: string,
+      target: string,
+      description: string,
+      team: string = '시스템',
+      beforeValue?: string,
+      afterValue?: string,
+      changedField?: string,
+      title?: string
+    ) => {
+      const logData = {
+        page: 'plan_sales',
+        record_id: target,
+        action_type: action,
+        description: description,
+        before_value: beforeValue || null,
+        after_value: afterValue || null,
+        changed_field: changedField || null,
+        title: title || null,
+        user_name: userName,
+        team: currentUser?.department || '시스템',
+        user_department: currentUser?.department,
+        user_position: currentUser?.position,
+        user_profile_image: currentUser?.profile_image_url,
+        created_at: new Date().toISOString()
+      };
 
-        const newLog: ChangeLog = {
-          id: Math.max(...changeLogs.map((log) => log.id), 0) + 1,
-          dateTime,
-          team,
-          user: '시스템', // 임시로 시스템으로 설정, 나중에 실제 사용자 정보로 교체 가능
-          action,
-          target,
-          description
-        };
+      const supabase = createClient();
+      const { data, error } = await supabase.from('common_log_data').insert(logData).select();
 
-        setChangeLogs((prev) => {
-          try {
-            const result = [newLog, ...prev]; // 최신순으로 정렬
-            resolve();
-            return result;
-          } catch (error) {
-            console.error('변경로그 상태 업데이트 오류:', error);
-            reject(error);
-            return prev;
-          }
-        });
-      } catch (error) {
-        console.error('변경로그 생성 중 오류:', error);
-        reject(error);
+      if (error) {
+        console.error('❌ 변경로그 추가 실패:', error);
+      } else {
+        console.log('✅ 변경로그 추가 성공:', data);
+        await fetchChangeLogs();
       }
-    });
-  };
+    },
+    [currentUser, user, userName, fetchChangeLogs]
+  );
 
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
@@ -2392,27 +2413,191 @@ export default function SalesManagement() {
               // 로컬 상태 업데이트
               setSales((prev) => prev.map((s) => (s.id === updatedRecord.id ? updatedRecord : s)));
 
-              // 변경로그 추가
+              // 변경로그 추가 (필드별)
               if (originalSales) {
-                const changes: string[] = [];
                 const salesCode = updatedRecord.code || `SALES-${updatedRecord.id}`;
+                const salesTitle = updatedRecord.itemName || '매출';
+
+                // 각 필드별 변경사항 추적
+                if (originalSales.customerName !== updatedRecord.customerName) {
+                  await addChangeLog(
+                    '수정',
+                    salesCode,
+                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 고객명이 ${originalSales.customerName || ''} → ${updatedRecord.customerName || ''} 로 수정 되었습니다.`,
+                    updatedRecord.businessUnit || '미분류',
+                    originalSales.customerName || '',
+                    updatedRecord.customerName || '',
+                    '고객명',
+                    salesTitle
+                  );
+                }
 
                 if (originalSales.salesType !== updatedRecord.salesType) {
-                  changes.push(`판매유형: "${originalSales.salesType}" → "${updatedRecord.salesType}"`);
-                }
-                if (originalSales.customerName !== updatedRecord.customerName) {
-                  changes.push(`고객명: "${originalSales.customerName}" → "${updatedRecord.customerName}"`);
-                }
-                if (originalSales.itemName !== updatedRecord.itemName) {
-                  changes.push(`품목명 수정`);
+                  await addChangeLog(
+                    '수정',
+                    salesCode,
+                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 판매유형이 ${originalSales.salesType || ''} → ${updatedRecord.salesType || ''} 로 수정 되었습니다.`,
+                    updatedRecord.businessUnit || '미분류',
+                    originalSales.salesType || '',
+                    updatedRecord.salesType || '',
+                    '판매유형',
+                    salesTitle
+                  );
                 }
 
-                if (changes.length > 0) {
-                  addChangeLog(
-                    '매출 정보 수정',
+                if (originalSales.businessUnit !== updatedRecord.businessUnit) {
+                  await addChangeLog(
+                    '수정',
                     salesCode,
-                    `${updatedRecord.customerName || '매출'} - ${changes.join(', ')}`,
-                    updatedRecord.businessUnit || '미분류'
+                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 사업부가 ${originalSales.businessUnit || ''} → ${updatedRecord.businessUnit || ''} 로 수정 되었습니다.`,
+                    updatedRecord.businessUnit || '미분류',
+                    originalSales.businessUnit || '',
+                    updatedRecord.businessUnit || '',
+                    '사업부',
+                    salesTitle
+                  );
+                }
+
+                if (originalSales.itemName !== updatedRecord.itemName) {
+                  await addChangeLog(
+                    '수정',
+                    salesCode,
+                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 품목명이 ${originalSales.itemName || ''} → ${updatedRecord.itemName || ''} 로 수정 되었습니다.`,
+                    updatedRecord.businessUnit || '미분류',
+                    originalSales.itemName || '',
+                    updatedRecord.itemName || '',
+                    '품목명',
+                    salesTitle
+                  );
+                }
+
+                if (originalSales.status !== updatedRecord.status) {
+                  await addChangeLog(
+                    '수정',
+                    salesCode,
+                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 상태가 ${originalSales.status || ''} → ${updatedRecord.status || ''} 로 수정 되었습니다.`,
+                    updatedRecord.businessUnit || '미분류',
+                    originalSales.status || '',
+                    updatedRecord.status || '',
+                    '상태',
+                    salesTitle
+                  );
+                }
+
+                if (originalSales.team !== updatedRecord.team) {
+                  await addChangeLog(
+                    '수정',
+                    salesCode,
+                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 팀이 ${originalSales.team || ''} → ${updatedRecord.team || ''} 로 수정 되었습니다.`,
+                    updatedRecord.businessUnit || '미분류',
+                    originalSales.team || '',
+                    updatedRecord.team || '',
+                    '팀',
+                    salesTitle
+                  );
+                }
+
+                if (originalSales.registrant !== updatedRecord.registrant) {
+                  await addChangeLog(
+                    '수정',
+                    salesCode,
+                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 등록자가 ${originalSales.registrant || ''} → ${updatedRecord.registrant || ''} 로 수정 되었습니다.`,
+                    updatedRecord.businessUnit || '미분류',
+                    originalSales.registrant || '',
+                    updatedRecord.registrant || '',
+                    '등록자',
+                    salesTitle
+                  );
+                }
+
+                if (originalSales.modelCode !== updatedRecord.modelCode) {
+                  await addChangeLog(
+                    '수정',
+                    salesCode,
+                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 모델코드가 ${originalSales.modelCode || ''} → ${updatedRecord.modelCode || ''} 로 수정 되었습니다.`,
+                    updatedRecord.businessUnit || '미분류',
+                    originalSales.modelCode || '',
+                    updatedRecord.modelCode || '',
+                    '모델코드',
+                    salesTitle
+                  );
+                }
+
+                if (originalSales.itemCode !== updatedRecord.itemCode) {
+                  await addChangeLog(
+                    '수정',
+                    salesCode,
+                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 품목코드가 ${originalSales.itemCode || ''} → ${updatedRecord.itemCode || ''} 로 수정 되었습니다.`,
+                    updatedRecord.businessUnit || '미분류',
+                    originalSales.itemCode || '',
+                    updatedRecord.itemCode || '',
+                    '품목코드',
+                    salesTitle
+                  );
+                }
+
+                if (originalSales.quantity !== updatedRecord.quantity) {
+                  await addChangeLog(
+                    '수정',
+                    salesCode,
+                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 수량이 ${originalSales.quantity || ''} → ${updatedRecord.quantity || ''} 로 수정 되었습니다.`,
+                    updatedRecord.businessUnit || '미분류',
+                    String(originalSales.quantity || ''),
+                    String(updatedRecord.quantity || ''),
+                    '수량',
+                    salesTitle
+                  );
+                }
+
+                if (originalSales.unitPrice !== updatedRecord.unitPrice) {
+                  await addChangeLog(
+                    '수정',
+                    salesCode,
+                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 단가가 ${originalSales.unitPrice || ''} → ${updatedRecord.unitPrice || ''} 로 수정 되었습니다.`,
+                    updatedRecord.businessUnit || '미분류',
+                    String(originalSales.unitPrice || ''),
+                    String(updatedRecord.unitPrice || ''),
+                    '단가',
+                    salesTitle
+                  );
+                }
+
+                if (originalSales.totalAmount !== updatedRecord.totalAmount) {
+                  await addChangeLog(
+                    '수정',
+                    salesCode,
+                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 총액이 ${originalSales.totalAmount || ''} → ${updatedRecord.totalAmount || ''} 로 수정 되었습니다.`,
+                    updatedRecord.businessUnit || '미분류',
+                    String(originalSales.totalAmount || ''),
+                    String(updatedRecord.totalAmount || ''),
+                    '총액',
+                    salesTitle
+                  );
+                }
+
+                if (originalSales.deliveryDate !== updatedRecord.deliveryDate) {
+                  await addChangeLog(
+                    '수정',
+                    salesCode,
+                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 납품일이 ${originalSales.deliveryDate || ''} → ${updatedRecord.deliveryDate || ''} 로 수정 되었습니다.`,
+                    updatedRecord.businessUnit || '미분류',
+                    originalSales.deliveryDate || '',
+                    updatedRecord.deliveryDate || '',
+                    '납품일',
+                    salesTitle
+                  );
+                }
+
+                if (originalSales.notes !== updatedRecord.notes) {
+                  await addChangeLog(
+                    '수정',
+                    salesCode,
+                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 비고가 ${originalSales.notes || ''} → ${updatedRecord.notes || ''} 로 수정 되었습니다.`,
+                    updatedRecord.businessUnit || '미분류',
+                    originalSales.notes || '',
+                    updatedRecord.notes || '',
+                    '비고',
+                    salesTitle
                   );
                 }
               }
@@ -2464,11 +2649,15 @@ export default function SalesManagement() {
                 setSales((prev) => [newSales, ...prev]);
 
                 // 변경로그 추가
-                addChangeLog(
-                  '매출 데이터 생성',
+                await addChangeLog(
+                  '추가',
                   newSales.code,
+                  `매출관리 ${newSales.customerName}(${newSales.code}) 정보의 개요탭 데이터가 추가 되었습니다.`,
+                  newSales.businessUnit || '미분류',
+                  '',
                   `${newSales.customerName} - ${newSales.itemName} (${Number(newSales.totalAmount).toLocaleString()}원)`,
-                  newSales.businessUnit || '미분류'
+                  '개요탭',
+                  newSales.itemName
                 );
               }
             } catch (error) {

@@ -66,7 +66,7 @@ interface HardwareTableProps {
   selectedAssignee?: string;
   tasks?: HardwareTableData[];
   setTasks?: React.Dispatch<React.SetStateAction<HardwareTableData[]>>;
-  addChangeLog?: (action: string, target: string, description: string, team?: string) => void;
+  addChangeLog?: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string) => void;
   deleteMultipleHardware?: (ids: number[]) => Promise<any>;
   onHardwareSave?: (hardware: HardwareTableData) => Promise<void>;
   statusTypes?: any[];
@@ -330,21 +330,218 @@ export default function HardwareTable({
     console.log('🔄 변환된 데이터:', convertedHardware);
 
     try {
+      // 변경로그 추가 - 필드별 상세 추적 (개요탭 전체 필드)
+      const existingIndex = data.findIndex((hardware) => hardware.id === convertedHardware.id);
+
+      if (existingIndex !== -1 && addChangeLog) {
+        // 기존 Hardware 업데이트 - 변경로그 추가
+        const originalHardware = data[existingIndex];
+        const hardwareCode = convertedHardware.code || `HW-${convertedHardware.id}`;
+        const hardwareName = convertedHardware.assetName || convertedHardware.workContent || '하드웨어';
+
+        // 1. 자산분류 변경
+        if (originalHardware.assetCategory !== convertedHardware.assetCategory) {
+          addChangeLog(
+            '수정',
+            hardwareCode,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 자산분류가 ${originalHardware.assetCategory || ''} → ${convertedHardware.assetCategory || ''} 로 수정 되었습니다.`,
+            convertedHardware.team || '미분류',
+            originalHardware.assetCategory || '',
+            convertedHardware.assetCategory || '',
+            '자산분류'
+          );
+        }
+
+        // 2. 자산명 변경
+        if (originalHardware.assetName !== convertedHardware.assetName) {
+          addChangeLog(
+            '수정',
+            hardwareCode,
+            `하드웨어관리 ${originalHardware.assetName || ''}(${hardwareCode}) 정보의 개요탭 자산명이 ${originalHardware.assetName || ''} → ${convertedHardware.assetName || ''} 로 수정 되었습니다.`,
+            convertedHardware.team || '미분류',
+            originalHardware.assetName || '',
+            convertedHardware.assetName || '',
+            '자산명'
+          );
+        }
+
+        // 3. 모델 변경
+        if (originalHardware.model !== convertedHardware.model) {
+          addChangeLog(
+            '수정',
+            hardwareCode,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 모델이 ${originalHardware.model || ''} → ${convertedHardware.model || ''} 로 수정 되었습니다.`,
+            convertedHardware.team || '미분류',
+            originalHardware.model || '',
+            convertedHardware.model || '',
+            '모델'
+          );
+        }
+
+        // 4. 제조사 변경
+        if (originalHardware.manufacturer !== convertedHardware.manufacturer) {
+          addChangeLog(
+            '수정',
+            hardwareCode,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 제조사가 ${originalHardware.manufacturer || ''} → ${convertedHardware.manufacturer || ''} 로 수정 되었습니다.`,
+            convertedHardware.team || '미분류',
+            originalHardware.manufacturer || '',
+            convertedHardware.manufacturer || '',
+            '제조사'
+          );
+        }
+
+        // 5. 공급업체 변경
+        if (originalHardware.vendor !== convertedHardware.vendor) {
+          addChangeLog(
+            '수정',
+            hardwareCode,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 공급업체가 ${originalHardware.vendor || ''} → ${convertedHardware.vendor || ''} 로 수정 되었습니다.`,
+            convertedHardware.team || '미분류',
+            originalHardware.vendor || '',
+            convertedHardware.vendor || '',
+            '공급업체'
+          );
+        }
+
+        // 6. 상세스펙 변경
+        if (originalHardware.detailSpec !== convertedHardware.detailSpec) {
+          addChangeLog(
+            '수정',
+            hardwareCode,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 상세스펙이 ${originalHardware.detailSpec || ''} → ${convertedHardware.detailSpec || ''} 로 수정 되었습니다.`,
+            convertedHardware.team || '미분류',
+            originalHardware.detailSpec || '',
+            convertedHardware.detailSpec || '',
+            '상세스펙'
+          );
+        }
+
+        // 7. 사용자 변경
+        if (originalHardware.currentUser !== convertedHardware.currentUser) {
+          addChangeLog(
+            '수정',
+            hardwareCode,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 사용자가 ${originalHardware.currentUser || ''} → ${convertedHardware.currentUser || ''} 로 수정 되었습니다.`,
+            convertedHardware.team || '미분류',
+            originalHardware.currentUser || '',
+            convertedHardware.currentUser || '',
+            '사용자'
+          );
+        }
+
+        // 8. 위치 변경
+        if (originalHardware.location !== convertedHardware.location) {
+          addChangeLog(
+            '수정',
+            hardwareCode,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 위치가 ${originalHardware.location || ''} → ${convertedHardware.location || ''} 로 수정 되었습니다.`,
+            convertedHardware.team || '미분류',
+            originalHardware.location || '',
+            convertedHardware.location || '',
+            '위치'
+          );
+        }
+
+        // 9. 담당자 변경
+        if (originalHardware.assignee !== convertedHardware.assignee) {
+          addChangeLog(
+            '수정',
+            hardwareCode,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 담당자가 ${originalHardware.assignee || ''} → ${convertedHardware.assignee || ''} 로 수정 되었습니다.`,
+            convertedHardware.team || '미분류',
+            originalHardware.assignee || '',
+            convertedHardware.assignee || '',
+            '담당자'
+          );
+        }
+
+        // 10. 상태 변경
+        if (originalHardware.status !== convertedHardware.status) {
+          addChangeLog(
+            '수정',
+            hardwareCode,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 상태가 ${originalHardware.status} → ${convertedHardware.status} 로 수정 되었습니다.`,
+            convertedHardware.team || '미분류',
+            originalHardware.status,
+            convertedHardware.status,
+            '상태'
+          );
+        }
+
+        // 11. 구매일 변경
+        if (originalHardware.purchaseDate !== convertedHardware.purchaseDate) {
+          addChangeLog(
+            '수정',
+            hardwareCode,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 구매일이 ${originalHardware.purchaseDate || ''} → ${convertedHardware.purchaseDate || ''} 로 수정 되었습니다.`,
+            convertedHardware.team || '미분류',
+            originalHardware.purchaseDate || '',
+            convertedHardware.purchaseDate || '',
+            '구매일'
+          );
+        }
+
+        // 12. 보증만료일 변경
+        if (originalHardware.warrantyEndDate !== convertedHardware.warrantyEndDate) {
+          addChangeLog(
+            '수정',
+            hardwareCode,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 보증만료일이 ${originalHardware.warrantyEndDate || ''} → ${convertedHardware.warrantyEndDate || ''} 로 수정 되었습니다.`,
+            convertedHardware.team || '미분류',
+            originalHardware.warrantyEndDate || '',
+            convertedHardware.warrantyEndDate || '',
+            '보증만료일'
+          );
+        }
+
+        // 13. 시리얼번호 변경
+        if (originalHardware.serialNumber !== convertedHardware.serialNumber) {
+          addChangeLog(
+            '수정',
+            hardwareCode,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 시리얼번호가 ${originalHardware.serialNumber || ''} → ${convertedHardware.serialNumber || ''} 로 수정 되었습니다.`,
+            convertedHardware.team || '미분류',
+            originalHardware.serialNumber || '',
+            convertedHardware.serialNumber || '',
+            '시리얼번호'
+          );
+        }
+
+        // 14. 팀 변경
+        if (originalHardware.team !== convertedHardware.team) {
+          addChangeLog(
+            '수정',
+            hardwareCode,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 팀이 ${originalHardware.team || ''} → ${convertedHardware.team || ''} 로 수정 되었습니다.`,
+            convertedHardware.team || '미분류',
+            originalHardware.team || '',
+            convertedHardware.team || '',
+            '팀'
+          );
+        }
+
+        // 15. 자산설명 변경
+        if (originalHardware.assetDescription !== convertedHardware.assetDescription) {
+          addChangeLog(
+            '수정',
+            hardwareCode,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 자산설명이 ${originalHardware.assetDescription || ''} → ${convertedHardware.assetDescription || ''} 로 수정 되었습니다.`,
+            convertedHardware.team || '미분류',
+            originalHardware.assetDescription || '',
+            convertedHardware.assetDescription || '',
+            '자산설명'
+          );
+        }
+      }
+
       // 부모 컴포넌트의 저장 함수 호출 (Supabase 연동)
       if (onHardwareSave) {
         await onHardwareSave(convertedHardware);
         console.log('✅ Supabase 저장 완료');
         handleEditDialogClose();
-        return;
-      }
-
-      // onHardwareSave가 없으면 로컬 상태만 업데이트 (이전 동작 유지)
-      const existingIndex = data.findIndex((hardware) => hardware.id === convertedHardware.id);
-      console.log('🔍 기존 Hardware 인덱스:', existingIndex);
-
-      if (existingIndex !== -1) {
-        // 기존 Hardware 업데이트
-        const originalHardware = data[existingIndex];
+      } else {
+        // onHardwareSave가 없으면 로컬 상태만 업데이트
         const updatedDataArray = [...data];
         updatedDataArray[existingIndex] = convertedHardware;
         setData(updatedDataArray);
@@ -353,70 +550,8 @@ export default function HardwareTable({
         if (setTasks) {
           setTasks(updatedDataArray);
         }
-
-      // 변경로그 추가 - 변경된 필드 확인
-      if (addChangeLog) {
-        const changes: string[] = [];
-        const hardwareCode = convertedHardware.code || `HW-${convertedHardware.id}`;
-
-        if (originalHardware.status !== convertedHardware.status) {
-          changes.push(`상태: "${originalHardware.status}" → "${convertedHardware.status}"`);
-        }
-        if (originalHardware.assignee !== convertedHardware.assignee) {
-          changes.push(`담당자: "${originalHardware.assignee || '미할당'}" → "${convertedHardware.assignee || '미할당'}"`);
-        }
-        if (originalHardware.workContent !== convertedHardware.workContent) {
-          changes.push(`자산명 수정`);
-        }
-
-        if (changes.length > 0) {
-          addChangeLog(
-            '하드웨어 정보 수정',
-            hardwareCode,
-            `${convertedHardware.workContent || '하드웨어'} - ${changes.join(', ')}`,
-            convertedHardware.team || '미분류'
-          );
-        }
+        handleEditDialogClose();
       }
-
-      console.log('✅ 기존 Task 업데이트 완료');
-    } else {
-      // 새 Task 추가 - 상단에 추가
-      const currentYear = new Date().getFullYear();
-      const yearSuffix = currentYear.toString().slice(-2);
-      const maxNo = Math.max(...data.map((t) => t.no || 0), 0);
-      const newHardwareWithNumber = {
-        ...convertedHardware,
-        id: Date.now(), // 임시 ID
-        no: maxNo + 1,
-        code: `HW-${yearSuffix}-${String(maxNo + 1).padStart(3, '0')}`,
-        registrationDate: new Date().toISOString().split('T')[0],
-        startDate: convertedHardware.startDate || new Date().toISOString().split('T')[0]
-      };
-      // 새 데이터를 배열 맨 앞에 추가 (역순 정렬을 위해)
-      const newData = [newHardwareWithNumber, ...data];
-      setData(newData);
-
-      // 부모 컴포넌트로 동기화
-      if (setTasks) {
-        setTasks(newData);
-      }
-
-      // 변경로그 추가 - 새 하드웨어 생성
-      if (addChangeLog) {
-        addChangeLog(
-          '새 하드웨어 등록',
-          newHardwareWithNumber.code,
-          `${newHardwareWithNumber.workContent || '새 하드웨어'} 등록`,
-          newHardwareWithNumber.team || '미분류'
-        );
-      }
-
-      console.log('✅ 새 Hardware 추가 완료:', newHardwareWithNumber);
-    }
-
-    handleEditDialogClose();
-
     } catch (error) {
       console.error('❌ 하드웨어 저장 실패:', error);
       alert('하드웨어 저장 중 오류가 발생했습니다.');

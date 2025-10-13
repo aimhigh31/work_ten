@@ -77,7 +77,7 @@ interface InspectionTableProps {
   selectedAssignee?: string;
   inspections?: InspectionTableData[];
   setInspections?: React.Dispatch<React.SetStateAction<InspectionTableData[]>>;
-  addChangeLog?: (action: string, target: string, description: string, team?: string) => void;
+  addChangeLog?: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string) => void;
   onSave?: (inspection: InspectionTableData) => Promise<void>;
   onDelete?: (ids: number[]) => Promise<void>;
   generateInspectionCode?: () => Promise<string>;
@@ -257,11 +257,16 @@ export default function InspectionTable({
         if (addChangeLog) {
           const deletedInspections = data.filter((inspection) => selected.includes(inspection.id));
           deletedInspections.forEach((inspection) => {
+            const inspectionCode = inspection.code || `SEC-${inspection.id}`;
+            const inspectionTitle = inspection.inspectionContent || '점검';
             addChangeLog(
-              '점검 삭제',
-              inspection.code || `SEC-${inspection.id}`,
-              `${inspection.inspectionContent || '점검'} 삭제`,
-              inspection.team || '미분류'
+              '삭제',
+              inspectionCode,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 데이터가 삭제 되었습니다.`,
+              inspection.team || '미분류',
+              '',
+              '',
+              '-'
             );
           });
         }
@@ -282,11 +287,16 @@ export default function InspectionTable({
         if (addChangeLog) {
           const deletedInspections = data.filter((inspection) => selected.includes(inspection.id));
           deletedInspections.forEach((inspection) => {
+            const inspectionCode = inspection.code || `SEC-${inspection.id}`;
+            const inspectionTitle = inspection.inspectionContent || '점검';
             addChangeLog(
-              '점검 삭제',
-              inspection.code || `SEC-${inspection.id}`,
-              `${inspection.inspectionContent || '점검'} 삭제`,
-              inspection.team || '미분류'
+              '삭제',
+              inspectionCode,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 데이터가 삭제 되었습니다.`,
+              inspection.team || '미분류',
+              '',
+              '',
+              '-'
             );
           });
         }
@@ -314,8 +324,139 @@ export default function InspectionTable({
     if (onSave) {
       console.log('🔄 Supabase 연동 저장 함수 호출');
       try {
+        // 기존 inspection 찾기 (변경로그 추적용)
+        const existingIndex = data.findIndex((inspection) => inspection.id === updatedInspection.id);
+        const originalInspection = existingIndex !== -1 ? data[existingIndex] : null;
+
+        // Supabase에 저장
         await onSave(updatedInspection);
         console.log('✅ Supabase 저장 완료');
+
+        // 변경로그 추가 - 각 필드별로 개별 로그 생성 (기존 inspection 업데이트인 경우에만)
+        if (originalInspection && addChangeLog) {
+          const inspectionCode = updatedInspection.code || `SEC-${updatedInspection.id}`;
+          const inspectionTitle = updatedInspection.inspectionContent || '점검';
+
+          // 상태 변경
+          if (originalInspection.status !== updatedInspection.status) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 상태가 ${originalInspection.status} → ${updatedInspection.status} 수정 되었습니다.`,
+              updatedInspection.team || '미분류',
+              originalInspection.status,
+              updatedInspection.status,
+              '상태'
+            );
+          }
+
+          // 담당자 변경
+          if (originalInspection.assignee !== updatedInspection.assignee) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 담당자가 ${originalInspection.assignee || '미할당'} → ${updatedInspection.assignee || '미할당'} 수정 되었습니다.`,
+              updatedInspection.team || '미분류',
+              originalInspection.assignee || '미할당',
+              updatedInspection.assignee || '미할당',
+              '담당자'
+            );
+          }
+
+          // 점검내용 변경
+          if (originalInspection.inspectionContent !== updatedInspection.inspectionContent) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 점검내용이 ${originalInspection.inspectionContent} → ${updatedInspection.inspectionContent} 수정 되었습니다.`,
+              updatedInspection.team || '미분류',
+              originalInspection.inspectionContent || '',
+              updatedInspection.inspectionContent || '',
+              '점검내용'
+            );
+          }
+
+          // 점검유형 변경
+          if (originalInspection.inspectionType !== updatedInspection.inspectionType) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 점검유형이 ${originalInspection.inspectionType} → ${updatedInspection.inspectionType} 수정 되었습니다.`,
+              updatedInspection.team || '미분류',
+              originalInspection.inspectionType,
+              updatedInspection.inspectionType,
+              '점검유형'
+            );
+          }
+
+          // 점검대상 변경
+          if (originalInspection.inspectionTarget !== updatedInspection.inspectionTarget) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 점검대상이 ${originalInspection.inspectionTarget} → ${updatedInspection.inspectionTarget} 수정 되었습니다.`,
+              updatedInspection.team || '미분류',
+              originalInspection.inspectionTarget,
+              updatedInspection.inspectionTarget,
+              '점검대상'
+            );
+          }
+
+          // 점검일 변경
+          if (originalInspection.inspectionDate !== updatedInspection.inspectionDate) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 점검일이 ${originalInspection.inspectionDate || '미정'} → ${updatedInspection.inspectionDate || '미정'} 수정 되었습니다.`,
+              updatedInspection.team || '미분류',
+              originalInspection.inspectionDate || '미정',
+              updatedInspection.inspectionDate || '미정',
+              '점검일'
+            );
+          }
+
+          // 팀 변경
+          if (originalInspection.team !== updatedInspection.team) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 팀이 ${originalInspection.team || '미분류'} → ${updatedInspection.team || '미분류'} 수정 되었습니다.`,
+              updatedInspection.team || '미분류',
+              originalInspection.team || '미분류',
+              updatedInspection.team || '미분류',
+              '팀'
+            );
+          }
+
+          // 세부설명 변경
+          if (originalInspection.details !== updatedInspection.details) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보의 개요탭 세부설명이 ${originalInspection.details || ''} → ${updatedInspection.details || ''} 로 수정 되었습니다.`,
+              updatedInspection.team || '미분류',
+              originalInspection.details || '',
+              updatedInspection.details || '',
+              '세부설명'
+            );
+          }
+        }
+
+        // 새 inspection 생성인 경우 생성 로그 추가
+        if (!originalInspection && addChangeLog) {
+          const inspectionCode = updatedInspection.code || `SEC-${updatedInspection.id}`;
+          const inspectionTitle = updatedInspection.inspectionContent || '새 점검';
+          addChangeLog(
+            '생성',
+            inspectionCode,
+            `보안점검관리 ${inspectionTitle}(${inspectionCode}) 데이터가 생성 되었습니다.`,
+            updatedInspection.team || '미분류',
+            '',
+            '',
+            '-'
+          );
+        }
+
       } catch (error) {
         console.error('❌ Supabase 저장 실패:', error);
         alert('저장 중 오류가 발생했습니다. 다시 시도해주세요.');
@@ -339,33 +480,112 @@ export default function InspectionTable({
           setInspections(updatedData);
         }
 
-        // 변경로그 추가 - 변경된 필드 확인
+        // 변경로그 추가 - 각 필드별로 개별 로그 생성
         if (addChangeLog) {
-          const changes: string[] = [];
           const inspectionCode = updatedInspection.code || `SEC-${updatedInspection.id}`;
+          const inspectionTitle = updatedInspection.inspectionContent || '점검';
 
+          // 상태 변경
           if (originalInspection.status !== updatedInspection.status) {
-            changes.push(`상태: "${originalInspection.status}" → "${updatedInspection.status}"`);
-          }
-          if (originalInspection.assignee !== updatedInspection.assignee) {
-            changes.push(`담당자: "${originalInspection.assignee || '미할당'}" → "${updatedInspection.assignee || '미할당'}"`);
-          }
-          if (originalInspection.inspectionContent !== updatedInspection.inspectionContent) {
-            changes.push(`점검내용 수정`);
-          }
-          if (originalInspection.progress !== updatedInspection.progress) {
-            changes.push(`진행율: ${originalInspection.progress || 0}% → ${updatedInspection.progress || 0}%`);
-          }
-          if (originalInspection.completedDate !== updatedInspection.completedDate) {
-            changes.push(`완료일: "${originalInspection.completedDate || '미정'}" → "${updatedInspection.completedDate || '미정'}"`);
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 상태가 ${originalInspection.status} → ${updatedInspection.status} 수정 되었습니다.`,
+              updatedInspection.team || '미분류',
+              originalInspection.status,
+              updatedInspection.status,
+              '상태'
+            );
           }
 
-          if (changes.length > 0) {
+          // 담당자 변경
+          if (originalInspection.assignee !== updatedInspection.assignee) {
             addChangeLog(
-              '점검 정보 수정',
+              '수정',
               inspectionCode,
-              `${updatedInspection.inspectionContent || '점검'} - ${changes.join(', ')}`,
-              updatedInspection.team || '미분류'
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 담당자가 ${originalInspection.assignee || '미할당'} → ${updatedInspection.assignee || '미할당'} 수정 되었습니다.`,
+              updatedInspection.team || '미분류',
+              originalInspection.assignee || '미할당',
+              updatedInspection.assignee || '미할당',
+              '담당자'
+            );
+          }
+
+          // 점검내용 변경
+          if (originalInspection.inspectionContent !== updatedInspection.inspectionContent) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 점검내용이 ${originalInspection.inspectionContent} → ${updatedInspection.inspectionContent} 수정 되었습니다.`,
+              updatedInspection.team || '미분류',
+              originalInspection.inspectionContent || '',
+              updatedInspection.inspectionContent || '',
+              '점검내용'
+            );
+          }
+
+          // 점검유형 변경
+          if (originalInspection.inspectionType !== updatedInspection.inspectionType) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 점검유형이 ${originalInspection.inspectionType} → ${updatedInspection.inspectionType} 수정 되었습니다.`,
+              updatedInspection.team || '미분류',
+              originalInspection.inspectionType,
+              updatedInspection.inspectionType,
+              '점검유형'
+            );
+          }
+
+          // 점검대상 변경
+          if (originalInspection.inspectionTarget !== updatedInspection.inspectionTarget) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 점검대상이 ${originalInspection.inspectionTarget} → ${updatedInspection.inspectionTarget} 수정 되었습니다.`,
+              updatedInspection.team || '미분류',
+              originalInspection.inspectionTarget,
+              updatedInspection.inspectionTarget,
+              '점검대상'
+            );
+          }
+
+          // 점검일 변경
+          if (originalInspection.inspectionDate !== updatedInspection.inspectionDate) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 점검일이 ${originalInspection.inspectionDate || '미정'} → ${updatedInspection.inspectionDate || '미정'} 수정 되었습니다.`,
+              updatedInspection.team || '미분류',
+              originalInspection.inspectionDate || '미정',
+              updatedInspection.inspectionDate || '미정',
+              '점검일'
+            );
+          }
+
+          // 팀 변경
+          if (originalInspection.team !== updatedInspection.team) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 팀이 ${originalInspection.team || '미분류'} → ${updatedInspection.team || '미분류'} 수정 되었습니다.`,
+              updatedInspection.team || '미분류',
+              originalInspection.team || '미분류',
+              updatedInspection.team || '미분류',
+              '팀'
+            );
+          }
+
+          // 세부설명 변경
+          if (originalInspection.details !== updatedInspection.details) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보의 개요탭 세부설명이 ${originalInspection.details || ''} → ${updatedInspection.details || ''} 로 수정 되었습니다.`,
+              updatedInspection.team || '미분류',
+              originalInspection.details || '',
+              updatedInspection.details || '',
+              '세부설명'
             );
           }
         }
@@ -395,11 +615,16 @@ export default function InspectionTable({
 
         // 변경로그 추가 - 새 점검 생성
         if (addChangeLog) {
+          const newCode = newInspectionWithNumber.code;
+          const inspectionTitle = newInspectionWithNumber.inspectionContent || '새 점검';
           addChangeLog(
-            '새 점검 생성',
-            newInspectionWithNumber.code,
-            `${newInspectionWithNumber.inspectionContent || '새 점검'} 생성`,
-            newInspectionWithNumber.team || '미분류'
+            '생성',
+            newCode,
+            `보안점검관리 ${inspectionTitle}(${newCode}) 데이터가 생성 되었습니다.`,
+            newInspectionWithNumber.team || '미분류',
+            '',
+            '',
+            '-'
           );
         }
 

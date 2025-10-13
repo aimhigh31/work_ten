@@ -60,7 +60,16 @@ interface InvestmentDataTableProps {
   onEditInvestment?: (investment: InvestmentTableData) => void;
   onAddInvestment?: () => void;
   onDeleteInvestments?: (investments: InvestmentTableData[]) => void;
-  addChangeLog?: (action: string, target: string, description: string, team?: string) => void;
+  addChangeLog?: (
+    action: string,
+    target: string,
+    description: string,
+    team?: string,
+    beforeValue?: string,
+    afterValue?: string,
+    changedField?: string,
+    title?: string
+  ) => void;
 }
 
 // 컬럼 너비 정의
@@ -314,8 +323,8 @@ export default function InvestmentDataTable({
 
     const fileNames = Array.from(files).map((file) => file.name);
 
-    setData((prevData) =>
-      prevData.map((investment) => {
+    setInvestments(
+      investments.map((investment) => {
         if (investment.id === currentInvestmentId) {
           return {
             ...investment,
@@ -335,8 +344,8 @@ export default function InvestmentDataTable({
   const handleAttachmentDelete = (fileName: string) => {
     if (!currentInvestmentId) return;
 
-    setData((prevData) =>
-      prevData.map((investment) => {
+    setInvestments(
+      investments.map((investment) => {
         if (investment.id === currentInvestmentId) {
           return {
             ...investment,
@@ -355,7 +364,7 @@ export default function InvestmentDataTable({
     }
   };
 
-  const currentInvestment = currentInvestmentId ? data.find((investment) => investment.id === currentInvestmentId) : null;
+  const currentInvestment = currentInvestmentId ? investments.find((investment) => investment.id === currentInvestmentId) : null;
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -407,6 +416,20 @@ export default function InvestmentDataTable({
                 const selectedInvestments = investments.filter(inv => selectedItems.includes(inv.id));
                 if (window.confirm(`선택한 ${selectedItems.length}개의 투자를 삭제하시겠습니까?`)) {
                   selectedInvestments.forEach(investment => {
+                    // 변경로그 추가 (삭제 전에 호출)
+                    if (addChangeLog) {
+                      const investmentName = investment.investmentName || '투자';
+                      addChangeLog(
+                        '삭제',
+                        investment.code,
+                        `투자관리 ${investmentName}(${investment.code})이 삭제되었습니다.`,
+                        investment.team || '미분류',
+                        undefined,
+                        undefined,
+                        undefined,
+                        investmentName
+                      );
+                    }
                     onDeleteInvestments([investment]);
                   });
                   setSelectedItems([]);

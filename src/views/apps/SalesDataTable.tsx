@@ -69,7 +69,16 @@ interface SalesDataTableProps {
   selectedAssignee: string;
   sales: SalesRecord[];
   setSales: React.Dispatch<React.SetStateAction<SalesRecord[]>>;
-  addChangeLog: (action: string, target: string, description: string, team?: string) => void;
+  addChangeLog: (
+    action: string,
+    target: string,
+    description: string,
+    team?: string,
+    beforeValue?: string,
+    afterValue?: string,
+    changedField?: string,
+    title?: string
+  ) => void;
   // 외부에서 편집 다이얼로그 제어용 props
   isEditDialogOpen?: boolean;
   onEditDialogClose?: () => void;
@@ -526,8 +535,27 @@ const SalesDataTable: React.FC<SalesDataTableProps> = ({
   };
 
   // 선택된 행 삭제
-  const handleDeleteRecords = () => {
+  const handleDeleteRecords = async () => {
     if (window.confirm(`선택된 ${selectedRecords.length}개 항목을 삭제하시겠습니까?`)) {
+      // 삭제될 레코드들의 정보를 먼저 저장
+      const recordsToDelete = sales.filter((record) => selectedRecords.includes(record.id));
+
+      // 각 레코드에 대해 변경로그 추가
+      for (const record of recordsToDelete) {
+        const salesCode = record.code || `SALES-${record.id}`;
+        const salesTitle = record.itemName || '매출';
+        await addChangeLog(
+          '삭제',
+          salesCode,
+          `매출관리 ${salesTitle}(${salesCode}) 정보의 데이터탭 데이터가 삭제 되었습니다.`,
+          record.businessUnit || '미분류',
+          `${record.customerName} - ${record.itemName} (${Number(record.totalAmount).toLocaleString()}원)`,
+          '',
+          '데이터탭',
+          salesTitle
+        );
+      }
+
       setSales((prev) => prev.filter((record) => !selectedRecords.includes(record.id)));
       setSelectedRecords([]);
     }

@@ -50,6 +50,7 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import TaskTable from 'views/apps/TaskTable';
 import TaskEditDialog from 'components/TaskEditDialog';
 import EducationEditDialog from 'components/EducationEditDialog';
+import EducationDataTable from 'views/apps/EducationDataTable';
 import { taskData, taskStatusColors, assigneeAvatars } from 'data/task';
 import { TaskTableData, TaskStatus } from 'types/task';
 import { ThemeMode } from 'config';
@@ -57,16 +58,26 @@ import { useSupabaseEducation } from 'hooks/useSupabaseEducation';
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
 import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
+import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
+import { ChangeLogData } from 'types/changelog';
+import { createClient } from '@/lib/supabase/client';
+import { useSession } from 'next-auth/react';
+import useUser from 'hooks/useUser';
 
 // 변경로그 타입 정의
 interface ChangeLog {
-  id: number;
+  id: string;
   dateTime: string;
+  title: string;
+  code: string;
+  action: string;
+  location: string;
+  changedField?: string;
+  beforeValue?: string;
+  afterValue?: string;
+  description: string;
   team: string;
   user: string;
-  action: string;
-  target: string;
-  description: string;
 }
 
 // Icons
@@ -1574,12 +1585,16 @@ function EducationChangeLogView({
             <TableRow sx={{ backgroundColor: 'grey.50' }}>
               <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
               <TableCell sx={{ fontWeight: 600, width: 130 }}>변경시간</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 100 }}>코드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 180 }}>교육내용</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 120 }}>변경분류</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 150 }}>제목</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 120 }}>코드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경분류</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경위치</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90 }}>변경필드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 100 }}>변경전</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 100 }}>변경후</TableCell>
               <TableCell sx={{ fontWeight: 600, width: 280 }}>변경 세부내용</TableCell>
               <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>담당자</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -1597,55 +1612,50 @@ function EducationChangeLogView({
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.secondary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
                     {log.dateTime}
                   </Typography>
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                    {log.target}
+                    {log.title}
                   </Typography>
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                    {(() => {
-                      // target 필드로 교육 코드를 찾아서 매칭
-                      const education = educations.find((edu) => edu.code === log.target);
-                      if (education) {
-                        return education.content;
-                      }
-
-                      // 매칭되지 않으면 description에서 교육명 추출 시도
-                      const descriptionParts = log.description.split(' ');
-                      if (descriptionParts.length > 0) {
-                        // description의 첫 번째 부분이 교육명일 가능성이 높음
-                        const educationByContent = educations.find((edu) => log.description.includes(edu.content));
-                        if (educationByContent) {
-                          return educationByContent.content;
-                        }
-                      }
-
-                      return '교육내용 없음';
-                    })()}
+                    {log.code}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontSize: '13px',
-                      fontWeight: 500
-                    }}
-                  >
+                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
                     {log.action}
                   </Typography>
                 </TableCell>
                 <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                    {log.location}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                    {log.changedField || '-'}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                    {log.beforeValue || '-'}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                    {log.afterValue || '-'}
+                  </Typography>
+                </TableCell>
+                <TableCell>
                   <Typography
                     variant="body2"
                     sx={{
                       fontSize: '13px',
-                      color: 'text.secondary',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'normal',
@@ -1660,17 +1670,9 @@ function EducationChangeLogView({
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Chip
-                    label={log.team}
-                    size="small"
-                    sx={{
-                      height: 22,
-                      fontSize: '13px',
-                      backgroundColor: getTeamColor(log.team),
-                      color: '#333333',
-                      fontWeight: 500
-                    }}
-                  />
+                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                    {log.team}
+                  </Typography>
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" sx={{ fontSize: '13px' }}>
@@ -2232,6 +2234,15 @@ export default function EducationManagement() {
   const { users } = useSupabaseUserManagement();
   const { departments, fetchDepartments } = useSupabaseDepartmentManagement();
 
+  // 인증 및 사용자 정보
+  const { data: session } = useSession();
+  const user = useUser();
+  const userName = user?.name || session?.user?.name || '시스템';
+  const currentUser = users.find((u) => u.email === session?.user?.email);
+
+  // 변경로그 Hook
+  const { logs: dbChangeLogs, loading: changeLogsLoading, fetchChangeLogs } = useSupabaseChangeLog('main_education');
+
   // 부서 데이터 로드
   React.useEffect(() => {
     fetchDepartments();
@@ -2627,72 +2638,103 @@ export default function EducationManagement() {
   }, [selectedYear, viewYear, selectedTeam, selectedAssignee, selectedStatus]);
 
   // 변경로그 상태 관리
-  const [changeLogs, setChangeLogs] = useState<ChangeLog[]>([
-    {
-      id: 1,
-      dateTime: '2024-08-18 14:30:25',
-      team: '개발팀',
-      user: '김철수',
-      action: '교육완료',
-      target: 'MAIN-EDU-25-001',
-      description: 'React 고급 과정을 성공적으로 완료했습니다.'
-    },
-    {
-      id: 2,
-      dateTime: '2024-08-18 09:15:10',
-      team: '디자인팀',
-      user: '이영희',
-      action: '교육등록',
-      target: 'MAIN-EDU-25-002',
-      description: '의사소통 스킬 향상 과정에 등록했습니다.'
-    },
-    {
-      id: 3,
-      dateTime: '2024-08-17 16:20:30',
-      team: '기획팀',
-      user: '박지훈',
-      action: '상태변경',
-      target: 'MAIN-EDU-25-003',
-      description: '팀 관리와 리더십 과정 상태를 "예정"으로 변경했습니다.'
-    },
-    {
-      id: 4,
-      dateTime: '2024-08-17 11:45:15',
-      team: '마케팅팀',
-      user: '최수진',
-      action: '교육수정',
-      target: 'MAIN-EDU-25-004',
-      description: '비즈니스 영어 과정의 종료일을 수정했습니다.'
-    },
-    {
-      id: 5,
-      dateTime: '2024-08-16 10:30:00',
-      team: '개발팀',
-      user: '정우진',
-      action: '교육취소',
-      target: 'MAIN-EDU-25-005',
-      description: 'AI/ML 기초 과정을 취소했습니다.'
+  // 변경로그탭이 활성화될 때 데이터 강제 새로고침
+  React.useEffect(() => {
+    if (value === 4 && fetchChangeLogs) {
+      console.log('🔄 변경로그탭 활성화 - 데이터 새로고침');
+      fetchChangeLogs();
     }
-  ]);
+  }, [value, fetchChangeLogs]);
+
+  // DB 변경로그를 UI 형식으로 변환
+  const changeLogs = React.useMemo(() => {
+    return dbChangeLogs.map((log: ChangeLogData) => {
+      // record_id로 해당 교육 찾기
+      const education = educationData.find(edu => edu.code === log.record_id);
+
+      const date = new Date(log.created_at);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hour = String(date.getHours()).padStart(2, '0');
+      const minute = String(date.getMinutes()).padStart(2, '0');
+      const formattedDateTime = `${year}.${month}.${day} ${hour}:${minute}`;
+
+      return {
+        id: log.id,
+        dateTime: formattedDateTime,
+        title: log.title || education?.content || log.record_id,
+        code: log.record_id,
+        action: log.action_type,
+        location: log.description.includes('개요탭') ? '개요탭' : log.description.includes('데이터탭') ? '데이터탭' : '-',
+        changedField: log.changed_field || '-',
+        beforeValue: log.before_value || '-',
+        afterValue: log.after_value || '-',
+        description: log.description,
+        team: log.team || log.user_department || '-',
+        user: log.user_name
+      };
+    });
+  }, [dbChangeLogs, educationData]);
+
+  // 변경로그 추가 함수
+  const addChangeLog = React.useCallback(
+    async (
+      action: string,
+      target: string,
+      description: string,
+      team: string = '시스템',
+      beforeValue?: string,
+      afterValue?: string,
+      changedField?: string,
+      title?: string
+    ) => {
+      try {
+        const logData = {
+          page: 'main_education',
+          record_id: target,
+          action_type: action,
+          description: description,
+          before_value: beforeValue || null,
+          after_value: afterValue || null,
+          changed_field: changedField || null,
+          title: title || null,
+          user_name: userName,
+          team: currentUser?.department || team,
+          user_department: currentUser?.department,
+          user_position: currentUser?.position,
+          user_profile_image: currentUser?.profile_image_url,
+          created_at: new Date().toISOString()
+        };
+
+        console.log('📝 변경로그 저장 시도:', logData);
+
+        const supabase = createClient();
+        const { data, error } = await supabase.from('common_log_data').insert(logData).select();
+
+        if (error) {
+          console.error('❌ 변경로그 저장 실패:', error);
+        } else {
+          console.log('✅ 변경로그 저장 성공:', data);
+          await fetchChangeLogs();
+        }
+      } catch (err) {
+        console.error('❌ 변경로그 저장 중 오류:', err);
+      }
+    },
+    [currentUser, userName, fetchChangeLogs]
+  );
 
   // 탭 변경 핸들러
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
   };
 
-  // 변경로그 추가 함수
-  const addChangeLog = (action: string, target: string, description: string, team: string, user: string) => {
-    const newLog: ChangeLog = {
-      id: Date.now(),
-      dateTime: new Date().toLocaleString('ko-KR'),
-      team,
-      user,
-      action,
-      target,
-      description
-    };
-    setChangeLogs((prev) => [newLog, ...prev]);
-  };
+  // 데이터 새로고침 핸들러
+  const handleRefreshData = React.useCallback(async () => {
+    console.log('🔄 데이터 강제 새로고침');
+    // supabaseEducations는 자동으로 업데이트됨
+  }, []);
 
   // Excel 다운로드 함수
   const handleExcelDownload = () => {
@@ -3018,378 +3060,27 @@ export default function EducationManagement() {
           <Box sx={{ flex: 1, overflow: 'hidden', mt: 1 }}>
             {/* 데이터 탭 */}
             <TabPanel value={value} index={0}>
-              <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                {/* 상단 정보 및 액션 버튼 */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, mt: 3, flexShrink: 0 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    총 {filteredData.length}건
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Button
-                      variant="outlined"
-                      startIcon={<DocumentDownload size={16} />}
-                      size="small"
-                      onClick={handleExcelDownload}
-                      sx={{
-                        px: 2,
-                        borderColor: '#4CAF50',
-                        color: '#4CAF50',
-                        '&:hover': {
-                          borderColor: '#4CAF50',
-                          backgroundColor: '#4CAF50',
-                          color: '#fff'
-                        }
-                      }}
-                    >
-                      Excel Down
-                    </Button>
-                    <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={handleAddEducation} sx={{ px: 2 }}>
-                      추가
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      startIcon={<Trash size={16} />}
-                      size="small"
-                      color="error"
-                      disabled={selectedItems.length === 0}
-                      onClick={async () => {
-                        if (selectedItems.length === 0) return;
-
-                        const confirmDelete = window.confirm(`선택한 ${selectedItems.length}개의 교육을 삭제하시겠습니까?`);
-                        if (!confirmDelete) return;
-
-                        try {
-                          // 선택된 항목들을 삭제
-                          for (const id of selectedItems) {
-                            await deleteEducation(id);
-                          }
-
-                          console.log('삭제 완료:', selectedItems);
-                          setSelectedItems([]);
-
-                          // 성공 메시지
-                          alert('선택한 교육이 삭제되었습니다.');
-                        } catch (error) {
-                          console.error('삭제 실패:', error);
-                          alert('삭제 중 오류가 발생했습니다.');
-                        }
-                      }}
-                      sx={{
-                        px: 2,
-                        borderColor: selectedItems.length > 0 ? 'error.main' : 'grey.300',
-                        color: selectedItems.length > 0 ? 'error.main' : 'grey.500'
-                      }}
-                    >
-                      삭제 {selectedItems.length > 0 && `(${selectedItems.length})`}
-                    </Button>
-                  </Box>
-                </Box>
-
-                {/* 테이블 */}
-                <TableContainer
-                  sx={{
-                    flex: 1,
-                    border: 'none',
-                    borderRadius: 0,
-                    overflowX: 'auto',
-                    overflowY: 'auto',
-                    boxShadow: 'none',
-                    minHeight: 0,
-                    '& .MuiTable-root': {
-                      minWidth: 1400
-                    },
-                    // 스크롤바 스타일
-                    '&::-webkit-scrollbar': {
-                      width: '10px',
-                      height: '10px'
-                    },
-                    '&::-webkit-scrollbar-track': {
-                      backgroundColor: '#f8f9fa',
-                      borderRadius: '4px'
-                    },
-                    '&::-webkit-scrollbar-thumb': {
-                      backgroundColor: '#e9ecef',
-                      borderRadius: '4px',
-                      border: '2px solid #f8f9fa'
-                    },
-                    '&::-webkit-scrollbar-thumb:hover': {
-                      backgroundColor: '#dee2e6'
-                    },
-                    '&::-webkit-scrollbar-corner': {
-                      backgroundColor: '#f8f9fa'
-                    }
-                  }}
-                >
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow sx={{ backgroundColor: 'grey.50' }}>
-                        <TableCell padding="checkbox" sx={{ width: 50 }}>
-                          <Checkbox
-                            checked={paginatedData.length > 0 && selectedItems.length === paginatedData.length}
-                            indeterminate={selectedItems.length > 0 && selectedItems.length < paginatedData.length}
-                            onChange={handleSelectAll}
-                            size="small"
-                          />
-                        </TableCell>
-                        <TableCell sx={{ width: 60, fontWeight: 600 }}>NO</TableCell>
-                        <TableCell sx={{ width: 100, fontWeight: 600 }}>등록일</TableCell>
-                        <TableCell sx={{ width: 120, fontWeight: 600 }}>코드</TableCell>
-                        <TableCell sx={{ width: 100, fontWeight: 600 }}>교육분류</TableCell>
-                        <TableCell sx={{ width: 200, fontWeight: 600 }}>제목</TableCell>
-                        <TableCell sx={{ width: 100, fontWeight: 600 }}>교육유형</TableCell>
-                        <TableCell sx={{ width: 130, fontWeight: 600 }}>팀</TableCell>
-                        <TableCell sx={{ width: 90, fontWeight: 600 }}>담당자</TableCell>
-                        <TableCell sx={{ width: 90, fontWeight: 600 }}>상태</TableCell>
-                        <TableCell sx={{ width: 100, fontWeight: 600 }}>시작일</TableCell>
-                        <TableCell sx={{ width: 100, fontWeight: 600 }}>완료일</TableCell>
-                        <TableCell sx={{ width: 80, fontWeight: 600 }}>ACTION</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {paginatedData.map((item, index) => (
-                        <TableRow
-                          key={String(item.id) || `data-table-${index}`}
-                          hover
-                          sx={{
-                            '&:hover': { backgroundColor: 'action.hover' }
-                          }}
-                        >
-                          <TableCell padding="checkbox">
-                            <Checkbox checked={selectedItems.includes(item.id)} onChange={() => handleSelectItem(item.id)} size="small" />
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                              {item.no}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                              {item.registrationDate}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                              {item.code}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                              {item.category}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography
-                              variant="body2"
-                              sx={{
-                                fontSize: '13px',
-                                color: 'text.primary',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                                maxWidth: 180
-                              }}
-                            >
-                              {item.content}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                              {item.type}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                              {item.team}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Stack direction="row" spacing={1} alignItems="center">
-                              <Avatar
-                                src={userAvatars[item.assignee] || ''}
-                                alt={item.assignee}
-                                sx={{ width: 24, height: 24 }}
-                              >
-                                {item.assignee?.charAt(0)}
-                              </Avatar>
-                              <Typography variant="body2" noWrap sx={{ maxWidth: 80, fontSize: '13px' }}>
-                                {item.assignee}
-                              </Typography>
-                            </Stack>
-                          </TableCell>
-                          <TableCell>
-                            <Chip
-                              label={item.status}
-                              size="small"
-                              sx={{
-                                ...getStatusColor(item.status),
-                                fontWeight: 500,
-                                fontSize: '13px'
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                              {item.startDate}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                              {item.endDate}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', gap: 0.5 }}>
-                              <Tooltip title="수정">
-                                <IconButton size="small" onClick={() => handleEditEducation(item)} sx={{ color: 'primary.main' }}>
-                                  <Edit size={16} />
-                                </IconButton>
-                              </Tooltip>
-                            </Box>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-
-                      {/* 빈 행 추가 (테이블 높이 일정하게 유지) */}
-                      {Array.from({ length: Math.max(0, itemsPerPage - paginatedData.length) }).map((_, index) => (
-                        <TableRow key={`empty-${index}`} sx={{ height: 33 }}>
-                          <TableCell colSpan={12} sx={{ border: 'none' }}></TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-
-                {/* 페이지네이션 */}
-                <Box
-                  sx={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    mt: 1,
-                    px: 1,
-                    py: 0.5,
-                    borderTop: '1px solid',
-                    borderColor: 'divider'
-                  }}
-                >
-                  {/* 왼쪽: Row per page */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      Row per page
-                    </Typography>
-                    <FormControl size="small" sx={{ minWidth: 60 }}>
-                      <Select
-                        value={itemsPerPage}
-                        onChange={(e) => handleRowsPerPageChange(Number(e.target.value))}
-                        sx={{
-                          '& .MuiSelect-select': {
-                            py: 0.5,
-                            px: 1,
-                            fontSize: '0.875rem'
-                          },
-                          '& .MuiOutlinedInput-notchedOutline': {
-                            border: '1px solid #e0e0e0'
-                          }
-                        }}
-                      >
-                        <MenuItem value={5}>5</MenuItem>
-                        <MenuItem value={8}>8</MenuItem>
-                        <MenuItem value={10}>10</MenuItem>
-                        <MenuItem value={25}>25</MenuItem>
-                        <MenuItem value={50}>50</MenuItem>
-                      </Select>
-                    </FormControl>
-
-                    {/* Go to */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
-                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                        Go to
-                      </Typography>
-                      <TextField
-                        size="small"
-                        value={goToPage}
-                        onChange={(e) => handleGoToPageChange(e.target.value)}
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter') {
-                            handleGoToPageSubmit();
-                          }
-                        }}
-                        placeholder="1"
-                        sx={{
-                          width: 60,
-                          '& .MuiOutlinedInput-root': {
-                            '& input': {
-                              py: 0.5,
-                              px: 1,
-                              fontSize: '0.875rem',
-                              textAlign: 'center'
-                            },
-                            '& .MuiOutlinedInput-notchedOutline': {
-                              border: '1px solid #e0e0e0'
-                            }
-                          }
-                        }}
-                      />
-                      <Button
-                        size="small"
-                        onClick={handleGoToPageSubmit}
-                        sx={{
-                          minWidth: 'auto',
-                          px: 1.5,
-                          py: 0.5,
-                          fontSize: '0.875rem'
-                        }}
-                      >
-                        Go
-                      </Button>
-                    </Box>
-                  </Box>
-
-                  {/* 오른쪽: 페이지 네비게이션 */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      {filteredData.length > 0
-                        ? `${(currentPage - 1) * itemsPerPage + 1}-${Math.min(currentPage * itemsPerPage, filteredData.length)} of ${filteredData.length}`
-                        : '0-0 of 0'}
-                    </Typography>
-                    {totalPages > 0 && (
-                      <Pagination
-                        count={totalPages}
-                        page={currentPage}
-                        onChange={handlePageChange}
-                        color="primary"
-                        size="small"
-                        showFirstButton
-                        showLastButton
-                        sx={{
-                          '& .MuiPaginationItem-root': {
-                            fontSize: '0.875rem',
-                            minWidth: '32px',
-                            height: '32px',
-                            borderRadius: '4px'
-                          },
-                          '& .MuiPaginationItem-page.Mui-selected': {
-                            backgroundColor: 'primary.main',
-                            color: 'white !important',
-                            borderRadius: '4px',
-                            fontWeight: 500,
-                            '&:hover': {
-                              backgroundColor: 'primary.dark'
-                            }
-                          },
-                          '& .MuiPaginationItem-page': {
-                            borderRadius: '4px',
-                            '&:hover': {
-                              backgroundColor: 'grey.100'
-                            }
-                          }
-                        }}
-                      />
-                    )}
-                  </Box>
-                </Box>
+              <Box
+                sx={{
+                  p: 0.5,
+                  height: '100%',
+                  overflow: 'hidden'
+                }}
+              >
+                <EducationDataTable
+                  selectedYear={selectedYear}
+                  selectedTeam={selectedTeam}
+                  selectedStatus={selectedStatus}
+                  selectedAssignee={selectedAssignee}
+                  tasks={educationData}
+                  setTasks={() => {}}
+                  addChangeLog={addChangeLog}
+                  onDataRefresh={async () => {}}
+                />
               </Box>
             </TabPanel>
+
+            {/* 칸반 탭 */}
 
             {/* 칸반 탭 */}
             <TabPanel value={value} index={1}>

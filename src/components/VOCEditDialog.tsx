@@ -54,6 +54,7 @@ interface EditVOCState {
   status: string;
   priority: string;
   registrationDate: string;
+  receptionDate: string;
   resolutionDate: string;
   team: string;
 }
@@ -81,6 +82,7 @@ const editVOCReducer = (state: EditVOCState, action: EditVOCAction): EditVOCStat
         status: action.voc.status || '접수',
         priority: action.voc.priority || '보통',
         registrationDate: action.voc.registrationDate || '',
+        receptionDate: action.voc.receptionDate || '',
         resolutionDate: action.voc.resolutionDate || '',
         team: action.voc.team || '고객지원팀'
       };
@@ -97,6 +99,7 @@ const editVOCReducer = (state: EditVOCState, action: EditVOCAction): EditVOCStat
         status: '대기',
         priority: '',
         registrationDate: action.registrationDate,
+        receptionDate: action.registrationDate,
         resolutionDate: '',
         team: ''
       };
@@ -113,6 +116,7 @@ const editVOCReducer = (state: EditVOCState, action: EditVOCAction): EditVOCStat
         status: '대기',
         priority: '',
         registrationDate: '',
+        receptionDate: '',
         resolutionDate: '',
         team: ''
       };
@@ -1365,6 +1369,7 @@ const VOCEditDialog = memo(
       status: '접수',
       priority: '',
       registrationDate: new Date().toISOString().split('T')[0],
+      receptionDate: new Date().toISOString().split('T')[0],
       resolutionDate: '',
       team: ''
     });

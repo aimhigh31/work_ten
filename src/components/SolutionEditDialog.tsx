@@ -51,6 +51,7 @@ interface EditSolutionState {
   status: SolutionStatus;
   code: string;
   registrationDate: string;
+  startDate: string;
   completedDate: string;
   team: string;
   solutionType: string;
@@ -80,6 +81,7 @@ const editSolutionReducer = (state: EditSolutionState, action: EditSolutionActio
         status: action.solution.status,
         code: action.solution.code,
         registrationDate: action.solution.registrationDate || '',
+        startDate: action.solution.startDate || '',
         completedDate: action.solution.completedDate || '',
         team: action.solution.team || '',
         solutionType: action.solution.solutionType || '웹개발',
@@ -94,6 +96,7 @@ const editSolutionReducer = (state: EditSolutionState, action: EditSolutionActio
         status: '대기',
         code: action.code,
         registrationDate: action.registrationDate,
+        startDate: action.registrationDate,
         completedDate: '',
         team: '',
         solutionType: '',
@@ -109,6 +112,7 @@ const editSolutionReducer = (state: EditSolutionState, action: EditSolutionActio
         status: '대기',
         code: '',
         registrationDate: '',
+        startDate: '',
         completedDate: '',
         team: '',
         solutionType: '',
@@ -403,8 +407,8 @@ const OverviewTab = memo(
                 </span>
               }
               type="date"
-              value={(solutionState as any).startDate || solutionState.registrationDate}
-              onChange={handleFieldChange('startDate' as any)}
+              value={solutionState.startDate || solutionState.registrationDate}
+              onChange={handleFieldChange('startDate')}
               InputLabelProps={{ shrink: true }}
               variant="outlined"
             />
@@ -1356,6 +1360,7 @@ const SolutionEditDialog = memo(
       status: '대기',
       code: '',
       registrationDate: '',
+      startDate: '',
       completedDate: '',
       team: '',
       solutionType: '',
@@ -1591,7 +1596,7 @@ const SolutionEditDialog = memo(
             status: solutionState.status,
             code: solutionState.code,
             registrationDate: solutionState.registrationDate,
-            startDate: new Date().toISOString().split('T')[0], // 오늘 날짜로 시작일 설정
+            startDate: solutionState.startDate || new Date().toISOString().split('T')[0], // 사용자가 입력한 시작일 또는 오늘 날짜
             completedDate: solutionState.completedDate,
             solutionType: solutionState.solutionType,
             developmentType: solutionState.developmentType,
@@ -1610,7 +1615,7 @@ const SolutionEditDialog = memo(
             detailContent: solutionState.detailContent,
             assignee: solutionState.assignee,
             status: solutionState.status,
-            startDate: solution.startDate || new Date().toISOString().split('T')[0], // 기존 시작일 유지 또는 오늘 날짜
+            startDate: solutionState.startDate || solution.startDate || new Date().toISOString().split('T')[0], // 수정된 시작일 사용
             completedDate: solutionState.completedDate,
             solutionType: solutionState.solutionType,
             developmentType: solutionState.developmentType,

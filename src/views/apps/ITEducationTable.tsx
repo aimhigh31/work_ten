@@ -49,6 +49,7 @@ const convertTableDataToRecord = (tableData: ITEducationTableData): ITEducationR
     code: tableData.code,
     educationType: tableData.educationType,
     educationName: tableData.educationName,
+    description: tableData.description,
     location: tableData.location,
     participantCount: tableData.attendeeCount,
     executionDate: tableData.executionDate,
@@ -69,6 +70,7 @@ const convertRecordToTableData = (record: ITEducationRecord): ITEducationTableDa
     code: record.code,
     educationType: record.educationType,
     educationName: record.educationName,
+    description: record.description,
     location: record.location,
     attendeeCount: record.participantCount,
     executionDate: record.executionDate,
@@ -107,7 +109,7 @@ interface ITEducationTableProps {
   selectedAssignee?: string;
   tasks?: ITEducationTableData[];
   setTasks?: React.Dispatch<React.SetStateAction<ITEducationTableData[]>>;
-  addChangeLog?: (action: string, target: string, description: string, team?: string) => void;
+  addChangeLog?: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string) => void;
 }
 
 export default function ITEducationTable({
@@ -213,6 +215,7 @@ export default function ITEducationTable({
             code: item.code || '',
             educationType: (item.education_type as any) || '온라인',
             educationName: item.education_name || '',
+            description: item.description || '',
             location: item.location || '',
             attendeeCount: item.participant_count || 0,
             executionDate: item.execution_date || '',
@@ -378,24 +381,125 @@ export default function ITEducationTable({
           setTasks(updatedData);
         }
 
-        // 변경로그 추가
+        // 변경로그 추가 - 필드별 상세 추적
         if (addChangeLog) {
-          const changes: string[] = [];
           const taskCode = updatedTask.code || `IT-EDU-${updatedTask.id}`;
+          const educationName = updatedTask.educationName || 'IT교육';
 
-          if (originalTask.status !== updatedTask.status) {
-            changes.push(`상태: "${originalTask.status}" → "${updatedTask.status}"`);
-          }
-          if (originalTask.assignee !== updatedTask.assignee) {
-            changes.push(`담당자: "${originalTask.assignee || '미할당'}" → "${updatedTask.assignee || '미할당'}"`);
-          }
-
-          if (changes.length > 0) {
+          // 교육유형 변경
+          if (originalTask.educationType !== updatedTask.educationType) {
             addChangeLog(
-              'IT교육 정보 수정',
+              '수정',
               taskCode,
-              `${updatedTask.educationName || 'IT교육'} - ${changes.join(', ')}`,
-              '교육관리'
+              `IT교육관리 ${educationName}(${taskCode}) 정보의 개요탭 교육유형이 ${originalTask.educationType} → ${updatedTask.educationType} 로 수정 되었습니다.`,
+              updatedTask.team || '미분류',
+              originalTask.educationType,
+              updatedTask.educationType,
+              '교육유형'
+            );
+          }
+
+          // 교육명 변경
+          if (originalTask.educationName !== updatedTask.educationName) {
+            addChangeLog(
+              '수정',
+              taskCode,
+              `IT교육관리 ${originalTask.educationName || ''}(${taskCode}) 정보의 개요탭 교육명이 ${originalTask.educationName || ''} → ${updatedTask.educationName || ''} 로 수정 되었습니다.`,
+              updatedTask.team || '미분류',
+              originalTask.educationName || '',
+              updatedTask.educationName || '',
+              '교육명'
+            );
+          }
+
+          // 장소 변경
+          if (originalTask.location !== updatedTask.location) {
+            addChangeLog(
+              '수정',
+              taskCode,
+              `IT교육관리 ${educationName}(${taskCode}) 정보의 개요탭 장소가 ${originalTask.location || ''} → ${updatedTask.location || ''} 로 수정 되었습니다.`,
+              updatedTask.team || '미분류',
+              originalTask.location || '',
+              updatedTask.location || '',
+              '장소'
+            );
+          }
+
+          // 참석수 변경
+          if (originalTask.attendeeCount !== updatedTask.attendeeCount) {
+            addChangeLog(
+              '수정',
+              taskCode,
+              `IT교육관리 ${educationName}(${taskCode}) 정보의 개요탭 참석수가 ${originalTask.attendeeCount} → ${updatedTask.attendeeCount} 로 수정 되었습니다.`,
+              updatedTask.team || '미분류',
+              String(originalTask.attendeeCount),
+              String(updatedTask.attendeeCount),
+              '참석수'
+            );
+          }
+
+          // 상태 변경
+          if (originalTask.status !== updatedTask.status) {
+            addChangeLog(
+              '수정',
+              taskCode,
+              `IT교육관리 ${educationName}(${taskCode}) 정보의 개요탭 상태가 ${originalTask.status} → ${updatedTask.status} 로 수정 되었습니다.`,
+              updatedTask.team || '미분류',
+              originalTask.status,
+              updatedTask.status,
+              '상태'
+            );
+          }
+
+          // 담당자 변경
+          if (originalTask.assignee !== updatedTask.assignee) {
+            addChangeLog(
+              '수정',
+              taskCode,
+              `IT교육관리 ${educationName}(${taskCode}) 정보의 개요탭 담당자가 ${originalTask.assignee || ''} → ${updatedTask.assignee || ''} 로 수정 되었습니다.`,
+              updatedTask.team || '미분류',
+              originalTask.assignee || '',
+              updatedTask.assignee || '',
+              '담당자'
+            );
+          }
+
+          // 팀 변경
+          if (originalTask.team !== updatedTask.team) {
+            addChangeLog(
+              '수정',
+              taskCode,
+              `IT교육관리 ${educationName}(${taskCode}) 정보의 개요탭 팀이 ${originalTask.team || ''} → ${updatedTask.team || ''} 로 수정 되었습니다.`,
+              updatedTask.team || '미분류',
+              originalTask.team || '',
+              updatedTask.team || '',
+              '팀'
+            );
+          }
+
+          // 실행일 변경
+          if (originalTask.executionDate !== updatedTask.executionDate) {
+            addChangeLog(
+              '수정',
+              taskCode,
+              `IT교육관리 ${educationName}(${taskCode}) 정보의 개요탭 실행일이 ${originalTask.executionDate || ''} → ${updatedTask.executionDate || ''} 로 수정 되었습니다.`,
+              updatedTask.team || '미분류',
+              originalTask.executionDate || '',
+              updatedTask.executionDate || '',
+              '실행일'
+            );
+          }
+
+          // 교육설명 변경
+          if (originalTask.description !== updatedTask.description) {
+            addChangeLog(
+              '수정',
+              taskCode,
+              `IT교육관리 ${educationName}(${taskCode}) 정보의 개요탭 교육설명이 ${originalTask.description || ''} → ${updatedTask.description || ''} 로 수정 되었습니다.`,
+              updatedTask.team || '미분류',
+              originalTask.description || '',
+              updatedTask.description || '',
+              '교육설명'
             );
           }
         }
@@ -417,6 +521,7 @@ export default function ITEducationTable({
             code: item.code || '',
             educationType: (item.education_type as any) || '온라인',
             educationName: item.education_name || '',
+            description: item.description || '',
             location: item.location || '',
             attendeeCount: item.participant_count || 0,
             executionDate: item.execution_date || '',
@@ -465,20 +570,15 @@ export default function ITEducationTable({
     setEditDialog(true);
   };
 
-  // 상태 색상 (파스텔톤 배경, 검정 계열 글자)
+  // 상태 색상 (비용관리와 동일한 형식)
   const getStatusColor = (status: ITEducationStatus) => {
-    switch (status) {
-      case '계획':
-        return { backgroundColor: '#F5F5F5', color: '#757575' };
-      case '진행중':
-        return { backgroundColor: '#E3F2FD', color: '#1976D2' };
-      case '완료':
-        return { backgroundColor: '#E8F5E9', color: '#388E3C' };
-      case '취소':
-        return { backgroundColor: '#FFEBEE', color: '#D32F2F' };
-      default:
-        return { backgroundColor: '#F5F5F5', color: '#757575' };
-    }
+    const colors: Record<string, any> = {
+      계획: { bgcolor: '#F5F5F5', color: '#757575' },
+      진행중: { bgcolor: '#E3F2FD', color: '#1976D2' },
+      완료: { bgcolor: '#E8F5E9', color: '#388E3C' },
+      취소: { bgcolor: '#FFEBEE', color: '#D32F2F' }
+    };
+    return colors[status] || { bgcolor: '#F5F5F5', color: '#757575' };
   };
 
   // 팀 색상
@@ -559,7 +659,7 @@ export default function ITEducationTable({
           boxShadow: 'none',
           minHeight: 0,
           '& .MuiTable-root': {
-            minWidth: 1200
+            minWidth: 1400
           },
           // 스크롤바 스타일
           '&::-webkit-scrollbar': {
@@ -588,10 +688,9 @@ export default function ITEducationTable({
             <TableRow sx={{ backgroundColor: 'grey.50' }}>
               <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
                 <Checkbox
-                  checked={paginatedData.length > 0 && paginatedData.every((task) => selected.includes(task.id))}
                   indeterminate={selected.length > 0 && selected.length < paginatedData.length}
+                  checked={paginatedData.length > 0 && selected.length === paginatedData.length}
                   onChange={handleSelectAllClick}
-                  size="small"
                 />
               </TableCell>
               <TableCell sx={{ width: columnWidths.no, fontWeight: 600 }}>NO</TableCell>
@@ -636,26 +735,25 @@ export default function ITEducationTable({
                         }
                         setSelected(newSelected);
                       }}
-                      size="small"
                     />
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                    <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                       {filteredData.length - (page * rowsPerPage + index)}
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                    <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                       {task.registrationDate}
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                    <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                       {task.code}
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                    <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                       {task.educationType || '유형없음'}
                     </Typography>
                   </TableCell>
@@ -663,7 +761,7 @@ export default function ITEducationTable({
                     <Typography
                       variant="body2"
                       sx={{
-                        fontSize: '13px',
+                        fontSize: '12px',
                         color: 'text.primary',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -675,22 +773,22 @@ export default function ITEducationTable({
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                    <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                       {task.location || '-'}
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary', textAlign: 'center' }}>
+                    <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary', textAlign: 'center' }}>
                       {task.attendeeCount || 0}
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                    <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                       {task.team || '-'}
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Stack direction="row" spacing={1} alignItems="center">
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Avatar
                         src={getUserProfileImage(task.assignee)}
                         alt={task.assignee}
@@ -698,35 +796,34 @@ export default function ITEducationTable({
                       >
                         {task.assignee?.charAt(0)}
                       </Avatar>
-                      <Typography variant="body2" noWrap sx={{ maxWidth: 80, fontSize: '13px' }}>
+                      <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                         {task.assignee}
                       </Typography>
-                    </Stack>
+                    </Box>
                   </TableCell>
                   <TableCell>
                     <Chip
                       label={task.status}
                       size="small"
                       sx={{
-                        ...getStatusColor(task.status),
-                        fontWeight: 500,
-                        fontSize: '13px'
+                        backgroundColor: getStatusColor(task.status).bgcolor,
+                        color: getStatusColor(task.status).color,
+                        fontSize: '13px',
+                        fontWeight: 500
                       }}
                     />
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                    <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                       {task.executionDate || '-'}
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      <Tooltip title="수정">
-                        <IconButton size="small" onClick={() => handleEditTask(task)} sx={{ color: 'primary.main' }}>
-                          <Edit size={16} />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
+                    <Tooltip title="팝업편집">
+                      <IconButton size="small" onClick={() => handleEditTask(task)} sx={{ color: 'primary.main' }}>
+                        <Edit size={16} />
+                      </IconButton>
+                    </Tooltip>
                   </TableCell>
                 </TableRow>
               ))

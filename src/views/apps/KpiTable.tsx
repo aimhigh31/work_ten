@@ -67,7 +67,16 @@ interface TaskTableProps {
   selectedAssignee?: string;
   tasks?: TaskTableData[];
   setTasks?: React.Dispatch<React.SetStateAction<TaskTableData[]>>;
-  addChangeLog?: (action: string, target: string, description: string, team?: string) => void;
+  addChangeLog?: (
+    action: string,
+    target: string,
+    description: string,
+    team?: string,
+    beforeValue?: string,
+    afterValue?: string,
+    changedField?: string,
+    title?: string
+  ) => void;
   users?: any[];
   onDeleteKpis?: (ids: number[]) => Promise<void>;
   onSaveKpi?: (task: TaskTableData) => Promise<void>;
@@ -219,15 +228,10 @@ export default function KpiTable({
   const handleDeleteSelected = async () => {
     if (selected.length === 0) return;
 
-    try {
-      // 삭제될 업무들의 정보를 변경로그에 추가
-      if (addChangeLog) {
-        const deletedTasks = data.filter((task) => selected.includes(task.id));
-        deletedTasks.forEach((task) => {
-          addChangeLog('업무 삭제', task.code || `TASK-${task.id}`, `${task.workContent || '업무'} 삭제`, task.team || '미분류');
-        });
-      }
+    const confirmDelete = window.confirm(`선택한 ${selected.length}개의 KPI를 삭제하시겠습니까?`);
+    if (!confirmDelete) return;
 
+    try {
       // Supabase에서 삭제
       if (onDeleteKpis) {
         await onDeleteKpis(selected);
@@ -240,7 +244,27 @@ export default function KpiTable({
         }
       }
 
+      // 삭제될 업무들의 정보를 변경로그에 추가
+      if (addChangeLog) {
+        const deletedTasks = data.filter((task) => selected.includes(task.id));
+        for (const task of deletedTasks) {
+          const kpiTitle = task.workContent || 'KPI';
+          const codeToUse = task.code || `TASK-${task.id}`;
+          await addChangeLog(
+            '삭제',
+            codeToUse,
+            `KPI관리 ${kpiTitle}(${codeToUse}) 정보의 데이터탭 데이터가 삭제 되었습니다.`,
+            task.team || '시스템',
+            kpiTitle,
+            '',
+            '데이터탭',
+            kpiTitle
+          );
+        }
+      }
+
       setSelected([]);
+      alert('선택한 KPI가 삭제되었습니다.');
     } catch (error) {
       console.error('삭제 오류:', error);
       alert('삭제 중 오류가 발생했습니다.');

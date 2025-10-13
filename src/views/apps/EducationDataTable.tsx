@@ -65,12 +65,28 @@ import {
   EducationResult
 } from 'types/education';
 import { educationData } from 'data/education';
+import { useSupabaseEducation } from 'hooks/useSupabaseEducation';
 
 // ==============================|| 교육관리 데이터 테이블 ||============================== //
 
 interface EducationDataTableProps {
   selectedStatus: string;
   selectedYear: string;
+  selectedTeam?: string;
+  selectedAssignee?: string;
+  tasks?: any[];
+  setTasks?: React.Dispatch<React.SetStateAction<any[]>>;
+  addChangeLog?: (
+    action: string,
+    target: string,
+    description: string,
+    team?: string,
+    beforeValue?: string,
+    afterValue?: string,
+    changedField?: string,
+    title?: string
+  ) => void;
+  onDataRefresh?: () => Promise<void>;
 }
 
 // 컬럼 너비 정의
@@ -118,8 +134,18 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
-export default function EducationDataTable({ selectedStatus, selectedYear }: EducationDataTableProps) {
+export default function EducationDataTable({
+  selectedStatus,
+  selectedYear,
+  selectedTeam = '전체',
+  selectedAssignee = '전체',
+  tasks,
+  setTasks,
+  addChangeLog,
+  onDataRefresh
+}: EducationDataTableProps) {
   const theme = useTheme();
+  const { addEducation, updateEducation, deleteEducation } = useSupabaseEducation();
   const [data, setData] = useState<EducationRecord[]>(educationData);
   const [selected, setSelected] = useState<number[]>([]);
   const [actionDialog, setActionDialog] = useState<{ open: boolean; recordId: number | null; isNew: boolean }>({
@@ -225,9 +251,76 @@ export default function EducationDataTable({ selectedStatus, selectedYear }: Edu
   };
 
   // 선택된 행 삭제
-  const handleDeleteRows = () => {
-    setData((prev) => prev.filter((record) => !selected.includes(record.id)));
-    setSelected([]);
+  const handleDeleteRows = async () => {
+    if (selected.length === 0) return;
+
+    const confirmDelete = window.confirm(`선택한 ${selected.length}개의 교육을 삭제하시겠습니까?`);
+    if (!confirmDelete) return;
+
+    try {
+      console.log('🗑️ 삭제할 항목들:', selected);
+
+      // Supabase에서 각 항목 삭제
+      const deletePromises = selected.map(async (id) => {
+        const success = await deleteEducation(String(id));
+        if (!success) {
+          console.error(`❌ ID ${id} 삭제 실패`);
+        } else {
+          console.log(`✅ ID ${id} 삭제 성공`);
+        }
+        return success;
+      });
+
+      const results = await Promise.all(deletePromises);
+      const allSuccess = results.every((result) => result);
+
+      if (allSuccess) {
+        console.log('✅ 모든 항목 삭제 성공');
+
+        // 삭제될 교육들의 정보를 변경로그에 추가
+        if (addChangeLog) {
+          const deletedRecords = data.filter((record) => selected.includes(record.id));
+          for (const record of deletedRecords) {
+            const codeToUse = record.code || `ID-${record.id}`;
+            const educationTitle = record.title || record.content || '교육';
+            console.log('🔍 삭제 변경로그:', { code: record.code, codeToUse });
+            // 삭제의 경우 변경 후 값은 없음
+            await addChangeLog(
+              '삭제',
+              codeToUse,
+              `개인교육관리 ${educationTitle}(${codeToUse}) 정보의 데이터탭 데이터가 삭제 되었습니다.`,
+              record.team || '시스템',
+              `${educationTitle} - ${record.location || '-'}`,
+              '',
+              '데이터탭',
+              educationTitle
+            );
+          }
+        }
+
+        // 로컬 상태 업데이트
+        const updatedData = data.filter((record) => !selected.includes(record.id));
+        setData(updatedData);
+        setSelected([]);
+
+        // 부모 컴포넌트로 동기화
+        if (setTasks) {
+          setTasks(updatedData);
+        }
+
+        // 데이터 새로고침
+        if (onDataRefresh) {
+          await onDataRefresh();
+        }
+
+        alert('선택한 교육이 삭제되었습니다.');
+      } else {
+        alert('일부 항목 삭제에 실패했습니다. 다시 시도해주세요.');
+      }
+    } catch (error) {
+      console.error('🔴 삭제 중 오류:', error);
+      alert('삭제 중 오류가 발생했습니다.');
+    }
   };
 
   // Action 다이얼로그 열기
@@ -247,8 +340,29 @@ export default function EducationDataTable({ selectedStatus, selectedYear }: Edu
   };
 
   // 저장
-  const handleSave = () => {
-    if (editingRecord) {
+  const handleSave = async () => {
+    if (!editingRecord) return;
+
+    try {
+      console.log('[HANDLE_SAVE] 💾 저장 시작');
+
+      // 필수 필드 validation
+      const validateRequiredFields = () => {
+        const errors: string[] = [];
+        if (!editingRecord?.content) errors.push('교육명');
+        if (!editingRecord?.completionDate) errors.push('완료일');
+        if (!editingRecord?.location) errors.push('장소');
+        if (!editingRecord?.participants || editingRecord.participants <= 0) errors.push('참석수');
+        return errors;
+      };
+
+      // 필드 검증
+      const errors = validateRequiredFields();
+      if (errors.length > 0) {
+        alert(`필수 필드를 입력해주세요: ${errors.join(', ')}`);
+        return;
+      }
+
       // 교육유형이 변경된 경우 코드 재생성
       if (actionDialog.isNew || editingRecord.educationType !== data.find((r) => r.id === editingRecord.id)?.educationType) {
         editingRecord.code = generateCode(
@@ -257,9 +371,155 @@ export default function EducationDataTable({ selectedStatus, selectedYear }: Edu
         );
       }
 
+      // EducationInput 형식으로 변환
+      const educationData = {
+        code: editingRecord.code,
+        registration_date: editingRecord.registrationDate,
+        start_date: editingRecord.startDate || null,
+        completion_date: editingRecord.completionDate || null,
+        education_category: editingRecord.educationCategory || null,
+        title: editingRecord.content || null,
+        description: editingRecord.description || null,
+        education_type: editingRecord.educationType || null,
+        team: editingRecord.team || null,
+        assignee_id: null,
+        assignee_name: editingRecord.assignee || null,
+        status: editingRecord.status
+      };
+
+      if (actionDialog.isNew) {
+        // 새 교육 생성
+        console.log('🔵 새 교육 생성 시작');
+        const result = await addEducation(educationData);
+
+        if (result) {
+          console.log('✅ 생성 성공:', result);
+
+          if (addChangeLog) {
+            const educationTitle = educationData.title || '교육';
+            await addChangeLog(
+              '추가',
+              result.code,
+              `개인교육관리 ${educationTitle}(${result.code}) 정보의 개요탭 데이터가 추가 되었습니다.`,
+              educationData.team || '시스템',
+              '',
+              `${educationTitle} - ${editingRecord.location || '-'}`,
+              '개요탭',
+              educationTitle
+            );
+          }
+
+          // 데이터 새로고침
+          if (onDataRefresh) {
+            console.log('🔄 데이터 새로고침 호출 (생성)');
+            await onDataRefresh();
+          }
+
+          alert('교육이 추가되었습니다.');
+        } else {
+          console.error('❌ 생성 실패');
+          alert('교육 추가에 실패했습니다.');
+          return;
+        }
+      } else {
+        // 기존 교육 수정
+        console.log('🔵 기존 교육 수정 시작:', editingRecord.id);
+        const originalRecord = data.find((r) => r.id === editingRecord.id);
+        const success = await updateEducation(String(editingRecord.id), educationData);
+
+        if (success) {
+          console.log('✅ 수정 성공');
+
+          if (addChangeLog && originalRecord) {
+            // 필드 한글명 매핑
+            const fieldNameMap: Record<string, string> = {
+              content: '교육명',
+              educationType: '교육유형',
+              status: '상태',
+              location: '장소',
+              completionDate: '완료일',
+              assignee: '담당자',
+              participants: '참석수',
+              team: '팀',
+              description: '설명',
+              educationCategory: '교육분류'
+            };
+
+            // 변경된 필드 찾기
+            const changes: Array<{ field: string; fieldKorean: string; before: any; after: any }> = [];
+
+            Object.keys(fieldNameMap).forEach((field) => {
+              const beforeVal = (originalRecord as any)[field];
+              const afterVal = (editingRecord as any)[field];
+
+              // 값이 다른 경우만 추가
+              if (beforeVal !== afterVal) {
+                changes.push({
+                  field,
+                  fieldKorean: fieldNameMap[field],
+                  before: beforeVal || '',
+                  after: afterVal || ''
+                });
+              }
+            });
+
+            console.log('🔍 변경 감지된 필드들:', changes);
+
+            const educationTitle = editingRecord.content || editingRecord.title || '교육';
+            const codeToUse = originalRecord.code || editingRecord.code || `ID-${editingRecord.id}`;
+
+            // 변경된 필드가 있으면 각각 로그 기록
+            if (changes.length > 0) {
+              for (const change of changes) {
+                const description = `개인교육관리 ${educationTitle}(${codeToUse}) 정보의 개요탭 ${change.fieldKorean}이 ${change.before} → ${change.after} 로 수정 되었습니다.`;
+
+                await addChangeLog(
+                  '수정',
+                  codeToUse,
+                  description,
+                  editingRecord.team || '시스템',
+                  String(change.before),
+                  String(change.after),
+                  change.fieldKorean,
+                  educationTitle
+                );
+              }
+            } else {
+              // 변경사항이 없는 경우 (일반 저장)
+              await addChangeLog(
+                '수정',
+                codeToUse,
+                `개인교육관리 ${educationTitle}(${codeToUse}) 정보의 개요탭에서 수정되었습니다.`,
+                editingRecord.team || '시스템',
+                '',
+                '',
+                '-',
+                educationTitle
+              );
+            }
+          }
+
+          // 데이터 새로고침
+          if (onDataRefresh) {
+            console.log('🔄 데이터 새로고침 호출 (수정)');
+            await onDataRefresh();
+          }
+
+          alert('교육이 수정되었습니다.');
+        } else {
+          console.error('❌ 수정 실패');
+          alert('교육 수정에 실패했습니다.');
+          return;
+        }
+      }
+
+      // 로컬 상태 업데이트
       setData((prev) => prev.map((record) => (record.id === editingRecord.id ? { ...editingRecord, isNew: false } : record)));
       setActionDialog({ open: false, recordId: null, isNew: false });
       setEditingRecord(null);
+    } catch (error) {
+      console.error('🔴 저장 중 오류:', error);
+      alert('저장 중 오류가 발생했습니다.');
     }
   };
 
@@ -362,8 +622,9 @@ export default function EducationDataTable({ selectedStatus, selectedYear }: Edu
     if (editingRecord && selectedParticipantItems.length > 0) {
       setEditingRecord({
         ...editingRecord,
-        participantList: editingRecord.participantList.filter((p) => p.id !== participantId)
+        participantList: editingRecord.participantList.filter((p) => !selectedParticipantItems.includes(p.id))
       });
+      setSelectedParticipantItems([]);
     }
   };
 
@@ -451,16 +712,6 @@ export default function EducationDataTable({ selectedStatus, selectedYear }: Edu
 
   // 선택된 교육 기록 찾기
   const selectedRecord = actionDialog.recordId ? data.find((r) => r.id === actionDialog.recordId) : null;
-
-  // 필수 필드 validation 함수 추가
-  const validateRequiredFields = () => {
-    const errors: string[] = [];
-    if (!editingRecord?.content) errors.push('교육명');
-    if (!editingRecord?.completionDate) errors.push('완료일');
-    if (!editingRecord?.location) errors.push('장소');
-    if (!editingRecord?.participants || editingRecord.participants <= 0) errors.push('참석수');
-    return errors;
-  };
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
@@ -750,7 +1001,7 @@ export default function EducationDataTable({ selectedStatus, selectedYear }: Edu
                     }
                   }
                 }
-              }}
+              }
             />
             )}
           </Box>

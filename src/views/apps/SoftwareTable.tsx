@@ -72,7 +72,7 @@ interface SoftwareTableProps {
   selectedAssignee?: string;
   tasks?: TaskTableData[];
   setTasks?: React.Dispatch<React.SetStateAction<TaskTableData[]>>;
-  addChangeLog?: (action: string, target: string, description: string, team?: string) => void;
+  addChangeLog?: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string) => void;
   deleteMultipleSoftware?: (ids: number[]) => Promise<any>;
 }
 
@@ -305,33 +305,190 @@ export default function SoftwareTable({
         setTasks(updatedData);
       }
 
-      // 변경로그 추가 - 변경된 필드 확인
+      // 변경로그 추가 - 필드별 상세 추적 (14개 필드)
       if (addChangeLog) {
-        const changes: string[] = [];
-        const taskCode = updatedTask.code || `TASK-${updatedTask.id}`;
+        const taskCode = updatedTask.code || `IT-SW-${updatedTask.id}`;
+        const softwareName = updatedTask.softwareName || updatedTask.workContent || '소프트웨어';
 
-        if (originalTask.status !== updatedTask.status) {
-          changes.push(`상태: "${originalTask.status}" → "${updatedTask.status}"`);
-        }
-        if (originalTask.assignee !== updatedTask.assignee) {
-          changes.push(`담당자: "${originalTask.assignee || '미할당'}" → "${updatedTask.assignee || '미할당'}"`);
-        }
-        if (originalTask.workContent !== updatedTask.workContent) {
-          changes.push(`업무내용 수정`);
-        }
-        if (originalTask.progress !== updatedTask.progress) {
-          changes.push(`진행율: ${originalTask.progress || 0}% → ${updatedTask.progress || 0}%`);
-        }
-        if (originalTask.completedDate !== updatedTask.completedDate) {
-          changes.push(`완료일: "${originalTask.completedDate || '미정'}" → "${updatedTask.completedDate || '미정'}"`);
-        }
-
-        if (changes.length > 0) {
+        // 1. 소프트웨어분류 변경
+        if (originalTask.softwareCategory !== updatedTask.softwareCategory) {
           addChangeLog(
-            '업무 정보 수정',
+            '수정',
             taskCode,
-            `${updatedTask.workContent || '업무'} - ${changes.join(', ')}`,
-            updatedTask.team || '미분류'
+            `소프트웨어관리 ${softwareName}(${taskCode}) 정보의 개요탭 소프트웨어분류가 ${originalTask.softwareCategory || ''} → ${updatedTask.softwareCategory || ''} 로 수정 되었습니다.`,
+            updatedTask.team || '미분류',
+            originalTask.softwareCategory || '',
+            updatedTask.softwareCategory || '',
+            '소프트웨어분류'
+          );
+        }
+
+        // 2. 소프트웨어명 변경
+        if (originalTask.softwareName !== updatedTask.softwareName) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `소프트웨어관리 ${originalTask.softwareName || ''}(${taskCode}) 정보의 개요탭 소프트웨어명이 ${originalTask.softwareName || ''} → ${updatedTask.softwareName || ''} 로 수정 되었습니다.`,
+            updatedTask.team || '미분류',
+            originalTask.softwareName || '',
+            updatedTask.softwareName || '',
+            '소프트웨어명'
+          );
+        }
+
+        // 3. 스펙 변경
+        if (originalTask.spec !== updatedTask.spec) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `소프트웨어관리 ${softwareName}(${taskCode}) 정보의 개요탭 스펙이 ${originalTask.spec || ''} → ${updatedTask.spec || ''} 로 수정 되었습니다.`,
+            updatedTask.team || '미분류',
+            originalTask.spec || '',
+            updatedTask.spec || '',
+            '스펙'
+          );
+        }
+
+        // 4. 사용자 변경
+        if (originalTask.currentUser !== updatedTask.currentUser) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `소프트웨어관리 ${softwareName}(${taskCode}) 정보의 개요탭 사용자가 ${originalTask.currentUser || ''} → ${updatedTask.currentUser || ''} 로 수정 되었습니다.`,
+            updatedTask.team || '미분류',
+            originalTask.currentUser || '',
+            updatedTask.currentUser || '',
+            '사용자'
+          );
+        }
+
+        // 5. 담당자 변경
+        if (originalTask.assignee !== updatedTask.assignee) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `소프트웨어관리 ${softwareName}(${taskCode}) 정보의 개요탭 담당자가 ${originalTask.assignee || ''} → ${updatedTask.assignee || ''} 로 수정 되었습니다.`,
+            updatedTask.team || '미분류',
+            originalTask.assignee || '',
+            updatedTask.assignee || '',
+            '담당자'
+          );
+        }
+
+        // 6. 상태 변경
+        if (originalTask.status !== updatedTask.status) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `소프트웨어관리 ${softwareName}(${taskCode}) 정보의 개요탭 상태가 ${originalTask.status} → ${updatedTask.status} 로 수정 되었습니다.`,
+            updatedTask.team || '미분류',
+            originalTask.status,
+            updatedTask.status,
+            '상태'
+          );
+        }
+
+        // 7. 시작일 변경
+        if (originalTask.startDate !== updatedTask.startDate) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `소프트웨어관리 ${softwareName}(${taskCode}) 정보의 개요탭 시작일이 ${originalTask.startDate || ''} → ${updatedTask.startDate || ''} 로 수정 되었습니다.`,
+            updatedTask.team || '미분류',
+            originalTask.startDate || '',
+            updatedTask.startDate || '',
+            '시작일'
+          );
+        }
+
+        // 8. 완료일 변경
+        if (originalTask.completedDate !== updatedTask.completedDate) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `소프트웨어관리 ${softwareName}(${taskCode}) 정보의 개요탭 완료일이 ${originalTask.completedDate || ''} → ${updatedTask.completedDate || ''} 로 수정 되었습니다.`,
+            updatedTask.team || '미분류',
+            originalTask.completedDate || '',
+            updatedTask.completedDate || '',
+            '완료일'
+          );
+        }
+
+        // 9. 팀 변경
+        if (originalTask.team !== updatedTask.team) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `소프트웨어관리 ${softwareName}(${taskCode}) 정보의 개요탭 팀이 ${originalTask.team || ''} → ${updatedTask.team || ''} 로 수정 되었습니다.`,
+            updatedTask.team || '미분류',
+            originalTask.team || '',
+            updatedTask.team || '',
+            '팀'
+          );
+        }
+
+        // 10. 설명 변경
+        if (originalTask.description !== updatedTask.description) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `소프트웨어관리 ${softwareName}(${taskCode}) 정보의 개요탭 설명이 ${originalTask.description || ''} → ${updatedTask.description || ''} 로 수정 되었습니다.`,
+            updatedTask.team || '미분류',
+            originalTask.description || '',
+            updatedTask.description || '',
+            '설명'
+          );
+        }
+
+        // 11. 라이센스키 변경
+        if (originalTask.licenseKey !== updatedTask.licenseKey) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `소프트웨어관리 ${softwareName}(${taskCode}) 정보의 개요탭 라이센스키가 ${originalTask.licenseKey || ''} → ${updatedTask.licenseKey || ''} 로 수정 되었습니다.`,
+            updatedTask.team || '미분류',
+            originalTask.licenseKey || '',
+            updatedTask.licenseKey || '',
+            '라이센스키'
+          );
+        }
+
+        // 12. 솔루션업체 변경
+        if (originalTask.solutionProvider !== updatedTask.solutionProvider) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `소프트웨어관리 ${softwareName}(${taskCode}) 정보의 개요탭 솔루션업체가 ${originalTask.solutionProvider || ''} → ${updatedTask.solutionProvider || ''} 로 수정 되었습니다.`,
+            updatedTask.team || '미분류',
+            originalTask.solutionProvider || '',
+            updatedTask.solutionProvider || '',
+            '솔루션업체'
+          );
+        }
+
+        // 13. 사용자수 변경
+        if (originalTask.userCount !== updatedTask.userCount) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `소프트웨어관리 ${softwareName}(${taskCode}) 정보의 개요탭 사용자수가 ${originalTask.userCount || 0} → ${updatedTask.userCount || 0} 로 수정 되었습니다.`,
+            updatedTask.team || '미분류',
+            String(originalTask.userCount || 0),
+            String(updatedTask.userCount || 0),
+            '사용자수'
+          );
+        }
+
+        // 14. 라이센스유형 변경
+        if (originalTask.licenseType !== updatedTask.licenseType) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `소프트웨어관리 ${softwareName}(${taskCode}) 정보의 개요탭 라이센스유형이 ${originalTask.licenseType || ''} → ${updatedTask.licenseType || ''} 로 수정 되었습니다.`,
+            updatedTask.team || '미분류',
+            originalTask.licenseType || '',
+            updatedTask.licenseType || '',
+            '라이센스유형'
           );
         }
       }

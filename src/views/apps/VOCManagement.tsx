@@ -47,16 +47,26 @@ import { VOCTableData, VOCStatus } from 'types/voc';
 import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
 import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
+import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
+import { ChangeLogData } from 'types/changelog';
+import { createClient } from '@/lib/supabase/client';
+import { useSession } from 'next-auth/react';
+import useUser from 'hooks/useUser';
 
 // 변경로그 타입 정의
 interface ChangeLog {
-  id: number;
+  id: string;
   dateTime: string;
+  title: string;
+  code: string;
+  action: string;
+  location: string;
+  changedField?: string;
+  beforeValue?: string;
+  afterValue?: string;
+  description: string;
   team: string;
   user: string;
-  action: string;
-  target: string;
-  description: string;
 }
 
 // Icons
@@ -1162,12 +1172,16 @@ function ChangeLogView({
             <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
               <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
               <TableCell sx={{ fontWeight: 600, width: 130 }}>변경시간</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 200 }}>제목</TableCell>
               <TableCell sx={{ fontWeight: 600, width: 100 }}>코드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 180 }}>VOC내용</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 120 }}>변경분류</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 280 }}>변경 세부내용</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 80 }}>변경분류</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 100 }}>변경위치</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 100 }}>변경필드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 120 }}>변경전</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 120 }}>변경후</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 250 }}>변경 세부내용</TableCell>
               <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>담당자</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -1185,40 +1199,68 @@ function ChangeLogView({
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.secondary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
                     {log.dateTime}
                   </Typography>
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                    {log.target}
+                    {log.title}
                   </Typography>
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                    {(() => {
-                      const voc = vocs.find((voc) => voc.code === log.target);
-                      return voc?.workContent || log.description.split(' - ')[0] || 'VOC내용 없음';
-                    })()}
+                    {log.code}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontSize: '13px',
-                      fontWeight: 500
-                    }}
-                  >
+                  <Typography variant="body2" sx={{ fontSize: '13px', fontWeight: 500 }}>
                     {log.action}
                   </Typography>
                 </TableCell>
                 <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                    {log.location}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                    {log.changedField || '-'}
+                  </Typography>
+                </TableCell>
+                <TableCell>
                   <Typography
                     variant="body2"
                     sx={{
                       fontSize: '13px',
-                      color: 'text.secondary',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}
+                    title={log.beforeValue || '-'}
+                  >
+                    {log.beforeValue || '-'}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontSize: '13px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}
+                    title={log.afterValue || '-'}
+                  >
+                    {log.afterValue || '-'}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontSize: '13px',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'normal',
@@ -1233,17 +1275,9 @@ function ChangeLogView({
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Chip
-                    label={log.team}
-                    size="small"
-                    sx={{
-                      height: 22,
-                      fontSize: '13px',
-                      backgroundColor: getTeamColor(log.team),
-                      color: '#333333',
-                      fontWeight: 500
-                    }}
-                  />
+                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                    {log.team}
+                  </Typography>
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" sx={{ fontSize: '13px' }}>
@@ -2272,10 +2306,21 @@ export default function VOCManagement() {
   const theme = useTheme();
   const [value, setValue] = useState(0);
 
+  // 세션 및 사용자 정보
+  const { data: session } = useSession();
+  const user = useUser();
+  const userName = user?.name || session?.user?.name || '시스템';
+
   // Supabase 훅 사용 (즉시 렌더링 - loading 상태 제거)
   const { users } = useSupabaseUserManagement();
   const { departments, fetchDepartments } = useSupabaseDepartmentManagement();
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
+
+  // 현재 로그인한 사용자 정보
+  const currentUser = React.useMemo(() => {
+    if (!session?.user?.email || users.length === 0) return null;
+    return users.find((u) => u.email === session.user.email);
+  }, [session, users]);
 
   // 부서 데이터 로드 (useEffect는 이미 병렬로 실행됨)
   React.useEffect(() => {
@@ -2299,54 +2344,33 @@ export default function VOCManagement() {
   const [changeLogRowsPerPage, setChangeLogRowsPerPage] = useState(10);
   const [changeLogGoToPage, setChangeLogGoToPage] = useState('');
 
-  // 변경로그 상태 - 초기 데이터는 기존 샘플 데이터 사용
-  const [changeLogs, setChangeLogs] = useState<ChangeLog[]>([
-    {
-      id: 1,
-      dateTime: '2024-12-15 14:30',
-      team: '개발팀',
-      user: '김철수',
-      action: 'VOC 상태 변경',
-      target: 'TASK-24-010',
-      description: '웹사이트 리뉴얼 프로젝트 상태를 "진행"에서 "완료"로 변경'
-    },
-    {
-      id: 2,
-      dateTime: '2024-12-14 10:15',
-      team: '기획팀',
-      user: '이영희',
-      action: '새 VOC 생성',
-      target: 'TASK-24-011',
-      description: '모바일 앱 UI/UX 개선 VOC 신규 등록'
-    },
-    {
-      id: 3,
-      dateTime: '2024-12-13 16:45',
-      team: '마케팅팀',
-      user: '박민수',
-      action: '담당자 변경',
-      target: 'TASK-24-009',
-      description: '마케팅 캠페인 기획 담당자를 "최지연"에서 "박민수"로 변경'
-    },
-    {
-      id: 4,
-      dateTime: '2024-12-12 09:30',
-      team: '디자인팀',
-      user: '강민정',
-      action: '완료일 수정',
-      target: 'TASK-24-008',
-      description: '로고 디자인 작업의 완료 예정일을 2024-12-20으로 수정'
-    },
-    {
-      id: 5,
-      dateTime: '2024-12-11 15:20',
-      team: '개발팀',
-      user: '정현우',
-      action: 'VOC 삭제',
-      target: 'TASK-24-007',
-      description: '중복된 데이터베이스 최적화 VOC 삭제'
-    }
-  ]);
+  // Supabase 변경로그 훅 사용 (page='it_voc')
+  const { logs, loading, error, fetchChangeLogs, addChangeLog: addSupabaseChangeLog, isAdding } = useSupabaseChangeLog('it_voc');
+
+  // 변경로그 데이터 변환 (ChangeLogData -> ChangeLog)
+  const changeLogs = React.useMemo(() => {
+    return logs.map((log: ChangeLogData) => ({
+      id: log.id,
+      dateTime: new Date(log.created_at).toLocaleString('ko-KR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }),
+      title: log.title || log.description.split(' ')[1]?.split('(')[0] || '-',
+      code: log.record_id,
+      action: log.action_type,
+      location: 'VOC관리',
+      changedField: log.changed_field || undefined,
+      beforeValue: log.before_value || undefined,
+      afterValue: log.after_value || undefined,
+      description: log.description,
+      team: log.team || '시스템',
+      user: log.user_name
+    }));
+  }, [logs]);
 
   // 필터 상태
   const [selectedYear, setSelectedYear] = useState('전체');
@@ -2356,29 +2380,53 @@ export default function VOCManagement() {
   const [selectedRecentStatus, setSelectedRecentStatus] = useState('전체');
 
   // 연도 옵션 생성
-  const currentYear = new Date().getFullYear();
+  const currentYearValue = new Date().getFullYear();
   const yearOptions = [];
-  for (let i = currentYear - 3; i <= currentYear + 3; i++) {
+  for (let i = currentYearValue - 3; i <= currentYearValue + 3; i++) {
     yearOptions.push(i.toString());
   }
 
-  // 변경로그 추가 함수
-  const addChangeLog = (action: string, target: string, description: string, team: string = '시스템') => {
-    const now = new Date();
-    const dateTime = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  // 변경로그 추가 함수 (Supabase 버전)
+  const addChangeLog = React.useCallback(
+    async (
+      action: string,
+      target: string,
+      description: string,
+      team: string = '시스템',
+      beforeValue?: string,
+      afterValue?: string,
+      changedField?: string,
+      title?: string
+    ) => {
+      const logData = {
+        page: 'it_voc',
+        record_id: target,
+        action_type: action,
+        description: description,
+        before_value: beforeValue || null,
+        after_value: afterValue || null,
+        changed_field: changedField || null,
+        title: title || null,
+        user_name: userName,
+        team: currentUser?.department || '시스템',
+        user_department: currentUser?.department,
+        user_position: currentUser?.position,
+        user_profile_image: currentUser?.profile_image_url,
+        created_at: new Date().toISOString()
+      };
 
-    const newLog: ChangeLog = {
-      id: Math.max(...changeLogs.map((log) => log.id), 0) + 1,
-      dateTime,
-      team,
-      user: '시스템', // 임시로 시스템으로 설정, 나중에 실제 사용자 정보로 교체 가능
-      action,
-      target,
-      description
-    };
+      const supabase = createClient();
+      const { data, error } = await supabase.from('common_log_data').insert(logData).select();
 
-    setChangeLogs((prev) => [newLog, ...prev]); // 최신순으로 정렬
-  };
+      if (error) {
+        console.error('❌ 변경로그 추가 실패:', error);
+      } else {
+        console.log('✅ 변경로그 추가 성공:', data);
+        await fetchChangeLogs();
+      }
+    },
+    [currentUser, user, userName, fetchChangeLogs]
+  );
 
   // 카드 클릭 핸들러
   const handleCardClick = (voc: VOCTableData) => {

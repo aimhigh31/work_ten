@@ -52,17 +52,27 @@ import { useSupabaseSecurityEducation, SecurityEducationItem } from '../../hooks
 import { useSupabaseMasterCode3 } from '../../hooks/useSupabaseMasterCode3';
 import { useSupabaseUserManagement } from '../../hooks/useSupabaseUserManagement';
 import { useSupabaseDepartmentManagement } from '../../hooks/useSupabaseDepartmentManagement';
-import { supabase } from '../../lib/supabase';
+import { useSupabaseChangeLog } from '../../hooks/useSupabaseChangeLog';
+import { ChangeLogData } from '../../types/changelog';
+import { safeJsonParse } from '../../utils/changeLogHelper';
+import { useSession } from 'next-auth/react';
+import useUser from '../../hooks/useUser';
+import { createClient } from '@/lib/supabase/client';
 
-// 변경로그 타입 정의
+// 변경로그 타입 정의 (UI용)
 interface ChangeLog {
-  id: number;
+  id: string;
   dateTime: string;
+  title: string;
+  code: string;
+  action: string;
+  location: string;
+  changedField?: string;
+  beforeValue?: string;
+  afterValue?: string;
+  description: string;
   team: string;
   user: string;
-  action: string;
-  target: string;
-  description: string;
 }
 
 // Icons
@@ -1321,12 +1331,16 @@ function ChangeLogView({
             <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
               <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
               <TableCell sx={{ fontWeight: 600, width: 130 }}>변경시간</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 100 }}>코드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 180 }}>업무내용</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 120 }}>변경분류</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 280 }}>변경 세부내용</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 180 }}>제목</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 140 }}>코드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경분류</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경위치</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90 }}>변경필드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 100 }}>변경전</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 100 }}>변경후</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 300 }}>변경 세부내용</TableCell>
               <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>담당자</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -1339,45 +1353,78 @@ function ChangeLogView({
                 }}
               >
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
                     {changeLogs.length - (page * rowsPerPage + index)}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.secondary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
                     {log.dateTime}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                    {log.target}
+                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                    {log.title}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                    {(() => {
-                      const task = tasks.find((task) => task.code === log.target);
-                      return task?.workContent || log.description.split(' - ')[0] || '업무내용 없음';
-                    })()}
+                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                    {log.code}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontSize: '13px',
-                      fontWeight: 500
-                    }}
-                  >
+                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
                     {log.action}
                   </Typography>
                 </TableCell>
                 <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                    {log.location}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                    {log.changedField || '-'}
+                  </Typography>
+                </TableCell>
+                <TableCell>
                   <Typography
                     variant="body2"
                     sx={{
                       fontSize: '13px',
-                      color: 'text.secondary',
+                      color: 'text.primary',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: 100
+                    }}
+                    title={log.beforeValue || '-'}
+                  >
+                    {log.beforeValue || '-'}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontSize: '13px',
+                      color: 'text.primary',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: 100
+                    }}
+                    title={log.afterValue || '-'}
+                  >
+                    {log.afterValue || '-'}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontSize: '13px',
+                      color: 'text.primary',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'normal',
@@ -1392,20 +1439,12 @@ function ChangeLogView({
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Chip
-                    label={log.team}
-                    size="small"
-                    sx={{
-                      height: 22,
-                      fontSize: '13px',
-                      backgroundColor: getTeamColor(log.team),
-                      color: '#333333',
-                      fontWeight: 500
-                    }}
-                  />
+                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                    {log.team}
+                  </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
                     {log.user}
                   </Typography>
                 </TableCell>
@@ -2427,6 +2466,17 @@ export default function SecurityEducationManagement() {
   const theme = useTheme();
   const [value, setValue] = useState(0);
 
+  // 현재 사용자 정보
+  const user = useUser();
+  const { data: session } = useSession();
+  const { users } = useSupabaseUserManagement();
+
+  // 세션 email로 DB에서 사용자 찾기
+  const currentUser = React.useMemo(() => {
+    if (!session?.user?.email || users.length === 0) return null;
+    return users.find((u) => u.email === session.user.email);
+  }, [session, users]);
+
   // Supabase hooks
   const {
     items: securityEducations,
@@ -2437,7 +2487,6 @@ export default function SecurityEducationManagement() {
     fetchEducations
   } = useSupabaseSecurityEducation();
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
-  const { users } = useSupabaseUserManagement();
   const { departments, fetchDepartments } = useSupabaseDepartmentManagement();
 
   // 컴포넌트 마운트 시 부서 목록 로드
@@ -2456,35 +2505,47 @@ export default function SecurityEducationManagement() {
   // 데이터베이스 데이터를 테이블 형식으로 변환
   useEffect(() => {
     console.log('🟡 useEffect 트리거됨, securityEducations 개수:', securityEducations.length);
-    console.log('🟡 securityEducations 데이터:', securityEducations);
+    console.log('🟡 securityEducations 첫번째 데이터:', securityEducations[0]);
 
-    const convertedTasks: SecurityEducationTableData[] = securityEducations.map((education: SecurityEducationItem) => ({
-      id: education.id,
-      no: education.no || education.id,
-      title: education.education_name,
-      educationName: education.education_name || '교육명 없음',
-      educationType: education.education_type || '온라인',
-      assignee: education.assignee || '미정',
-      team: education.team || '보안팀', // DB에서 팀 정보 로드
-      executionDate: education.execution_date || new Date().toISOString().split('T')[0],
-      attendeeCount: education.participant_count || 0,
-      participantCount: education.participant_count || 0,
-      status: (education.status as SecurityEducationStatus) || '계획',
-      description: education.description || '',
-      location: education.location || '',
-      code: education.code || `EDU-${education.id}`,
-      registrationDate: education.registration_date || new Date().toISOString().split('T')[0],
-      achievements: education.achievements || '', // 성과
-      feedback: education.feedback || '', // 교육소감
-      improvementPoints: education.improvement_points || '',
-      improvements: education.improvement_points || '', // improvement_points에서 개선사항 로드
-      effectivenessScore: education.effectiveness_score || 0,
-      completionRate: education.completion_rate || 0,
-      satisfactionScore: education.satisfaction_score || 0
-    }));
+    // 첫번째 education의 code 필드 확인
+    if (securityEducations.length > 0) {
+      console.log('🔍🔍🔍 DB에서 가져온 education.code:', securityEducations[0].code);
+      console.log('🔍🔍🔍 DB에서 가져온 education 전체 키:', Object.keys(securityEducations[0]));
+    }
+
+    const convertedTasks: SecurityEducationTableData[] = securityEducations.map((education: SecurityEducationItem) => {
+      const convertedCode = education.code || `EDU-${education.id}`;
+
+      console.log(`🔍 ID ${education.id}: DB code="${education.code}" → 사용할 code="${convertedCode}"`);
+
+      return {
+        id: education.id,
+        no: education.no || education.id,
+        title: education.education_name,
+        educationName: education.education_name || '교육명 없음',
+        educationType: education.education_type || '온라인',
+        assignee: education.assignee || '미정',
+        team: education.team || '보안팀', // DB에서 팀 정보 로드
+        executionDate: education.execution_date || new Date().toISOString().split('T')[0],
+        attendeeCount: education.participant_count || 0,
+        participantCount: education.participant_count || 0,
+        status: (education.status as SecurityEducationStatus) || '계획',
+        description: education.description || '',
+        location: education.location || '',
+        code: convertedCode,
+        registrationDate: education.registration_date || new Date().toISOString().split('T')[0],
+        achievements: education.achievements || '', // 성과
+        feedback: education.feedback || '', // 교육소감
+        improvementPoints: education.improvement_points || '',
+        improvements: education.improvement_points || '', // improvement_points에서 개선사항 로드
+        effectivenessScore: education.effectiveness_score || 0,
+        completionRate: education.completion_rate || 0,
+        satisfactionScore: education.satisfaction_score || 0
+      };
+    });
 
     console.log('🟡 변환된 tasks 개수:', convertedTasks.length);
-    console.log('🟡 변환된 tasks:', convertedTasks);
+    console.log('🟡 변환된 첫번째 task.code:', convertedTasks[0]?.code);
     setTasks(convertedTasks);
   }, [securityEducations]);
 
@@ -2575,54 +2636,47 @@ export default function SecurityEducationManagement() {
   const [changeLogRowsPerPage, setChangeLogRowsPerPage] = useState(10);
   const [changeLogGoToPage, setChangeLogGoToPage] = useState('');
 
-  // 변경로그 상태 - 초기 데이터는 기존 샘플 데이터 사용
-  const [changeLogs, setChangeLogs] = useState<ChangeLog[]>([
-    {
-      id: 1,
-      dateTime: '2024-12-15 14:30',
-      team: '개발팀',
-      user: '김철수',
-      action: '업무 상태 변경',
-      target: 'TASK-24-010',
-      description: '웹사이트 리뉴얼 프로젝트 상태를 "진행"에서 "완료"로 변경'
-    },
-    {
-      id: 2,
-      dateTime: '2024-12-14 10:15',
-      team: '기획팀',
-      user: '이영희',
-      action: '새 업무 생성',
-      target: 'TASK-24-011',
-      description: '모바일 앱 UI/UX 개선 업무 신규 등록'
-    },
-    {
-      id: 3,
-      dateTime: '2024-12-13 16:45',
-      team: '마케팅팀',
-      user: '박민수',
-      action: '담당자 변경',
-      target: 'TASK-24-009',
-      description: '마케팅 캠페인 기획 담당자를 "최지연"에서 "박민수"로 변경'
-    },
-    {
-      id: 4,
-      dateTime: '2024-12-12 09:30',
-      team: '디자인팀',
-      user: '강민정',
-      action: '완료일 수정',
-      target: 'TASK-24-008',
-      description: '로고 디자인 작업의 완료 예정일을 2024-12-20으로 수정'
-    },
-    {
-      id: 5,
-      dateTime: '2024-12-11 15:20',
-      team: '개발팀',
-      user: '정현우',
-      action: '업무 삭제',
-      target: 'TASK-24-007',
-      description: '중복된 데이터베이스 최적화 업무 삭제'
+  // 변경로그 Hook (전체 보안교육의 변경 이력)
+  const { logs: dbChangeLogs, loading: changeLogsLoading, fetchChangeLogs } = useSupabaseChangeLog('main_education');
+
+  // 변경로그탭이 활성화될 때 데이터 강제 새로고침
+  React.useEffect(() => {
+    if (value === 4 && fetchChangeLogs) {
+      console.log('🔄 변경로그탭 활성화 - 데이터 새로고침');
+      fetchChangeLogs();
     }
-  ]);
+  }, [value, fetchChangeLogs]);
+
+  // DB 변경로그를 UI 형식으로 변환
+  const changeLogs = React.useMemo(() => {
+    return dbChangeLogs.map((log: ChangeLogData) => {
+      // record_id로 해당 교육 찾기 (record_id는 코드로 저장되어 있음)
+      const education = tasks.find(t => t.code === log.record_id);
+
+      const date = new Date(log.created_at);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hour = String(date.getHours()).padStart(2, '0');
+      const minute = String(date.getMinutes()).padStart(2, '0');
+      const formattedDateTime = `${year}.${month}.${day} ${hour}:${minute}`;
+
+      return {
+        id: log.id,
+        dateTime: formattedDateTime,
+        title: log.title || education?.educationName || log.record_id,
+        code: log.record_id,
+        action: log.action_type,
+        location: log.description.includes('개요탭') ? '개요탭' : log.description.includes('데이터탭') ? '데이터탭' : '-',
+        changedField: log.changed_field || '-',
+        beforeValue: log.before_value || '-',
+        afterValue: log.after_value || '-',
+        description: log.description,
+        team: log.team || log.user_department || '-',
+        user: log.user_name
+      };
+    });
+  }, [dbChangeLogs, tasks]);
 
   // 필터 상태
   const [selectedYear, setSelectedYear] = useState('전체');
@@ -2639,22 +2693,55 @@ export default function SecurityEducationManagement() {
   }
 
   // 변경로그 추가 함수
-  const addChangeLog = (action: string, target: string, description: string, team: string = '시스템') => {
-    const now = new Date();
-    const dateTime = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const addChangeLog = useCallback(
+    async (
+      action: string,
+      target: string,
+      description: string,
+      team: string = '시스템',
+      beforeValue?: string,
+      afterValue?: string,
+      changedField?: string,
+      title?: string
+    ) => {
+      try {
+        const userName = currentUser?.user_name || currentUser?.name || user?.name || '시스템';
 
-    const newLog: ChangeLog = {
-      id: Math.max(...changeLogs.map((log) => log.id), 0) + 1,
-      dateTime,
-      team,
-      user: '시스템', // 임시로 시스템으로 설정, 나중에 실제 사용자 정보로 교체 가능
-      action,
-      target,
-      description
-    };
+        const logData = {
+          page: 'main_education',
+          record_id: target, // 코드를 record_id로 사용
+          action_type: action,
+          description: description,
+          before_value: beforeValue || null,
+          after_value: afterValue || null,
+          changed_field: changedField || null,
+          title: title || null,
+          user_name: userName,
+          team: currentUser?.department || team, // 로그인한 사용자의 부서
+          user_department: currentUser?.department,
+          user_position: currentUser?.position,
+          user_profile_image: currentUser?.profile_image_url,
+          created_at: new Date().toISOString()
+        };
 
-    setChangeLogs((prev) => [newLog, ...prev]); // 최신순으로 정렬
-  };
+        console.log('📝 변경로그 저장 시도:', logData);
+
+        // common_log_data에 직접 저장
+        const supabase = createClient();
+        const { data, error } = await supabase.from('common_log_data').insert(logData).select();
+
+        if (error) {
+          console.error('❌ 변경로그 저장 실패:', error);
+        } else {
+          console.log('✅ 변경로그 저장 성공:', data);
+          await fetchChangeLogs();
+        }
+      } catch (err) {
+        console.error('❌ 변경로그 저장 중 오류:', err);
+      }
+    },
+    [currentUser, user, fetchChangeLogs]
+  );
 
   // 카드 클릭 핸들러
   const handleCardClick = (task: SecurityEducationTableData) => {

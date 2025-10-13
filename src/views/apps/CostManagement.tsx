@@ -51,6 +51,11 @@ import { CostRecord } from 'types/cost';
 import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
 import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
+import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
+import { ChangeLogData } from 'types/changelog';
+import { createClient } from '@/lib/supabase/client';
+import { useSession } from 'next-auth/react';
+import useUser from 'hooks/useUser';
 
 // Icons
 import { TableDocument, Chart, Calendar, Element, DocumentText } from '@wandersonalwes/iconsax-react';
@@ -59,13 +64,18 @@ import { TableDocument, Chart, Calendar, Element, DocumentText } from '@wanderso
 
 // 변경로그 타입 정의
 interface ChangeLog {
-  id: number;
+  id: string;
   dateTime: string;
+  title: string;
+  code: string;
+  action: string;
+  location: string;
+  changedField?: string;
+  beforeValue?: string;
+  afterValue?: string;
+  description: string;
   team: string;
   user: string;
-  action: string;
-  target: string;
-  description: string;
 }
 
 interface TabPanelProps {
@@ -106,7 +116,16 @@ interface CostKanbanViewProps {
   selectedAssignee: string;
   costs: CostRecord[];
   updateCostRecord: (id: string, updates: Partial<CostRecord>) => Promise<CostRecord>;
-  addChangeLog: (action: string, target: string, description: string, team: string, user: string) => void;
+  addChangeLog: (
+    action: string,
+    target: string,
+    description: string,
+    team?: string,
+    beforeValue?: string,
+    afterValue?: string,
+    changedField?: string,
+    title?: string
+  ) => void;
   checkCodeExists: (code: string, excludeId?: number) => Promise<boolean>;
   assigneeList?: any[];
 }
@@ -243,8 +262,8 @@ function CostKanbanView({
         // 변경로그 추가
         const costCode = currentCost.code || `COST-${costId}`;
         const content = currentCost.content || '비용내용 없음';
-        const description = `${content} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
-        addChangeLog('비용 상태 변경', costCode, description, currentCost.team || '미분류', currentCost.assignee || '시스템');
+        const description = `비용관리 ${content}(${costCode}) 정보의 개요탭 상태가 ${oldStatus} → ${newStatus} 로 수정 되었습니다.`;
+        await addChangeLog('수정', costCode, description, currentCost.team || '미분류', oldStatus, newStatus, '상태', content);
       } catch (error) {
         console.error('드래그 상태 업데이트 실패:', error);
       }
@@ -1868,13 +1887,17 @@ function CostChangeLogView({
           <TableHead>
             <TableRow sx={{ backgroundColor: 'grey.50' }}>
               <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 130 }}>변경시간</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 100 }}>코드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 180 }}>비용내용</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 120 }}>변경분류</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 280 }}>변경 세부내용</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 110 }}>변경시간</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 150 }}>제목</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 150 }}>코드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경분류</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경위치</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경필드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 120 }}>변경전</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 120 }}>변경후</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 330 }}>변경 세부내용</TableCell>
               <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>담당자</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -1892,40 +1915,50 @@ function CostChangeLogView({
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.secondary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
                     {log.dateTime}
                   </Typography>
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                    {log.target}
+                    {log.title}
                   </Typography>
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                    {(() => {
-                      const cost = costs.find((cost) => cost.code === log.target);
-                      return cost?.content || log.description.split(' - ')[0] || '비용내용 없음';
-                    })()}
+                    {log.code}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontSize: '13px',
-                      fontWeight: 500
-                    }}
-                  >
+                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
                     {log.action}
                   </Typography>
                 </TableCell>
                 <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                    {log.location}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                    {log.changedField}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                    {log.beforeValue}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                    {log.afterValue}
+                  </Typography>
+                </TableCell>
+                <TableCell>
                   <Typography
                     variant="body2"
                     sx={{
                       fontSize: '13px',
-                      color: 'text.secondary',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'normal',
@@ -1940,17 +1973,9 @@ function CostChangeLogView({
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Chip
-                    label={log.team}
-                    size="small"
-                    sx={{
-                      height: 22,
-                      fontSize: '13px',
-                      backgroundColor: getTeamColor(log.team),
-                      color: '#333333',
-                      fontWeight: 500
-                    }}
-                  />
+                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                    {log.team}
+                  </Typography>
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" sx={{ fontSize: '13px' }}>
@@ -2110,6 +2135,13 @@ export default function CostManagement() {
   const { departments, fetchDepartments } = useSupabaseDepartmentManagement();
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
+  // Supabase 변경로그 연동
+  const { data: session } = useSession();
+  const user = useUser();
+  const userName = user?.name || session?.user?.name || '시스템';
+  const currentUser = users.find((u) => u.email === session?.user?.email);
+  const { logs: changeLogData, fetchChangeLogs } = useSupabaseChangeLog('main_cost');
+
   // 부서 데이터 로드
   React.useEffect(() => {
     fetchDepartments();
@@ -2171,36 +2203,44 @@ export default function CostManagement() {
   const [changeLogRowsPerPage, setChangeLogRowsPerPage] = useState(10);
   const [changeLogGoToPage, setChangeLogGoToPage] = useState('');
 
-  // 변경로그 상태 - 초기 데이터
-  const [changeLogs, setChangeLogs] = useState<ChangeLog[]>([
-    {
-      id: 1,
-      dateTime: '2024-12-15 14:30',
-      team: 'IT팀',
-      user: '김철수',
-      action: '비용 상태 변경',
-      target: 'COST-24-001',
-      description: '프로젝트 관리 소프트웨어 라이선스 상태를 "진행"에서 "완료"로 변경'
-    },
-    {
-      id: 2,
-      dateTime: '2024-12-14 10:15',
-      team: '마케팅팀',
-      user: '박영희',
-      action: '새 비용 생성',
-      target: 'COST-24-002',
-      description: '신제품 론칭 이벤트 비용 신규 등록 - 5,000,000원'
-    },
-    {
-      id: 3,
-      dateTime: '2024-12-13 16:45',
-      team: '영업팀',
-      user: '이준호',
-      action: '비용 정보 수정',
-      target: 'COST-24-003',
-      description: '클라우드 서버 비용 - 금액: "3,000,000원" → "3,500,000원"'
+  // Supabase 데이터를 ChangeLog 형식으로 변환
+  const changeLogs = React.useMemo<ChangeLog[]>(() => {
+    if (!changeLogData || !Array.isArray(changeLogData)) {
+      return [];
     }
-  ]);
+    return changeLogData.map((log) => ({
+      id: log.id,
+      dateTime: new Date(log.created_at).toLocaleString('ko-KR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }),
+      title: log.title || log.description.split(' ')[1]?.split('(')[0] || '-',
+      code: log.record_id,
+      action: log.action_type,
+      location: log.description.includes('개요탭') ? '개요탭' : log.description.includes('데이터탭') ? '데이터탭' : '-',
+      changedField: log.changed_field || '-',
+      beforeValue: log.before_value || '-',
+      afterValue: log.after_value || '-',
+      description: log.description,
+      team: log.team || '-',
+      user: log.user_name
+    }));
+  }, [changeLogData]);
+
+  // 변경로그 데이터 로드
+  useEffect(() => {
+    console.log('📋 비용관리 변경로그 데이터 로드 시작');
+    fetchChangeLogs();
+  }, [fetchChangeLogs]);
+
+  useEffect(() => {
+    console.log('📊 Cost changeLogData:', changeLogData);
+    console.log('📊 Cost changeLogs (변환된 데이터):', changeLogs);
+  }, [changeLogData, changeLogs]);
 
   // 필터 상태
   const [selectedTeam, setSelectedTeam] = useState('전체');
@@ -2215,23 +2255,47 @@ export default function CostManagement() {
     yearOptions.push(i.toString());
   }
 
-  // 변경로그 추가 함수
-  const addChangeLog = (action: string, target: string, description: string, team: string = '시스템', user: string = '시스템') => {
-    const now = new Date();
-    const dateTime = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  // 변경로그 추가 함수 (8 파라미터)
+  const addChangeLog = React.useCallback(
+    async (
+      action: string,
+      target: string,
+      description: string,
+      team: string = '시스템',
+      beforeValue?: string,
+      afterValue?: string,
+      changedField?: string,
+      title?: string
+    ) => {
+      const logData = {
+        page: 'main_cost',
+        record_id: target,
+        action_type: action,
+        description: description,
+        before_value: beforeValue || null,
+        after_value: afterValue || null,
+        changed_field: changedField || null,
+        title: title || null,
+        user_name: userName,
+        team: currentUser?.department || team,
+        user_department: currentUser?.department,
+        user_position: currentUser?.position,
+        user_profile_image: currentUser?.profile_image_url,
+        created_at: new Date().toISOString()
+      };
 
-    const newLog: ChangeLog = {
-      id: Math.max(...changeLogs.map((log) => log.id), 0) + 1,
-      dateTime,
-      team,
-      user,
-      action,
-      target,
-      description
-    };
+      const supabase = createClient();
+      const { data, error } = await supabase.from('common_log_data').insert(logData).select();
 
-    setChangeLogs((prev) => [newLog, ...prev]);
-  };
+      if (error) {
+        console.error('❌ 변경로그 추가 실패:', error);
+      } else {
+        console.log('✅ 변경로그 추가 성공:', data);
+        await fetchChangeLogs();
+      }
+    },
+    [currentUser, user, userName, fetchChangeLogs]
+  );
 
   // 비용 레코드 업데이트 함수 (칸반 뷰용)
   const updateCostRecord = async (id: string, updates: Partial<CostRecord>): Promise<CostRecord> => {
@@ -2629,6 +2693,7 @@ export default function CostManagement() {
                     }
                   }}
                   checkCodeExists={checkCodeExists}
+                  addChangeLog={addChangeLog}
                   externalDialogControl={{
                     open: editDialog.open,
                     recordId: editDialog.recordId,

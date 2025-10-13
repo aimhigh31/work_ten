@@ -70,7 +70,16 @@ interface TaskTableProps {
   selectedAssignee?: string;
   tasks?: TaskTableData[];
   setTasks?: React.Dispatch<React.SetStateAction<TaskTableData[]>>;
-  addChangeLog?: (action: string, target: string, description: string, team?: string) => void;
+  addChangeLog?: (
+    action: string,
+    target: string,
+    description: string,
+    team?: string,
+    beforeValue?: string,
+    afterValue?: string,
+    changedField?: string,
+    title?: string
+  ) => void;
 }
 
 export default function TaskTable({
@@ -269,22 +278,42 @@ export default function TaskTable({
   const handleDeleteSelected = async () => {
     if (selected.length === 0) return;
 
-    const deletedTasks = data.filter((task) => selected.includes(task.id));
+    const confirmDelete = window.confirm(`선택한 ${selected.length}개의 업무를 삭제하시겠습니까?`);
+    if (!confirmDelete) return;
 
-    // 각 선택된 업무를 Supabase에서 삭제 (is_active = false)
-    for (const task of deletedTasks) {
-      const supabaseTask = supabaseTasks.find(t => parseInt(t.id.split('-')[0], 16) === task.id);
-      if (supabaseTask) {
-        await deleteTask(supabaseTask.id);
+    try {
+      const deletedTasks = data.filter((task) => selected.includes(task.id));
 
-        // 변경로그 추가
-        if (addChangeLog) {
-          addChangeLog('업무 삭제', task.code || `TASK-${task.id}`, `${task.workContent || '업무'} 삭제`, task.team || '미분류');
+      // 각 선택된 업무를 Supabase에서 삭제 (is_active = false)
+      for (const task of deletedTasks) {
+        const supabaseTask = supabaseTasks.find(t => parseInt(t.id.split('-')[0], 16) === task.id);
+        if (supabaseTask) {
+          await deleteTask(supabaseTask.id);
+
+          // 변경로그 추가
+          if (addChangeLog) {
+            const taskTitle = task.workContent || '업무';
+            const codeToUse = task.code || `TASK-${task.id}`;
+            await addChangeLog(
+              '삭제',
+              codeToUse,
+              `업무관리 ${taskTitle}(${codeToUse}) 정보의 데이터탭 데이터가 삭제 되었습니다.`,
+              task.team || '시스템',
+              taskTitle,
+              '',
+              '데이터탭',
+              taskTitle
+            );
+          }
         }
       }
-    }
 
-    setSelected([]);
+      setSelected([]);
+      alert('선택한 업무가 삭제되었습니다.');
+    } catch (error) {
+      console.error('삭제 오류:', error);
+      alert('삭제 중 오류가 발생했습니다.');
+    }
   };
 
   // 편집 다이얼로그 닫기
@@ -302,6 +331,9 @@ export default function TaskTable({
     const supabaseTask = supabaseTasks.find(t => parseInt(t.id.split('-')[0], 16) === updatedTask.id);
 
     if (supabaseTask) {
+      // 원본 데이터 찾기 (변경 전 값 확인용)
+      const originalTask = data.find(t => t.id === updatedTask.id);
+
       // 기존 Task 업데이트
       const success = await updateTask(supabaseTask.id, {
         start_date: updatedTask.startDate || null,
@@ -315,13 +347,58 @@ export default function TaskTable({
         status: updatedTask.status
       });
 
-      if (success && addChangeLog) {
-        addChangeLog(
-          '업무 정보 수정',
-          updatedTask.code,
-          `${updatedTask.workContent || '업무'} 수정`,
-          updatedTask.team || '미분류'
-        );
+      if (success && addChangeLog && originalTask) {
+        // 필드별 변경 추적
+        const fieldNameMap: Record<string, string> = {
+          workContent: '제목',
+          status: '상태',
+          assignee: '담당자',
+          completedDate: '완료일',
+          startDate: '시작일',
+          team: '팀',
+          department: '부서',
+          progress: '진행률',
+          description: '설명'
+        };
+
+        // 변경된 필드 찾기
+        const changes: Array<{ field: string; fieldKorean: string; before: any; after: any }> = [];
+
+        Object.keys(fieldNameMap).forEach((field) => {
+          const beforeVal = (originalTask as any)[field];
+          const afterVal = (updatedTask as any)[field];
+
+          if (beforeVal !== afterVal) {
+            changes.push({
+              field,
+              fieldKorean: fieldNameMap[field],
+              before: beforeVal || '',
+              after: afterVal || ''
+            });
+          }
+        });
+
+        console.log('🔍 변경 감지된 필드들:', changes);
+
+        const taskTitle = updatedTask.workContent || '업무';
+
+        // 변경된 필드가 있으면 각각 로그 기록
+        if (changes.length > 0) {
+          for (const change of changes) {
+            const description = `업무관리 ${taskTitle}(${updatedTask.code}) 정보의 데이터탭 ${change.fieldKorean}이 ${change.before} → ${change.after} 로 수정 되었습니다.`;
+
+            await addChangeLog(
+              '수정',
+              updatedTask.code,
+              description,
+              updatedTask.team || '시스템',
+              String(change.before),
+              String(change.after),
+              change.fieldKorean,
+              taskTitle
+            );
+          }
+        }
       }
 
       console.log('✅ 기존 Task 업데이트 완료');
@@ -381,11 +458,16 @@ export default function TaskTable({
 
       if (result) {
         if (addChangeLog) {
-          addChangeLog(
-            '새 업무 생성',
+          const taskTitle = updatedTask.workContent || '업무';
+          await addChangeLog(
+            '추가',
             newTaskCode,
-            `${updatedTask.workContent || '새 업무'} 생성`,
-            updatedTask.team || '미분류'
+            `업무관리 ${taskTitle}(${newTaskCode}) 정보의 데이터탭 데이터가 추가 되었습니다.`,
+            updatedTask.team || '시스템',
+            '',
+            taskTitle,
+            '데이터탭',
+            taskTitle
           );
         }
         console.log('✅ 새 Task 추가 완료:', newTaskCode);

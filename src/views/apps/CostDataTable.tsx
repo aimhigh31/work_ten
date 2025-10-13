@@ -466,6 +466,16 @@ interface CostDataTableProps {
   updateCostRecord?: (id: string, updates: Partial<CostRecord>) => Promise<CostRecord>;
   deleteCostRecord?: (id: string) => Promise<void>;
   checkCodeExists?: (code: string) => Promise<boolean>;
+  addChangeLog?: (
+    action: string,
+    target: string,
+    description: string,
+    team?: string,
+    beforeValue?: string,
+    afterValue?: string,
+    changedField?: string,
+    title?: string
+  ) => void;
   editRequest?: {
     recordId?: number;
     shouldEdit: boolean;
@@ -489,6 +499,7 @@ export default function CostDataTable({
   updateCostRecord,
   deleteCostRecord,
   checkCodeExists,
+  addChangeLog,
   editRequest,
   onEditComplete,
   externalDialogControl
@@ -1037,6 +1048,20 @@ export default function CostDataTable({
           const savedCost = await createCostRecord(newRecordData);
           console.log('새 레코드가 추가되었습니다.');
 
+          // 변경로그 추가
+          if (savedCost && addChangeLog) {
+            await addChangeLog(
+              '추가',
+              savedCost.code,
+              `비용관리 ${savedCost.content}(${savedCost.code}) 정보의 개요탭 데이터가 추가 되었습니다.`,
+              savedCost.team || '미분류',
+              '',
+              `${savedCost.content} - ${Number(savedCost.amount).toLocaleString()}원`,
+              '개요탭',
+              savedCost.content
+            );
+          }
+
           // Supabase에 금액 데이터 저장 (data_relation.md 패턴)
           if (savedCost && amountItems.length > 0) {
             console.log('💾 금액 데이터 저장 시작, cost_id:', savedCost.id);
@@ -1083,6 +1108,8 @@ export default function CostDataTable({
         }
       } else if (dialog.mode === 'edit' && dialog.recordId) {
         // 기존 레코드 수정
+        const originalCost = costs.find((c) => c.id === dialog.recordId?.toString());
+
         const updates = {
           title: overviewData.title,
           content: overviewData.content,
@@ -1102,6 +1129,130 @@ export default function CostDataTable({
         if (updateCostRecord) {
           await updateCostRecord(dialog.recordId.toString(), updates);
           console.log('레코드가 수정되었습니다.');
+
+          // 변경로그 추가 (필드별)
+          if (originalCost && addChangeLog) {
+            const costCode = overviewData.code;
+            const costTitle = overviewData.content;
+
+            // 각 필드별 변경사항 추적
+            if (originalCost.title !== overviewData.title) {
+              await addChangeLog(
+                '수정',
+                costCode,
+                `비용관리 ${costTitle}(${costCode}) 정보의 개요탭 제목이 ${originalCost.title || ''} → ${overviewData.title || ''} 로 수정 되었습니다.`,
+                overviewData.team || '미분류',
+                originalCost.title || '',
+                overviewData.title || '',
+                '제목',
+                costTitle
+              );
+            }
+
+            if (originalCost.content !== overviewData.content) {
+              await addChangeLog(
+                '수정',
+                costCode,
+                `비용관리 ${costTitle}(${costCode}) 정보의 개요탭 비용내용이 ${originalCost.content || ''} → ${overviewData.content || ''} 로 수정 되었습니다.`,
+                overviewData.team || '미분류',
+                originalCost.content || '',
+                overviewData.content || '',
+                '비용내용',
+                costTitle
+              );
+            }
+
+            if (originalCost.costType !== overviewData.costType) {
+              await addChangeLog(
+                '수정',
+                costCode,
+                `비용관리 ${costTitle}(${costCode}) 정보의 개요탭 비용유형이 ${originalCost.costType || ''} → ${overviewData.costType || ''} 로 수정 되었습니다.`,
+                overviewData.team || '미분류',
+                originalCost.costType || '',
+                overviewData.costType || '',
+                '비용유형',
+                costTitle
+              );
+            }
+
+            if (originalCost.team !== overviewData.team) {
+              await addChangeLog(
+                '수정',
+                costCode,
+                `비용관리 ${costTitle}(${costCode}) 정보의 개요탭 팀이 ${originalCost.team || ''} → ${overviewData.team || ''} 로 수정 되었습니다.`,
+                overviewData.team || '미분류',
+                originalCost.team || '',
+                overviewData.team || '',
+                '팀',
+                costTitle
+              );
+            }
+
+            if (originalCost.assignee !== overviewData.assignee) {
+              await addChangeLog(
+                '수정',
+                costCode,
+                `비용관리 ${costTitle}(${costCode}) 정보의 개요탭 담당자가 ${originalCost.assignee || ''} → ${overviewData.assignee || ''} 로 수정 되었습니다.`,
+                overviewData.team || '미분류',
+                originalCost.assignee || '',
+                overviewData.assignee || '',
+                '담당자',
+                costTitle
+              );
+            }
+
+            if (originalCost.status !== overviewData.status) {
+              await addChangeLog(
+                '수정',
+                costCode,
+                `비용관리 ${costTitle}(${costCode}) 정보의 개요탭 상태가 ${originalCost.status || ''} → ${overviewData.status || ''} 로 수정 되었습니다.`,
+                overviewData.team || '미분류',
+                originalCost.status || '',
+                overviewData.status || '',
+                '상태',
+                costTitle
+              );
+            }
+
+            if (originalCost.startDate !== overviewData.startDate) {
+              await addChangeLog(
+                '수정',
+                costCode,
+                `비용관리 ${costTitle}(${costCode}) 정보의 개요탭 시작일이 ${originalCost.startDate || ''} → ${overviewData.startDate || ''} 로 수정 되었습니다.`,
+                overviewData.team || '미분류',
+                originalCost.startDate || '',
+                overviewData.startDate || '',
+                '시작일',
+                costTitle
+              );
+            }
+
+            if (originalCost.completionDate !== overviewData.completionDate) {
+              await addChangeLog(
+                '수정',
+                costCode,
+                `비용관리 ${costTitle}(${costCode}) 정보의 개요탭 완료일이 ${originalCost.completionDate || ''} → ${overviewData.completionDate || ''} 로 수정 되었습니다.`,
+                overviewData.team || '미분류',
+                originalCost.completionDate || '',
+                overviewData.completionDate || '',
+                '완료일',
+                costTitle
+              );
+            }
+
+            if (originalCost.amount !== totalAmount) {
+              await addChangeLog(
+                '수정',
+                costCode,
+                `비용관리 ${costTitle}(${costCode}) 정보의 개요탭 금액이 ${originalCost.amount || ''} → ${totalAmount || ''} 로 수정 되었습니다.`,
+                overviewData.team || '미분류',
+                String(originalCost.amount || ''),
+                String(totalAmount || ''),
+                '금액',
+                costTitle
+              );
+            }
+          }
 
           // Supabase에 금액 데이터 저장 (data_relation.md 패턴 - 삭제 후 재저장)
           console.log('💾 금액 데이터 저장 시작, cost_id:', dialog.recordId);
@@ -1195,6 +1346,9 @@ export default function CostDataTable({
   // 선택된 행 삭제
   const handleDeleteRecords = async () => {
     try {
+      // 삭제될 레코드들의 정보를 먼저 저장
+      const recordsToDelete = costs.filter((record) => selectedRecords.includes(Number(record.id)));
+
       if (deleteCostRecord) {
         // Supabase API를 통해 삭제
         for (const recordId of selectedRecords) {
@@ -1204,6 +1358,24 @@ export default function CostDataTable({
       } else {
         // Fallback: 직접 상태 업데이트
         setCosts((prev) => prev.filter((record) => !selectedRecords.includes(Number(record.id))));
+      }
+
+      // 각 레코드에 대해 변경로그 추가
+      if (addChangeLog) {
+        for (const record of recordsToDelete) {
+          const costCode = record.code || `COST-${record.id}`;
+          const costTitle = record.content || '비용';
+          await addChangeLog(
+            '삭제',
+            costCode,
+            `비용관리 ${costTitle}(${costCode}) 정보의 데이터탭 데이터가 삭제 되었습니다.`,
+            record.team || '미분류',
+            `${record.content} - ${Number(record.amount).toLocaleString()}원`,
+            '',
+            '데이터탭',
+            costTitle
+          );
+        }
       }
 
       setSelectedRecords([]);

@@ -73,6 +73,9 @@ import { useSupabaseDepartments } from '../hooks/useSupabaseDepartments';
 import useIdGenerator from '../hooks/useIdGenerator';
 import useUser from '../hooks/useUser';
 import { supabase } from '../lib/supabase';
+import { useSupabaseChangeLog } from '../hooks/useSupabaseChangeLog';
+import { CreateChangeLogInput, CHANGE_LOG_ACTIONS, ChangeLogMetadata } from '../types/changelog';
+import { generateChangeDescription, safeJsonStringify } from '../utils/changeLogHelper';
 
 // 데이터 변환 유틸리티 함수들
 const convertTableDataToRecord = (tableData: SecurityEducationTableData): SecurityEducationRecord => {
@@ -2685,7 +2688,13 @@ interface Material {
   uploadDate: string;
 }
 
-const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | string; currentUser?: UserProfile | null }) => {
+interface MaterialTabProps {
+  recordId?: number | string;
+  currentUser?: UserProfile | null;
+  onFileChange?: (action: string, fileName: string, fileData?: any) => void;
+}
+
+const MaterialTab = memo(({ recordId, currentUser, onFileChange }: MaterialTabProps) => {
   // 파일 관리 훅
   const {
     files,
@@ -2726,6 +2735,9 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
 
         if (!result.success) {
           alert(`파일 업로드 실패: ${result.error}`);
+        } else {
+          // 파일 업로드 성공 시 로깅
+          onFileChange?.('FILE_UPLOAD', file.name, { fileType: file.type, fileSize: file.size });
         }
       }
 
@@ -2734,7 +2746,7 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
         fileInputRef.current.value = '';
       }
     },
-    [recordId, uploadFile, currentUser]
+    [recordId, uploadFile, currentUser, onFileChange]
   );
 
   const formatFileSize = (bytes: number): string => {
@@ -2768,18 +2780,24 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
 
   const handleSaveEditMaterial = useCallback(async () => {
     if (editingMaterialId && editingMaterialText.trim()) {
+      // 기존 파일명 찾기
+      const originalFile = files.find(f => f.id === editingMaterialId);
+      const originalFileName = originalFile?.file_name || '';
+
       const result = await updateFile(editingMaterialId, {
         file_name: editingMaterialText.trim()
       });
 
       if (result.success) {
+        // 파일명 수정 성공 시 로깅
+        onFileChange?.('FILE_UPDATE', editingMaterialText.trim(), { oldFileName: originalFileName });
         setEditingMaterialId(null);
         setEditingMaterialText('');
       } else {
         alert(`파일명 수정 실패: ${result.error}`);
       }
     }
-  }, [editingMaterialId, editingMaterialText, updateFile]);
+  }, [editingMaterialId, editingMaterialText, updateFile, files, onFileChange]);
 
   const handleCancelEditMaterial = useCallback(() => {
     setEditingMaterialId(null);
@@ -2790,12 +2808,19 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
     async (materialId: string) => {
       if (!confirm('파일을 삭제하시겠습니까?')) return;
 
+      // 삭제할 파일 정보 찾기
+      const fileToDelete = files.find(f => f.id === materialId);
+      const fileName = fileToDelete?.file_name || '';
+
       const result = await deleteFile(materialId);
       if (!result.success) {
         alert(`파일 삭제 실패: ${result.error}`);
+      } else {
+        // 파일 삭제 성공 시 로깅
+        onFileChange?.('FILE_DELETE', fileName);
       }
     },
-    [deleteFile]
+    [deleteFile, files, onFileChange]
   );
 
   const handleDownloadMaterial = useCallback((fileData: FileData) => {
@@ -3143,6 +3168,26 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
   // 유효성 검사 에러
   const [validationError, setValidationError] = useState<string>('');
 
+  // 변경로그 관련 state (지연 저장 방식)
+  const [pendingChangeLogs, setPendingChangeLogs] = useState<CreateChangeLogInput[]>([]);
+
+  // 초기 데이터 스냅샷 (변경 감지용) - 다이얼로그를 열 때 저장
+  const [initialDataSnapshot, setInitialDataSnapshot] = useState<SecurityEducationRecord | null>(null);
+
+  // 다이얼로그를 열 때 초기 데이터 스냅샷 저장
+  useEffect(() => {
+    if (open && data && mode === 'edit') {
+      console.log('📸 초기 데이터 스냅샷 저장:', data);
+      setInitialDataSnapshot({ ...data });
+    } else if (open && mode === 'add') {
+      console.log('📸 신규 모드: 스냅샷 없음');
+      setInitialDataSnapshot(null);
+    }
+  }, [open, data, mode]);
+
+  // 변경로그 Hook
+  const { addChangeLog } = useSupabaseChangeLog('security_education', data?.id);
+
   // Supabase feedbacks를 RecordTab 형식으로 변환하고 pendingComments와 합치기
   const comments = useMemo(() => {
     // 기존 DB의 feedbacks (삭제된 것 제외)
@@ -3334,6 +3379,37 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
     [educationReport, data?.id]
   );
 
+  // 변경로그 큐에 추가하는 헬퍼 함수
+  const queueChangeLog = useCallback((
+    action: string,
+    beforeValue?: any,
+    afterValue?: any,
+    metadata?: ChangeLogMetadata
+  ) => {
+    const userName = currentUser?.user_name || user?.name || '알 수 없음';
+
+    const description = generateChangeDescription(action, metadata || {}, userName);
+
+    const logInput: CreateChangeLogInput = {
+      page: 'security_education',
+      record_id: String(data?.id || ''),
+      action_type: action,
+      description: description,
+      before_value: beforeValue ? safeJsonStringify(beforeValue) : undefined,
+      after_value: afterValue ? safeJsonStringify(afterValue) : undefined,
+      user_id: currentUser?.id,
+      user_name: userName,
+      team: currentUser?.department || user?.department,
+      user_department: currentUser?.department || user?.department,
+      user_position: currentUser?.position,
+      user_profile_image: currentUser?.profile_image_url,
+      metadata: metadata
+    };
+
+    setPendingChangeLogs(prev => [...prev, logInput]);
+    console.log('📝 변경로그 큐에 추가:', logInput);
+  }, [data?.id, currentUser, user]);
+
   // 기록 탭 핸들러들
   const handleAddComment = useCallback(() => {
     if (!newComment.trim()) return;
@@ -3359,7 +3435,15 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
 
     setPendingComments(prev => [tempComment, ...prev]);
     setNewComment('');
-  }, [newComment, currentUser, user]);
+
+    // 변경로그 추가
+    queueChangeLog(
+      CHANGE_LOG_ACTIONS.COMMENT_ADD,
+      null,
+      newComment,
+      { changeType: 'create' }
+    );
+  }, [newComment, currentUser, user, queueChangeLog]);
 
   const handleEditComment = useCallback((commentId: string, content: string) => {
     setEditingCommentId(commentId);
@@ -3368,6 +3452,16 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
 
   const handleSaveEditComment = useCallback(() => {
     if (!editingCommentText.trim() || !editingCommentId) return;
+
+    // 기존 내용 찾기 (변경로그용)
+    let beforeContent = '';
+    if (editingCommentId.startsWith('temp_')) {
+      const tempComment = pendingComments.find(c => c.id === editingCommentId);
+      beforeContent = tempComment?.content || '';
+    } else {
+      const existingComment = comments.find(c => c.id === editingCommentId && !c.isNew);
+      beforeContent = existingComment?.content || '';
+    }
 
     // 임시 저장된 기록인지 확인 (ID가 temp_로 시작)
     if (editingCommentId.startsWith('temp_')) {
@@ -3387,9 +3481,17 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
       }));
     }
 
+    // 변경로그 추가
+    queueChangeLog(
+      CHANGE_LOG_ACTIONS.COMMENT_UPDATE,
+      beforeContent,
+      editingCommentText,
+      { changeType: 'update' }
+    );
+
     setEditingCommentId(null);
     setEditingCommentText('');
-  }, [editingCommentText, editingCommentId]);
+  }, [editingCommentText, editingCommentId, pendingComments, comments, queueChangeLog]);
 
   const handleCancelEditComment = useCallback(() => {
     setEditingCommentId(null);
@@ -3397,6 +3499,16 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
   }, []);
 
   const handleDeleteComment = useCallback((commentId: string) => {
+    // 삭제할 내용 찾기 (변경로그용)
+    let deletedContent = '';
+    if (commentId.startsWith('temp_')) {
+      const tempComment = pendingComments.find(c => c.id === commentId);
+      deletedContent = tempComment?.content || '';
+    } else {
+      const existingComment = comments.find(c => c.id === commentId && !c.isNew);
+      deletedContent = existingComment?.content || '';
+    }
+
     // 임시 저장된 기록인지 확인 (ID가 temp_로 시작)
     if (commentId.startsWith('temp_')) {
       // pendingComments에서 직접 삭제
@@ -3405,11 +3517,52 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
       // 기존 DB 데이터는 삭제 목록에 추가 (저장 시 DB에서 삭제)
       setDeletedCommentIds(prev => [...prev, commentId]);
     }
-  }, []);
+
+    // 변경로그 추가
+    queueChangeLog(
+      CHANGE_LOG_ACTIONS.COMMENT_DELETE,
+      deletedContent,
+      null,
+      { changeType: 'delete' }
+    );
+  }, [pendingComments, comments, queueChangeLog]);
+
+  // 파일 변경 핸들러
+  const handleFileChange = useCallback((action: string, fileName: string, fileData?: any) => {
+    if (action === 'FILE_UPLOAD') {
+      queueChangeLog(
+        CHANGE_LOG_ACTIONS.FILE_UPLOAD,
+        null,
+        fileName,
+        { targetName: fileName, changeType: 'create', ...fileData }
+      );
+    } else if (action === 'FILE_UPDATE') {
+      queueChangeLog(
+        CHANGE_LOG_ACTIONS.FILE_UPDATE,
+        fileData?.oldFileName || '',
+        fileName,
+        { targetName: fileName, changeType: 'update' }
+      );
+    } else if (action === 'FILE_DELETE') {
+      queueChangeLog(
+        CHANGE_LOG_ACTIONS.FILE_DELETE,
+        fileName,
+        null,
+        { targetName: fileName, changeType: 'delete' }
+      );
+    }
+  }, [queueChangeLog]);
 
   const handleSave = useCallback(async () => {
+    console.log('🚀🚀🚀 handleSave 함수 시작! 🚀🚀🚀');
+    console.log('📊 mode:', mode);
+    console.log('📊 data:', data);
+    console.log('📊 educationState:', educationState);
+    console.log('📊 pendingChangeLogs 현재 상태:', pendingChangeLogs);
+
     // 유효성 검사
     if (!educationState.educationType || !educationState.educationType.trim()) {
+      console.log('❌ 유효성 검사 실패: 교육유형 없음');
       setValidationError('교육유형을 선택해주세요.');
       return;
     }
@@ -3439,6 +3592,93 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
         finalEducationReport = parsedTempData;
         console.log(`🔄 최종 사용할 educationReport:`, finalEducationReport);
       }
+    }
+
+    // 개요탭 필드 변경 로깅 (edit 모드일 때만)
+    if (mode === 'edit' && initialDataSnapshot) {
+      console.log('🔍 개요탭 변경 감지 시작');
+      console.log('🔍 초기 스냅샷:', initialDataSnapshot);
+      console.log('🔍 현재 educationState:', educationState);
+
+      // 변경된 필드들을 감지
+      const fieldsToCheck = [
+        { field: 'educationName', action: CHANGE_LOG_ACTIONS.EDUCATION_NAME_CHANGE },
+        { field: 'educationType', action: CHANGE_LOG_ACTIONS.EDUCATION_TYPE_CHANGE },
+        { field: 'status', action: CHANGE_LOG_ACTIONS.STATUS_CHANGE },
+        { field: 'assignee', action: CHANGE_LOG_ACTIONS.ASSIGNEE_CHANGE },
+        { field: 'team', action: CHANGE_LOG_ACTIONS.TEAM_CHANGE },
+        { field: 'location', action: CHANGE_LOG_ACTIONS.LOCATION_CHANGE },
+        { field: 'description', action: CHANGE_LOG_ACTIONS.DESCRIPTION_CHANGE },
+        { field: 'executionDate', action: CHANGE_LOG_ACTIONS.DATE_CHANGE },
+        { field: 'participantCount', action: CHANGE_LOG_ACTIONS.PARTICIPANT_COUNT_CHANGE }
+      ];
+
+      fieldsToCheck.forEach(({ field, action }) => {
+        const oldValue = initialDataSnapshot[field];
+        const newValue = educationState[field];
+        console.log(`🔍 필드 체크 [${field}]: "${oldValue}" vs "${newValue}" | 변경됨: ${oldValue !== newValue}`);
+
+        if (oldValue !== newValue) {
+          console.log(`✅ 변경 감지! 필드: ${field}, 이전값: ${oldValue}, 새값: ${newValue}`);
+          queueChangeLog(
+            action,
+            oldValue,
+            newValue,
+            {
+              changeType: 'update',
+              fieldName: field
+            }
+          );
+        }
+      });
+
+      // 교육실적보고 변경 로깅
+      if (initialDataSnapshot.achievements !== finalEducationReport.achievements) {
+        queueChangeLog(
+          CHANGE_LOG_ACTIONS.ACHIEVEMENT_UPDATE,
+          initialDataSnapshot.achievements,
+          finalEducationReport.achievements,
+          {
+            changeType: 'update',
+            fieldName: 'achievements'
+          }
+        );
+      }
+
+      if (initialDataSnapshot.improvements !== finalEducationReport.improvements ||
+          initialDataSnapshot.improvement_points !== finalEducationReport.improvements) {
+        queueChangeLog(
+          CHANGE_LOG_ACTIONS.IMPROVEMENT_UPDATE,
+          initialDataSnapshot.improvements || initialDataSnapshot.improvement_points,
+          finalEducationReport.improvements,
+          {
+            changeType: 'update',
+            fieldName: 'improvements'
+          }
+        );
+      }
+
+      if (initialDataSnapshot.feedback !== finalEducationReport.feedback) {
+        queueChangeLog(
+          CHANGE_LOG_ACTIONS.FEEDBACK_UPDATE,
+          initialDataSnapshot.feedback,
+          finalEducationReport.feedback,
+          {
+            changeType: 'update',
+            fieldName: 'feedback'
+          }
+        );
+      }
+    } else if (mode === 'add') {
+      // 신규 교육 생성 로그
+      queueChangeLog(
+        CHANGE_LOG_ACTIONS.EDUCATION_CREATE,
+        null,
+        educationState.educationName,
+        {
+          changeType: 'create'
+        }
+      );
     }
 
     const educationData: SecurityEducationRecord = {
@@ -3599,6 +3839,19 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
           console.warn('⚠️ 커리큘럼 저장에 실패했지만 다른 데이터 저장은 계속 진행합니다.');
         } else {
           console.log('✅ 커리큘럼 데이터 저장 성공:', curriculumDataToSave.length, '개 항목');
+
+          // 커리큘럼 추가 로깅
+          curriculumDataToSave.forEach((item) => {
+            queueChangeLog(
+              CHANGE_LOG_ACTIONS.CURRICULUM_ADD,
+              null,
+              item,
+              {
+                targetName: item.session_title,
+                changeType: 'create'
+              }
+            );
+          });
         }
       } catch (error) {
         console.error('❌ 커리큘럼 데이터 저장 중 오류:', error);
@@ -3685,6 +3938,33 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
           } else {
             console.log('✅ 참석자 데이터 저장 성공:', insertedData?.length || 0, '개 항목');
             console.log('✅ 저장된 참석자 데이터:', insertedData);
+
+            // 참석자 추가 및 출석 로깅
+            participantDataToSave.forEach((item) => {
+              // 참석자 추가 로그
+              queueChangeLog(
+                CHANGE_LOG_ACTIONS.ATTENDEE_ADD,
+                null,
+                item,
+                {
+                  targetName: item.user_name,
+                  changeType: 'create'
+                }
+              );
+
+              // 출석 상태가 '출석'이면 출석 확인 로그도 추가
+              if (item.attendance_status === '출석') {
+                queueChangeLog(
+                  CHANGE_LOG_ACTIONS.ATTENDANCE_CHECK,
+                  null,
+                  item.attendance_status,
+                  {
+                    targetName: item.user_name,
+                    changeType: 'update'
+                  }
+                );
+              }
+            });
           }
         } else {
           console.log('⚠️ 저장할 유효한 참석자 데이터가 없습니다.');
@@ -3772,6 +4052,32 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
       console.warn('⚠️ 기록 저장에 실패했지만 교육 데이터는 저장되었습니다.');
     }
 
+    // 7. 변경로그 일괄 저장
+    try {
+      if (pendingChangeLogs.length > 0) {
+        console.log('📝 변경로그 저장 시작:', pendingChangeLogs.length, '개 항목');
+
+        for (const logInput of pendingChangeLogs) {
+          // record_id가 없는 경우 (신규 생성) educationIdToUse 사용
+          const finalLogInput = {
+            ...logInput,
+            record_id: logInput.record_id || String(educationIdToUse)
+          };
+
+          await addChangeLog(finalLogInput);
+          console.log('✅ 변경로그 저장 완료:', logInput.description);
+        }
+
+        console.log('✅ 모든 변경로그 저장 완료');
+
+        // 저장 후 초기화
+        setPendingChangeLogs([]);
+      }
+    } catch (error) {
+      console.error('❌ 변경로그 저장 중 오류:', error);
+      console.warn('⚠️ 변경로그 저장에 실패했지만 교육 데이터는 저장되었습니다.');
+    }
+
     // 성공적으로 저장된 후 SessionStorage 정리 (add 모드에서만)
     if (mode === 'add') {
       try {
@@ -3803,7 +4109,11 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
     addFeedback,
     updateFeedback,
     deleteFeedback,
-    educationReport
+    educationReport,
+    initialDataSnapshot,
+    queueChangeLog,
+    addChangeLog,
+    pendingChangeLogs
   ]);
 
   const handleClose = useCallback(() => {
@@ -3838,6 +4148,8 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
     setEditingCommentId(null);
     setEditingCommentText('');
     setValidationError('');
+    setInitialDataSnapshot(null); // 초기 데이터 스냅샷 초기화
+    setPendingChangeLogs([]); // 변경로그 초기화
   }, [onClose, mode]);
 
   return (
@@ -3945,7 +4257,7 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
         </TabPanel>
 
         <TabPanel value={value} index={5}>
-          <MaterialTab recordId={data?.id} currentUser={currentUser} />
+          <MaterialTab recordId={data?.id} currentUser={currentUser} onFileChange={handleFileChange} />
         </TabPanel>
       </DialogContent>
 

@@ -167,7 +167,7 @@ interface SecurityEducationTableProps {
   selectedAssignee?: string;
   tasks?: SecurityEducationTableData[];
   setTasks?: React.Dispatch<React.SetStateAction<SecurityEducationTableData[]>>;
-  addChangeLog?: (action: string, target: string, description: string, team?: string) => void;
+  addChangeLog?: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string, title?: string) => void;
   onDataRefresh?: () => Promise<void>;
 }
 
@@ -404,14 +404,22 @@ export default function SecurityEducationTable({
         // 삭제될 업무들의 정보를 변경로그에 추가
         if (addChangeLog) {
           const deletedTasks = data.filter((task) => selected.includes(task.id));
-          deletedTasks.forEach((task) => {
-            addChangeLog(
-              '교육 삭제',
-              task.code || `EDU-${task.id}`,
-              `${task.educationName || '교육'} 삭제`,
-              task.educationType || '미분류'
+          for (const task of deletedTasks) {
+            const codeToUse = task.code || `ID-${task.id}`;
+            const educationTitle = task.educationName || '교육';
+            console.log('🔍 삭제 변경로그:', { code: task.code, codeToUse });
+            // 삭제의 경우 변경 후 값은 없음
+            await addChangeLog(
+              '삭제',
+              codeToUse,
+              `보안교육관리 ${educationTitle}(${codeToUse}) 정보의 데이터탭 데이터가 삭제 되었습니다.`,
+              task.team || '보안팀',
+              `${educationTitle} - ${task.location || '-'}`,
+              '',
+              '데이터탭',
+              educationTitle
             );
-          });
+          }
         }
 
         // 로컬 상태 업데이트
@@ -508,8 +516,90 @@ export default function SecurityEducationTable({
 
         if (success) {
           console.log('✅ 수정 성공');
-          if (addChangeLog) {
-            addChangeLog('수정', updatedTask.code || updatedTask.title, `보안교육 "${updatedTask.title}" 정보가 수정되었습니다.`, '보안팀');
+
+          // 원본 데이터에서 code 가져오기
+          const originalTask = data.find(t => t.id === updatedTask.id);
+
+          console.log('🔍🔍🔍 CODE 디버깅:', {
+            'updatedTask.id': updatedTask.id,
+            'data 배열 개수': data.length,
+            'originalTask 찾았나?': !!originalTask,
+            'originalTask 전체': originalTask,
+            'originalTask?.code': originalTask?.code,
+            'updatedTask.code': updatedTask.code,
+            'educationData.code': educationData.code
+          });
+
+          const codeToUse = originalTask?.code || updatedTask.code || educationData.code || `ID-${updatedTask.id}`;
+
+          console.log('🔍 최종 사용할 코드:', codeToUse);
+
+          if (addChangeLog && originalTask) {
+            // 필드 한글명 매핑
+            const fieldNameMap: Record<string, string> = {
+              educationName: '교육명',
+              status: '상태',
+              educationType: '교육유형',
+              location: '장소',
+              executionDate: '실행일',
+              assignee: '담당자',
+              attendeeCount: '참석수',
+              team: '팀',
+              description: '설명',
+              achievements: '성과',
+              improvements: '개선사항',
+              feedback: '피드백'
+            };
+
+            // 변경된 필드 찾기
+            const changes: Array<{ field: string; fieldKorean: string; before: any; after: any }> = [];
+
+            Object.keys(fieldNameMap).forEach((field) => {
+              const beforeVal = (originalTask as any)[field];
+              const afterVal = (updatedTask as any)[field];
+
+              // 값이 다른 경우만 추가
+              if (beforeVal !== afterVal) {
+                changes.push({
+                  field,
+                  fieldKorean: fieldNameMap[field],
+                  before: beforeVal || '',
+                  after: afterVal || ''
+                });
+              }
+            });
+
+            console.log('🔍 변경 감지된 필드들:', changes);
+
+            // 변경된 필드가 있으면 각각 로그 기록
+            if (changes.length > 0) {
+              for (const change of changes) {
+                const description = `보안교육관리 ${updatedTask.educationName}(${codeToUse}) 정보의 개요탭 ${change.fieldKorean}이 ${change.before} → ${change.after} 로 수정 되었습니다.`;
+
+                await addChangeLog(
+                  '수정',
+                  codeToUse,
+                  description,
+                  updatedTask.team || '보안팀',
+                  String(change.before),
+                  String(change.after),
+                  change.fieldKorean,
+                  updatedTask.educationName
+                );
+              }
+            } else {
+              // 변경사항이 없는 경우 (일반 저장)
+              await addChangeLog(
+                '수정',
+                codeToUse,
+                `보안교육관리 ${updatedTask.educationName}(${codeToUse}) 정보의 개요탭에서 수정되었습니다.`,
+                updatedTask.team || '보안팀',
+                '',
+                '',
+                '-',
+                updatedTask.educationName
+              );
+            }
           }
           // 데이터 새로고침
           if (onDataRefresh) {
@@ -589,8 +679,26 @@ export default function SecurityEducationTable({
 
           console.log('✅ 생성 성공, 생성된 데이터:', createdData);
 
+          // 생성된 데이터에서 code 가져오기
+          const codeToUse = createdData?.code || educationData.code || updatedTask.code || `ID-${newId}`;
+
+          console.log('🔍 변경로그 저장:', {
+            'createdData?.code': createdData?.code,
+            'codeToUse': codeToUse
+          });
+
           if (addChangeLog) {
-            addChangeLog('생성', updatedTask.code || updatedTask.title, `보안교육 "${updatedTask.title}"이 생성되었습니다.`, '보안팀');
+            // 생성의 경우 변경 전 값은 없음
+            await addChangeLog(
+              '추가',
+              codeToUse,
+              `보안교육관리 ${updatedRecord.educationName}(${codeToUse}) 정보의 개요탭 데이터가 추가 되었습니다.`,
+              updatedRecord.team || '보안팀',
+              '',
+              `${updatedRecord.educationName} - ${updatedRecord.location || '-'}`,
+              '개요탭',
+              updatedRecord.educationName
+            );
           }
 
           // 데이터 새로고침
@@ -651,11 +759,13 @@ export default function SecurityEducationTable({
         // 최신 데이터로 TableData 형식 변환
         const latestTask: SecurityEducationTableData = {
           ...task,
+          code: latestData.code, // DB의 code 명시적으로 설정
           team: latestData.team || '보안팀',
           achievements: latestData.achievements || '',
           improvements: latestData.improvement_points || '',
           feedback: latestData.feedback || ''
         };
+        console.log('🔍 DB에서 가져온 code:', latestData.code);
         setEditingTask(latestTask);
         setEditingRecord(convertTableDataToRecord(latestTask));
       }

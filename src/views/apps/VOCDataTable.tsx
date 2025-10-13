@@ -64,7 +64,16 @@ interface VOCDataTableProps {
   selectedAssignee?: string;
   vocs?: VocData[];
   setVOCs?: React.Dispatch<React.SetStateAction<VocData[]>>;
-  addChangeLog?: (action: string, target: string, description: string, team?: string) => void;
+  addChangeLog?: (
+    action: string,
+    target: string,
+    description: string,
+    team?: string,
+    beforeValue?: string,
+    afterValue?: string,
+    changedField?: string,
+    title?: string
+  ) => void;
 }
 
 export default function VOCDataTable({
@@ -312,11 +321,21 @@ export default function VOCDataTable({
         await deleteVoc(voc.id);
       }
 
-      // 삭제될 업무들의 정보를 변경로그에 추가
+      // 삭제될 VOC들의 정보를 변경로그에 추가
       if (addChangeLog) {
         deletedVOCs.forEach((voc) => {
           const vocCode = `IT-VOC-${new Date(voc.registrationDate).getFullYear().toString().slice(-2)}-${String(voc.no).padStart(3, '0')}`;
-          addChangeLog('VOC 삭제', vocCode, `${voc.title || 'VOC'} 삭제`, voc.team || '미분류');
+          const vocContent = voc.content || 'VOC';
+          addChangeLog(
+            '삭제',
+            vocCode,
+            `VOC관리 ${vocContent}(${vocCode})이 삭제되었습니다.`,
+            voc.team || '미분류',
+            undefined,
+            undefined,
+            undefined,
+            vocContent
+          );
         });
       }
 
@@ -351,6 +370,182 @@ export default function VOCDataTable({
       if (existingIndex !== -1) {
         // 기존 VOC 업데이트
         const originalVOC = data[existingIndex];
+
+        // 변경로그 추가 - DB 저장 전에 실행 (필드별 상세 추적)
+        if (addChangeLog) {
+          const vocCode = `IT-VOC-${new Date(updatedVOC.registrationDate).getFullYear().toString().slice(-2)}-${String(updatedVOC.no).padStart(3, '0')}`;
+          const vocContent = updatedVOC.content || 'VOC';
+
+          // 1. VOC유형 변경
+          if (originalVOC.vocType !== updatedVOC.vocType) {
+            addChangeLog(
+              '수정',
+              vocCode,
+              `VOC관리 ${vocContent}(${vocCode}) 정보의 개요탭 VOC유형이 ${originalVOC.vocType || ''} → ${updatedVOC.vocType || ''} 로 수정 되었습니다.`,
+              updatedVOC.team || '미분류',
+              originalVOC.vocType || '',
+              updatedVOC.vocType || '',
+              'VOC유형',
+              vocContent
+            );
+          }
+
+          // 2. 고객명 변경
+          if (originalVOC.customerName !== updatedVOC.customerName) {
+            addChangeLog(
+              '수정',
+              vocCode,
+              `VOC관리 ${vocContent}(${vocCode}) 정보의 개요탭 고객명이 ${originalVOC.customerName || ''} → ${updatedVOC.customerName || ''} 로 수정 되었습니다.`,
+              updatedVOC.team || '미분류',
+              originalVOC.customerName || '',
+              updatedVOC.customerName || '',
+              '고객명',
+              vocContent
+            );
+          }
+
+          // 3. 회사명 변경
+          if (originalVOC.companyName !== updatedVOC.companyName) {
+            addChangeLog(
+              '수정',
+              vocCode,
+              `VOC관리 ${vocContent}(${vocCode}) 정보의 개요탭 회사명이 ${originalVOC.companyName || ''} → ${updatedVOC.companyName || ''} 로 수정 되었습니다.`,
+              updatedVOC.team || '미분류',
+              originalVOC.companyName || '',
+              updatedVOC.companyName || '',
+              '회사명',
+              vocContent
+            );
+          }
+
+          // 4. 요청내용 변경
+          if (originalVOC.content !== updatedVOC.content) {
+            addChangeLog(
+              '수정',
+              vocCode,
+              `VOC관리 ${vocContent}(${vocCode}) 정보의 개요탭 요청내용이 ${originalVOC.content || ''} → ${updatedVOC.content || ''} 로 수정 되었습니다.`,
+              updatedVOC.team || '미분류',
+              originalVOC.content || '',
+              updatedVOC.content || '',
+              '요청내용',
+              vocContent
+            );
+          }
+
+          // 5. 처리내용 변경
+          if (originalVOC.responseContent !== updatedVOC.responseContent) {
+            addChangeLog(
+              '수정',
+              vocCode,
+              `VOC관리 ${vocContent}(${vocCode}) 정보의 개요탭 처리내용이 ${originalVOC.responseContent || ''} → ${updatedVOC.responseContent || ''} 로 수정 되었습니다.`,
+              updatedVOC.team || '미분류',
+              originalVOC.responseContent || '',
+              updatedVOC.responseContent || '',
+              '처리내용',
+              vocContent
+            );
+          }
+
+          // 6. 우선순위 변경
+          if (originalVOC.priority !== updatedVOC.priority) {
+            addChangeLog(
+              '수정',
+              vocCode,
+              `VOC관리 ${vocContent}(${vocCode}) 정보의 개요탭 우선순위가 ${originalVOC.priority || ''} → ${updatedVOC.priority || ''} 로 수정 되었습니다.`,
+              updatedVOC.team || '미분류',
+              originalVOC.priority || '',
+              updatedVOC.priority || '',
+              '우선순위',
+              vocContent
+            );
+          }
+
+          // 7. 상태 변경
+          if (originalVOC.status !== updatedVOC.status) {
+            addChangeLog(
+              '수정',
+              vocCode,
+              `VOC관리 ${vocContent}(${vocCode}) 정보의 개요탭 상태가 ${originalVOC.status || ''} → ${updatedVOC.status || ''} 로 수정 되었습니다.`,
+              updatedVOC.team || '미분류',
+              originalVOC.status || '',
+              updatedVOC.status || '',
+              '상태',
+              vocContent
+            );
+          }
+
+          // 8. 담당자 변경
+          if (originalVOC.assignee !== updatedVOC.assignee) {
+            addChangeLog(
+              '수정',
+              vocCode,
+              `VOC관리 ${vocContent}(${vocCode}) 정보의 개요탭 담당자가 ${originalVOC.assignee || ''} → ${updatedVOC.assignee || ''} 로 수정 되었습니다.`,
+              updatedVOC.team || '미분류',
+              originalVOC.assignee || '',
+              updatedVOC.assignee || '',
+              '담당자',
+              vocContent
+            );
+          }
+
+          // 9. 팀 변경
+          if (originalVOC.team !== updatedVOC.team) {
+            addChangeLog(
+              '수정',
+              vocCode,
+              `VOC관리 ${vocContent}(${vocCode}) 정보의 개요탭 팀이 ${originalVOC.team || ''} → ${updatedVOC.team || ''} 로 수정 되었습니다.`,
+              updatedVOC.team || '미분류',
+              originalVOC.team || '',
+              updatedVOC.team || '',
+              '팀',
+              vocContent
+            );
+          }
+
+          // 10. 접수일 변경
+          if (originalVOC.receptionDate !== updatedVOC.receptionDate) {
+            addChangeLog(
+              '수정',
+              vocCode,
+              `VOC관리 ${vocContent}(${vocCode}) 정보의 개요탭 접수일이 ${originalVOC.receptionDate || ''} → ${updatedVOC.receptionDate || ''} 로 수정 되었습니다.`,
+              updatedVOC.team || '미분류',
+              originalVOC.receptionDate || '',
+              updatedVOC.receptionDate || '',
+              '접수일',
+              vocContent
+            );
+          }
+
+          // 11. 완료일 변경
+          if (originalVOC.resolutionDate !== updatedVOC.resolutionDate) {
+            addChangeLog(
+              '수정',
+              vocCode,
+              `VOC관리 ${vocContent}(${vocCode}) 정보의 개요탭 완료일이 ${originalVOC.resolutionDate || ''} → ${updatedVOC.resolutionDate || ''} 로 수정 되었습니다.`,
+              updatedVOC.team || '미분류',
+              originalVOC.resolutionDate || '',
+              updatedVOC.resolutionDate || '',
+              '완료일',
+              vocContent
+            );
+          }
+
+          // 12. 채널 변경
+          if (originalVOC.channel !== updatedVOC.channel) {
+            addChangeLog(
+              '수정',
+              vocCode,
+              `VOC관리 ${vocContent}(${vocCode}) 정보의 개요탭 채널이 ${originalVOC.channel || ''} → ${updatedVOC.channel || ''} 로 수정 되었습니다.`,
+              updatedVOC.team || '미분류',
+              originalVOC.channel || '',
+              updatedVOC.channel || '',
+              '채널',
+              vocContent
+            );
+          }
+        }
+
+        // DB 업데이트 (변경로그 추가 후)
         const dbVocData = convertToDbVocData(updatedVOC);
         const success = await updateVoc(updatedVOC.id, dbVocData);
 
@@ -362,34 +557,6 @@ export default function VOCDataTable({
           // 부모 컴포넌트로 동기화
           if (setVOCs) {
             setVOCs(updatedData);
-          }
-
-          // 변경로그 추가 - 변경된 필드 확인
-          if (addChangeLog) {
-            const changes: string[] = [];
-            const vocCode = `IT-VOC-${new Date(updatedVOC.registrationDate).getFullYear().toString().slice(-2)}-${String(updatedVOC.no).padStart(3, '0')}`;
-
-            if (originalVOC.status !== updatedVOC.status) {
-              changes.push(`상태: "${originalVOC.status}" → "${updatedVOC.status}"`);
-            }
-            if (originalVOC.assignee !== updatedVOC.assignee) {
-              changes.push(`담당자: "${originalVOC.assignee || '미할당'}" → "${updatedVOC.assignee || '미할당'}"`);
-            }
-            if (originalVOC.content !== updatedVOC.content) {
-              changes.push(`내용 수정`);
-            }
-            if (originalVOC.resolutionDate !== updatedVOC.resolutionDate) {
-              changes.push(`완료일: "${originalVOC.resolutionDate || '미정'}" → "${updatedVOC.resolutionDate || '미정'}"`);
-            }
-
-            if (changes.length > 0) {
-              addChangeLog(
-                'VOC 정보 수정',
-                vocCode,
-                `${updatedVOC.title || 'VOC'} - ${changes.join(', ')}`,
-                updatedVOC.team || '미분류'
-              );
-            }
           }
 
           console.log('✅ 기존 VOC 업데이트 완료');
@@ -414,11 +581,16 @@ export default function VOCDataTable({
           // 변경로그 추가 - 새 VOC 생성
           if (addChangeLog) {
             const vocCode = `IT-VOC-${new Date(createdVOC.registration_date).getFullYear().toString().slice(-2)}-${String(createdVOC.no).padStart(3, '0')}`;
+            const vocContent = newVocData.content || '새 VOC';
             addChangeLog(
-              '새 VOC 생성',
+              '추가',
               vocCode,
-              `${newVocData.title || '새 VOC'} 생성`,
-              newVocData.team || '미분류'
+              `VOC관리 ${vocContent}(${vocCode})이 신규 등록되었습니다.`,
+              newVocData.team || '미분류',
+              undefined,
+              undefined,
+              undefined,
+              vocContent
             );
           }
 
