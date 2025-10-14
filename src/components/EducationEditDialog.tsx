@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useReducer, memo, useEffect, useRef } from 'react';
+import { useSession } from 'next-auth/react';
 import {
   Dialog,
   DialogTitle,
@@ -27,100 +28,97 @@ import {
   Alert,
   Pagination
 } from '@mui/material';
+import { EducationData, Education_STATUS, Education_TYPES, Education_CHANNELS, Education_PRIORITIES } from '../types/education';
+import { useOptimizedInput } from '../hooks/useDebounce';
+import { useSupabaseMasterCode3 } from '../hooks/useSupabaseMasterCode3';
+import { useSupabaseUserManagement } from '../hooks/useSupabaseUserManagement';
+import { useSupabaseFeedback } from '../hooks/useSupabaseFeedback';
+import { PAGE_IDENTIFIERS, FeedbackData } from '../types/feedback';
+import { useSupabaseFiles } from '../hooks/useSupabaseFiles';
+import { FileData } from '../types/files';
+// import { usePerformanceMonitor } from '../utils/performance';
 
 // Icons
 import { TableDocument, Category, Element } from '@wandersonalwes/iconsax-react';
 
-// Hooks
-import useUser from '../hooks/useUser';
-import { useSupabaseUserManagement } from '../hooks/useSupabaseUserManagement';
-import { useSupabaseFeedback } from '../hooks/useSupabaseFeedback';
-import { PAGE_IDENTIFIERS } from '../types/feedback';
-import { useSupabaseFiles } from '../hooks/useSupabaseFiles';
-import { FileData } from '../types/files';
-
-// 교육 데이터 타입 정의
-interface EducationData {
-  id: number;
-  no: number;
-  registrationDate: string;
-  code: string;
-  category: string;
-  content: string;
-  type: string;
-  assignee: string;
-  team: string;
-  status: string;
-  startDate: string;
-  endDate: string;
-}
-
 // 상태 관리를 위한 reducer
 interface EditEducationState {
+  customerName: string;
+  companyName: string;
+  educationType: string;
+  channel: string;
+  title: string;
   content: string;
-  description: string;
+  responseContent: string;
   assignee: string;
   status: string;
-  code: string;
+  priority: string;
   registrationDate: string;
-  startDate: string;
-  endDate: string;
+  receptionDate: string;
+  resolutionDate: string;
   team: string;
-  category: string;
-  type: string;
 }
 
 type EditEducationAction =
   | { type: 'SET_FIELD'; field: keyof EditEducationState; value: string }
-  | { type: 'SET_EDUCATION'; education: EducationData }
+  | { type: 'SET_TASK'; education: EducationData }
   | { type: 'RESET' }
-  | { type: 'INIT_NEW_EDUCATION'; code: string; registrationDate: string; startDate: string };
+  | { type: 'INIT_NEW_TASK'; registrationDate: string };
 
 const editEducationReducer = (state: EditEducationState, action: EditEducationAction): EditEducationState => {
   switch (action.type) {
     case 'SET_FIELD':
       return { ...state, [action.field]: action.value };
-    case 'SET_EDUCATION':
+    case 'SET_TASK':
       return {
-        content: action.education.content,
-        description: action.education.description || '',
-        assignee: action.education.assignee,
-        status: action.education.status,
-        code: action.education.code,
+        customerName: action.education.customerName || '',
+        companyName: action.education.companyName || '',
+        educationType: action.education.educationType || '문의',
+        channel: action.education.channel || '전화',
+        title: action.education.title || '',
+        content: action.education.content || '',
+        responseContent: action.education.responseContent || '',
+        assignee: action.education.assignee || '',
+        status: action.education.status || '접수',
+        priority: action.education.priority || '보통',
         registrationDate: action.education.registrationDate || '',
-        startDate: action.education.startDate || '',
-        endDate: action.education.endDate || '',
-        team: action.education.team || '',
-        category: action.education.category || '기술교육',
-        type: action.education.type || '온라인'
+        receptionDate: action.education.receptionDate || '',
+        resolutionDate: action.education.resolutionDate || '',
+        team: action.education.team || ''
       };
-    case 'INIT_NEW_EDUCATION':
+    case 'INIT_NEW_TASK':
       return {
+        customerName: '',
+        companyName: '',
+        educationType: '',
+        channel: '전화',
+        title: '',
         content: '',
-        description: '',
+        responseContent: '',
         assignee: '',
-        status: '대기',
-        code: action.code,
+        status: '진행',
+        priority: '',
         registrationDate: action.registrationDate,
-        startDate: action.startDate,
-        endDate: '',
-        team: '',
-        category: '',
-        type: ''
+        receptionDate: action.registrationDate,
+        resolutionDate: '',
+        team: ''
       };
     case 'RESET':
       return {
+        customerName: '',
+        companyName: '',
+        educationType: '',
+        channel: '전화',
+        title: '',
         content: '',
-        description: '',
+        responseContent: '',
         assignee: '',
-        status: '대기',
-        code: '',
+        status: '진행',
+        priority: '',
         registrationDate: '',
-        startDate: '',
-        endDate: '',
-        team: '',
-        category: '',
-        type: ''
+        receptionDate: '',
+        resolutionDate: '',
+        team: ''
       };
     default:
       return state;
@@ -134,34 +132,134 @@ const OverviewTab = memo(
     onFieldChange,
     assignees,
     assigneeAvatars,
-    educationCategories,
-    educationMethods,
     statusOptions,
-    departments,
-    users
+    statusColors,
+    education
   }: {
     educationState: EditEducationState;
     onFieldChange: (field: keyof EditEducationState, value: string) => void;
     assignees: string[];
     assigneeAvatars: Record<string, string>;
-    educationCategories: string[];
-    educationMethods: string[];
     statusOptions: string[];
-    departments: string[];
-    users: any[];
+    statusColors: Record<string, any>;
+    education: EducationData | null;
   }) => {
+    // TextField 직접 참조를 위한 ref
+    const requestContentRef = useRef<HTMLInputElement>(null);
+    const actionContentRef = useRef<HTMLTextAreaElement>(null);
+
+    // 마스터코드 훅 사용
+    const { getSubCodesByGroup } = useSupabaseMasterCode3();
+
+    // 사용자관리 훅 사용
+    const { users } = useSupabaseUserManagement();
+
+    // GROUP029의 서브코드 목록 가져오기 (교육분야)
+    const educationFieldOptions = getSubCodesByGroup('GROUP029').map(subCode => ({
+      value: subCode.subcode_name,
+      label: subCode.subcode_name,
+      description: subCode.subcode_description
+    }));
+
+    // GROUP008의 서브코드 목록 가져오기 (교육방식)
+    const educationTypeOptions = getSubCodesByGroup('GROUP008').map(subCode => ({
+      value: subCode.subcode_name,
+      label: subCode.subcode_name,
+      description: subCode.subcode_description
+    }));
+
+    // GROUP024의 서브코드 목록 가져오기 (우선순위)
+    const priorityOptions = getSubCodesByGroup('GROUP024').map(subCode => ({
+      value: subCode.subcode_name,
+      label: subCode.subcode_name,
+      description: subCode.subcode_description
+    }));
+
+    // GROUP002의 서브코드 목록 가져오기 (상태)
+    const statusOptionsFromMaster = getSubCodesByGroup('GROUP002').map(subCode => ({
+      value: subCode.subcode_name,
+      label: subCode.subcode_name,
+      description: subCode.subcode_description
+    }));
+
+    // 사용자 목록 옵션 생성 (등록자)
+    const userOptions = users
+      .filter(user => user.is_active && user.status === 'active')
+      .map(user => ({
+        value: user.user_name,
+        label: user.user_name,
+        department: user.department || '',
+        avatar: user.profile_image_url || user.avatar_url || ''
+      }));
+
+    // 텍스트 필드용 최적화된 입력 관리
+    const contentInput = useOptimizedInput(educationState.content, 150);
+    const responseContentInput = useOptimizedInput(educationState.responseContent, 200);
+
+    // 무한 루프 방지를 위한 ref
+    const isUpdatingRef = useRef(false);
+
+    // debounced 값이 변경될 때마다 상위 컴포넌트에 알림 (onFieldChange 의존성 제거로 최적화)
+    useEffect(() => {
+      if (!isUpdatingRef.current && contentInput.debouncedValue !== educationState.content) {
+        onFieldChange('content', contentInput.debouncedValue);
+      }
+    }, [contentInput.debouncedValue, educationState.content]); // onFieldChange 제거
+
+    useEffect(() => {
+      if (!isUpdatingRef.current && responseContentInput.debouncedValue !== educationState.responseContent) {
+        onFieldChange('responseContent', responseContentInput.debouncedValue);
+      }
+    }, [responseContentInput.debouncedValue, educationState.responseContent]); // onFieldChange 제거
+
+    // 외부에서 상태가 변경될 때 입력 값 동기화 (reset 함수 의존성 제거로 최적화)
+    useEffect(() => {
+      if (educationState.content !== contentInput.inputValue && educationState.content !== contentInput.debouncedValue) {
+        isUpdatingRef.current = true;
+        contentInput.reset(educationState.content);
+        setTimeout(() => {
+          isUpdatingRef.current = false;
+        }, 0);
+      }
+    }, [educationState.content, contentInput.inputValue, contentInput.debouncedValue]); // reset 제거
+
+    useEffect(() => {
+      if (educationState.responseContent !== responseContentInput.inputValue && educationState.responseContent !== responseContentInput.debouncedValue) {
+        isUpdatingRef.current = true;
+        responseContentInput.reset(educationState.responseContent);
+        setTimeout(() => {
+          isUpdatingRef.current = false;
+        }, 0);
+      }
+    }, [educationState.responseContent, responseContentInput.inputValue, responseContentInput.debouncedValue]); // reset 제거
+
     const handleFieldChange = useCallback(
-      (field: keyof EditEducationState) =>
-        (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { value: string } }) => {
-          onFieldChange(field, e.target.value);
-        },
+      (field: keyof EditEducationState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { value: string } }) => {
+        onFieldChange(field, e.target.value);
+      },
       []
-    );
+    ); // onFieldChange 의존성 제거로 최적화
+
+    // 현재 입력 값들을 반환하는 함수 (의존성 배열 제거로 최적화)
+    const getCurrentValues = useCallback(() => {
+      return {
+        content: requestContentRef.current?.value || contentInput.inputValue,
+        responseContent: actionContentRef.current?.value || responseContentInput.inputValue
+      };
+    }, []); // 의존성 배열 제거 - ref를 통해 최신 값 접근
+
+    // 컴포넌트가 마운트될 때 getCurrentValues 함수를 전역에서 접근 가능하도록 설정
+    useEffect(() => {
+      (window as any).getOverviewTabCurrentValues = getCurrentValues;
+      return () => {
+        delete (window as any).getOverviewTabCurrentValues;
+      };
+    }, []); // 의존성 배열에서 getCurrentValues 제거
 
     return (
       <Box sx={{ height: '650px', overflowY: 'auto', pr: 1, px: 3, py: 3 }}>
         <Stack spacing={3}>
-          {/* 제목 - 전체 너비 */}
+          {/* 첫 번째 섹션: 제목 */}
           <TextField
             fullWidth
             label={
@@ -169,246 +267,286 @@ const OverviewTab = memo(
                 제목 <span style={{ color: 'red' }}>*</span>
               </span>
             }
-            value={educationState.content}
-            onChange={handleFieldChange('content')}
+            value={educationState.title}
+            onChange={handleFieldChange('title')}
             variant="outlined"
             InputLabelProps={{ shrink: true }}
           />
 
-          {/* 세부내용 - 전체 너비 */}
+          {/* 두 번째 섹션: 설명 */}
           <TextField
             fullWidth
-            label="세부내용"
+            label="설명"
             multiline
             rows={4}
-            value={educationState.description}
-            onChange={handleFieldChange('description')}
+            value={contentInput.inputValue}
+            onChange={(e) => contentInput.handleChange(e.target.value)}
             variant="outlined"
             InputLabelProps={{ shrink: true }}
+            inputRef={requestContentRef}
           />
 
-          {/* 교육분류, 교육유형, 상태 - 3등분 배치 */}
+          {/* 세 번째 줄: 교육분야 - 교육유형 - 상태 */}
           <Stack direction="row" spacing={2}>
-            <FormControl fullWidth required>
-              <InputLabel
-                shrink
-                sx={{
-                  '& .MuiInputLabel-asterisk': {
-                    color: 'red'
-                  }
-                }}
-              >
-                교육분류
+            <FormControl fullWidth>
+              <InputLabel shrink>
+                <span>
+                  교육분야 <span style={{ color: 'red' }}>*</span>
+                </span>
               </InputLabel>
-              <Select value={educationState.category} label="교육분류" onChange={handleFieldChange('category')} displayEmpty>
+              <Select value={educationState.customerName} label="교육분야 *" onChange={handleFieldChange('customerName')} displayEmpty>
                 <MenuItem value="">선택</MenuItem>
-                {educationCategories.map((category) => (
-                  <MenuItem key={category} value={category}>
-                    {category}
-                  </MenuItem>
-                ))}
+                {educationFieldOptions.length > 0 ? (
+                  educationFieldOptions.map((option) => (
+                    <MenuItem key={option.value} value={option.value} title={option.description}>
+                      {option.label}
+                    </MenuItem>
+                  ))
+                ) : (
+                  <MenuItem value="">교육분야 로딩중...</MenuItem>
+                )}
               </Select>
             </FormControl>
 
-            <FormControl fullWidth required>
-              <InputLabel
-                shrink
-                sx={{
-                  '& .MuiInputLabel-asterisk': {
-                    color: 'red'
-                  }
-                }}
-              >
-                교육방식
+            <FormControl fullWidth>
+              <InputLabel shrink>
+                <span>
+                  교육유형 <span style={{ color: 'red' }}>*</span>
+                </span>
               </InputLabel>
-              <Select value={educationState.type} label="교육방식" onChange={handleFieldChange('type')} displayEmpty>
+              <Select value={educationState.educationType} label="교육유형 *" onChange={handleFieldChange('educationType')} displayEmpty>
                 <MenuItem value="">선택</MenuItem>
-                {educationMethods.map((method) => (
-                  <MenuItem key={method} value={method}>
-                    {method}
-                  </MenuItem>
-                ))}
+                {educationTypeOptions.length > 0 ? (
+                  educationTypeOptions.map((option) => (
+                    <MenuItem key={option.value} value={option.value} title={option.description}>
+                      {option.label}
+                    </MenuItem>
+                  ))
+                ) : (
+                  // 백업용: 마스터코드 로딩 중이거나 데이터가 없을 때
+                  Education_TYPES.map((type) => (
+                    <MenuItem key={type} value={type}>
+                      {type}
+                    </MenuItem>
+                  ))
+                )}
               </Select>
             </FormControl>
 
             <FormControl fullWidth>
               <InputLabel shrink>상태</InputLabel>
-              <Select value={educationState.status} label="상태" onChange={handleFieldChange('status')}>
-                {statusOptions.map((status) => {
-                  const getStatusColor = (statusName: string) => {
-                    switch (statusName) {
-                      case '대기':
-                        return { bgcolor: '#F5F5F5', color: '#757575' };
-                      case '진행':
-                        return { bgcolor: '#E3F2FD', color: '#1976D2' };
-                      case '완료':
-                        return { bgcolor: '#E8F5E9', color: '#388E3C' };
-                      case '홀딩':
-                        return { bgcolor: '#FFEBEE', color: '#D32F2F' };
-                      default:
-                        return { bgcolor: '#F5F5F5', color: '#757575' };
+              <Select value={educationState.status} label="상태" onChange={handleFieldChange('status')} displayEmpty>
+                {statusOptionsFromMaster.length > 0 ? (
+                  statusOptionsFromMaster.map((option) => {
+                    let chipColors = { bgcolor: '#F5F5F5', color: '#757575' };
+
+                    if (option.value === '대기') {
+                      chipColors = { bgcolor: '#F5F5F5', color: '#757575' };
+                    } else if (option.value === '진행') {
+                      chipColors = { bgcolor: '#E3F2FD', color: '#1976D2' };
+                    } else if (option.value === '완료') {
+                      chipColors = { bgcolor: '#E8F5E9', color: '#388E3C' };
+                    } else if (option.value === '홀딩') {
+                      chipColors = { bgcolor: '#FFEBEE', color: '#D32F2F' };
                     }
-                  };
-                  return (
-                    <MenuItem key={status} value={status}>
-                      <Chip
-                        label={status}
-                        size="small"
-                        sx={{
-                          backgroundColor: getStatusColor(status).bgcolor,
-                          color: getStatusColor(status).color,
-                          fontSize: '13px',
-                          fontWeight: 400
-                        }}
-                      />
-                    </MenuItem>
-                  );
-                })}
+
+                    return (
+                      <MenuItem key={option.value} value={option.value}>
+                        <Chip
+                          label={option.label}
+                          size="small"
+                          sx={{
+                            backgroundColor: chipColors.bgcolor,
+                            color: chipColors.color,
+                            fontSize: '13px',
+                            fontWeight: 400
+                          }}
+                        />
+                      </MenuItem>
+                    );
+                  })
+                ) : (
+                  Education_STATUS.map((status) => {
+                    let chipColors = { bgcolor: '#F5F5F5', color: '#757575' };
+
+                    if (status === '대기') {
+                      chipColors = { bgcolor: '#F5F5F5', color: '#757575' };
+                    } else if (status === '진행') {
+                      chipColors = { bgcolor: '#E3F2FD', color: '#1976D2' };
+                    } else if (status === '완료') {
+                      chipColors = { bgcolor: '#E8F5E9', color: '#388E3C' };
+                    } else if (status === '홀딩') {
+                      chipColors = { bgcolor: '#FFEBEE', color: '#D32F2F' };
+                    }
+
+                    return (
+                      <MenuItem key={status} value={status}>
+                        <Chip
+                          label={status}
+                          size="small"
+                          sx={{
+                            backgroundColor: chipColors.bgcolor,
+                            color: chipColors.color,
+                            fontSize: '13px',
+                            fontWeight: 400
+                          }}
+                        />
+                      </MenuItem>
+                    );
+                  })
+                )}
               </Select>
             </FormControl>
           </Stack>
 
-          {/* 시작일, 완료일 - 2등분 배치 */}
+          {/* 네 번째 줄: 시작일 - 종료일 */}
           <Stack direction="row" spacing={2}>
             <TextField
               fullWidth
-              required
-              label="시작일"
+              label={
+                <span>
+                  시작일 <span style={{ color: 'red' }}>*</span>
+                </span>
+              }
               type="date"
-              value={educationState.startDate}
-              onChange={handleFieldChange('startDate')}
-              InputLabelProps={{
-                shrink: true,
-                sx: {
-                  '& .MuiInputLabel-asterisk': {
-                    color: 'red'
-                  }
-                }
-              }}
+              value={educationState.receptionDate}
+              onChange={handleFieldChange('receptionDate')}
+              InputLabelProps={{ shrink: true }}
               variant="outlined"
             />
 
             <TextField
               fullWidth
-              required
-              label="완료일"
+              label={
+                <span>
+                  종료일 <span style={{ color: 'red' }}>*</span>
+                </span>
+              }
               type="date"
-              value={educationState.endDate}
-              onChange={handleFieldChange('endDate')}
-              InputLabelProps={{
-                shrink: true,
-                sx: {
-                  '& .MuiInputLabel-asterisk': {
-                    color: 'red'
-                  }
-                }
-              }}
+              value={educationState.resolutionDate}
+              onChange={handleFieldChange('resolutionDate')}
+              InputLabelProps={{ shrink: true }}
               variant="outlined"
             />
           </Stack>
 
-          {/* 팀, 담당자 - 2등분 배치 */}
+          {/* 다섯 번째 줄: 팀 - 담당자 */}
           <Stack direction="row" spacing={2}>
             <TextField
               fullWidth
-              disabled
               label="팀"
-              required
-              value={educationState.team || ''}
-              InputLabelProps={{
-                shrink: true,
-                sx: {
-                  '& .MuiInputLabel-asterisk': {
-                    color: 'red'
-                  }
-                }
+              value={educationState.team}
+              onChange={handleFieldChange('team')}
+              variant="outlined"
+              InputLabelProps={{ shrink: true }}
+              InputProps={{
+                readOnly: true
               }}
               sx={{
-                '& .MuiInputBase-root.Mui-disabled': {
-                  backgroundColor: '#f5f5f5'
+                '& .MuiOutlinedInput-root': {
+                  backgroundColor: '#f5f5f5',
+                  '& fieldset': {
+                    borderColor: '#e0e0e0'
+                  },
+                  '&:hover fieldset': {
+                    borderColor: '#e0e0e0'
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: '#e0e0e0'
+                  }
                 },
-                '& .MuiInputBase-input.Mui-disabled': {
-                  WebkitTextFillColor: 'rgba(0, 0, 0, 0.7)'
-                },
-                '& .MuiInputLabel-root': {
-                  color: 'rgba(0, 0, 0, 0.7)'
-                },
-                '& .MuiInputLabel-root.Mui-disabled': {
-                  color: 'rgba(0, 0, 0, 0.7)'
+                '& .MuiInputBase-input': {
+                  color: '#666666'
                 }
               }}
             />
 
-            <TextField
-              fullWidth
-              disabled
-              label="담당자"
-              required
-              value={educationState.assignee || ''}
-              InputLabelProps={{
-                shrink: true,
-                sx: {
-                  '& .MuiInputLabel-asterisk': {
-                    color: 'red'
+            <FormControl fullWidth>
+              <InputLabel shrink>담당자</InputLabel>
+              <Select
+                value={educationState.assignee}
+                label="담당자"
+                onChange={handleFieldChange('assignee')}
+                disabled={true}
+                sx={{
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    borderColor: '#e0e0e0'
+                  },
+                  '&:hover .MuiOutlinedInput-notchedOutline': {
+                    borderColor: '#e0e0e0'
+                  },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    borderColor: '#e0e0e0'
+                  },
+                  backgroundColor: '#f5f5f5',
+                  '& .MuiSelect-select': {
+                    color: '#666666',
+                    WebkitTextFillColor: '#666666'
+                  },
+                  '&.Mui-disabled .MuiSelect-select': {
+                    color: '#666666',
+                    WebkitTextFillColor: '#666666'
                   }
-                }
-              }}
-              InputProps={{
-                startAdornment: (() => {
-                  // educationState.assignee에 해당하는 사용자 찾기
-                  const assigneeUser = users.find((user) => user.user_name === educationState.assignee);
+                }}
+                renderValue={(value) => {
+                  const user = userOptions.find(u => u.value === value);
+                  if (!user) return value;
                   return (
-                    assigneeUser && (
+                    <Stack direction="row" spacing={1.5} alignItems="center">
                       <Avatar
-                        src={assigneeUser.profile_image_url || assigneeUser.avatar_url}
-                        alt={assigneeUser.user_name}
-                        sx={{ width: 24, height: 24, mr: 0.25 }}
+                        src={user.avatar}
+                        alt={user.label}
+                        sx={{ width: 20, height: 20 }}
                       >
-                        {assigneeUser.user_name?.charAt(0)}
+                        {user.label?.charAt(0)}
                       </Avatar>
-                    )
+                      <Typography variant="body1" sx={{ color: '#666666' }}>
+                        {user.label}
+                      </Typography>
+                    </Stack>
                   );
-                })()
-              }}
-              sx={{
-                '& .MuiInputBase-root.Mui-disabled': {
-                  backgroundColor: '#f5f5f5'
-                },
-                '& .MuiInputBase-input.Mui-disabled': {
-                  WebkitTextFillColor: 'rgba(0, 0, 0, 0.7)'
-                },
-                '& .MuiInputLabel-root': {
-                  color: 'rgba(0, 0, 0, 0.7)'
-                },
-                '& .MuiInputLabel-root.Mui-disabled': {
-                  color: 'rgba(0, 0, 0, 0.7)'
-                }
-              }}
-            />
+                }}
+              >
+                {userOptions.length > 0 ? (
+                  userOptions.map((user) => (
+                    <MenuItem key={user.value} value={user.value} title={user.department}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Avatar
+                          src={user.avatar}
+                          sx={{ width: 20, height: 20, fontSize: '12px' }}
+                        >
+                          {user.label.charAt(0)}
+                        </Avatar>
+                        <Typography variant="body2">{user.label}</Typography>
+                      </Box>
+                    </MenuItem>
+                  ))
+                ) : (
+                  <MenuItem value="">사용자 목록 로딩중...</MenuItem>
+                )}
+              </Select>
+            </FormControl>
           </Stack>
 
-          {/* 등록일, 코드 - 2등분 배치 */}
+          {/* 여섯 번째 줄: 등록일 - 코드 */}
           <Stack direction="row" spacing={2}>
             <TextField
               fullWidth
               label="등록일"
-              disabled
+              type="date"
               value={educationState.registrationDate}
+              onChange={handleFieldChange('registrationDate')}
               InputLabelProps={{ shrink: true }}
               variant="outlined"
+              InputProps={{
+                readOnly: true
+              }}
               sx={{
-                '& .MuiInputBase-root': {
-                  backgroundColor: 'grey.100'
-                },
-                '& .MuiInputBase-input': {
-                  color: 'rgba(0, 0, 0, 0.87)',
-                  WebkitTextFillColor: 'rgba(0, 0, 0, 0.87)'
-                },
-                '& .MuiInputLabel-root': {
-                  color: 'rgba(0, 0, 0, 0.87)'
-                },
-                '& .MuiInputLabel-root.Mui-disabled': {
-                  color: 'rgba(0, 0, 0, 0.87)'
+                '& .MuiOutlinedInput-root': {
+                  backgroundColor: '#f5f5f5',
+                  '& fieldset': {
+                    borderColor: '#e0e0e0'
+                  }
                 }
               }}
             />
@@ -416,27 +554,21 @@ const OverviewTab = memo(
             <TextField
               fullWidth
               label="코드"
-              disabled
-              value={educationState.code}
+              value={education ? `MAIN-EDU-${new Date(education.registrationDate).getFullYear().toString().slice(-2)}-${String(education.no).padStart(3, '0')}` :
+                     `MAIN-EDU-${new Date().getFullYear().toString().slice(-2)}-XXX`}
               InputLabelProps={{ shrink: true }}
               variant="outlined"
+              InputProps={{
+                readOnly: true
+              }}
               sx={{
-                '& .MuiInputBase-root': {
-                  backgroundColor: 'grey.100'
-                },
-                '& .MuiInputBase-input': {
-                  color: 'rgba(0, 0, 0, 0.87)',
-                  WebkitTextFillColor: 'rgba(0, 0, 0, 0.87)'
-                },
-                '& .MuiInputLabel-root': {
-                  color: 'rgba(0, 0, 0, 0.87)'
-                },
-                '& .MuiInputLabel-root.Mui-disabled': {
-                  color: 'rgba(0, 0, 0, 0.87)'
+                '& .MuiOutlinedInput-root': {
+                  backgroundColor: '#f5f5f5'
                 }
               }}
             />
           </Stack>
+
         </Stack>
       </Box>
     );
@@ -445,7 +577,24 @@ const OverviewTab = memo(
 
 OverviewTab.displayName = 'OverviewTab';
 
-// 기록 탭 컴포넌트
+// 모던한 접기/펼치기 아이콘 컴포넌트
+const ExpandIcon = ({ expanded }: { expanded: boolean }) => (
+  <SvgIcon
+    sx={{
+      transition: 'transform 0.2s ease-in-out, color 0.2s ease-in-out',
+      transform: expanded ? 'rotate(0deg)' : 'rotate(-90deg)',
+      fontSize: '14px',
+      '&:hover': {
+        transform: expanded ? 'rotate(0deg) scale(1.1)' : 'rotate(-90deg) scale(1.1)',
+        color: 'primary.main'
+      }
+    }}
+  >
+    <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" />
+  </SvgIcon>
+);
+
+// 기록 탭 컴포넌트 (보안교육관리와 동일)
 const RecordTab = memo(
   ({
     comments,
@@ -564,7 +713,6 @@ const RecordTab = memo(
             flex: 1,
             maxHeight: '500px',
             overflowY: 'auto',
-            overflowX: 'hidden',
             minHeight: 0,
             pb: 0,
             '&::-webkit-scrollbar': {
@@ -727,7 +875,7 @@ const RecordTab = memo(
             alignItems: 'center',
             mt: 'auto',
             pt: 3,
-            pb: 4,
+            pb: 3,
             px: 4,
             borderTop: '1px solid',
             borderColor: 'divider',
@@ -786,7 +934,7 @@ const RecordTab = memo(
 
 RecordTab.displayName = 'RecordTab';
 
-// 자료 탭 컴포넌트 (DB 기반)
+// 자료 탭 컴포넌트 - DB 기반 파일 관리
 const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | string; currentUser?: any }) => {
   const {
     files,
@@ -796,78 +944,46 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
     deleteFile,
     isUploading,
     isDeleting
-  } = useSupabaseFiles(PAGE_IDENTIFIERS.EDUCATION, recordId);
+  } = useSupabaseFiles(PAGE_IDENTIFIERS.IT_Education, recordId);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
   const [editingMaterialText, setEditingMaterialText] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 파일 크기 포맷팅
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  // 파일 타입별 아이콘
-  const getFileIcon = (type: string): string => {
-    if (type.startsWith('image/')) return '🖼️';
-    if (type.startsWith('video/')) return '🎥';
-    if (type.startsWith('audio/')) return '🎵';
-    if (type.includes('pdf')) return '📄';
-    if (type.includes('word') || type.includes('document')) return '📝';
-    if (type.includes('excel') || type.includes('spreadsheet')) return '📊';
-    if (type.includes('powerpoint') || type.includes('presentation')) return '📋';
-    if (type.includes('zip') || type.includes('rar') || type.includes('archive')) return '📦';
-    return '📄';
-  };
-
-  // 파일 업로드 핸들러
   const handleFileUpload = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const selectedFiles = event.target.files;
-      if (!selectedFiles || selectedFiles.length === 0) return;
-
-      // recordId가 없으면 저장 먼저 하라고 알림
       if (!recordId) {
-        alert('파일을 업로드하려면 먼저 교육을 저장해주세요.');
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
+        alert('파일을 업로드하려면 먼저 Education를 저장해주세요.');
         return;
       }
 
-      // 각 파일을 업로드
-      for (const file of Array.from(selectedFiles)) {
-        const uploadInput = {
-          page: PAGE_IDENTIFIERS.EDUCATION,
-          record_id: String(recordId),
-          user_id: currentUser?.id,
-          user_name: currentUser?.name || '알 수 없음',
-          team: currentUser?.department,
-          metadata: {
-            original_name: file.name
-          }
-        };
+      const fileList = event.target.files;
+      if (!fileList || fileList.length === 0) return;
 
-        const result = await uploadFile(file, uploadInput);
+      const uploadPromises = Array.from(fileList).map(async (file) => {
+        const result = await uploadFile(file, {
+          page: PAGE_IDENTIFIERS.IT_Education,
+          record_id: String(recordId),
+          user_id: undefined,
+          user_name: currentUser?.user_name || '알 수 없음',
+          team: currentUser?.department
+        });
+
         if (!result.success) {
-          console.error('파일 업로드 실패:', result.error);
           alert(`파일 업로드 실패: ${result.error}`);
         }
-      }
+      });
+
+      await Promise.all(uploadPromises);
 
       // 파일 입력 초기화
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     },
-    [recordId, currentUser, uploadFile]
+    [recordId, uploadFile, currentUser]
   );
 
-  // 파일명 수정 핸들러
   const handleEditMaterial = useCallback((fileId: string, fileName: string) => {
     setEditingMaterialId(fileId);
     setEditingMaterialText(fileName);
@@ -876,16 +992,15 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
   const handleSaveEditMaterial = useCallback(async () => {
     if (!editingMaterialText.trim() || !editingMaterialId) return;
 
-    const result = await updateFile(editingMaterialId, {
-      file_name: editingMaterialText.trim()
-    });
-
-    if (result.success) {
+    try {
+      await updateFile(editingMaterialId, {
+        file_name: editingMaterialText.trim()
+      });
       setEditingMaterialId(null);
       setEditingMaterialText('');
-    } else {
-      console.error('파일명 수정 실패:', result.error);
-      alert(`파일명 수정 실패: ${result.error}`);
+    } catch (error) {
+      console.error('파일명 수정 실패:', error);
+      alert('파일명 수정에 실패했습니다.');
     }
   }, [editingMaterialText, editingMaterialId, updateFile]);
 
@@ -894,39 +1009,66 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
     setEditingMaterialText('');
   }, []);
 
-  // 파일 삭제 핸들러
   const handleDeleteMaterial = useCallback(
     async (fileId: string) => {
-      if (!confirm('이 파일을 삭제하시겠습니까?')) return;
+      if (!confirm('파일을 삭제하시겠습니까?')) return;
 
-      const result = await deleteFile(fileId);
-      if (!result.success) {
-        console.error('파일 삭제 실패:', result.error);
-        alert(`파일 삭제 실패: ${result.error}`);
+      try {
+        await deleteFile(fileId);
+      } catch (error) {
+        console.error('파일 삭제 실패:', error);
+        alert('파일 삭제에 실패했습니다.');
       }
     },
     [deleteFile]
   );
 
-  // 파일 다운로드 핸들러
-  const handleDownloadMaterial = useCallback((file: FileData) => {
-    if (file.file_url) {
+  const handleDownloadMaterial = useCallback(async (file: FileData) => {
+    try {
+      const response = await fetch(file.file_url);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = file.file_url;
+      link.href = url;
       link.download = file.file_name;
-      link.target = '_blank';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    } else {
-      alert('다운로드할 파일이 없습니다.');
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('파일 다운로드 실패:', error);
+      alert('파일 다운로드에 실패했습니다.');
     }
   }, []);
 
-  // 업로드 버튼 클릭
   const handleUploadClick = useCallback(() => {
+    if (!recordId) {
+      alert('파일을 업로드하려면 먼저 Education를 저장해주세요.');
+      return;
+    }
     fileInputRef.current?.click();
-  }, []);
+  }, [recordId]);
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const getFileIcon = (fileName: string): string => {
+    const ext = fileName.split('.').pop()?.toLowerCase() || '';
+    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp'].includes(ext)) return '🖼️';
+    if (['mp4', 'avi', 'mov', 'wmv', 'flv', 'mkv'].includes(ext)) return '🎥';
+    if (['mp3', 'wav', 'flac', 'aac', 'ogg'].includes(ext)) return '🎵';
+    if (ext === 'pdf') return '📄';
+    if (['doc', 'docx', 'txt'].includes(ext)) return '📝';
+    if (['xls', 'xlsx', 'csv'].includes(ext)) return '📊';
+    if (['ppt', 'pptx'].includes(ext)) return '📋';
+    if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return '📦';
+    return '📄';
+  };
 
   return (
     <Box sx={{ height: '650px', px: '5%' }}>
@@ -955,13 +1097,13 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
           <Stack spacing={2} alignItems="center">
             <Typography fontSize="48px">📁</Typography>
             <Typography variant="h6" color="primary.main">
-              파일을 업로드하세요
+              {isUploading ? '파일 업로드 중...' : '파일을 업로드하세요'}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               클릭하거나 파일을 여기로 드래그하세요
             </Typography>
-            <Button variant="contained" size="small" startIcon={<Typography>📤</Typography>} disabled={isUploading}>
-              {isUploading ? '업로드 중...' : '파일 선택'}
+            <Button variant="contained" size="small" startIcon={<Typography>📤</Typography>} disabled={isUploading || !recordId}>
+              파일 선택
             </Button>
           </Stack>
         </Paper>
@@ -969,15 +1111,15 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
 
       {/* 자료 항목들 */}
       <Box sx={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-        {filesLoading && files.length === 0 ? (
-          <Box sx={{ textAlign: 'center', py: 4 }}>
+        {filesLoading ? (
+          <Box sx={{ p: 4, textAlign: 'center' }}>
             <Typography variant="body2" color="text.secondary">
-              파일 목록을 불러오는 중...
+              파일 목록 로딩 중...
             </Typography>
           </Box>
         ) : (
           <Stack spacing={2}>
-            {files.map((file) => (
+            {files.map((file: FileData) => (
               <Paper
                 key={file.id}
                 variant="outlined"
@@ -1007,17 +1149,17 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                       justifyContent: 'center'
                     }}
                   >
-                    <Typography fontSize="24px">{getFileIcon(file.file_type || '')}</Typography>
+                    <Typography fontSize="24px">{getFileIcon(file.file_name)}</Typography>
                   </Box>
 
                   {/* 파일 정보 영역 */}
                   <Box sx={{ flexGrow: 1 }}>
-                    {editingMaterialId === String(file.id) ? (
+                    {editingMaterialId === file.id ? (
                       <TextField
                         fullWidth
                         value={editingMaterialText}
                         onChange={(e) => setEditingMaterialText(e.target.value)}
-                        onKeyDown={(e) => {
+                        onKeyPress={(e) => {
                           if (e.key === 'Enter') handleSaveEditMaterial();
                           if (e.key === 'Escape') handleCancelEditMaterial();
                         }}
@@ -1038,20 +1180,20 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                             px: 1
                           }
                         }}
-                        onClick={() => handleEditMaterial(String(file.id), file.file_name)}
+                        onClick={() => handleEditMaterial(file.id, file.file_name)}
                       >
                         {file.file_name}
                       </Typography>
                     )}
                     <Typography variant="caption" color="text.secondary">
-                      {file.file_type} • {formatFileSize(file.file_size)}
-                      {file.created_at && ` • ${new Date(file.created_at).toLocaleDateString('ko-KR')}`}
+                      {formatFileSize(file.file_size)} • {new Date(file.created_at).toLocaleDateString('ko-KR')}
+                      {file.uploaded_by && ` • ${file.uploaded_by}`}
                     </Typography>
                   </Box>
 
                   {/* 액션 버튼들 */}
                   <Stack direction="row" spacing={1}>
-                    {editingMaterialId === String(file.id) ? (
+                    {editingMaterialId === file.id ? (
                       <>
                         <IconButton size="small" onClick={handleSaveEditMaterial} color="success" sx={{ p: 0.5 }} title="저장">
                           <Typography fontSize="14px">✓</Typography>
@@ -1073,7 +1215,7 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                         </IconButton>
                         <IconButton
                           size="small"
-                          onClick={() => handleEditMaterial(String(file.id), file.file_name)}
+                          onClick={() => handleEditMaterial(file.id, file.file_name)}
                           color="primary"
                           sx={{ p: 0.5 }}
                           title="수정"
@@ -1082,7 +1224,7 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                         </IconButton>
                         <IconButton
                           size="small"
-                          onClick={() => handleDeleteMaterial(String(file.id))}
+                          onClick={() => handleDeleteMaterial(file.id)}
                           color="error"
                           sx={{ p: 0.5 }}
                           title="삭제"
@@ -1140,461 +1282,406 @@ interface EducationEditDialogProps {
   onSave: (education: EducationData) => void;
   assignees: string[];
   assigneeAvatars: Record<string, string>;
-  educationCategories?: string[];
-  educationMethods?: string[];
-  statusOptions?: string[];
-  departments?: string[];
-  educations?: EducationData[];
+  statusOptions: string[];
+  statusColors: Record<string, any>;
+  teams?: string[];
 }
 
-const EducationEditDialog = memo(({ open, onClose, education, onSave, assignees, assigneeAvatars, educationCategories = ['기술', '리더십', '외국어'], educationMethods = ['온라인', '세미나', '워크샵', '집합교육2'], statusOptions = ['예정', '진행중', '완료', '보류'], departments = ['개발팀', '기획팀', '디자인팀'], educations = [] }: EducationEditDialogProps) => {
-  // 사용자 정보 가져오기
-  const user = useUser();
-  const { users } = useSupabaseUserManagement();
+const EducationEditDialog = memo(
+  ({ open, onClose, education, onSave, assignees, assigneeAvatars, statusOptions, statusColors, teams }: EducationEditDialogProps) => {
+    // 성능 모니터링
+    // const { renderCount, logStats } = usePerformanceMonitor('EducationEditDialog');
 
-  const [editTab, setEditTab] = useState(0);
-  const [educationState, dispatch] = useReducer(editEducationReducer, {
-    content: '',
-    description: '',
-    assignee: '',
-    status: '대기',
-    code: '',
-    registrationDate: new Date().toISOString().split('T')[0],
-    startDate: '',
-    endDate: '',
-    team: '',
-    category: '',
-    type: ''
-  });
+    // 세션 정보
+    const { data: session } = useSession();
 
-  // 피드백/기록 훅
-  const {
-    feedbacks,
-    loading: feedbackLoading,
-    error: feedbackError,
-    fetchFeedbacks,
-    addFeedback,
-    updateFeedback,
-    deleteFeedback
-  } = useSupabaseFeedback(PAGE_IDENTIFIERS.EDUCATION, education?.id);
+    // 사용자 관리 훅
+    const { users } = useSupabaseUserManagement();
 
-  // 기록 상태 관리
-  const [newComment, setNewComment] = useState('');
-  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
-  const [editingCommentText, setEditingCommentText] = useState('');
-  // 임시 저장된 기록들 (저장 버튼 클릭 시 DB에 저장)
-  const [pendingComments, setPendingComments] = useState<Array<{
-    id: string;
-    content: string;
-    timestamp: string;
-    author: string;
-    avatar?: string;
-    department?: string;
-    position?: string;
-    role?: string;
-    isNew: boolean;
-  }>>([]);
-  // 수정된 기록들 추적
-  const [modifiedComments, setModifiedComments] = useState<{[key: string]: string}>({});
-  // 삭제된 기록 ID들
-  const [deletedCommentIds, setDeletedCommentIds] = useState<string[]>([]);
+    // 현재 로그인한 사용자 정보
+    const currentUser = useMemo(() => {
+      if (!session?.user?.email || users.length === 0) return null;
+      return users.find((u) => u.email === session.user.email);
+    }, [session, users]);
 
-  // Supabase feedbacks를 RecordTab 형식으로 변환
-  const comments = useMemo(() => {
-    const existingComments = feedbacks
-      .filter(feedback => !deletedCommentIds.includes(String(feedback.id)))
-      .map((feedback) => {
+    // 피드백 훅 사용 (DB 연동)
+    const {
+      feedbacks,
+      loading: feedbackLoading,
+      addFeedback,
+      updateFeedback,
+      deleteFeedback
+    } = useSupabaseFeedback(PAGE_IDENTIFIERS.IT_Education, education?.id?.toString());
+
+    // 🔄 임시 저장: 로컬 state로 기록 관리
+    const [pendingFeedbacks, setPendingFeedbacks] = useState<FeedbackData[]>([]);
+    const [initialFeedbacks, setInitialFeedbacks] = useState<FeedbackData[]>([]);
+
+    // 초기화 여부를 추적 (무한 루프 방지)
+    const feedbacksInitializedRef = useRef(false);
+    const feedbacksRef = useRef<FeedbackData[]>([]);
+
+    const [editTab, setEditTab] = useState(0);
+    const [draggedItemId, setDraggedItemId] = useState<number | null>(null);
+    const [educationState, dispatch] = useReducer(editEducationReducer, {
+      customerName: '',
+      companyName: '',
+      educationType: '',
+      channel: '전화',
+      title: '',
+      content: '',
+      responseContent: '',
+      assignee: '',
+      status: '접수',
+      priority: '',
+      registrationDate: new Date().toISOString().split('T')[0],
+      receptionDate: new Date().toISOString().split('T')[0],
+      resolutionDate: '',
+      team: ''
+    });
+
+    // 코드 자동 생성 함수
+    const generateEducationCode = useCallback(() => {
+      const currentYear = new Date().getFullYear();
+      const currentYearStr = currentYear.toString().slice(-2); // 연도 뒤 2자리
+
+      // 현재 연도의 Education 개수를 기반으로 순번 생성 (실제 구현에서는 서버에서 처리)
+      // 여기서는 간단히 현재 시간을 기반으로 순번 생성
+      const sequence = String(Date.now()).slice(-3).padStart(3, '0');
+
+      return `Education-${currentYearStr}-${sequence}`;
+    }, []);
+
+    // 현재 날짜 생성 함수
+    const getCurrentDate = useCallback(() => {
+      const today = new Date();
+      return today.toISOString().split('T')[0]; // YYYY-MM-DD 형식
+    }, []);
+
+    // Education 변경 시 상태 업데이트
+    React.useEffect(() => {
+      if (education) {
+        dispatch({ type: 'SET_TASK', education });
+      } else if (open) {
+        // 새 Education 생성 시 자동으로 등록일 설정
+        const newRegistrationDate = getCurrentDate();
+        dispatch({ type: 'INIT_NEW_TASK', registrationDate: newRegistrationDate });
+
+        // 로그인한 사용자 정보로 팀과 담당자 자동 설정
+        if (currentUser) {
+          dispatch({ type: 'SET_FIELD', field: 'team', value: currentUser.department || '' });
+          dispatch({ type: 'SET_FIELD', field: 'assignee', value: currentUser.user_name || '' });
+        }
+      }
+    }, [education, open, getCurrentDate, currentUser]);
+
+    // 성능 모니터링 로그 제거 (프로덕션 준비)
+    // useEffect(() => {
+    //   if (process.env.NODE_ENV === 'development' && renderCount > 1) {
+    //     console.log(`🔄 EducationEditDialog 렌더링 횟수: ${renderCount}`);
+    //     if (renderCount % 10 === 0) {
+    //       const stats = logStats();
+    //       console.log('📊 EducationEditDialog 성능 통계:', stats);
+    //     }
+    //   }
+    // }, [renderCount, logStats]);
+
+    // feedbacks를 ref에 저장 (dependency 문제 방지)
+    useEffect(() => {
+      feedbacksRef.current = feedbacks;
+    }, [feedbacks]);
+
+    // DB에서 가져온 feedbacks를 pendingFeedbacks로 초기화
+    useEffect(() => {
+      if (open && education?.id && !feedbacksInitializedRef.current) {
+        // feedbacks 데이터가 로드될 때까지 기다렸다가 초기화
+        if (feedbacks.length > 0) {
+          setPendingFeedbacks(feedbacks);
+          setInitialFeedbacks(feedbacks);
+          feedbacksInitializedRef.current = true;
+          console.log('✅ Education관리 기록 초기화:', feedbacks.length, '개');
+        }
+      }
+
+      // 다이얼로그 닫힐 때 초기화 플래그 리셋
+      if (!open) {
+        feedbacksInitializedRef.current = false;
+        setPendingFeedbacks([]);
+        setInitialFeedbacks([]);
+      }
+    }, [open, education?.id, feedbacks]);
+
+    // 코멘트 상태 - pendingFeedbacks에서 변환
+    const comments = useMemo(() => {
+      return pendingFeedbacks.map((feedback) => {
+        // user_name으로 사용자 찾기
         const feedbackUser = users.find((u) => u.user_name === feedback.user_name);
-        const feedbackIdStr = String(feedback.id);
-        const content = modifiedComments[feedbackIdStr] || feedback.description;
+
         return {
-          id: feedbackIdStr,
+          id: feedback.id,
           author: feedback.user_name,
-          content: content,
+          content: feedback.description,
           timestamp: new Date(feedback.created_at).toLocaleString('ko-KR'),
           avatar: feedback.user_profile_image || feedbackUser?.profile_image_url || undefined,
           department: feedback.user_department || feedback.team || feedbackUser?.department || '',
           position: feedback.user_position || feedbackUser?.position || '',
-          role: feedback.metadata?.role || feedbackUser?.role || '',
-          isNew: false
+          role: feedback.metadata?.role || feedbackUser?.role || ''
         };
       });
+    }, [pendingFeedbacks, users]);
 
-    const newComments = pendingComments.map(comment => ({
-      ...comment,
-      isNew: true
-    }));
+    const [newComment, setNewComment] = useState('');
+    const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+    const [editingCommentText, setEditingCommentText] = useState('');
 
-    return [...newComments, ...existingComments];
-  }, [feedbacks, users, pendingComments, modifiedComments, deletedCommentIds]);
+    // 에러 상태
+    const [validationError, setValidationError] = useState<string>('');
 
+    // Education 변경 시 상태 업데이트
+    React.useEffect(() => {
+      if (education) {
+        dispatch({ type: 'SET_TASK', education });
+      }
+    }, [education]);
 
-  // 코드 자동 생성 함수
-  const generateEducationCode = useCallback(() => {
-    const year = new Date().getFullYear().toString().slice(-2);
+    // 최적화된 핸들러들
+    const handleFieldChange = useCallback((field: keyof EditEducationState, value: string) => {
+      dispatch({ type: 'SET_FIELD', field, value });
+    }, []);
 
-    // 모든 교육 데이터에서 번호 추출 (PSEDU, MAIN-EDUCATION 둘 다 지원)
-    const allNumbers = educations
-      .filter((e) => e.code)
-      .map((e) => {
-        const codeParts = e.code.split('-');
-        // MAIN-EDUCATION-25-001 형식
-        if (codeParts.length === 4 && codeParts[0] === 'MAIN' && codeParts[1] === 'EDUCATION') {
-          return parseInt(codeParts[3]) || 0;
-        }
-        // PSEDU-25-001 형식
-        if (codeParts.length === 3 && codeParts[0] === 'PSEDU') {
-          return parseInt(codeParts[2]) || 0;
-        }
-        return 0;
-      })
-      .filter(num => num > 0);
+    const handleTabChange = useCallback((event: React.SyntheticEvent, newValue: number) => {
+      setEditTab(newValue);
+    }, []);
 
-    const maxNumber = allNumbers.length > 0 ? Math.max(...allNumbers) : 0;
-    const code = `MAIN-EDUCATION-${year}-${(maxNumber + 1).toString().padStart(3, '0')}`;
-
-    return code;
-  }, [educations]);
-
-  // 현재 날짜 생성 함수
-  const getCurrentDate = useCallback(() => {
-    const today = new Date();
-    return today.toISOString().split('T')[0]; // YYYY-MM-DD 형식
-  }, []);
-
-  // 교육 변경 시 상태 업데이트
-  React.useEffect(() => {
-    if (education) {
-      dispatch({ type: 'SET_EDUCATION', education });
-    } else if (open) {
-      // 새 교육 추가 시 API에서 다음 코드 가져오기
-      const initNewEducation = async () => {
-        try {
-          console.log('✅ API 호출 시작: /api/education/next-code');
-          const response = await fetch('/api/education/next-code');
-          const result = await response.json();
-          console.log('✅ API 응답:', result);
-
-          if (response.ok && result.code) {
-            const newCode = result.code;
-            const today = new Date().toISOString().split('T')[0];
-            console.log('✅ 생성된 코드:', newCode);
-            dispatch({ type: 'INIT_NEW_EDUCATION', code: newCode, registrationDate: today, startDate: today });
-          } else {
-            console.error('❌ 코드 생성 API 오류:', result);
-            // 실패 시 임시 코드 사용
-            const tempCode = `MAIN-EDU-TEMP-${Date.now()}`;
-            const today = new Date().toISOString().split('T')[0];
-            dispatch({ type: 'INIT_NEW_EDUCATION', code: tempCode, registrationDate: today, startDate: today });
-          }
-        } catch (error) {
-          console.error('❌ 코드 생성 API 호출 실패:', error);
-          // 실패 시 임시 코드 사용
-          const tempCode = `MAIN-EDU-TEMP-${Date.now()}`;
-          const today = new Date().toISOString().split('T')[0];
-          dispatch({ type: 'INIT_NEW_EDUCATION', code: tempCode, registrationDate: today, startDate: today });
-        }
-      };
-
-      initNewEducation();
-    }
-  }, [education, open]);
-
-  // 팀을 로그인한 사용자의 부서로 자동 설정
-  useEffect(() => {
-    if (user && typeof user !== 'boolean' && user.department && !educationState.team && !education && open) {
-      dispatch({ type: 'SET_FIELD', field: 'team', value: user.department });
-    }
-  }, [user, educationState.team, education, open]);
-
-  // 담당자를 로그인한 사용자로 자동 설정
-  useEffect(() => {
-    if (user && typeof user !== 'boolean' && user.name && !educationState.assignee && !education && open) {
-      dispatch({ type: 'SET_FIELD', field: 'assignee', value: user.name });
-    }
-  }, [user, educationState.assignee, education, open]);
-
-  // 에러 상태
-  const [validationError, setValidationError] = useState<string>('');
-
-  // 최적화된 핸들러들
-  const handleFieldChange = useCallback((field: keyof EditEducationState, value: string) => {
-    dispatch({ type: 'SET_FIELD', field, value });
-  }, []);
-
-  const handleTabChange = useCallback((event: React.SyntheticEvent, newValue: number) => {
-    setEditTab(newValue);
-  }, []);
-
-  // 기록 핸들러들
-  const handleAddComment = useCallback(() => {
-    if (!newComment.trim()) return;
-
-    // 현재 사용자 정보 가져오기
-    const feedbackUser = users.find((u) => u.user_name === user?.name);
-    const currentUserName = feedbackUser?.user_name || user?.name || '현재 사용자';
-    const currentTeam = feedbackUser?.department || user?.department || '';
-    const currentPosition = feedbackUser?.position || '';
-    const currentProfileImage = feedbackUser?.profile_image_url || '';
-    const currentRole = feedbackUser?.role || '';
-
-    // DB에 바로 저장하지 않고 임시 저장 (저장 버튼 클릭 시 DB 저장)
-    const tempComment = {
-      id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      content: newComment,
-      timestamp: new Date().toLocaleString('ko-KR'),
-      author: currentUserName,
-      avatar: currentProfileImage || undefined,
-      department: currentTeam,
-      position: currentPosition,
-      role: currentRole,
-      isNew: true
-    };
-
-    setPendingComments(prev => [tempComment, ...prev]);
-    setNewComment('');
-  }, [newComment, users, user]);
-
-  const handleEditComment = useCallback((commentId: string, content: string) => {
-    setEditingCommentId(commentId);
-    setEditingCommentText(content);
-  }, []);
-
-  const handleSaveEditComment = useCallback(() => {
-    if (!editingCommentText.trim() || !editingCommentId) return;
-
-    // 임시 저장된 기록인지 확인 (ID가 temp_로 시작)
-    if (editingCommentId.startsWith('temp_')) {
-      // pendingComments에서 직접 수정
-      setPendingComments(prev =>
-        prev.map(comment =>
-          comment.id === editingCommentId
-            ? { ...comment, content: editingCommentText }
-            : comment
-        )
-      );
-    } else {
-      // 기존 DB 데이터는 수정 목록에 추가 (저장 시 DB 업데이트)
-      setModifiedComments(prev => ({
-        ...prev,
-        [editingCommentId]: editingCommentText
-      }));
-    }
-
-    setEditingCommentId(null);
-    setEditingCommentText('');
-  }, [editingCommentText, editingCommentId]);
-
-  const handleCancelEditComment = useCallback(() => {
-    setEditingCommentId(null);
-    setEditingCommentText('');
-  }, []);
-
-  const handleDeleteComment = useCallback((commentId: string) => {
-    // 임시 저장된 기록인지 확인 (ID가 temp_로 시작)
-    if (commentId.startsWith('temp_')) {
-      // pendingComments에서 직접 삭제
-      setPendingComments(prev => prev.filter(comment => comment.id !== commentId));
-    } else {
-      // 기존 DB 데이터는 삭제 목록에 추가 (저장 시 DB에서 삭제)
-      setDeletedCommentIds(prev => [...prev, commentId]);
-    }
-  }, []);
-
-
-  const handleSave = useCallback(async () => {
-    // 필수 입력 검증
-    if (!educationState.content.trim()) {
-      setValidationError('교육내용을 입력해주세요.');
-      return;
-    }
-
-    if (!educationState.category) {
-      setValidationError('교육분류를 선택해주세요.');
-      return;
-    }
-
-    if (!educationState.type) {
-      setValidationError('교육방식을 선택해주세요.');
-      return;
-    }
-
-    if (!educationState.startDate) {
-      setValidationError('시작일을 선택해주세요.');
-      return;
-    }
-
-    if (!educationState.endDate) {
-      setValidationError('완료일을 선택해주세요.');
-      return;
-    }
-
-    if (!educationState.team.trim()) {
-      setValidationError('팀을 선택해주세요.');
-      return;
-    }
-
-    if (!educationState.assignee.trim()) {
-      setValidationError('담당자를 선택해주세요.');
-      return;
-    }
-
-    // 에러 초기화
-    setValidationError('');
-
-    let educationId: number;
-
-    if (!education) {
-      // 새 교육 생성
-      const newEducation: EducationData = {
-        id: Date.now(),
-        no: Date.now(),
+    const handleSave = useCallback(async () => {
+      // OverviewTab의 현재 입력값 가져오기
+      const currentValues = (window as any).getOverviewTabCurrentValues?.() || {
         content: educationState.content,
-        description: educationState.description,
-        assignee: educationState.assignee,
-        status: educationState.status,
-        code: educationState.code,
-        registrationDate: educationState.registrationDate,
-        startDate: educationState.startDate,
-        endDate: educationState.endDate,
-        team: educationState.team,
-        category: educationState.category,
-        type: educationState.type
+        responseContent: educationState.responseContent
       };
 
-      educationId = newEducation.id;
-      onSave(newEducation);
-    } else {
-      // 기존 교육 수정
-      const updatedEducation: EducationData = {
-        ...education,
-        content: educationState.content,
-        description: educationState.description,
-        assignee: educationState.assignee,
-        status: educationState.status,
-        startDate: educationState.startDate,
-        endDate: educationState.endDate,
-        team: educationState.team,
-        category: educationState.category,
-        type: educationState.type,
-        code: educationState.code,
-        registrationDate: educationState.registrationDate
-      };
-
-      educationId = updatedEducation.id;
-      onSave(updatedEducation);
-    }
-
-    // 기록(피드백) 데이터 저장
-    console.log('📝 기록 데이터 저장 시작');
-    console.log('📝 삭제할 기록:', deletedCommentIds.length, '개');
-    console.log('📝 수정할 기록:', Object.keys(modifiedComments).length, '개');
-    console.log('📝 추가할 기록:', pendingComments.length, '개');
-
-    try {
-      // 삭제된 기록들 처리
-      if (deletedCommentIds.length > 0) {
-        for (const commentId of deletedCommentIds) {
-          await deleteFeedback(Number(commentId));
-          console.log('✅ 기록 삭제 완료:', commentId);
-        }
+      // 필수 입력 검증
+      if (!educationState.title || !educationState.title.trim()) {
+        setValidationError('제목을 입력해주세요.');
+        return;
       }
 
-      // 수정된 기록들 처리
-      if (Object.keys(modifiedComments).length > 0) {
-        for (const [commentId, newContent] of Object.entries(modifiedComments)) {
-          await updateFeedback(Number(commentId), { description: newContent });
-          console.log('✅ 기록 수정 완료:', commentId);
-        }
+      if (!educationState.customerName || !educationState.customerName.trim()) {
+        setValidationError('교육분야를 선택해주세요.');
+        return;
       }
 
-      // 새로 추가된 기록들 처리
-      if (pendingComments.length > 0) {
-        console.log('📝 기록 추가 시작:', {
-          '기록 개수': pendingComments.length,
-          '교육 ID (원본)': educationId,
-          '교육 ID (타입)': typeof educationId,
-          '교육 ID (문자열 변환)': String(educationId)
+      if (!educationState.educationType || !educationState.educationType.trim()) {
+        setValidationError('교육유형을 선택해주세요.');
+        return;
+      }
+
+      if (!educationState.receptionDate || !educationState.receptionDate.trim()) {
+        setValidationError('시작일을 선택해주세요.');
+        return;
+      }
+
+      if (!educationState.resolutionDate || !educationState.resolutionDate.trim()) {
+        setValidationError('종료일을 선택해주세요.');
+        return;
+      }
+
+      // 에러 초기화
+      setValidationError('');
+
+      // 🔄 기록 탭 변경사항 DB 저장
+      console.log('💾 기록 탭 변경사항 저장 시작');
+      console.time('⏱️ 기록 저장 Total');
+
+      if (education?.id) {
+        // 추가된 기록 (temp- ID)
+        const addedFeedbacks = pendingFeedbacks.filter(fb =>
+          fb.id.toString().startsWith('temp-') &&
+          !initialFeedbacks.find(initial => initial.id === fb.id)
+        );
+
+        // 수정된 기록
+        const updatedFeedbacks = pendingFeedbacks.filter(fb => {
+          if (fb.id.toString().startsWith('temp-')) return false;
+          const initial = initialFeedbacks.find(initial => initial.id === fb.id);
+          return initial && initial.description !== fb.description;
         });
 
-        for (const comment of pendingComments) {
-          const feedbackInput = {
-            page: PAGE_IDENTIFIERS.EDUCATION,
-            record_id: String(educationId),
-            action_type: '기록',
-            description: comment.content,
-            user_name: comment.author,
-            team: comment.department || '',
-            user_department: comment.department || '',
-            user_position: comment.position || '',
-            user_profile_image: comment.avatar || '',
-            metadata: { role: comment.role || '' }
-          };
+        // 삭제된 기록
+        const deletedFeedbacks = initialFeedbacks.filter(initial =>
+          !pendingFeedbacks.find(pending => pending.id === initial.id)
+        );
 
-          console.log('📝 기록 추가 상세:', {
-            'record_id': feedbackInput.record_id,
-            'record_id 타입': typeof feedbackInput.record_id,
-            'description': comment.content.substring(0, 30) + '...'
-          });
-
-          await addFeedback(feedbackInput);
-          console.log('✅ 기록 추가 완료:', comment.content.substring(0, 20) + '...');
+        // 추가 (역순으로 저장)
+        const reversedAddedFeedbacks = [...addedFeedbacks].reverse();
+        for (const feedback of reversedAddedFeedbacks) {
+          const { id, created_at, user_id, ...feedbackData } = feedback;
+          await addFeedback(feedbackData);
         }
+
+        // 수정
+        for (const feedback of updatedFeedbacks) {
+          await updateFeedback(String(feedback.id), {
+            description: feedback.description
+          });
+        }
+
+        // 삭제 - feedbacks 배열에 존재하는 항목만 삭제
+        for (const feedback of deletedFeedbacks) {
+          const existsInFeedbacks = feedbacks.some(fb => String(fb.id) === String(feedback.id));
+          if (existsInFeedbacks) {
+            await deleteFeedback(String(feedback.id));
+          } else {
+            console.warn(`⚠️ 피드백 ${feedback.id}가 feedbacks 배열에 없어 삭제 건너뜀 (이미 삭제됨)`);
+          }
+        }
+
+        console.timeEnd('⏱️ 기록 저장 Total');
+        console.log('✅ 기록 탭 변경사항 저장 완료');
       }
 
-      console.log('✅ 기록 데이터 저장 완료');
+      // 약간의 지연을 두고 저장 (상태 업데이트 완료 대기)
+      setTimeout(async () => {
+        if (!education) {
+          // 새 Education 생성
+          const newEducation: EducationData = {
+            id: Date.now(),
+            no: Date.now(),
+            registrationDate: educationState.registrationDate || new Date().toISOString().split('T')[0],
+            receptionDate: new Date().toISOString().split('T')[0],
+            customerName: educationState.customerName,
+            companyName: '',
+            educationType: educationState.educationType,
+            channel: '전화',
+            title: educationState.title,
+            content: currentValues.content,
+            team: currentUser?.department || '',
+            assignee: currentUser?.user_name || '',
+            status: educationState.status,
+            priority: educationState.priority,
+            responseContent: currentValues.responseContent,
+            resolutionDate: educationState.resolutionDate,
+            satisfactionScore: null,
+            attachments: []
+          };
 
-      // 저장 후 임시 데이터 초기화
-      setPendingComments([]);
-      setModifiedComments({});
-      setDeletedCommentIds([]);
-    } catch (error) {
-      console.error('❌ 기록 데이터 저장 중 오류:', error);
-      console.warn('⚠️ 기록 저장에 실패했지만 교육 데이터는 저장되었습니다.');
-    }
+          console.log('🚀 새 Education 생성 중:', newEducation);
+          console.log('👤 현재 사용자 정보:', { department: currentUser?.department, name: currentUser?.user_name });
+          onSave(newEducation);
+        } else {
+          // 기존 Education 수정
+          const updatedEducation: EducationData = {
+            ...education,
+            customerName: educationState.customerName,
+            educationType: educationState.educationType,
+            title: educationState.title,
+            content: currentValues.content,
+            assignee: educationState.assignee,
+            status: educationState.status,
+            priority: educationState.priority,
+            responseContent: currentValues.responseContent,
+            resolutionDate: educationState.resolutionDate
+          };
 
-    onClose();
-  }, [education, educationState, onSave, onClose, deletedCommentIds, modifiedComments, pendingComments, deleteFeedback, updateFeedback, addFeedback]);
+          console.log('📝 기존 Education 수정 중:', updatedEducation);
+          onSave(updatedEducation);
+        }
+        onClose();
+      }, 50); // 50ms 지연
+    }, [education, educationState, onSave, onClose, dispatch, pendingFeedbacks, initialFeedbacks, feedbacks, addFeedback, updateFeedback, deleteFeedback]);
 
-  const handleClose = useCallback(() => {
-    setEditTab(0);
-    dispatch({ type: 'RESET' });
-    setPendingComments([]);
-    setModifiedComments({});
-    setDeletedCommentIds([]);
-    setNewComment('');
-    setEditingCommentId(null);
-    setEditingCommentText('');
-    setValidationError('');
-    onClose();
-  }, [onClose]);
+    const handleClose = useCallback(() => {
+      setEditTab(0);
+      dispatch({ type: 'RESET' });
+      setNewComment('');
+      setEditingCommentId(null);
+      setEditingCommentText('');
+      setValidationError(''); // 에러 상태 초기화
+      // 🔄 기록 탭 임시 데이터 초기화
+      setPendingFeedbacks([]);
+      setInitialFeedbacks([]);
+      onClose();
+    }, [onClose]);
 
-  // 메모이제이션된 탭 컴포넌트 props
-  const overviewTabProps = useMemo(
-    () => ({
-      educationState,
-      onFieldChange: handleFieldChange,
-      assignees,
-      assigneeAvatars,
-      educationCategories,
-      educationMethods,
-      statusOptions,
-      departments,
-      users
-    }),
-    [educationState, handleFieldChange, assignees, assigneeAvatars, educationCategories, educationMethods, statusOptions, departments, users]
-  );
+    // 🔄 기록탭 핸들러 함수들 - 로컬 state만 변경 (임시 저장)
+    const handleAddComment = useCallback(() => {
+      if (!newComment.trim() || !education?.id) return;
 
-  const recordTabProps = useMemo(
-    () => {
-      // 현재 사용자 정보 가져오기
-      const feedbackUser = users.find((u) => u.user_name === user?.name);
-      const currentUserName = feedbackUser?.user_name || user?.name || '현재 사용자';
-      const currentUserAvatar = feedbackUser?.profile_image_url || user?.avatar || '';
-      const currentUserRole = feedbackUser?.role || user?.role || '';
-      const currentUserDepartment = feedbackUser?.department || user?.department || '';
+      const currentUserName = currentUser?.user_name || '현재 사용자';
+      const currentTeam = currentUser?.department || '';
+      const currentPosition = currentUser?.position || '';
+      const currentProfileImage = currentUser?.profile_image_url || '';
+      const currentRole = currentUser?.role || '';
 
-      return {
+      // 로컬 임시 ID 생성
+      const tempId = `temp-${Date.now()}-${Math.random()}`;
+      const newFeedback: FeedbackData = {
+        id: tempId,
+        page: PAGE_IDENTIFIERS.IT_Education,
+        record_id: education.id.toString(),
+        action_type: '기록',
+        description: newComment,
+        user_name: currentUserName,
+        team: currentTeam,
+        created_at: new Date().toISOString(),
+        metadata: { role: currentRole },
+        user_department: currentTeam,
+        user_position: currentPosition,
+        user_profile_image: currentProfileImage
+      };
+
+      // 로컬 state에만 추가 (즉시 반응)
+      setPendingFeedbacks(prev => [newFeedback, ...prev]);
+      setNewComment('');
+    }, [newComment, education?.id, currentUser]);
+
+    const handleEditComment = useCallback((commentId: string, content: string) => {
+      setEditingCommentId(commentId);
+      setEditingCommentText(content);
+    }, []);
+
+    const handleSaveEditComment = useCallback(() => {
+      if (!editingCommentText.trim() || !editingCommentId) return;
+
+      // 로컬 state만 업데이트 (즉시 반응)
+      setPendingFeedbacks(prev =>
+        prev.map(fb =>
+          fb.id === editingCommentId
+            ? { ...fb, description: editingCommentText }
+            : fb
+        )
+      );
+
+      setEditingCommentId(null);
+      setEditingCommentText('');
+    }, [editingCommentText, editingCommentId]);
+
+    const handleCancelEditComment = useCallback(() => {
+      setEditingCommentId(null);
+      setEditingCommentText('');
+    }, []);
+
+    const handleDeleteComment = useCallback((commentId: string) => {
+      // 로컬 state에서만 제거 (즉시 반응)
+      setPendingFeedbacks(prev => prev.filter(fb => fb.id !== commentId));
+    }, []);
+
+    // 메모이제이션된 탭 컴포넌트 props
+    const overviewTabProps = useMemo(
+      () => ({
+        educationState,
+        onFieldChange: handleFieldChange,
+        assignees,
+        assigneeAvatars,
+        statusOptions,
+        statusColors,
+        education
+      }),
+      [educationState, handleFieldChange, assignees, assigneeAvatars, statusOptions, statusColors, education]
+    );
+
+    const recordTabProps = useMemo(
+      () => ({
         comments,
         newComment,
         onNewCommentChange: setNewComment,
@@ -1606,90 +1693,88 @@ const EducationEditDialog = memo(({ open, onClose, education, onSave, assignees,
         onCancelEditComment: handleCancelEditComment,
         onDeleteComment: handleDeleteComment,
         onEditCommentTextChange: setEditingCommentText,
-        currentUserName,
-        currentUserAvatar,
-        currentUserRole,
-        currentUserDepartment
-      };
-    },
-    [
-      comments,
-      newComment,
-      editingCommentId,
-      editingCommentText,
-      handleAddComment,
-      handleEditComment,
-      handleSaveEditComment,
-      handleCancelEditComment,
-      handleDeleteComment,
-      users,
-      user
-    ]
-  );
+        currentUserName: currentUser?.user_name || '현재 사용자',
+        currentUserAvatar: currentUser?.profile_image_url || '',
+        currentUserRole: currentUser?.role || '',
+        currentUserDepartment: currentUser?.department || ''
+      }),
+      [
+        comments,
+        newComment,
+        editingCommentId,
+        editingCommentText,
+        handleAddComment,
+        handleEditComment,
+        handleSaveEditComment,
+        handleCancelEditComment,
+        handleDeleteComment,
+        currentUser
+      ]
+    );
 
-
-  return (
-    <Dialog
-      open={open}
-      onClose={handleClose}
-      maxWidth="lg"
-      fullWidth
-      PaperProps={{
-        sx: {
-          height: '840px',
-          maxHeight: '840px',
-          overflow: 'hidden'
-        }
-      }}
-    >
-      <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', pr: 2, pt: 2 }}>
-        <Box>
-          <Typography variant="h6" component="div" sx={{ fontSize: '14px', color: 'rgba(0, 0, 0, 0.75)', fontWeight: 500 }}>
-            개인교육관리 편집
-          </Typography>
-          {education && (
-            <Typography variant="body2" sx={{ fontSize: '12px', color: '#666666', fontWeight: 500 }}>
-              {education.content} ({education.code})
+    return (
+      <Dialog
+        open={open}
+        onClose={handleClose}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{
+          sx: {
+            height: '840px',
+            maxHeight: '840px',
+            overflow: 'hidden'
+          }
+        }}
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', pr: 2, pt: 2 }}>
+          <Box>
+            <Typography variant="h6" component="div" sx={{ fontSize: '14px', color: 'rgba(0, 0, 0, 0.75)', fontWeight: 500 }}>
+              개인교육관리 편집
             </Typography>
-          )}
+            {education && (
+              <Typography variant="body2" sx={{ fontSize: '12px', color: '#666666', fontWeight: 500 }}>
+                {education.title} (MAIN-EDU-{new Date(education.registrationDate).getFullYear().toString().slice(-2)}-{String(education.no).padStart(3, '0')})
+              </Typography>
+            )}
+          </Box>
+
+          {/* 취소, 저장 버튼을 오른쪽 상단으로 이동 */}
+          <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
+            <Button onClick={handleClose} variant="outlined" size="small" sx={{ minWidth: '60px' }}>
+              취소
+            </Button>
+            <Button onClick={handleSave} variant="contained" size="small" sx={{ minWidth: '60px' }}>
+              저장
+            </Button>
+          </Box>
+        </DialogTitle>
+
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2, backgroundColor: 'background.paper' }}>
+          <Tabs value={editTab} onChange={handleTabChange}>
+            <Tab label="개요" />
+            <Tab label="기록" />
+            <Tab label="자료" />
+          </Tabs>
         </Box>
 
-        {/* 취소, 저장 버튼을 오른쪽 상단으로 이동 */}
-        <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-          <Button onClick={handleClose} variant="outlined" size="small" sx={{ minWidth: '60px' }}>
-            취소
-          </Button>
-          <Button onClick={handleSave} variant="contained" size="small" sx={{ minWidth: '60px' }}>
-            저장
-          </Button>
-        </Box>
-      </DialogTitle>
+        <DialogContent sx={{ p: 1, pt: 1 }}>
+          {editTab === 0 && <OverviewTab {...overviewTabProps} />}
+          {editTab === 1 && <RecordTab {...recordTabProps} />}
+          {editTab === 2 && <MaterialTab recordId={education?.id} currentUser={currentUser} />}
+        </DialogContent>
 
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2, backgroundColor: 'background.paper' }}>
-        <Tabs value={editTab} onChange={handleTabChange}>
-          <Tab label="개요" />
-          <Tab label="기록" />
-          <Tab label="자료" />
-        </Tabs>
-      </Box>
-
-      <DialogContent sx={{ p: 1, pt: 1, overflow: 'hidden' }}>
-        {editTab === 0 && <OverviewTab {...overviewTabProps} />}
-        {editTab === 1 && <RecordTab {...recordTabProps} />}
-        {editTab === 2 && <MaterialTab recordId={education?.id} currentUser={user} />}
-      </DialogContent>
-
-      {/* 에러 메시지 표시 */}
-      {validationError && (
-        <Box sx={{ px: 2, pb: 2 }}>
-          <Alert severity="error" sx={{ mt: 1 }}>
-            {validationError}
-          </Alert>
-        </Box>
-      )}
-    </Dialog>
-  );
-});
+        {/* 에러 메시지 표시 */}
+        {validationError && (
+          <Box sx={{ px: 2, pb: 2 }}>
+            <Alert severity="error" sx={{ mt: 1 }}>
+              {validationError}
+            </Alert>
+          </Box>
+        )}
+      </Dialog>
+    );
+  }
+);
 
 EducationEditDialog.displayName = 'EducationEditDialog';
 

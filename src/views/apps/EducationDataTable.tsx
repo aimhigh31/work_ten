@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 
 // Material-UI
 import {
@@ -11,71 +11,58 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
   Checkbox,
   Typography,
   Chip,
-  IconButton,
   Button,
   TextField,
   Select,
   MenuItem,
   FormControl,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Tab,
-  Tabs,
-  Tooltip,
-  Avatar,
   Pagination,
-  Stack,
-  Card,
-  CardContent,
-  Grid,
-  List,
-  ListItem,
-  ListItemText,
-  Divider,
-  FormLabel,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  InputLabel
+  Avatar,
+  IconButton,
+  Tooltip,
+  LinearProgress
 } from '@mui/material';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3';
-import { useTheme } from '@mui/material/styles';
+// project imports
+import EducationEditDialog from 'components/EducationEditDialog';
+
+// data and types
+import { teams, assignees, educationStatusOptions, educationStatusColors, assigneeAvatars } from 'data/education';
+import { EducationData } from 'types/education';
+
+// hooks
+import { useSupabaseEducation } from 'hooks/useSupabaseEducation';
+import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
+import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
 
 // Icons
-import { Add, Trash, Setting4, Profile2User, CloseCircle, Edit, Eye, DocumentUpload } from '@wandersonalwes/iconsax-react';
-// ExpandMore 아이콘은 기본 화살표로 대체
+import { Add, Trash, Edit, DocumentDownload } from '@wandersonalwes/iconsax-react';
 
-// Project imports
-import {
-  EducationRecord,
-  educationTypeOptions,
-  statusOptions,
-  attendanceStatusOptions,
-  educationTypeCodeMap,
-  CurriculumItem,
-  ParticipantItem,
-  EducationResult
-} from 'types/education';
-import { educationData } from 'data/education';
-import { useSupabaseEducation } from 'hooks/useSupabaseEducation';
-
-// ==============================|| 교육관리 데이터 테이블 ||============================== //
+// 컬럼 너비 정의 (Education 테이블 구조)
+const columnWidths = {
+  checkbox: 50,
+  no: 60,
+  registrationDate: 100,
+  code: 120,
+  educationType: 120,
+  title: 250,
+  team: 100,
+  assignee: 120,
+  status: 90,
+  startDate: 100,
+  completionDate: 100,
+  action: 80
+};
 
 interface EducationDataTableProps {
-  selectedStatus: string;
-  selectedYear: string;
+  selectedYear?: string;
   selectedTeam?: string;
+  selectedStatus?: string;
   selectedAssignee?: string;
-  tasks?: any[];
-  setTasks?: React.Dispatch<React.SetStateAction<any[]>>;
+  educations?: EducationData[];
+  setEducations?: React.Dispatch<React.SetStateAction<EducationData[]>>;
   addChangeLog?: (
     action: string,
     target: string,
@@ -86,101 +73,202 @@ interface EducationDataTableProps {
     changedField?: string,
     title?: string
   ) => void;
-  onDataRefresh?: () => Promise<void>;
-}
-
-// 컬럼 너비 정의
-const columnWidths = {
-  checkbox: 50,
-  no: 60,
-  registrationDate: 100,
-  code: 120,
-  educationCategory: 100,
-  title: 200,
-  educationType: 100,
-  team: 80,
-  assignee: 120,
-  status: 90,
-  startDate: 100,
-  completionDate: 100,
-  action: 80
-};
-
-// 담당자 목록 (실제로는 API에서 가져와야 함)
-const assigneeOptions = [
-  { name: '김인사', avatar: '/assets/images/users/avatar-1.png' },
-  { name: '이기술', avatar: '/assets/images/users/avatar-2.png' },
-  { name: '박안전', avatar: '/assets/images/users/avatar-3.png' },
-  { name: '최리더', avatar: '/assets/images/users/avatar-4.png' },
-  { name: '정마케팅', avatar: '/assets/images/users/avatar-5.png' },
-  { name: '김디지털', avatar: '/assets/images/users/avatar-6.png' },
-  { name: '이개발', avatar: '/assets/images/users/avatar-7.png' },
-  { name: '송보안', avatar: '/assets/images/users/avatar-8.png' },
-  { name: '한영업', avatar: '/assets/images/users/avatar-9.png' }
-];
-
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-  return (
-    <div role="tabpanel" hidden={value !== index} id={`action-tabpanel-${index}`} aria-labelledby={`action-tab-${index}`} {...other}>
-      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
-    </div>
-  );
 }
 
 export default function EducationDataTable({
-  selectedStatus,
-  selectedYear,
+  selectedYear = '전체',
   selectedTeam = '전체',
+  selectedStatus = '전체',
   selectedAssignee = '전체',
-  tasks,
-  setTasks,
-  addChangeLog,
-  onDataRefresh
+  educations,
+  setEducations,
+  addChangeLog
 }: EducationDataTableProps) {
-  const theme = useTheme();
-  const { addEducation, updateEducation, deleteEducation } = useSupabaseEducation();
-  const [data, setData] = useState<EducationRecord[]>(educationData);
+  const [data, setData] = useState<EducationData[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
-  const [actionDialog, setActionDialog] = useState<{ open: boolean; recordId: number | null; isNew: boolean }>({
-    open: false,
-    recordId: null,
-    isNew: false
-  });
-  const [actionTabValue, setActionTabValue] = useState(0);
-
-  // 편집 중인 레코드 상태
-  const [editingRecord, setEditingRecord] = useState<EducationRecord | null>(null);
-
-  // 선택된 커리큘럼과 참석자 관리
-  const [selectedCurriculumItems, setSelectedCurriculumItems] = useState<number[]>([]);
-  const [selectedParticipantItems, setSelectedParticipantItems] = useState<number[]>([]);
-
-  // 첨부파일 관리
-  const [attachmentDialog, setAttachmentDialog] = useState<{
-    open: boolean;
-    curriculumId: number | null;
-  }>({ open: false, curriculumId: null });
-
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [goToPage, setGoToPage] = useState<string>('');
+  const [goToPage, setGoToPage] = useState('');
+  const [isInitialLoading, setIsInitialLoading] = useState(true); // 초기 로딩 상태
 
-  // 필터링된 데이터
-  const filteredData = useMemo(() => {
-    return data.filter((record) => {
-      const statusMatch = selectedStatus === '전체' || record.status === selectedStatus;
-      const yearMatch = selectedYear === '전체' || record.registrationDate.startsWith(selectedYear);
+  // Supabase Education 연동
+  const { getEducations, createEducation, updateEducation, deleteEducation, convertToEducationData, convertToDbEducationData, loading, error } = useSupabaseEducation();
 
-      return statusMatch && yearMatch;
+  // 마스터코드 연동
+  const { getSubCodesByGroup } = useSupabaseMasterCode3();
+
+  // 사용자관리 연동
+  const { users } = useSupabaseUserManagement();
+
+  // GROUP023의 Education유형 목록 가져오기
+  const educationTypeOptions = getSubCodesByGroup('GROUP023');
+
+  // 사용자 목록 옵션 생성 (등록자)
+  const userOptions = users
+    .filter(user => user.is_active && user.status === 'active')
+    .map(user => user.user_name);
+
+  // 사용자명으로 사용자 정보를 빠르게 찾기 위한 Map
+  const userMap = useMemo(() => {
+    const map = new Map();
+    users.forEach(user => {
+      if (user.is_active && user.status === 'active') {
+        map.set(user.user_name, user);
+      }
     });
-  }, [data, selectedStatus, selectedYear]);
+    return map;
+  }, [users]);
+
+  // GROUP024의 우선순위 목록 가져오기 (현재 미사용이지만 향후 확장을 위해 유지)
+  // const priorityOptions = getSubCodesByGroup('GROUP024');
+
+  // GROUP002의 상태 목록 가져오기 (현재 미사용이지만 향후 확장을 위해 유지)
+  // const statusOptionsFromMaster = getSubCodesByGroup('GROUP002');
+
+  // Education유형별 색상 매핑 함수
+  const getEducationTypeColor = (educationType: string) => {
+    const colors = [
+      '#E3F2FD', // 파란색
+      '#FFEBEE', // 빨간색
+      '#F3E5F5', // 보라색
+      '#E8F5E9', // 초록색
+      '#FFF3E0', // 주황색
+      '#E0F2F1', // 청록색
+      '#FFF8E1', // 노란색
+      '#FCE4EC'  // 분홍색
+    ];
+
+    // Education유형의 인덱스를 기반으로 색상 선택
+    const index = educationTypeOptions.findIndex(option => option.subcode_name === educationType);
+    return index >= 0 ? colors[index % colors.length] : '#F5F5F5';
+  };
+
+  // 우선순위별 색상 매핑 함수
+  const getPriorityColor = (priority: string) => {
+    const priorityColors = {
+      '긴급': '#FFEBEE', // 빨간색
+      '높음': '#FFF3E0', // 주황색
+      '보통': '#E8F5E9', // 초록색
+      '낮음': '#E3F2FD'  // 파란색
+    };
+
+    return priorityColors[priority as keyof typeof priorityColors] || '#F5F5F5';
+  };
+
+  // 상태별 색상 매핑 함수
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case '대기':
+        return { bgcolor: '#F5F5F5', color: '#757575' };
+      case '진행':
+        return { bgcolor: '#E3F2FD', color: '#1976D2' };
+      case '완료':
+        return { bgcolor: '#E8F5E9', color: '#388E3C' };
+      case '홀딩':
+        return { bgcolor: '#FFEBEE', color: '#D32F2F' };
+      default:
+        return { bgcolor: '#F5F5F5', color: '#757575' };
+    }
+  };
+
+  // Edit 팝업 관련 상태
+  const [editDialog, setEditDialog] = useState(false);
+  const [editingEducation, setEditingEducation] = useState<EducationData | null>(null);
+
+  // Excel 다운로드 기능
+  const handleExcelDownload = () => {
+    try {
+      // 필터링된 데이터를 Excel 형식으로 변환 (테이블과 동일한 컬럼 순서)
+      const excelData = filteredData.map((education) => ({
+        NO: education.no,
+        등록일: education.registrationDate,
+        코드: `MAIN-EDU-${new Date(education.registrationDate).getFullYear().toString().slice(-2)}-${String(education.no).padStart(3, '0')}`,
+        Education유형: education.educationType || '미분류',
+        요청내용: education.content || '',
+        처리내용: education.responseContent || '',
+        우선순위: education.priority || '보통',
+        상태: education.status || '대기',
+        완료일: education.resolutionDate || '',
+        등록자: education.assignee || ''
+      }));
+
+      // CSV 형식으로 데이터 변환 (Excel에서 열 수 있음)
+      const csvContent = [
+        // 헤더
+        Object.keys(excelData[0] || {}).join(','),
+        // 데이터 행들
+        ...excelData.map((row) =>
+          Object.values(row)
+            .map((value) =>
+              // CSV에서 쉼표가 포함된 값은 따옴표로 감싸기
+              typeof value === 'string' && value.includes(',') ? `"${value}"` : value
+            )
+            .join(',')
+        )
+      ].join('\n');
+
+      // BOM 추가 (한글 깨짐 방지)
+      const bom = '\uFEFF';
+      const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+
+      // 파일 다운로드
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `개인교육관리_${new Date().toISOString().slice(0, 10)}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Excel 다운로드 중 오류 발생:', error);
+      alert('Excel 다운로드 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 컴포넌트 마운트 시 Education 데이터 로드
+  useEffect(() => {
+    const loadEducationData = async () => {
+      console.log('📞 Education 데이터 로드 시작');
+      setIsInitialLoading(true);
+      const dbEducations = await getEducations();
+      const educationData = dbEducations.map(convertToEducationData);
+      setData(educationData);
+      if (setEducations) {
+        setEducations(educationData);
+      }
+      setIsInitialLoading(false);
+    };
+
+    loadEducationData();
+  }, [getEducations, convertToEducationData, setEducations]);
+
+  // educations props가 변경될 때 data 상태 업데이트
+  useEffect(() => {
+    if (educations) {
+      setData([...educations]);
+    }
+  }, [educations]);
+
+  // 필터링된 데이터 (역순 정렬 추가)
+  const filteredData = useMemo(() => {
+    const filtered = data.filter((education) => {
+      // 연도 필터
+      if (selectedYear !== '전체') {
+        const educationYear = new Date(education.registrationDate).getFullYear().toString();
+        if (educationYear !== selectedYear) return false;
+      }
+
+      const teamMatch = selectedTeam === '전체' || education.team === selectedTeam;
+      const statusMatch = selectedStatus === '전체' || education.status === selectedStatus;
+      const assigneeMatch = selectedAssignee === '전체' || education.assignee === selectedAssignee;
+
+      return teamMatch && statusMatch && assigneeMatch;
+    });
+    // NO 기준 역순 정렬
+    return filtered.sort((a, b) => (b.no || 0) - (a.no || 0));
+  }, [data, selectedYear || '전체', selectedTeam, selectedStatus, selectedAssignee]);
 
   // 페이지네이션 적용된 데이터
   const paginatedData = useMemo(() => {
@@ -191,1711 +279,755 @@ export default function EducationDataTable({
   // 총 페이지 수 계산
   const totalPages = Math.ceil(filteredData.length / rowsPerPage);
 
-  // 새로운 코드 생성 함수 (EDU-I-24-001 형식)
-  const generateCode = (records: EducationRecord[], educationType: string) => {
-    const year = new Date().getFullYear().toString().slice(-2);
-    const typeCode = educationTypeCodeMap[educationType as keyof typeof educationTypeCodeMap];
+  // 필터가 변경될 때 페이지를 리셋
+  useEffect(() => {
+    setPage(0);
+  }, [selectedYear || '전체', selectedTeam, selectedStatus, selectedAssignee]);
 
-    const existingCodes = records
-      .filter((record) => record.code.startsWith(`EDU-${typeCode}-${year}-`))
-      .map((record) => {
-        const match = record.code.match(/EDU-[A-Z]-\d{2}-(\d{3})/);
-        return match ? parseInt(match[1], 10) : 0;
-      });
-
-    const maxNumber = existingCodes.length > 0 ? Math.max(...existingCodes) : 0;
-    const newNumber = maxNumber + 1;
-
-    return `EDU-${typeCode}-${year}-${newNumber.toString().padStart(3, '0')}`;
+  // 페이지 변경 핸들러
+  const handleChangePage = (event: React.ChangeEvent<unknown>, newPage: number) => {
+    setPage(newPage - 1);
   };
 
-  // 체크박스 관련 함수들
+  // Go to 페이지 핸들러
+  const handleGoToPage = () => {
+    const pageNumber = parseInt(goToPage, 10);
+    if (pageNumber >= 1 && pageNumber <= totalPages) {
+      setPage(pageNumber - 1);
+    }
+    setGoToPage('');
+  };
+
+  // 전체 선택 처리
   const handleSelectAllClick = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.checked) {
-      const newSelected = paginatedData.map((row) => row.id);
-      setSelected(newSelected);
+      const newSelecteds = paginatedData.map((n) => n.id);
+      setSelected(newSelecteds);
       return;
     }
     setSelected([]);
   };
 
-  const isSelected = (id: number) => selected.indexOf(id) !== -1;
-
-  // 새 행 추가 - Action 다이얼로그 열기
-  const handleAddRow = () => {
-    const newRecord: EducationRecord = {
-      id: Math.max(...data.map((r) => r.id)) + 1,
-      registrationDate: new Date().toISOString().split('T')[0],
-      code: generateCode(data, '신입교육'), // 기본값으로 신입교육 사용
-      educationType: '신입교육',
-      content: '',
-      participants: 0,
-      location: '',
-      status: '예정',
-      completionDate: '',
-      assignee: '김인사',
-      curriculum: [],
-      participantList: [],
-      result: {
-        performance: '',
-        improvement: '',
-        feedback: ''
-      },
-      isNew: true
-    };
-
-    setData((prev) => [newRecord, ...prev]);
-    setEditingRecord(newRecord);
-    setActionDialog({ open: true, recordId: newRecord.id, isNew: true });
-    setActionTabValue(0);
-  };
-
   // 선택된 행 삭제
-  const handleDeleteRows = async () => {
+  const handleDeleteSelected = async () => {
     if (selected.length === 0) return;
 
-    const confirmDelete = window.confirm(`선택한 ${selected.length}개의 교육을 삭제하시겠습니까?`);
-    if (!confirmDelete) return;
-
     try {
-      console.log('🗑️ 삭제할 항목들:', selected);
+      const deletedEducations = data.filter((education) => selected.includes(education.id));
 
-      // Supabase에서 각 항목 삭제
-      const deletePromises = selected.map(async (id) => {
-        const success = await deleteEducation(String(id));
-        if (!success) {
-          console.error(`❌ ID ${id} 삭제 실패`);
-        } else {
-          console.log(`✅ ID ${id} 삭제 성공`);
-        }
-        return success;
-      });
+      // Supabase에서 삭제 (soft delete)
+      for (const education of deletedEducations) {
+        await deleteEducation(education.id);
+      }
 
-      const results = await Promise.all(deletePromises);
-      const allSuccess = results.every((result) => result);
+      // 삭제될 Education들의 정보를 변경로그에 추가
+      if (addChangeLog) {
+        deletedEducations.forEach((education) => {
+          const educationCode = `MAIN-EDU-${new Date(education.registrationDate).getFullYear().toString().slice(-2)}-${String(education.no).padStart(3, '0')}`;
+          const educationTitle = education.title || 'Education';
+          addChangeLog(
+            '삭제',
+            educationCode,
+            `개인교육관리 ${educationTitle}(${educationCode})이 삭제되었습니다.`,
+            education.team || '미분류',
+            undefined,
+            undefined,
+            undefined,
+            educationTitle
+          );
+        });
+      }
 
-      if (allSuccess) {
-        console.log('✅ 모든 항목 삭제 성공');
+      const updatedData = data.filter((education) => !selected.includes(education.id));
+      setData(updatedData);
+      setSelected([]);
 
-        // 삭제될 교육들의 정보를 변경로그에 추가
-        if (addChangeLog) {
-          const deletedRecords = data.filter((record) => selected.includes(record.id));
-          for (const record of deletedRecords) {
-            const codeToUse = record.code || `ID-${record.id}`;
-            const educationTitle = record.title || record.content || '교육';
-            console.log('🔍 삭제 변경로그:', { code: record.code, codeToUse });
-            // 삭제의 경우 변경 후 값은 없음
-            await addChangeLog(
-              '삭제',
-              codeToUse,
-              `개인교육관리 ${educationTitle}(${codeToUse}) 정보의 데이터탭 데이터가 삭제 되었습니다.`,
-              record.team || '시스템',
-              `${educationTitle} - ${record.location || '-'}`,
-              '',
-              '데이터탭',
-              educationTitle
-            );
-          }
-        }
-
-        // 로컬 상태 업데이트
-        const updatedData = data.filter((record) => !selected.includes(record.id));
-        setData(updatedData);
-        setSelected([]);
-
-        // 부모 컴포넌트로 동기화
-        if (setTasks) {
-          setTasks(updatedData);
-        }
-
-        // 데이터 새로고침
-        if (onDataRefresh) {
-          await onDataRefresh();
-        }
-
-        alert('선택한 교육이 삭제되었습니다.');
-      } else {
-        alert('일부 항목 삭제에 실패했습니다. 다시 시도해주세요.');
+      // 부모 컴포넌트로 동기화
+      if (setEducations) {
+        setEducations(updatedData);
       }
     } catch (error) {
-      console.error('🔴 삭제 중 오류:', error);
-      alert('삭제 중 오류가 발생했습니다.');
+      console.error('❌ 개인교육관리 삭제 실패:', error);
+      alert('개인교육관리 삭제 중 오류가 발생했습니다.');
     }
   };
 
-  // Action 다이얼로그 열기
-  const handleActionClick = (recordId: number) => {
-    const record = data.find((r) => r.id === recordId);
-    if (record) {
-      setEditingRecord({ ...record });
-      setActionDialog({ open: true, recordId, isNew: false });
-      setActionTabValue(0);
-    }
+  // 편집 다이얼로그 닫기
+  const handleEditDialogClose = () => {
+    setEditDialog(false);
+    setEditingEducation(null);
   };
 
-  const handleActionClose = () => {
-    setActionDialog({ open: false, recordId: null, isNew: false });
-    setEditingRecord(null);
-    setActionTabValue(0);
-  };
-
-  // 저장
-  const handleSave = async () => {
-    if (!editingRecord) return;
+  // Education 저장
+  const handleEditEducationSave = async (updatedEducation: EducationData) => {
+    console.log('💾 Education 저장 요청:', updatedEducation);
 
     try {
-      console.log('[HANDLE_SAVE] 💾 저장 시작');
+      const existingIndex = data.findIndex((education) => education.id === updatedEducation.id);
+      console.log('🔍 기존 Education 인덱스:', existingIndex);
 
-      // 필수 필드 validation
-      const validateRequiredFields = () => {
-        const errors: string[] = [];
-        if (!editingRecord?.content) errors.push('교육명');
-        if (!editingRecord?.completionDate) errors.push('완료일');
-        if (!editingRecord?.location) errors.push('장소');
-        if (!editingRecord?.participants || editingRecord.participants <= 0) errors.push('참석수');
-        return errors;
-      };
+      if (existingIndex !== -1) {
+        // 기존 Education 업데이트
+        const originalEducation = data[existingIndex];
 
-      // 필드 검증
-      const errors = validateRequiredFields();
-      if (errors.length > 0) {
-        alert(`필수 필드를 입력해주세요: ${errors.join(', ')}`);
-        return;
-      }
+        // 변경로그 추가 - DB 저장 전에 실행 (필드별 상세 추적)
+        if (addChangeLog) {
+          const educationCode = `MAIN-EDU-${new Date(updatedEducation.registrationDate).getFullYear().toString().slice(-2)}-${String(updatedEducation.no).padStart(3, '0')}`;
+          const educationTitle = updatedEducation.title || 'Education';
 
-      // 교육유형이 변경된 경우 코드 재생성
-      if (actionDialog.isNew || editingRecord.educationType !== data.find((r) => r.id === editingRecord.id)?.educationType) {
-        editingRecord.code = generateCode(
-          data.filter((r) => r.id !== editingRecord.id),
-          editingRecord.educationType
-        );
-      }
-
-      // EducationInput 형식으로 변환
-      const educationData = {
-        code: editingRecord.code,
-        registration_date: editingRecord.registrationDate,
-        start_date: editingRecord.startDate || null,
-        completion_date: editingRecord.completionDate || null,
-        education_category: editingRecord.educationCategory || null,
-        title: editingRecord.content || null,
-        description: editingRecord.description || null,
-        education_type: editingRecord.educationType || null,
-        team: editingRecord.team || null,
-        assignee_id: null,
-        assignee_name: editingRecord.assignee || null,
-        status: editingRecord.status
-      };
-
-      if (actionDialog.isNew) {
-        // 새 교육 생성
-        console.log('🔵 새 교육 생성 시작');
-        const result = await addEducation(educationData);
-
-        if (result) {
-          console.log('✅ 생성 성공:', result);
-
-          if (addChangeLog) {
-            const educationTitle = educationData.title || '교육';
-            await addChangeLog(
-              '추가',
-              result.code,
-              `개인교육관리 ${educationTitle}(${result.code}) 정보의 개요탭 데이터가 추가 되었습니다.`,
-              educationData.team || '시스템',
-              '',
-              `${educationTitle} - ${editingRecord.location || '-'}`,
-              '개요탭',
+          // 1. Education유형 변경
+          if (originalEducation.educationType !== updatedEducation.educationType) {
+            addChangeLog(
+              '수정',
+              educationCode,
+              `개인교육관리 ${educationTitle}(${educationCode}) 정보의 개요탭 Education유형이 ${originalEducation.educationType || ''} → ${updatedEducation.educationType || ''} 로 수정 되었습니다.`,
+              updatedEducation.team || '미분류',
+              originalEducation.educationType || '',
+              updatedEducation.educationType || '',
+              'Education유형',
               educationTitle
             );
           }
 
-          // 데이터 새로고침
-          if (onDataRefresh) {
-            console.log('🔄 데이터 새로고침 호출 (생성)');
-            await onDataRefresh();
+          // 2. 고객명 변경
+          if (originalEducation.customerName !== updatedEducation.customerName) {
+            addChangeLog(
+              '수정',
+              educationCode,
+              `개인교육관리 ${educationTitle}(${educationCode}) 정보의 개요탭 고객명이 ${originalEducation.customerName || ''} → ${updatedEducation.customerName || ''} 로 수정 되었습니다.`,
+              updatedEducation.team || '미분류',
+              originalEducation.customerName || '',
+              updatedEducation.customerName || '',
+              '고객명',
+              educationTitle
+            );
           }
 
-          alert('교육이 추가되었습니다.');
-        } else {
-          console.error('❌ 생성 실패');
-          alert('교육 추가에 실패했습니다.');
-          return;
+          // 3. 회사명 변경
+          if (originalEducation.companyName !== updatedEducation.companyName) {
+            addChangeLog(
+              '수정',
+              educationCode,
+              `개인교육관리 ${educationTitle}(${educationCode}) 정보의 개요탭 회사명이 ${originalEducation.companyName || ''} → ${updatedEducation.companyName || ''} 로 수정 되었습니다.`,
+              updatedEducation.team || '미분류',
+              originalEducation.companyName || '',
+              updatedEducation.companyName || '',
+              '회사명',
+              educationTitle
+            );
+          }
+
+          // 4. 요청내용 변경
+          if (originalEducation.content !== updatedEducation.content) {
+            addChangeLog(
+              '수정',
+              educationCode,
+              `개인교육관리 ${educationTitle}(${educationCode}) 정보의 개요탭 요청내용이 ${originalEducation.content || ''} → ${updatedEducation.content || ''} 로 수정 되었습니다.`,
+              updatedEducation.team || '미분류',
+              originalEducation.content || '',
+              updatedEducation.content || '',
+              '요청내용',
+              educationTitle
+            );
+          }
+
+          // 5. 처리내용 변경
+          if (originalEducation.responseContent !== updatedEducation.responseContent) {
+            addChangeLog(
+              '수정',
+              educationCode,
+              `개인교육관리 ${educationTitle}(${educationCode}) 정보의 개요탭 처리내용이 ${originalEducation.responseContent || ''} → ${updatedEducation.responseContent || ''} 로 수정 되었습니다.`,
+              updatedEducation.team || '미분류',
+              originalEducation.responseContent || '',
+              updatedEducation.responseContent || '',
+              '처리내용',
+              educationTitle
+            );
+          }
+
+          // 6. 우선순위 변경
+          if (originalEducation.priority !== updatedEducation.priority) {
+            addChangeLog(
+              '수정',
+              educationCode,
+              `개인교육관리 ${educationTitle}(${educationCode}) 정보의 개요탭 우선순위가 ${originalEducation.priority || ''} → ${updatedEducation.priority || ''} 로 수정 되었습니다.`,
+              updatedEducation.team || '미분류',
+              originalEducation.priority || '',
+              updatedEducation.priority || '',
+              '우선순위',
+              educationTitle
+            );
+          }
+
+          // 7. 상태 변경
+          if (originalEducation.status !== updatedEducation.status) {
+            addChangeLog(
+              '수정',
+              educationCode,
+              `개인교육관리 ${educationTitle}(${educationCode}) 정보의 개요탭 상태가 ${originalEducation.status || ''} → ${updatedEducation.status || ''} 로 수정 되었습니다.`,
+              updatedEducation.team || '미분류',
+              originalEducation.status || '',
+              updatedEducation.status || '',
+              '상태',
+              educationTitle
+            );
+          }
+
+          // 8. 담당자 변경
+          if (originalEducation.assignee !== updatedEducation.assignee) {
+            addChangeLog(
+              '수정',
+              educationCode,
+              `개인교육관리 ${educationTitle}(${educationCode}) 정보의 개요탭 담당자가 ${originalEducation.assignee || ''} → ${updatedEducation.assignee || ''} 로 수정 되었습니다.`,
+              updatedEducation.team || '미분류',
+              originalEducation.assignee || '',
+              updatedEducation.assignee || '',
+              '담당자',
+              educationTitle
+            );
+          }
+
+          // 9. 팀 변경
+          if (originalEducation.team !== updatedEducation.team) {
+            addChangeLog(
+              '수정',
+              educationCode,
+              `개인교육관리 ${educationTitle}(${educationCode}) 정보의 개요탭 팀이 ${originalEducation.team || ''} → ${updatedEducation.team || ''} 로 수정 되었습니다.`,
+              updatedEducation.team || '미분류',
+              originalEducation.team || '',
+              updatedEducation.team || '',
+              '팀',
+              educationTitle
+            );
+          }
+
+          // 10. 접수일 변경
+          if (originalEducation.receptionDate !== updatedEducation.receptionDate) {
+            addChangeLog(
+              '수정',
+              educationCode,
+              `개인교육관리 ${educationTitle}(${educationCode}) 정보의 개요탭 접수일이 ${originalEducation.receptionDate || ''} → ${updatedEducation.receptionDate || ''} 로 수정 되었습니다.`,
+              updatedEducation.team || '미분류',
+              originalEducation.receptionDate || '',
+              updatedEducation.receptionDate || '',
+              '접수일',
+              educationTitle
+            );
+          }
+
+          // 11. 완료일 변경
+          if (originalEducation.resolutionDate !== updatedEducation.resolutionDate) {
+            addChangeLog(
+              '수정',
+              educationCode,
+              `개인교육관리 ${educationTitle}(${educationCode}) 정보의 개요탭 완료일이 ${originalEducation.resolutionDate || ''} → ${updatedEducation.resolutionDate || ''} 로 수정 되었습니다.`,
+              updatedEducation.team || '미분류',
+              originalEducation.resolutionDate || '',
+              updatedEducation.resolutionDate || '',
+              '완료일',
+              educationTitle
+            );
+          }
+
+          // 12. 채널 변경
+          if (originalEducation.channel !== updatedEducation.channel) {
+            addChangeLog(
+              '수정',
+              educationCode,
+              `개인교육관리 ${educationTitle}(${educationCode}) 정보의 개요탭 채널이 ${originalEducation.channel || ''} → ${updatedEducation.channel || ''} 로 수정 되었습니다.`,
+              updatedEducation.team || '미분류',
+              originalEducation.channel || '',
+              updatedEducation.channel || '',
+              '채널',
+              educationTitle
+            );
+          }
         }
-      } else {
-        // 기존 교육 수정
-        console.log('🔵 기존 교육 수정 시작:', editingRecord.id);
-        const originalRecord = data.find((r) => r.id === editingRecord.id);
-        const success = await updateEducation(String(editingRecord.id), educationData);
+
+        // DB 업데이트 (변경로그 추가 후)
+        const dbEducationData = convertToDbEducationData(updatedEducation);
+        const success = await updateEducation(updatedEducation.id, dbEducationData);
 
         if (success) {
-          console.log('✅ 수정 성공');
+          // 불변성을 유지하면서 배열 업데이트 (.map() 사용)
+          const updatedData = data.map((edu) =>
+            edu.id === updatedEducation.id ? { ...updatedEducation } : edu
+          );
+          setData(updatedData);
 
-          if (addChangeLog && originalRecord) {
-            // 필드 한글명 매핑
-            const fieldNameMap: Record<string, string> = {
-              content: '교육명',
-              educationType: '교육유형',
-              status: '상태',
-              location: '장소',
-              completionDate: '완료일',
-              assignee: '담당자',
-              participants: '참석수',
-              team: '팀',
-              description: '설명',
-              educationCategory: '교육분류'
-            };
-
-            // 변경된 필드 찾기
-            const changes: Array<{ field: string; fieldKorean: string; before: any; after: any }> = [];
-
-            Object.keys(fieldNameMap).forEach((field) => {
-              const beforeVal = (originalRecord as any)[field];
-              const afterVal = (editingRecord as any)[field];
-
-              // 값이 다른 경우만 추가
-              if (beforeVal !== afterVal) {
-                changes.push({
-                  field,
-                  fieldKorean: fieldNameMap[field],
-                  before: beforeVal || '',
-                  after: afterVal || ''
-                });
-              }
-            });
-
-            console.log('🔍 변경 감지된 필드들:', changes);
-
-            const educationTitle = editingRecord.content || editingRecord.title || '교육';
-            const codeToUse = originalRecord.code || editingRecord.code || `ID-${editingRecord.id}`;
-
-            // 변경된 필드가 있으면 각각 로그 기록
-            if (changes.length > 0) {
-              for (const change of changes) {
-                const description = `개인교육관리 ${educationTitle}(${codeToUse}) 정보의 개요탭 ${change.fieldKorean}이 ${change.before} → ${change.after} 로 수정 되었습니다.`;
-
-                await addChangeLog(
-                  '수정',
-                  codeToUse,
-                  description,
-                  editingRecord.team || '시스템',
-                  String(change.before),
-                  String(change.after),
-                  change.fieldKorean,
-                  educationTitle
-                );
-              }
-            } else {
-              // 변경사항이 없는 경우 (일반 저장)
-              await addChangeLog(
-                '수정',
-                codeToUse,
-                `개인교육관리 ${educationTitle}(${codeToUse}) 정보의 개요탭에서 수정되었습니다.`,
-                editingRecord.team || '시스템',
-                '',
-                '',
-                '-',
-                educationTitle
-              );
-            }
+          // 부모 컴포넌트로 동기화
+          if (setEducations) {
+            setEducations(updatedData);
           }
 
-          // 데이터 새로고침
-          if (onDataRefresh) {
-            console.log('🔄 데이터 새로고침 호출 (수정)');
-            await onDataRefresh();
-          }
-
-          alert('교육이 수정되었습니다.');
+          console.log('✅ 기존 개인교육관리 업데이트 완료');
         } else {
-          console.error('❌ 수정 실패');
-          alert('교육 수정에 실패했습니다.');
-          return;
+          throw new Error('개인교육관리 업데이트 실패');
+        }
+      } else {
+        // 새 Education 추가
+        const dbEducationData = convertToDbEducationData(updatedEducation);
+        const createdEducation = await createEducation(dbEducationData);
+
+        if (createdEducation) {
+          const newEducationData = convertToEducationData(createdEducation);
+          const newData = [newEducationData, ...data];
+          setData(newData);
+
+          // 부모 컴포넌트로 동기화
+          if (setEducations) {
+            setEducations(newData);
+          }
+
+          // 변경로그 추가 - 새 개인교육관리 생성
+          if (addChangeLog) {
+            const educationCode = `MAIN-EDU-${new Date(createdEducation.registration_date).getFullYear().toString().slice(-2)}-${String(createdEducation.no).padStart(3, '0')}`;
+            const educationTitle = newEducationData.title || '새 개인교육관리';
+            addChangeLog(
+              '추가',
+              educationCode,
+              `개인교육관리 ${educationTitle}(${educationCode})이 신규 등록되었습니다.`,
+              newEducationData.team || '미분류',
+              undefined,
+              undefined,
+              undefined,
+              educationTitle
+            );
+          }
+
+          console.log('✅ 새 개인교육관리 추가 완료:', newEducationData);
+        } else {
+          console.error('❌ 개인교육관리 생성 실패 - createEducation이 null 반환');
+          console.error('❌ 브라우저 콘솔에서 상세 에러를 확인하세요 (🚀 createEducation 시작 ~ ❌ Supabase 생성 오류)');
+          throw new Error('개인교육관리 생성 실패: Supabase에서 에러가 발생했습니다. 콘솔 로그를 확인하세요.');
         }
       }
 
-      // 로컬 상태 업데이트
-      setData((prev) => prev.map((record) => (record.id === editingRecord.id ? { ...editingRecord, isNew: false } : record)));
-      setActionDialog({ open: false, recordId: null, isNew: false });
-      setEditingRecord(null);
+      handleEditDialogClose();
     } catch (error) {
-      console.error('🔴 저장 중 오류:', error);
-      alert('저장 중 오류가 발생했습니다.');
+      console.error('❌ 개인교육관리 저장 실패:', error);
+      alert(`개인교육관리 저장 중 오류가 발생했습니다.\n\n${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
-  // 취소
-  const handleCancel = () => {
-    if (actionDialog.isNew && editingRecord) {
-      // 새 레코드인 경우 데이터에서 제거
-      setData((prev) => prev.filter((record) => record.id !== editingRecord.id));
-    }
-    handleActionClose();
+  // 새 Education 추가
+  const addNewEducation = () => {
+    // 바로 편집 팝업 열기
+    setEditingEducation(null);
+    setEditDialog(true);
   };
 
-  // 커리큘럼 선택 관리 함수들
-  const handleCurriculumSelect = (curriculumId: number) => {
-    setSelectedCurriculumItems((prev) =>
-      prev.includes(curriculumId) ? prev.filter((id) => id !== curriculumId) : [...prev, curriculumId]
-    );
+  // 편집 핸들러 (IT교육관리 스타일)
+  const handleEditEducation = (education: EducationData) => {
+    setEditingEducation(education);
+    setEditDialog(true);
   };
 
-  const handleSelectAllCurriculum = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.checked && editingRecord) {
-      setSelectedCurriculumItems(editingRecord.curriculum.map((c) => c.id));
-    } else {
-      setSelectedCurriculumItems([]);
-    }
-  };
 
-  // 커리큘럼 관리 함수들
-  const handleAddCurriculum = () => {
-    if (editingRecord) {
-      const newCurriculum: CurriculumItem = {
-        id: Math.max(...editingRecord.curriculum.map((c) => c.id), 0) + 1,
-        time: '',
-        subject: '',
-        instructor: '',
-        content: '',
-        attachment: ''
-      };
-      setEditingRecord({
-        ...editingRecord,
-        curriculum: [newCurriculum, ...editingRecord.curriculum]
-      });
-    }
-  };
+  return (
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* 로딩 상태 표시 */}
+      {(loading || isInitialLoading) && (
+        <Box sx={{ width: '100%', mb: 1 }}>
+          <LinearProgress />
+        </Box>
+      )}
 
-  const handleDeleteCurriculum = () => {
-    if (editingRecord && selectedCurriculumItems.length > 0) {
-      setEditingRecord({
-        ...editingRecord,
-        curriculum: editingRecord.curriculum.filter((c) => !selectedCurriculumItems.includes(c.id))
-      });
-      setSelectedCurriculumItems([]);
-    }
-  };
+      {/* 에러 상태 표시 */}
+      {error && (
+        <Box sx={{ mb: 1 }}>
+          <Typography variant="body2" color="error" sx={{ fontSize: '13px' }}>
+            {error}
+          </Typography>
+        </Box>
+      )}
 
-  const handleUpdateCurriculum = (curriculumId: number, field: keyof CurriculumItem, value: string) => {
-    if (editingRecord) {
-      setEditingRecord({
-        ...editingRecord,
-        curriculum: editingRecord.curriculum.map((c) => (c.id === curriculumId ? { ...c, [field]: value } : c))
-      });
-    }
-  };
+      {/* 초기 로딩 중일 때는 아래 내용 숨기기 */}
+      {isInitialLoading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
+          <Typography variant="body2" color="text.secondary">
+            데이터를 불러오는 중...
+          </Typography>
+        </Box>
+      ) : (
+        <>
+          {/* 상단 정보 및 액션 버튼 */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, mt: 3, flexShrink: 0 }}>
+        <Typography variant="body2" color="text.secondary">
+          총 {filteredData.length}건
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<DocumentDownload size={16} />}
+            size="small"
+            onClick={handleExcelDownload}
+            sx={{
+              px: 2,
+              borderColor: '#4CAF50',
+              color: '#4CAF50',
+              '&:hover': {
+                borderColor: '#4CAF50',
+                backgroundColor: '#4CAF50',
+                color: '#fff'
+              }
+            }}
+          >
+            Excel Down
+          </Button>
+          <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={addNewEducation} sx={{ px: 2 }}>
+            추가
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<Trash size={16} />}
+            size="small"
+            color="error"
+            disabled={selected.length === 0}
+            onClick={handleDeleteSelected}
+            sx={{
+              px: 2,
+              borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
+              color: selected.length > 0 ? 'error.main' : 'grey.500'
+            }}
+          >
+            삭제 {selected.length > 0 && `(${selected.length})`}
+          </Button>
+        </Box>
+      </Box>
 
-  // 참석자 선택 관리 함수들
-  const handleParticipantSelect = (participantId: number) => {
-    setSelectedParticipantItems((prev) =>
-      prev.includes(participantId) ? prev.filter((id) => id !== participantId) : [...prev, participantId]
-    );
-  };
-
-  const handleSelectAllParticipants = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.checked && editingRecord) {
-      setSelectedParticipantItems(editingRecord.participantList.map((p) => p.id));
-    } else {
-      setSelectedParticipantItems([]);
-    }
-  };
-
-  // 참석자 관리 함수들
-  const handleAddParticipant = () => {
-    if (editingRecord) {
-      const newParticipant: ParticipantItem = {
-        id: Math.max(...editingRecord.participantList.map((p) => p.id), 0) + 1,
-        assignee: '',
-        department: '',
-        position: '',
-        attendance: '예정',
-        report: '',
-        notes: ''
-      };
-      setEditingRecord({
-        ...editingRecord,
-        participantList: [...editingRecord.participantList, newParticipant]
-      });
-    }
-  };
-
-  const handleDeleteParticipant = () => {
-    if (editingRecord && selectedParticipantItems.length > 0) {
-      setEditingRecord({
-        ...editingRecord,
-        participantList: editingRecord.participantList.filter((p) => !selectedParticipantItems.includes(p.id))
-      });
-      setSelectedParticipantItems([]);
-    }
-  };
-
-  const handleUpdateParticipant = (participantId: number, field: keyof ParticipantItem, value: string) => {
-    if (editingRecord) {
-      setEditingRecord({
-        ...editingRecord,
-        participantList: editingRecord.participantList.map((p) => (p.id === participantId ? { ...p, [field]: value } : p))
-      });
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case '대기':
-      case '예정':
-        return { backgroundColor: '#F5F5F5', color: '#757575' };
-      case '진행':
-        return { backgroundColor: '#E3F2FD', color: '#1976D2' };
-      case '완료':
-        return { backgroundColor: '#E8F5E9', color: '#388E3C' };
-      case '홀딩':
-      case '취소':
-        return { backgroundColor: '#FFEBEE', color: '#D32F2F' };
-      default:
-        return { backgroundColor: '#F5F5F5', color: '#757575' };
-    }
-  };
-
-  const getAttendanceColor = (attendance: string) => {
-    switch (attendance) {
-      case '참석':
-        return { backgroundColor: '#e8f5e8', color: '#2e7d32' };
-      case '불참':
-        return { backgroundColor: '#ffebee', color: '#d32f2f' };
-      case '예정':
-        return { backgroundColor: '#fff3e0', color: '#f57c00' };
-      default:
-        return { backgroundColor: '#f5f5f5', color: '#757575' };
-    }
-  };
-
-  const renderDisplayCell = (value: string | number) => {
-    return (
-      <Typography
+      {/* 테이블 */}
+      <TableContainer
         sx={{
-          fontSize: '12px'
+          flex: 1,
+          border: 'none',
+          borderRadius: 0,
+          overflowX: 'auto',
+          overflowY: 'auto',
+          boxShadow: 'none',
+          minHeight: 0,
+          '& .MuiTable-root': {
+            minWidth: 1400
+          },
+          // 스크롤바 스타일
+          '&::-webkit-scrollbar': {
+            width: '10px',
+            height: '10px'
+          },
+          '&::-webkit-scrollbar-track': {
+            backgroundColor: '#f8f9fa',
+            borderRadius: '4px'
+          },
+          '&::-webkit-scrollbar-thumb': {
+            backgroundColor: '#e9ecef',
+            borderRadius: '4px',
+            border: '2px solid #f8f9fa'
+          },
+          '&::-webkit-scrollbar-thumb:hover': {
+            backgroundColor: '#dee2e6'
+          },
+          '&::-webkit-scrollbar-corner': {
+            backgroundColor: '#f8f9fa'
+          }
         }}
       >
-        {value}
-      </Typography>
-    );
-  };
+        <Table size="small">
+          <TableHead>
+            <TableRow sx={{ backgroundColor: 'grey.50' }}>
+              <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
+                <Checkbox
+                  indeterminate={selected.length > 0 && selected.length < paginatedData.length}
+                  checked={paginatedData.length > 0 && selected.length === paginatedData.length}
+                  onChange={handleSelectAllClick}
+                />
+              </TableCell>
+              <TableCell sx={{ width: columnWidths.no, fontWeight: 600 }}>NO</TableCell>
+              <TableCell sx={{ width: columnWidths.registrationDate, fontWeight: 600 }}>등록일</TableCell>
+              <TableCell sx={{ width: columnWidths.code, fontWeight: 600 }}>코드</TableCell>
+              <TableCell sx={{ width: columnWidths.educationType, fontWeight: 600 }}>교육방식</TableCell>
+              <TableCell sx={{ width: columnWidths.title, fontWeight: 600 }}>제목</TableCell>
+              <TableCell sx={{ width: columnWidths.team, fontWeight: 600 }}>팀</TableCell>
+              <TableCell sx={{ width: columnWidths.assignee, fontWeight: 600 }}>담당자</TableCell>
+              <TableCell sx={{ width: columnWidths.status, fontWeight: 600 }}>상태</TableCell>
+              <TableCell sx={{ width: columnWidths.startDate, fontWeight: 600 }}>시작일</TableCell>
+              <TableCell sx={{ width: columnWidths.completionDate, fontWeight: 600 }}>완료일</TableCell>
+              <TableCell sx={{ width: columnWidths.action, fontWeight: 600 }}>ACTION</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {paginatedData.length > 0 ? (
+              paginatedData.map((education) => (
+                <TableRow
+                  key={education.id}
+                  hover
+                  sx={{
+                    '&:hover': { backgroundColor: 'action.hover' }
+                  }}
+                >
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      checked={selected.includes(education.id)}
+                      onChange={(event) => {
+                        const selectedIndex = selected.indexOf(education.id);
+                        let newSelected: number[] = [];
 
-  const renderAssigneeCell = (record: EducationRecord) => {
-    const assignee = assigneeOptions.find((option) => option.name === record.assignee);
+                        if (selectedIndex === -1) {
+                          newSelected = newSelected.concat(selected, education.id);
+                        } else if (selectedIndex === 0) {
+                          newSelected = newSelected.concat(selected.slice(1));
+                        } else if (selectedIndex === selected.length - 1) {
+                          newSelected = newSelected.concat(selected.slice(0, -1));
+                        } else if (selectedIndex > 0) {
+                          newSelected = newSelected.concat(selected.slice(0, selectedIndex), selected.slice(selectedIndex + 1));
+                        }
+                        setSelected(newSelected);
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                      {education.no}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                      {education.registrationDate}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                      MAIN-EDU-{new Date(education.registrationDate).getFullYear().toString().slice(-2)}-{String(education.no).padStart(3, '0')}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                      {education.educationType || '미분류'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                      {education.title || '제목 없음'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                      {education.team || '-'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    {education.assignee ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Avatar
+                          src={userMap.get(education.assignee)?.profile_image_url || userMap.get(education.assignee)?.avatar_url}
+                          sx={{ width: 24, height: 24 }}
+                        >
+                          {education.assignee.charAt(0)}
+                        </Avatar>
+                        <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                          {education.assignee}
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                        -
+                      </Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={education.status}
+                      size="small"
+                      sx={{
+                        backgroundColor: getStatusColor(education.status).bgcolor,
+                        color: getStatusColor(education.status).color,
+                        fontSize: '13px',
+                        fontWeight: 500
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                      {education.receptionDate || '-'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                      {education.resolutionDate || '-'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Tooltip title="팝업편집">
+                      <IconButton size="small" onClick={() => handleEditEducation(education)} sx={{ color: 'primary.main' }}>
+                        <Edit size={16} />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={12} align="center" sx={{ py: 4 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    검색 결과가 없습니다.
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
 
-    return (
+      {/* 페이지네이션 */}
       <Box
         sx={{
           display: 'flex',
+          justifyContent: 'space-between',
           alignItems: 'center',
-          gap: 1
+          mt: 0.5,
+          px: 1,
+          py: 0.5,
+          borderTop: '1px solid',
+          borderColor: 'divider',
+          flexShrink: 0
         }}
       >
-        <Avatar src={assignee?.avatar} sx={{ width: 24, height: 24 }} />
-        <Typography sx={{ fontSize: '12px' }}>{record.assignee}</Typography>
-      </Box>
-    );
-  };
-
-  // 페이지 변경
-  const handleChangePage = (event: React.ChangeEvent<unknown>, newPage: number) => {
-    setPage(newPage - 1);
-  };
-
-  // 특정 페이지로 이동
-  const handleGoToPage = () => {
-    const pageNumber = parseInt(goToPage, 10);
-    if (pageNumber >= 1 && pageNumber <= totalPages) {
-      setPage(pageNumber - 1);
-      setGoToPage('');
-    }
-  };
-
-  // 선택된 교육 기록 찾기
-  const selectedRecord = actionDialog.recordId ? data.find((r) => r.id === actionDialog.recordId) : null;
-
-  return (
-    <LocalizationProvider dateAdapter={AdapterDateFns}>
-      <Box>
-        {/* 상단 액션 버튼 */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="body2" color="text.secondary">
-            총 {filteredData.length}건
+        {/* 왼쪽: Row per page */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            Row per page
           </Typography>
-
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button variant="contained" startIcon={<Add />} onClick={handleAddRow} size="small">
-              추가
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<Trash />}
-              onClick={handleDeleteRows}
-              disabled={selected.length === 0}
-              size="small"
-              color="error"
+          <FormControl size="small" sx={{ minWidth: 60 }}>
+            <Select
+              value={rowsPerPage}
+              onChange={(e) => {
+                setRowsPerPage(Number(e.target.value));
+                setPage(0);
+              }}
+              sx={{
+                '& .MuiSelect-select': {
+                  py: 0.5,
+                  px: 1,
+                  fontSize: '0.875rem'
+                },
+                '& .MuiOutlinedInput-notchedOutline': {
+                  border: '1px solid #e0e0e0'
+                }
+              }}
             >
-              삭제 {selected.length > 0 && `(${selected.length})`}
-            </Button>
-          </Box>
-        </Box>
+              <MenuItem value={5}>5</MenuItem>
+              <MenuItem value={10}>10</MenuItem>
+              <MenuItem value={25}>25</MenuItem>
+              <MenuItem value={50}>50</MenuItem>
+            </Select>
+          </FormControl>
 
-        {/* 테이블 */}
-        <TableContainer component={Paper} sx={{ maxHeight: '70vh', overflow: 'auto' }}>
-          <Table stickyHeader size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
-                  <Checkbox
-                    indeterminate={selected.length > 0 && selected.length < paginatedData.length}
-                    checked={paginatedData.length > 0 && selected.length === paginatedData.length}
-                    onChange={handleSelectAllClick}
-                  />
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.no, fontWeight: 600, fontSize: '12px' }}>NO</TableCell>
-                <TableCell sx={{ width: columnWidths.registrationDate, fontWeight: 600, fontSize: '12px' }}>등록일</TableCell>
-                <TableCell sx={{ width: columnWidths.code, fontWeight: 600, fontSize: '12px' }}>코드</TableCell>
-                <TableCell sx={{ width: columnWidths.educationCategory, fontWeight: 600, fontSize: '12px' }}>교육분류</TableCell>
-                <TableCell sx={{ width: columnWidths.title, fontWeight: 600, fontSize: '12px' }}>제목</TableCell>
-                <TableCell sx={{ width: columnWidths.educationType, fontWeight: 600, fontSize: '12px' }}>교육유형</TableCell>
-                <TableCell sx={{ width: columnWidths.team, fontWeight: 600, fontSize: '12px' }}>팀</TableCell>
-                <TableCell sx={{ width: columnWidths.assignee, fontWeight: 600, fontSize: '12px' }}>담당자</TableCell>
-                <TableCell sx={{ width: columnWidths.status, fontWeight: 600, fontSize: '12px' }}>상태</TableCell>
-                <TableCell sx={{ width: columnWidths.startDate, fontWeight: 600, fontSize: '12px' }}>시작일</TableCell>
-                <TableCell sx={{ width: columnWidths.completionDate, fontWeight: 600, fontSize: '12px' }}>완료일</TableCell>
-                <TableCell sx={{ width: columnWidths.action, fontWeight: 600, fontSize: '12px' }}>ACTION</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {paginatedData.map((record, index) => {
-                const isItemSelected = isSelected(record.id);
-                const labelId = `enhanced-table-checkbox-${index}`;
-
-                return (
-                  <TableRow
-                    hover
-                    role="checkbox"
-                    aria-checked={isItemSelected}
-                    tabIndex={-1}
-                    key={record.id}
-                    selected={isItemSelected}
-                    sx={{
-                      backgroundColor: record.isNew ? theme.palette.action.hover : 'inherit'
-                    }}
-                  >
-                    <TableCell padding="checkbox">
-                      <Checkbox
-                        checked={isItemSelected}
-                        onChange={(event) => {
-                          if (event.target.checked) {
-                            setSelected([...selected, record.id]);
-                          } else {
-                            setSelected(selected.filter((id) => id !== record.id));
-                          }
-                        }}
-                        inputProps={{ 'aria-labelledby': labelId }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                        {page * rowsPerPage + index + 1}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                        {record.registration_date}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                        {record.code}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                        {record.educationCategory || '-'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                        {record.title || record.content}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography
-                        sx={{
-                          backgroundColor: 'white',
-                          color: 'black',
-                          fontSize: '12px',
-                          fontWeight: 500
-                        }}
-                      >
-                        {record.educationType}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                        {record.team || '-'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>{renderAssigneeCell(record)}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={record.status}
-                        size="small"
-                        sx={{
-                          ...getStatusColor(record.status),
-                          fontSize: '13px',
-                          fontWeight: 500
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                        {record.start_date || '-'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                        {record.completion_date || '-'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="center">
-                      <IconButton size="small" onClick={() => handleActionClick(record.id)} sx={{ color: theme.palette.primary.main }}>
-                        <Setting4 size={16} />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
-
-        {/* 페이지네이션 - VOC관리와 동일한 디자인 */}
-        {/* 페이지네이션 */}
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            mt: 0.5,
-            px: 1,
-            py: 0.5,
-            borderTop: '1px solid',
-            borderColor: 'divider',
-            flexShrink: 0
-          }}
-        >
-          {/* 왼쪽: Row per page */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          {/* Go to */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Row per page
+              Go to
             </Typography>
-            <FormControl size="small" sx={{ minWidth: 60 }}>
-              <Select
-                value={rowsPerPage}
-                onChange={(e) => {
-                  setRowsPerPage(Number(e.target.value));
-                  setPage(0);
-                }}
-                sx={{
-                  '& .MuiSelect-select': {
+            <TextField
+              size="small"
+              value={goToPage}
+              onChange={(e) => setGoToPage(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  handleGoToPage();
+                }
+              }}
+              placeholder="1"
+              sx={{
+                width: 60,
+                '& .MuiOutlinedInput-root': {
+                  '& input': {
                     py: 0.5,
                     px: 1,
-                    fontSize: '0.875rem'
+                    fontSize: '0.875rem',
+                    textAlign: 'center'
                   },
                   '& .MuiOutlinedInput-notchedOutline': {
                     border: '1px solid #e0e0e0'
                   }
-                }}
-              >
-                <MenuItem value={5}>5</MenuItem>
-                <MenuItem value={10}>10</MenuItem>
-                <MenuItem value={25}>25</MenuItem>
-                <MenuItem value={50}>50</MenuItem>
-              </Select>
-            </FormControl>
-
-            {/* Go to */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                Go to
-              </Typography>
-              <TextField
-                size="small"
-                value={goToPage}
-                onChange={(e) => setGoToPage(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    handleGoToPage();
-                  }
-                }}
-                placeholder="1"
-                sx={{
-                  width: 60,
-                  '& .MuiOutlinedInput-root': {
-                    '& input': {
-                      py: 0.5,
-                      px: 1,
-                      fontSize: '0.875rem',
-                      textAlign: 'center'
-                    },
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      border: '1px solid #e0e0e0'
-                    }
-                  }
-                }}
-              />
-              <Button
-                size="small"
-                onClick={handleGoToPage}
-                sx={{
-                  minWidth: 'auto',
-                  px: 1.5,
-                  py: 0.5,
-                  fontSize: '0.875rem'
-                }}
-              >
-                Go
-              </Button>
-            </Box>
-          </Box>
-
-          {/* 오른쪽: 페이지 정보와 페이지네이션 */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              {filteredData.length > 0
-                ? `${page * rowsPerPage + 1}-${Math.min((page + 1) * rowsPerPage, filteredData.length)} of ${filteredData.length}`
-                : '0-0 of 0'}
-            </Typography>
-            {totalPages > 0 && (
-              <Pagination
-                count={totalPages}
-                page={page + 1}
-                onChange={handleChangePage}
-                color="primary"
-                size="small"
-                showFirstButton
-                showLastButton
-                sx={{
-                  '& .MuiPaginationItem-root': {
-                    fontSize: '0.875rem',
-                    minWidth: '32px',
-                    height: '32px',
-                    borderRadius: '4px'
-                  },
-                  '& .MuiPaginationItem-page.Mui-selected': {
-                    backgroundColor: 'primary.main',
-                    color: 'white !important',
-                    borderRadius: '4px',
-                    fontWeight: 500,
-                    '&:hover': {
-                      backgroundColor: 'primary.dark',
-                      color: 'white !important'
-                    }
-                  },
-                  '& .MuiPaginationItem-page': {
-                    borderRadius: '4px',
-                    '&:hover': {
-                      backgroundColor: 'grey.100'
-                    }
-                  }
                 }
-              }
+              }}
             />
-            )}
+            <Button
+              size="small"
+              onClick={handleGoToPage}
+              sx={{
+                minWidth: 'auto',
+                px: 1.5,
+                py: 0.5,
+                fontSize: '0.875rem'
+              }}
+            >
+              Go
+            </Button>
           </Box>
         </Box>
 
-        {/* 교육 상세 정보 다이얼로그 */}
-        <Dialog
-          open={actionDialog.open}
-          onClose={handleActionClose}
-          maxWidth="xl"
-          fullWidth
-          PaperProps={{
-            sx: {
-              minHeight: '80vh',
-              maxHeight: '90vh'
-            }
-          }}
-        >
-          <DialogTitle
-            sx={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start',
-              pr: 2,
-              pt: 2,
-              pb: 1
-            }}
-          >
-            <Box>
-              <Typography variant="h6" component="div">
-                {editingRecord?.id ? '교육 정보 수정' : '새 교육 과정 등록'}
-              </Typography>
-              {editingRecord?.code && (
-                <Typography variant="body2" color="text.secondary">
-                  {editingRecord.code} - {editingRecord.content}
-                </Typography>
-              )}
-            </Box>
-
-            {/* 취소, 저장 버튼을 오른쪽 상단으로 이동 */}
-            <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-              <Button onClick={handleActionClose} variant="outlined" size="small" sx={{ minWidth: '60px' }}>
-                취소
-              </Button>
-              <Button onClick={handleSave} variant="contained" size="small" sx={{ minWidth: '60px' }}>
-                저장
-              </Button>
-            </Box>
-          </DialogTitle>
-
-          <DialogContent sx={{ px: 3, py: 2 }}>
-            <Tabs value={actionTabValue} onChange={(e, newValue) => setActionTabValue(newValue)} sx={{ mb: 3 }}>
-              <Tab label="개요" />
-              <Tab label="커리큘럼" />
-              <Tab label="참석자" />
-              <Tab label="교육실적" />
-            </Tabs>
-
-            {/* 개요 탭 */}
-            {actionTabValue === 0 && editingRecord && (
-              <Box sx={{ py: 2 }}>
-                <Grid container spacing={3}>
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      label={
-                        <span>
-                          교육명 <span style={{ color: 'red' }}>*</span>
-                        </span>
-                      }
-                      value={editingRecord.content}
-                      onChange={(e) => setEditingRecord((prev) => (prev ? { ...prev, content: e.target.value } : null))}
-                      variant="outlined"
-                      InputLabelProps={{ shrink: true }}
-                      error={!editingRecord.content}
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          backgroundColor: !editingRecord.content ? '#ffebee' : 'inherit',
-                          '& fieldset': {
-                            borderColor: !editingRecord.content ? '#f44336' : undefined
-                          }
-                        }
-                      }}
-                    />
-                  </Grid>
-                  <Grid item xs={6}>
-                    <FormControl fullWidth error={!editingRecord.educationType}>
-                      <InputLabel shrink>교육유형</InputLabel>
-                      <Select
-                        value={editingRecord.educationType}
-                        label="교육유형"
-                        onChange={(e) => {
-                          const newType = e.target.value as any;
-                          setEditingRecord((prev) =>
-                            prev
-                              ? {
-                                  ...prev,
-                                  educationType: newType,
-                                  code: generateCode(
-                                    data.filter((r) => r.id !== prev.id),
-                                    newType
-                                  )
-                                }
-                              : null
-                          );
-                        }}
-                      >
-                        {educationTypeOptions.map((option) => (
-                          <MenuItem key={option} value={option}>
-                            {option}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <TextField
-                      fullWidth
-                      label={
-                        <span>
-                          참석수 <span style={{ color: 'red' }}>*</span>
-                        </span>
-                      }
-                      type="number"
-                      value={editingRecord.participants}
-                      onChange={(e) => setEditingRecord((prev) => (prev ? { ...prev, participants: Number(e.target.value) } : null))}
-                      variant="outlined"
-                      InputLabelProps={{ shrink: true }}
-                      error={!editingRecord.participants || editingRecord.participants <= 0}
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          backgroundColor: !editingRecord.participants || editingRecord.participants <= 0 ? '#ffebee' : 'inherit',
-                          '& fieldset': {
-                            borderColor: !editingRecord.participants || editingRecord.participants <= 0 ? '#f44336' : undefined
-                          }
-                        }
-                      }}
-                    />
-                  </Grid>
-                  <Grid item xs={6}>
-                    <TextField
-                      fullWidth
-                      label={
-                        <span>
-                          완료일 <span style={{ color: 'red' }}>*</span>
-                        </span>
-                      }
-                      type="date"
-                      value={editingRecord.completionDate}
-                      onChange={(e) => setEditingRecord((prev) => (prev ? { ...prev, completionDate: e.target.value } : null))}
-                      variant="outlined"
-                      InputLabelProps={{ shrink: true }}
-                      error={!editingRecord.completionDate}
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          backgroundColor: !editingRecord.completionDate ? '#ffebee' : 'inherit',
-                          '& fieldset': {
-                            borderColor: !editingRecord.completionDate ? '#f44336' : undefined
-                          }
-                        }
-                      }}
-                    />
-                  </Grid>
-                  <Grid item xs={6}>
-                    <TextField
-                      fullWidth
-                      label={
-                        <span>
-                          장소 <span style={{ color: 'red' }}>*</span>
-                        </span>
-                      }
-                      value={editingRecord.location}
-                      onChange={(e) => setEditingRecord((prev) => (prev ? { ...prev, location: e.target.value } : null))}
-                      variant="outlined"
-                      InputLabelProps={{ shrink: true }}
-                      error={!editingRecord.location}
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          backgroundColor: !editingRecord.location ? '#ffebee' : 'inherit',
-                          '& fieldset': {
-                            borderColor: !editingRecord.location ? '#f44336' : undefined
-                          }
-                        }
-                      }}
-                    />
-                  </Grid>
-                  <Grid item xs={6}>
-                    <FormControl fullWidth>
-                      <InputLabel shrink>상태</InputLabel>
-                      <Select
-                        value={editingRecord.status}
-                        label="상태"
-                        onChange={(e) => setEditingRecord((prev) => (prev ? { ...prev, status: e.target.value as any } : null))}
-                      >
-                        {statusOptions.map((status) => (
-                          <MenuItem key={status} value={status}>
-                            <Chip label={status} size="small" />
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <FormControl fullWidth>
-                      <InputLabel shrink>담당자</InputLabel>
-                      <Select
-                        value={editingRecord.assignee}
-                        label="담당자"
-                        onChange={(e) => setEditingRecord((prev) => (prev ? { ...prev, assignee: e.target.value } : null))}
-                        renderValue={(value) => {
-                          const assignee = assigneeOptions.find((option) => option.name === value);
-                          return assignee ? (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Avatar src={assignee.avatar} sx={{ width: 24, height: 24 }} />
-                              <Typography sx={{ fontSize: '14px' }}>{assignee.name}</Typography>
-                            </Box>
-                          ) : (
-                            value
-                          );
-                        }}
-                      >
-                        {assigneeOptions.map((option) => (
-                          <MenuItem key={option.name} value={option.name}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Avatar src={option.avatar} sx={{ width: 24, height: 24 }} />
-                              <Typography sx={{ fontSize: '14px' }}>{option.name}</Typography>
-                            </Box>
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <TextField
-                      fullWidth
-                      label="등록일"
-                      type="date"
-                      value={editingRecord.registrationDate}
-                      InputLabelProps={{ shrink: true }}
-                      variant="outlined"
-                      InputProps={{
-                        readOnly: true
-                      }}
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          backgroundColor: '#f5f5f5',
-                          '& fieldset': {
-                            borderColor: '#e0e0e0'
-                          },
-                          '&:hover fieldset': {
-                            borderColor: '#e0e0e0'
-                          },
-                          '&.Mui-focused fieldset': {
-                            borderColor: '#e0e0e0'
-                          }
-                        },
-                        '& .MuiInputBase-input': {
-                          color: '#666666'
-                        }
-                      }}
-                    />
-                  </Grid>
-                </Grid>
-              </Box>
-            )}
-
-            {/* 커리큘럼 탭 - KPI관리와 동일한 디자인 */}
-            {actionTabValue === 1 && (
-              <Box sx={{ py: 2 }}>
-                {/* 추가, 삭제 버튼을 우측 상단으로 이동 */}
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2, gap: 1 }}>
-                  <Button
-                    variant="contained"
-                    size="small"
-                    onClick={handleAddCurriculum}
-                    sx={{
-                      minWidth: '60px',
-                      backgroundColor: '#1976d2',
-                      '&:hover': {
-                        backgroundColor: '#1565c0'
-                      }
-                    }}
-                  >
-                    추가
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={() => handleDeleteCurriculum()}
-                    disabled={selectedCurriculumItems.length === 0}
-                    sx={{
-                      minWidth: '60px',
-                      color: selectedCurriculumItems.length > 0 ? '#d32f2f' : '#9e9e9e',
-                      borderColor: selectedCurriculumItems.length > 0 ? '#d32f2f' : '#e0e0e0',
-                      '&:hover': {
-                        borderColor: selectedCurriculumItems.length > 0 ? '#c62828' : '#e0e0e0',
-                        backgroundColor: selectedCurriculumItems.length > 0 ? '#ffebee' : 'transparent'
-                      }
-                    }}
-                  >
-                    삭제 ({selectedCurriculumItems.length})
-                  </Button>
-                </Box>
-
-                {/* KPI관리와 동일한 테이블 디자인 */}
-                <TableContainer component={Paper} sx={{ boxShadow: 'none', border: 'none' }}>
-                  <Table sx={{ tableLayout: 'fixed' }}>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell
-                          sx={{
-                            backgroundColor: '#fafafa',
-                            color: '#333',
-                            fontWeight: 600,
-                            fontSize: '14px',
-                            border: 'none',
-                            width: '50px',
-                            textAlign: 'center',
-                            padding: '16px'
-                          }}
-                        >
-                          <Checkbox
-                            indeterminate={
-                              selectedCurriculumItems.length > 0 && selectedCurriculumItems.length < (editingRecord?.curriculum.length || 0)
-                            }
-                            checked={
-                              editingRecord?.curriculum.length > 0 && selectedCurriculumItems.length === editingRecord.curriculum.length
-                            }
-                            onChange={handleSelectAllCurriculum}
-                          />
-                        </TableCell>
-                        <TableCell
-                          sx={{
-                            backgroundColor: '#fafafa',
-                            color: '#333',
-                            fontWeight: 600,
-                            fontSize: '14px',
-                            border: 'none',
-                            width: '60px',
-                            textAlign: 'center',
-                            padding: '16px'
-                          }}
-                        >
-                          NO
-                        </TableCell>
-                        <TableCell
-                          sx={{
-                            backgroundColor: '#fafafa',
-                            color: '#333',
-                            fontWeight: 600,
-                            fontSize: '14px',
-                            border: 'none',
-                            width: '80px',
-                            textAlign: 'left',
-                            padding: '16px'
-                          }}
-                        >
-                          시간
-                        </TableCell>
-                        <TableCell
-                          sx={{
-                            backgroundColor: '#fafafa',
-                            color: '#333',
-                            fontWeight: 600,
-                            fontSize: '14px',
-                            border: 'none',
-                            width: '200px',
-                            textAlign: 'left',
-                            padding: '16px'
-                          }}
-                        >
-                          과목명
-                        </TableCell>
-                        <TableCell
-                          sx={{
-                            backgroundColor: '#fafafa',
-                            color: '#333',
-                            fontWeight: 600,
-                            fontSize: '14px',
-                            border: 'none',
-                            width: '120px',
-                            textAlign: 'left',
-                            padding: '16px'
-                          }}
-                        >
-                          강사
-                        </TableCell>
-                        <TableCell
-                          sx={{
-                            backgroundColor: '#fafafa',
-                            color: '#333',
-                            fontWeight: 600,
-                            fontSize: '14px',
-                            border: 'none',
-                            width: '300px',
-                            textAlign: 'left',
-                            padding: '16px'
-                          }}
-                        >
-                          내용
-                        </TableCell>
-                        <TableCell
-                          sx={{
-                            backgroundColor: '#fafafa',
-                            color: '#333',
-                            fontWeight: 600,
-                            fontSize: '14px',
-                            border: 'none',
-                            width: '100px',
-                            textAlign: 'center',
-                            padding: '16px'
-                          }}
-                        >
-                          첨부
-                        </TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {editingRecord?.curriculum.map((item, index) => (
-                        <TableRow
-                          key={item.id}
-                          sx={{
-                            '&:hover': {
-                              backgroundColor: '#f9f9f9'
-                            },
-                            height: 'auto',
-                            minHeight: '60px',
-                            borderBottom: '1px solid #e0e0e0'
-                          }}
-                        >
-                          <TableCell
-                            sx={{
-                              width: '50px',
-                              textAlign: 'center',
-                              padding: '16px',
-                              borderBottom: '1px solid #e0e0e0',
-                              borderTop: 'none',
-                              borderLeft: 'none',
-                              borderRight: 'none'
-                            }}
-                          >
-                            <Checkbox
-                              checked={selectedCurriculumItems.includes(item.id)}
-                              onChange={() => handleCurriculumSelect(item.id)}
-                            />
-                          </TableCell>
-                          <TableCell
-                            sx={{
-                              width: '60px',
-                              textAlign: 'center',
-                              fontSize: '14px',
-                              fontWeight: 500,
-                              color: '#333',
-                              padding: '16px',
-                              borderBottom: '1px solid #e0e0e0',
-                              borderTop: 'none',
-                              borderLeft: 'none',
-                              borderRight: 'none'
-                            }}
-                          >
-                            {editingRecord.curriculum.length - index}
-                          </TableCell>
-                          <TableCell
-                            sx={{
-                              width: '80px',
-                              padding: '16px',
-                              borderBottom: '1px solid #e0e0e0',
-                              borderTop: 'none',
-                              borderLeft: 'none',
-                              borderRight: 'none'
-                            }}
-                          >
-                            <TextField
-                              fullWidth
-                              size="small"
-                              value={item.time}
-                              onChange={(e) => handleUpdateCurriculum(item.id, 'time', e.target.value)}
-                              variant="standard"
-                              InputProps={{
-                                disableUnderline: true,
-                                style: { fontSize: '14px' }
-                              }}
-                              sx={{
-                                '& .MuiInputBase-input': {
-                                  padding: '0'
-                                }
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell
-                            sx={{
-                              width: '200px',
-                              padding: '16px',
-                              borderBottom: '1px solid #e0e0e0',
-                              borderTop: 'none',
-                              borderLeft: 'none',
-                              borderRight: 'none'
-                            }}
-                          >
-                            <TextField
-                              fullWidth
-                              size="small"
-                              value={item.subject}
-                              onChange={(e) => handleUpdateCurriculum(item.id, 'subject', e.target.value)}
-                              variant="standard"
-                              InputProps={{
-                                disableUnderline: true,
-                                style: { fontSize: '14px' }
-                              }}
-                              sx={{
-                                '& .MuiInputBase-input': {
-                                  padding: '0'
-                                }
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell
-                            sx={{
-                              width: '120px',
-                              padding: '16px',
-                              borderBottom: '1px solid #e0e0e0',
-                              borderTop: 'none',
-                              borderLeft: 'none',
-                              borderRight: 'none'
-                            }}
-                          >
-                            <TextField
-                              fullWidth
-                              size="small"
-                              value={item.instructor}
-                              onChange={(e) => handleUpdateCurriculum(item.id, 'instructor', e.target.value)}
-                              variant="standard"
-                              InputProps={{
-                                disableUnderline: true,
-                                style: { fontSize: '14px' }
-                              }}
-                              sx={{
-                                '& .MuiInputBase-input': {
-                                  padding: '0'
-                                }
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell
-                            sx={{
-                              width: '300px',
-                              padding: '16px',
-                              borderBottom: '1px solid #e0e0e0',
-                              borderTop: 'none',
-                              borderLeft: 'none',
-                              borderRight: 'none'
-                            }}
-                          >
-                            <TextField
-                              fullWidth
-                              size="small"
-                              value={item.content}
-                              onChange={(e) => handleUpdateCurriculum(item.id, 'content', e.target.value)}
-                              variant="standard"
-                              multiline
-                              maxRows={3}
-                              InputProps={{
-                                disableUnderline: true,
-                                style: { fontSize: '14px' }
-                              }}
-                              sx={{
-                                '& .MuiInputBase-input': {
-                                  padding: '0'
-                                }
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell
-                            sx={{
-                              width: '100px',
-                              textAlign: 'center',
-                              padding: '16px',
-                              borderBottom: '1px solid #e0e0e0',
-                              borderTop: 'none',
-                              borderLeft: 'none',
-                              borderRight: 'none'
-                            }}
-                          >
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              onClick={() => setAttachmentDialog({ open: true, curriculumId: item.id })}
-                              sx={{ fontSize: '12px', minWidth: '60px' }}
-                            >
-                              첨부
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Box>
-            )}
-
-            {/* 참석자 탭 */}
-            {actionTabValue === 2 && (
-              <Box sx={{ py: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="h6">참석자 목록</Typography>
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={handleDeleteParticipant}
-                      disabled={editingRecord?.participantList.length === 0}
-                    >
-                      삭제
-                    </Button>
-                    <Button variant="contained" size="small" onClick={handleAddParticipant}>
-                      추가
-                    </Button>
-                  </Box>
-                </Box>
-
-                <TableContainer component={Paper}>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell padding="checkbox">
-                          <Checkbox
-                            indeterminate={
-                              editingRecord?.participantList.length > 0 &&
-                              editingRecord.participantList.length < editingRecord.participantList.length
-                            }
-                            checked={
-                              editingRecord?.participantList.length > 0 &&
-                              editingRecord.participantList.length === editingRecord.participantList.length
-                            }
-                            onChange={() => {
-                              const allChecked =
-                                editingRecord.participantList.length > 0 &&
-                                editingRecord.participantList.length === editingRecord.participantList.length;
-                              editingRecord.participantList.forEach((item) => {
-                                const checkbox = document.getElementById(`participant-checkbox-${item.id}`);
-                                if (checkbox) {
-                                  checkbox.checked = allChecked;
-                                }
-                              });
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell>NO</TableCell>
-                        <TableCell>담당자</TableCell>
-                        <TableCell>부서</TableCell>
-                        <TableCell>직급</TableCell>
-                        <TableCell>참석여부</TableCell>
-                        <TableCell>Report</TableCell>
-                        <TableCell>비고</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {editingRecord?.participantList.map((participant, index) => (
-                        <TableRow key={participant.id}>
-                          <TableCell padding="checkbox">
-                            <Checkbox
-                              checked={editingRecord.participantList.some((p) => p.id === participant.id)}
-                              onChange={() => {
-                                const newParticipants = editingRecord.participantList.map((p) => ({ ...p, id: p.id }));
-                                if (editingRecord.participantList.some((p) => p.id === participant.id)) {
-                                  newParticipants.splice(
-                                    newParticipants.findIndex((p) => p.id === participant.id),
-                                    1
-                                  );
-                                } else {
-                                  newParticipants.push({
-                                    ...participant,
-                                    id: Math.max(...editingRecord.participantList.map((p) => p.id)) + 1
-                                  });
-                                }
-                                setEditingRecord((prev) => (prev ? { ...prev, participantList: newParticipants } : null));
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell>{editingRecord.participantList.length - index}</TableCell>
-                          <TableCell>
-                            <Select
-                              value={participant.assignee}
-                              onChange={(e) => handleUpdateParticipant(participant.id, 'assignee', e.target.value)}
-                              size="small"
-                              fullWidth
-                            >
-                              {assigneeOptions.map((option) => (
-                                <MenuItem key={option.name} value={option.name}>
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <Avatar src={option.avatar} sx={{ width: 24, height: 24 }} />
-                                    <Typography sx={{ fontSize: '14px' }}>{option.name}</Typography>
-                                  </Box>
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          </TableCell>
-                          <TableCell>
-                            <TextField
-                              size="small"
-                              value={participant.department}
-                              onChange={(e) => handleUpdateParticipant(participant.id, 'department', e.target.value)}
-                              fullWidth
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <TextField
-                              size="small"
-                              value={participant.position}
-                              onChange={(e) => handleUpdateParticipant(participant.id, 'position', e.target.value)}
-                              fullWidth
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Select
-                              value={participant.attendance}
-                              onChange={(e) => handleUpdateParticipant(participant.id, 'attendance', e.target.value as any)}
-                              size="small"
-                              fullWidth
-                            >
-                              {attendanceStatusOptions.map((option) => (
-                                <MenuItem key={option} value={option}>
-                                  <Chip label={option} size="small" />
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          </TableCell>
-                          <TableCell>
-                            <TextField
-                              size="small"
-                              value={participant.report}
-                              onChange={(e) => handleUpdateParticipant(participant.id, 'report', e.target.value)}
-                              fullWidth
-                              multiline
-                              rows={2}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <TextField
-                              size="small"
-                              value={participant.note || ''}
-                              onChange={(e) => handleUpdateParticipant(participant.id, 'note', e.target.value)}
-                              fullWidth
-                            />
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Box>
-            )}
-
-            {/* 교육실적 탭 */}
-            {actionTabValue === 3 && (
-              <Box sx={{ py: 2 }}>
-                <Stack spacing={3}>
-                  <Paper variant="outlined" sx={{ p: 2 }}>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        cursor: 'pointer',
-                        py: 1
-                      }}
-                      onClick={() => setEditingRecord((prev) => (prev ? { ...prev, result: { ...prev.result, performance: '' } } : null))}
-                    >
-                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                        성과
-                      </Typography>
-                      <Typography sx={{ fontSize: '16px' }}>{editingRecord?.result.performance ? '▲' : '▼'}</Typography>
-                    </Box>
-                    {editingRecord?.result.performance && (
-                      <Box sx={{ mt: 2 }}>
-                        <TextField
-                          fullWidth
-                          multiline
-                          rows={4}
-                          placeholder="교육을 통해 달성한 성과를 입력하세요..."
-                          value={editingRecord.result.performance}
-                          onChange={(e) =>
-                            setEditingRecord((prev) => (prev ? { ...prev, result: { ...prev.result, performance: e.target.value } } : null))
-                          }
-                          variant="outlined"
-                        />
-                      </Box>
-                    )}
-                  </Paper>
-
-                  <Paper variant="outlined" sx={{ p: 2 }}>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        cursor: 'pointer',
-                        py: 1
-                      }}
-                      onClick={() => setEditingRecord((prev) => (prev ? { ...prev, result: { ...prev.result, improvement: '' } } : null))}
-                    >
-                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                        개선
-                      </Typography>
-                      <Typography sx={{ fontSize: '16px' }}>{editingRecord?.result.improvement ? '▲' : '▼'}</Typography>
-                    </Box>
-                    {editingRecord?.result.improvement && (
-                      <Box sx={{ mt: 2 }}>
-                        <TextField
-                          fullWidth
-                          multiline
-                          rows={4}
-                          placeholder="앞으로 개선해야 할 사항을 입력하세요..."
-                          value={editingRecord.result.improvement}
-                          onChange={(e) =>
-                            setEditingRecord((prev) => (prev ? { ...prev, result: { ...prev.result, improvement: e.target.value } } : null))
-                          }
-                          variant="outlined"
-                        />
-                      </Box>
-                    )}
-                  </Paper>
-
-                  <Paper variant="outlined" sx={{ p: 2 }}>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        cursor: 'pointer',
-                        py: 1
-                      }}
-                      onClick={() => setEditingRecord((prev) => (prev ? { ...prev, result: { ...prev.result, feedback: '' } } : null))}
-                    >
-                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                        교육소감
-                      </Typography>
-                      <Typography sx={{ fontSize: '16px' }}>{editingRecord?.result.feedback ? '▲' : '▼'}</Typography>
-                    </Box>
-                    {editingRecord?.result.feedback && (
-                      <Box sx={{ mt: 2 }}>
-                        <TextField
-                          fullWidth
-                          multiline
-                          rows={4}
-                          placeholder="교육에 대한 전반적인 소감을 입력하세요..."
-                          value={editingRecord.result.feedback}
-                          onChange={(e) =>
-                            setEditingRecord((prev) => (prev ? { ...prev, result: { ...prev.result, feedback: e.target.value } } : null))
-                          }
-                          variant="outlined"
-                        />
-                      </Box>
-                    )}
-                  </Paper>
-                </Stack>
-              </Box>
-            )}
-          </DialogContent>
-        </Dialog>
-
-        {/* 첨부파일 다이얼로그 */}
-        <Dialog
-          open={attachmentDialog.open}
-          onClose={() => setAttachmentDialog({ open: false, curriculumId: null })}
-          maxWidth="sm"
-          fullWidth
-        >
-          <DialogTitle>첨부파일 관리</DialogTitle>
-          <DialogContent>
-            <Box sx={{ py: 2 }}>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                파일을 선택하여 업로드하세요.
-              </Typography>
-              <Button variant="contained" component="label" sx={{ mt: 2 }}>
-                파일 선택
-                <input
-                  type="file"
-                  hidden
-                  multiple
-                  accept="*/*"
-                  onChange={(e) => {
-                    // 파일 업로드 로직 (향후 구현)
-                    console.log('Selected files:', e.target.files);
-                  }}
-                />
-              </Button>
-            </Box>
-          </DialogContent>
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', p: 2, gap: 1 }}>
-            <Button onClick={() => setAttachmentDialog({ open: false, curriculumId: null })}>닫기</Button>
-          </Box>
-        </Dialog>
+        {/* 오른쪽: 페이지 네비게이션 */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            {filteredData.length > 0
+              ? `${page * rowsPerPage + 1}-${Math.min((page + 1) * rowsPerPage, filteredData.length)} of ${filteredData.length}`
+              : '0-0 of 0'}
+          </Typography>
+          {totalPages > 0 && (
+            <Pagination
+              count={totalPages}
+              page={page + 1}
+              onChange={handleChangePage}
+              color="primary"
+              size="small"
+              showFirstButton
+              showLastButton
+              sx={{
+                '& .MuiPaginationItem-root': {
+                  fontSize: '0.875rem',
+                  minWidth: '32px',
+                  height: '32px',
+                  borderRadius: '4px'
+                },
+                '& .MuiPaginationItem-page.Mui-selected': {
+                  backgroundColor: 'primary.main',
+                  color: 'white !important',
+                  borderRadius: '4px',
+                  fontWeight: 500,
+                  '&:hover': {
+                    backgroundColor: 'primary.dark',
+                    color: 'white !important'
+                  }
+                },
+                '& .MuiPaginationItem-page': {
+                  borderRadius: '4px',
+                  '&:hover': {
+                    backgroundColor: 'grey.100'
+                  }
+                }
+              }}
+            />
+          )}
+        </Box>
       </Box>
-    </LocalizationProvider>
+
+        </>
+      )}
+
+      {/* Education 편집 다이얼로그 */}
+      {editDialog && (
+        <EducationEditDialog
+          open={editDialog}
+          onClose={handleEditDialogClose}
+          education={editingEducation}
+          onSave={handleEditEducationSave}
+          assignees={assignees}
+          assigneeAvatars={assigneeAvatars}
+          statusOptions={educationStatusOptions}
+          statusColors={educationStatusColors}
+          teams={teams}
+        />
+      )}
+    </Box>
   );
 }

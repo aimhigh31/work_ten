@@ -1,451 +1,320 @@
-import { EducationRecord, CurriculumItem, ParticipantItem, EducationResult } from 'types/education';
+import { EducationData, EducationStatus, EducationRequestType } from 'types/education';
 
-// 교육관리 샘플 데이터
-export const educationData: EducationRecord[] = [
+// 샘플 담당자 목록
+export const assignees = ['김민수', '이영희', '박지훈', '최수진', '정우진', '한나라', '신동욱', '오세영'];
+
+// 담당자별 아바타 정보
+export const assigneeAvatars = {
+  김민수: '/assets/images/users/avatar-1.png',
+  이영희: '/assets/images/users/avatar-2.png',
+  박지훈: '/assets/images/users/avatar-3.png',
+  최수진: '/assets/images/users/avatar-4.png',
+  정우진: '/assets/images/users/avatar-5.png',
+  한나라: '/assets/images/users/avatar-6.png',
+  신동욱: '/assets/images/users/avatar-7.png',
+  오세영: '/assets/images/users/avatar-8.png'
+} as const;
+
+// 샘플 Education 데이터
+export const educationData: EducationData[] = [
+  // 2025년 데이터
   {
     id: 1,
-    registrationDate: '2024-12-01',
-    startDate: '2024-01-10',
-    code: 'EDU-I-24-001',
-    educationType: '신입교육',
-    content: '신입사원 기초 교육과정',
-    participants: 15,
-    location: '대회의실',
-    status: '완료',
-    completionDate: '2024-12-15',
-    assignee: '김인사',
-    curriculum: [
-      {
-        id: 1,
-        time: '09:00-10:30',
-        subject: '회사 소개 및 조직문화',
-        instructor: '김인사',
-        content: '회사 역사, 비전, 조직문화 이해',
-        attachment: 'company_intro.pdf'
-      },
-      {
-        id: 2,
-        time: '10:45-12:00',
-        subject: '업무 프로세스 교육',
-        instructor: '이기술',
-        content: '기본 업무 프로세스 및 시스템 사용법',
-        attachment: 'process_guide.pdf'
-      },
-      {
-        id: 3,
-        time: '13:00-14:30',
-        subject: '안전 및 보안 교육',
-        instructor: '박안전',
-        content: '직장 내 안전수칙 및 정보보안'
-      },
-      {
-        id: 4,
-        time: '14:45-16:00',
-        subject: '질의응답 및 멘토링',
-        instructor: '김인사',
-        content: '궁금한 사항 해결 및 멘토 배정'
-      }
-    ],
-    participantList: [
-      {
-        id: 1,
-        name: '김신입',
-        department: 'IT팀',
-        position: '사원',
-        attendance: '참석',
-        report: 'newcomer_report_001.pdf',
-        note: '적극적 참여'
-      },
-      {
-        id: 2,
-        name: '이신규',
-        department: '마케팅팀',
-        position: '사원',
-        attendance: '참석',
-        report: 'newcomer_report_002.pdf'
-      },
-      {
-        id: 3,
-        name: '박신인',
-        department: '영업팀',
-        position: '사원',
-        attendance: '불참',
-        note: '개인사정으로 불참'
-      }
-    ],
-    result: {
-      performance:
-        '신입사원들의 회사 적응도가 크게 향상되었으며, 업무 이해도가 평균 85% 증가했습니다. 특히 조직문화 이해 부분에서 높은 만족도를 보였습니다.',
-      improvement:
-        '실습 시간을 늘리고, 더 많은 상호작용 시간이 필요합니다. 멘토링 프로그램을 체계화하여 지속적인 지원이 가능하도록 개선이 필요합니다.',
-      feedback:
-        '신입사원들이 회사에 대한 이해가 높아졌고, 동료들과의 유대감 형성에 도움이 되었다는 긍정적인 피드백을 받았습니다. 향후 정기적인 후속 교육 요청이 있었습니다.'
-    }
+    no: 20,
+    registrationDate: '2025-01-15',
+    startDate: '2025-01-18',
+    code: 'MAIN-EDU-25-001',
+    requestType: '기능개선',
+    requestDepartment: '영업팀',
+    requester: '홍길동',
+    requestContent: 'CRM 시스템에 고객 등급별 알림 기능을 추가해주세요',
+    actionContent: '고객 등급 분류 및 알림 모듈 개발 진행 중입니다',
+    status: '진행중',
+    team: '개발팀',
+    assignee: '김민수',
+    completedDate: '',
+    attachments: ['crm_spec.pdf', 'notification_design.png']
   },
   {
     id: 2,
-    registrationDate: '2024-12-05',
-    startDate: '2024-02-15',
-    code: 'EDU-S-24-001',
-    educationType: '담당자교육',
-    content: '업무 전문성 향상 교육',
-    participants: 12,
-    location: '소회의실A',
-    status: '진행',
-    completionDate: '2024-12-20',
-    assignee: '이기술',
-    curriculum: [
-      {
-        id: 1,
-        time: '09:00-10:30',
-        subject: '업무 효율성 향상',
-        instructor: '이기술',
-        content: '업무 프로세스 최적화 및 도구 활용법'
-      },
-      {
-        id: 2,
-        time: '10:45-12:00',
-        subject: '커뮤니케이션 스킬',
-        instructor: '정마케팅',
-        content: '효과적인 의사소통 및 협업 방법'
-      }
-    ],
-    participantList: [
-      {
-        id: 1,
-        name: '최담당',
-        department: 'IT팀',
-        position: '대리',
-        attendance: '예정'
-      },
-      {
-        id: 2,
-        name: '송전문',
-        department: '기획팀',
-        position: '과장',
-        attendance: '예정'
-      }
-    ],
-    result: {
-      performance: '',
-      improvement: '',
-      feedback: ''
-    }
+    no: 19,
+    registrationDate: '2025-01-12',
+    startDate: '2025-01-15',
+    code: 'MAIN-EDU-25-002',
+    requestType: '오류신고',
+    requestDepartment: '회계팀',
+    requester: '김영희',
+    requestContent: '전자세금계산서 발행 시 금액 계산 오류가 발생합니다',
+    actionContent: '세금계산 로직 검토 및 수정 완료',
+    status: '완료',
+    team: '개발팀',
+    assignee: '이영희',
+    completedDate: '2025-01-20',
+    attachments: ['tax_error_log.xlsx', 'fix_report.pdf']
   },
   {
     id: 3,
-    registrationDate: '2024-12-10',
-    startDate: '2024-03-20',
-    code: 'EDU-M-24-001',
-    educationType: '관리자교육',
-    content: '리더십 및 팀 관리 교육',
-    participants: 8,
-    location: '임원회의실',
-    status: '예정',
-    completionDate: '2024-12-25',
-    assignee: '최리더',
-    curriculum: [
-      {
-        id: 1,
-        time: '09:00-10:30',
-        subject: '리더십 이론과 실무',
-        instructor: '외부전문가',
-        content: '현대적 리더십 이론 및 실무 적용'
-      },
-      {
-        id: 2,
-        time: '10:45-12:00',
-        subject: '팀 빌딩과 동기부여',
-        instructor: '외부전문가',
-        content: '효과적인 팀 관리 및 구성원 동기부여'
-      },
-      {
-        id: 3,
-        time: '13:00-14:30',
-        subject: '갈등 관리와 해결',
-        instructor: '외부전문가',
-        content: '조직 내 갈등 상황 관리 및 해결 방안'
-      }
-    ],
-    participantList: [
-      {
-        id: 1,
-        name: '김부장',
-        department: 'IT팀',
-        position: '부장',
-        attendance: '예정'
-      },
-      {
-        id: 2,
-        name: '이팀장',
-        department: '마케팅팀',
-        position: '팀장',
-        attendance: '예정'
-      }
-    ],
-    result: {
-      performance: '',
-      improvement: '',
-      feedback: ''
-    }
+    no: 18,
+    registrationDate: '2025-01-08',
+    startDate: '2025-01-10',
+    code: 'MAIN-EDU-25-003',
+    requestType: '문의',
+    requestDepartment: '마케팅팀',
+    requester: '박철수',
+    requestContent: '월별 매출 통계 데이터를 Excel로 추출하는 방법을 알려주세요',
+    actionContent: '데이터 추출 매뉴얼 작성 및 교육 실시 완료',
+    status: '완료',
+    team: '기획팀',
+    assignee: '박지훈',
+    completedDate: '2025-01-12',
+    attachments: ['export_manual.pdf', 'training_video.mp4']
   },
   {
     id: 4,
-    registrationDate: '2024-12-12',
-    startDate: '2024-04-05',
-    code: 'EDU-A-24-001',
-    educationType: '수시교육',
-    content: '신기술 동향 세미나',
-    participants: 20,
-    location: '온라인',
-    status: '예정',
-    completionDate: '2024-12-22',
-    assignee: '김디지털',
-    curriculum: [
-      {
-        id: 1,
-        time: '14:00-15:30',
-        subject: 'AI 기술 동향',
-        instructor: '김디지털',
-        content: '최신 AI 기술 트렌드 및 활용 사례'
-      },
-      {
-        id: 2,
-        time: '15:45-17:00',
-        subject: '클라우드 기술 소개',
-        instructor: '이개발',
-        content: '클라우드 서비스 및 마이그레이션 전략'
-      }
-    ],
-    participantList: [
-      {
-        id: 1,
-        name: '정개발',
-        department: 'IT팀',
-        position: '사원',
-        attendance: '예정'
-      },
-      {
-        id: 2,
-        name: '한기술',
-        department: 'IT팀',
-        position: '대리',
-        attendance: '예정'
-      }
-    ],
-    result: {
-      performance: '',
-      improvement: '',
-      feedback: ''
-    }
+    no: 17,
+    registrationDate: '2025-01-05',
+    startDate: '2025-02-01',
+    code: 'MAIN-EDU-25-004',
+    requestType: '기능개선',
+    requestDepartment: 'HR팀',
+    requester: '최민정',
+    requestContent: '직원 근태관리 시스템의 모바일 접근성을 개선해주세요',
+    actionContent: '모바일 UI 개선안 검토 중입니다',
+    status: '접수',
+    team: '디자인팀',
+    assignee: '최수진',
+    completedDate: '',
+    attachments: ['mobile_feedback.pdf', 'accessibility_guide.docx']
   },
   {
     id: 5,
-    registrationDate: '2024-11-20',
-    startDate: '2024-05-18',
-    code: 'EDU-I-24-002',
-    educationType: '신입교육',
-    content: '신입사원 IT 시스템 교육',
-    participants: 10,
-    location: 'IT교육실',
-    status: '완료',
-    completionDate: '2024-11-30',
-    assignee: '이개발',
-    curriculum: [
-      {
-        id: 1,
-        time: '09:00-10:30',
-        subject: '사내 시스템 소개',
-        instructor: '이개발',
-        content: 'ERP, 그룹웨어 등 사내 시스템 사용법'
-      },
-      {
-        id: 2,
-        time: '10:45-12:00',
-        subject: '보안 정책 교육',
-        instructor: '송보안',
-        content: '정보보안 정책 및 준수사항'
-      }
-    ],
-    participantList: [
-      {
-        id: 1,
-        name: '박IT',
-        department: 'IT팀',
-        position: '사원',
-        attendance: '참석',
-        report: 'it_training_report_001.pdf'
-      }
-    ],
-    result: {
-      performance: 'IT 시스템 활용 능력이 90% 향상되었으며, 업무 처리 속도가 크게 개선되었습니다.',
-      improvement: '실습 환경을 더욱 현실적으로 구성하고, 개인별 맞춤 교육이 필요합니다.',
-      feedback: '실무에 바로 적용할 수 있는 내용으로 구성되어 매우 유익했습니다.'
-    }
+    no: 16,
+    registrationDate: '2025-01-03',
+    startDate: '2025-02-15',
+    code: 'MAIN-EDU-25-005',
+    requestType: '오류신고',
+    requestDepartment: '구매팀',
+    requester: '정우진',
+    requestContent: '구매요청 승인 프로세스에서 메일 알림이 오지 않습니다',
+    actionContent: '메일 서버 점검 예정',
+    status: '보류',
+    team: '개발팀',
+    assignee: '정우진',
+    completedDate: '',
+    attachments: ['mail_log.txt']
   },
   {
     id: 6,
-    registrationDate: '2024-11-25',
-    startDate: '2024-06-22',
-    code: 'EDU-S-24-002',
-    educationType: '담당자교육',
-    content: '고객 서비스 향상 교육',
-    participants: 18,
-    location: '교육센터',
-    status: '완료',
-    completionDate: '2024-12-05',
-    assignee: '한영업',
-    curriculum: [
-      {
-        id: 1,
-        time: '09:00-10:30',
-        subject: '고객 응대 스킬',
-        instructor: '한영업',
-        content: '효과적인 고객 응대 방법 및 CS 마인드'
-      }
-    ],
-    participantList: [
-      {
-        id: 1,
-        name: '임서비스',
-        department: '영업팀',
-        position: '대리',
-        attendance: '참석'
-      }
-    ],
-    result: {
-      performance: '고객 만족도가 15% 향상되었으며, 고객 응대 품질이 크게 개선되었습니다.',
-      improvement: '다양한 고객 유형별 응대 시나리오를 추가로 다뤄야 합니다.',
-      feedback: '실제 고객 응대 상황에서 바로 활용할 수 있는 실용적인 교육이었습니다.'
-    }
+    no: 15,
+    registrationDate: '2025-01-02',
+    startDate: '2025-01-25',
+    code: 'MAIN-EDU-25-006',
+    requestType: '기능개선',
+    requestDepartment: '고객서비스팀',
+    requester: '한나라',
+    requestContent: '고객 문의 티켓 시스템에 우선순위 설정 기능을 추가해주세요',
+    actionContent: '티켓 우선순위 로직 설계 중',
+    status: '진행중',
+    team: '개발팀',
+    assignee: '한나라',
+    completedDate: '',
+    attachments: ['ticket_priority_spec.pdf']
   },
   {
     id: 7,
-    registrationDate: '2024-12-01',
-    startDate: '2024-07-12',
-    code: 'EDU-A-24-002',
-    educationType: '수시교육',
-    content: '업무 스트레스 관리 워크샵',
-    participants: 25,
-    location: '복지관',
+    no: 14,
+    registrationDate: '2024-12-28',
+    startDate: '2025-01-05',
+    code: 'MAIN-EDU-24-014',
+    requestType: '문의',
+    requestDepartment: '법무팀',
+    requester: '신동욱',
+    requestContent: '계약서 관리 시스템의 버전 관리 기능 사용법을 알려주세요',
+    actionContent: '계약서 버전 관리 가이드 제공',
     status: '완료',
-    completionDate: '2024-12-10',
-    assignee: '김인사',
-    curriculum: [
-      {
-        id: 1,
-        time: '14:00-15:30',
-        subject: '스트레스 이해와 관리',
-        instructor: '외부상담사',
-        content: '스트레스의 원인 파악 및 관리 방법'
-      }
-    ],
-    participantList: [
-      {
-        id: 1,
-        name: '조힐링',
-        department: '전체',
-        position: '전직원',
-        attendance: '참석'
-      }
-    ],
-    result: {
-      performance: '직원들의 스트레스 수준이 평균 20% 감소하고, 업무 만족도가 향상되었습니다.',
-      improvement: '정기적인 후속 프로그램과 개인 상담 서비스가 필요합니다.',
-      feedback: '일상에서 바로 적용할 수 있는 실용적인 스트레스 관리법을 배울 수 있어 좋았습니다.'
-    }
+    team: '기획팀',
+    assignee: '신동욱',
+    completedDate: '2025-01-08',
+    attachments: ['version_control_guide.pdf']
   },
+
+  // 2024년 데이터
   {
     id: 8,
+    no: 13,
+    registrationDate: '2024-12-20',
+    startDate: '2024-12-22',
+    code: 'MAIN-EDU-24-013',
+    requestType: '오류신고',
+    requestDepartment: '영업팀',
+    requester: '오세영',
+    requestContent: '견적서 생성 시 할인율 계산이 잘못되어 나옵니다',
+    actionContent: '할인율 계산 로직 수정 및 테스트 완료',
+    status: '완료',
+    team: '개발팀',
+    assignee: '오세영',
+    completedDate: '2024-12-25',
+    attachments: ['discount_fix.sql', 'test_result.xlsx']
+  },
+  {
+    id: 9,
+    no: 12,
+    registrationDate: '2024-12-18',
+    startDate: '2024-12-20',
+    code: 'MAIN-EDU-24-012',
+    requestType: '기능개선',
+    requestDepartment: '기획팀',
+    requester: '김태현',
+    requestContent: '프로젝트 관리 시스템에 간트차트 기능을 추가해주세요',
+    actionContent: '간트차트 라이브러리 검토 및 구현 완료',
+    status: '완료',
+    team: '개발팀',
+    assignee: '김민수',
+    completedDate: '2024-12-30',
+    attachments: ['gantt_chart.js', 'implementation_guide.pdf']
+  },
+  {
+    id: 10,
+    no: 11,
     registrationDate: '2024-12-15',
-    startDate: '2024-08-25',
-    code: 'EDU-M-24-002',
-    educationType: '관리자교육',
-    content: '성과 관리 및 평가 교육',
-    participants: 6,
-    location: '소회의실B',
-    status: '예정',
-    completionDate: '2024-12-28',
-    assignee: '정마케팅',
-    curriculum: [
-      {
-        id: 1,
-        time: '09:00-12:00',
-        subject: '성과 관리 시스템',
-        instructor: '외부컨설턴트',
-        content: '효과적인 성과 관리 및 평가 방법론'
-      }
-    ],
-    participantList: [
-      {
-        id: 1,
-        name: '이관리',
-        department: '전체',
-        position: '관리자',
-        attendance: '예정'
-      }
-    ],
-    result: {
-      performance: '',
-      improvement: '',
-      feedback: ''
-    }
+    startDate: '2024-12-18',
+    code: 'MAIN-EDU-24-011',
+    requestType: '문의',
+    requestDepartment: '회계팀',
+    requester: '이수진',
+    requestContent: '월별 손익계산서 자동생성 기능 사용 방법을 알려주세요',
+    actionContent: '자동생성 기능 매뉴얼 제공 및 개별 교육 실시',
+    status: '완료',
+    team: '기획팀',
+    assignee: '박지훈',
+    completedDate: '2024-12-20',
+    attachments: ['pl_auto_manual.pdf', 'training_record.docx']
+  },
+  {
+    id: 11,
+    no: 10,
+    registrationDate: '2024-12-10',
+    startDate: '2024-11-15',
+    code: 'MAIN-EDU-24-010',
+    requestType: '기능개선',
+    requestDepartment: 'IT팀',
+    requester: '박민호',
+    requestContent: '시스템 로그 모니터링 대시보드에 실시간 알람 기능을 추가해주세요',
+    actionContent: '실시간 알람 시스템 구축 완료',
+    status: '완료',
+    team: '개발팀',
+    assignee: '이영희',
+    completedDate: '2024-12-15',
+    attachments: ['alarm_system.py', 'monitoring_dashboard.html']
+  },
+  {
+    id: 12,
+    no: 9,
+    registrationDate: '2024-12-08',
+    startDate: '2024-10-20',
+    code: 'MAIN-EDU-24-009',
+    requestType: '오류신고',
+    requestDepartment: '제조팀',
+    requester: '최영수',
+    requestContent: '생산계획 시스템에서 자재 소요량 계산이 부정확합니다',
+    actionContent: 'BOM 계산 알고리즘 수정 및 검증 완료',
+    status: '완료',
+    team: '개발팀',
+    assignee: '최수진',
+    completedDate: '2024-12-12',
+    attachments: ['bom_calculation.xlsx', 'algorithm_fix.sql']
+  },
+  {
+    id: 13,
+    no: 8,
+    registrationDate: '2024-12-05',
+    startDate: '2024-09-15',
+    code: 'MAIN-EDU-24-008',
+    requestType: '문의',
+    requestDepartment: '품질팀',
+    requester: '김혜진',
+    requestContent: '품질검사 결과를 Excel로 일괄 다운로드하는 방법을 알려주세요',
+    actionContent: '일괄 다운로드 기능 개발 및 사용법 안내',
+    status: '완료',
+    team: '기획팀',
+    assignee: '정우진',
+    completedDate: '2024-12-08',
+    attachments: ['batch_download.pdf', 'quality_export_guide.docx']
+  },
+  {
+    id: 14,
+    no: 7,
+    registrationDate: '2024-11-28',
+    startDate: '2024-08-10',
+    code: 'MAIN-EDU-24-007',
+    requestType: '기능개선',
+    requestDepartment: '물류팀',
+    requester: '이재훈',
+    requestContent: '재고관리 시스템에 안전재고 알림 기능을 추가해주세요',
+    actionContent: '안전재고 알림 모듈 개발 완료',
+    status: '완료',
+    team: '개발팀',
+    assignee: '한나라',
+    completedDate: '2024-12-02',
+    attachments: ['safety_stock_alert.js', 'inventory_notification.pdf']
+  },
+  {
+    id: 15,
+    no: 6,
+    registrationDate: '2024-11-25',
+    startDate: '2024-07-20',
+    code: 'MAIN-EDU-24-006',
+    requestType: '기타',
+    requestDepartment: '총무팀',
+    requester: '정현우',
+    requestContent: '사내 시설 예약 시스템 사용자 매뉴얼을 업데이트해주세요',
+    actionContent: '최신 기능 반영한 매뉴얼 업데이트 완료',
+    status: '완료',
+    team: '기획팀',
+    assignee: '신동욱',
+    completedDate: '2024-11-30',
+    attachments: ['facility_manual_v2.pdf', 'feature_update_log.txt']
   }
 ];
 
-// 교육관리 통계 계산 함수
-export const getEducationStatistics = (records: EducationRecord[]) => {
-  const totalCount = records.length;
-  const planningCount = records.filter((record) => record.status === '계획').length;
-  const completedCount = records.filter((record) => record.status === '완료').length;
-  const inProgressCount = records.filter((record) => record.status === '진행').length;
+// 상태별 색상 매핑
+const statusColors = {
+  접수: '#FFF3E0',
+  진행중: '#E3F2FD',
+  완료: '#E8F5E8',
+  보류: '#FCE4EC'
+} as const;
 
-  // 교육유형별 통계
-  const byType = records.reduce(
-    (acc, record) => {
-      if (!acc[record.educationType]) {
-        acc[record.educationType] = { count: 0, amount: 0 };
-      }
-      acc[record.educationType].count++;
-      return acc;
-    },
-    {} as Record<string, { count: number; amount: number }>
-  );
+// 팀 색상 매핑
+const teamColors = {
+  개발팀: 'primary',
+  디자인팀: 'secondary',
+  기획팀: 'info',
+  마케팅팀: 'warning'
+} as const;
 
-  // 상태별 통계
-  const byStatus = records.reduce(
-    (acc, record) => {
-      if (!acc[record.status]) {
-        acc[record.status] = { count: 0, amount: 0 };
-      }
-      acc[record.status].count++;
-      return acc;
-    },
-    {} as Record<string, { count: number; amount: number }>
-  );
+// 요청유형 색상 매핑
+const requestTypeColors = {
+  기능개선: 'primary',
+  오류신고: 'error',
+  문의: 'info',
+  기타: 'secondary'
+} as const;
 
-  // 월별 트렌드 (최근 6개월)
-  const monthlyTrend = [];
-  for (let i = 5; i >= 0; i--) {
-    const date = new Date();
-    date.setMonth(date.getMonth() - i);
-    const monthStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+// 팀 목록
+export const teams = ['개발팀', '디자인팀', '기획팀', '마케팅팀'] as const;
 
-    const monthRecords = records.filter((record) => record.registrationDate.startsWith(monthStr));
+// 상태 옵션 목록
+export const educationStatusOptions = ['접수', '진행중', '완료', '보류'] as const;
 
-    monthlyTrend.push({
-      month: monthStr,
-      amount: 0, // 교육관리에서는 금액 개념이 없으므로 0
-      count: monthRecords.length
-    });
-  }
+// 요청유형 옵션 목록
+export const requestTypeOptions = ['기능개선', '오류신고', '문의', '기타'] as const;
 
-  return {
-    totalAmount: totalCount,
-    planningAmount: planningCount,
-    completedAmount: completedCount,
-    byType,
-    byStatus,
-    monthlyTrend
-  };
-};
+// 상태별 색상 매핑 (EducationDataTable에서 사용)
+export const educationStatusColors = statusColors;
+
+// 팀별 색상 매핑
+export const educationTeamColors = teamColors;
+
+// 요청유형별 색상 매핑
+export const educationRequestTypeColors = requestTypeColors;

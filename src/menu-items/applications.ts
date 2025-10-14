@@ -2,7 +2,7 @@
 import { NavActionType } from 'config';
 
 // assets
-import { Home3, Calendar1, TrendUp, Book1, Task, Link1, Money } from '@wandersonalwes/iconsax-react';
+import { Home3, Calendar1, TrendUp, Task, Link1, Money, Book1 } from '@wandersonalwes/iconsax-react';
 
 // types
 import { NavItemType } from 'types/menu';
