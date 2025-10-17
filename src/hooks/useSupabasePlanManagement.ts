@@ -51,7 +51,7 @@ export const useSupabasePlanManagement = () => {
       setError(null);
 
       const { data, error: fetchError } = await supabase
-        .from('plan_task_management')
+        .from('main_task_management')
         .select('*')
         .eq('task_id', taskId)
         .eq('is_active', true)
@@ -84,7 +84,7 @@ export const useSupabasePlanManagement = () => {
 
       // 1. 기존 데이터 삭제
       const { error: deleteError } = await supabase
-        .from('plan_task_management')
+        .from('main_task_management')
         .delete()
         .eq('task_id', taskId);
 
@@ -118,7 +118,7 @@ export const useSupabasePlanManagement = () => {
         console.log('📝 INSERT 데이터:', JSON.stringify(insertData, null, 2));
 
         const { error: insertError, data: insertedData } = await supabase
-          .from('plan_task_management')
+          .from('main_task_management')
           .insert(insertData)
           .select();
 
@@ -152,7 +152,7 @@ export const useSupabasePlanManagement = () => {
   const updatePlanItem = useCallback(async (id: number, updates: Partial<PlanItemInput>): Promise<boolean> => {
     try {
       const { error: updateError } = await supabase
-        .from('plan_task_management')
+        .from('main_task_management')
         .update({
           ...updates,
           updated_at: new Date().toISOString()

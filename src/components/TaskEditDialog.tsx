@@ -19,6 +19,7 @@ import {
   Chip,
   Grid,
   Checkbox,
+  Radio,
   Paper,
   IconButton,
   ToggleButtonGroup,
@@ -71,13 +72,15 @@ interface EditTaskState {
   progress: number;
   taskType: '일반' | 'KPI';
   loadedKpiTitle: string; // 불러온 KPI 제목
+  loadedKpiData: any | null; // 불러온 KPI 전체 데이터
 }
 
 type EditTaskAction =
   | { type: 'SET_FIELD'; field: keyof EditTaskState; value: string }
   | { type: 'SET_TASK'; task: TaskTableData }
   | { type: 'RESET' }
-  | { type: 'INIT_NEW_TASK'; code: string; registrationDate: string };
+  | { type: 'INIT_NEW_TASK'; code: string; registrationDate: string }
+  | { type: 'SET_LOADED_KPI_DATA'; data: any | null };
 
 const editTaskReducer = (state: EditTaskState, action: EditTaskAction): EditTaskState => {
   switch (action.type) {
@@ -100,7 +103,8 @@ const editTaskReducer = (state: EditTaskState, action: EditTaskAction): EditTask
         department: (action.task as any).department || 'IT',
         progress: action.task.progress || 0,
         taskType: (action.task as any).taskType || '일반',
-        loadedKpiTitle: (action.task as any).loadedKpiTitle || ''
+        loadedKpiTitle: (action.task as any).loadedKpiTitle || '',
+        loadedKpiData: (action.task as any).loadedKpiData || null
       };
     case 'INIT_NEW_TASK':
       return {
@@ -115,7 +119,8 @@ const editTaskReducer = (state: EditTaskState, action: EditTaskAction): EditTask
         department: 'IT',
         progress: 0,
         taskType: '일반',
-        loadedKpiTitle: ''
+        loadedKpiTitle: '',
+        loadedKpiData: null
       };
     case 'RESET':
       return {
@@ -130,8 +135,11 @@ const editTaskReducer = (state: EditTaskState, action: EditTaskAction): EditTask
         team: '',
         department: 'IT',
         taskType: '일반',
-        loadedKpiTitle: ''
+        loadedKpiTitle: '',
+        loadedKpiData: null
       };
+    case 'SET_LOADED_KPI_DATA':
+      return { ...state, loadedKpiData: action.data };
     default:
       return state;
   }
@@ -289,42 +297,57 @@ const OverviewTab = memo(
                 alignItems: 'center'
               }}
             >
-              {taskState.loadedKpiTitle && (
+              {taskState.loadedKpiData && (
                 <Box
                   sx={{
                     width: '100%',
-                    px: 1.5,
-                    py: 0.75,
                     bgcolor: 'grey.50',
                     borderRadius: 1,
                     border: '1px solid',
                     borderColor: 'grey.300',
-                    height: '48px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1
+                    overflow: 'hidden'
                   }}
                 >
-                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem', flexShrink: 0 }}>
-                    불러온 KPI:
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontWeight: 500,
-                      fontSize: '0.8rem',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      flex: 1
-                    }}
-                  >
-                    {taskState.loadedKpiTitle}
-                  </Typography>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow sx={{ backgroundColor: 'primary.main' }}>
+                        <TableCell sx={{ color: 'white', fontSize: '0.7rem', fontWeight: 600, py: 0.5, px: 1 }}>개요</TableCell>
+                        <TableCell sx={{ color: 'white', fontSize: '0.7rem', fontWeight: 600, py: 0.5, px: 1 }}>Main</TableCell>
+                        <TableCell sx={{ color: 'white', fontSize: '0.7rem', fontWeight: 600, py: 0.5, px: 1 }}>Sub</TableCell>
+                        <TableCell sx={{ color: 'white', fontSize: '0.7rem', fontWeight: 600, py: 0.5, px: 1 }}>영향도</TableCell>
+                        <TableCell sx={{ color: 'white', fontSize: '0.7rem', fontWeight: 600, py: 0.5, px: 1 }}>팀</TableCell>
+                        <TableCell sx={{ color: 'white', fontSize: '0.7rem', fontWeight: 600, py: 0.5, px: 1 }}>담당자</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      <TableRow>
+                        <TableCell sx={{ fontSize: '0.7rem', py: 0.5, px: 1 }}>
+                          {taskState.loadedKpiData.kpi_work_content || '-'}
+                        </TableCell>
+                        <TableCell sx={{ fontSize: '0.7rem', py: 0.5, px: 1 }}>
+                          {taskState.loadedKpiData.level === 0
+                            ? taskState.loadedKpiData.text
+                            : (taskState.loadedKpiData.parent_task_text || '-')}
+                        </TableCell>
+                        <TableCell sx={{ fontSize: '0.7rem', py: 0.5, px: 1 }}>
+                          {taskState.loadedKpiData.level === 1 ? taskState.loadedKpiData.text : '-'}
+                        </TableCell>
+                        <TableCell sx={{ fontSize: '0.7rem', py: 0.5, px: 1 }}>
+                          {taskState.loadedKpiData.priority || '-'}
+                        </TableCell>
+                        <TableCell sx={{ fontSize: '0.7rem', py: 0.5, px: 1 }}>
+                          {taskState.loadedKpiData.team || '-'}
+                        </TableCell>
+                        <TableCell sx={{ fontSize: '0.7rem', py: 0.5, px: 1 }}>
+                          {taskState.loadedKpiData.assignee || '-'}
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
                 </Box>
               )}
 
-              {!taskState.loadedKpiTitle && (
+              {!taskState.loadedKpiData && (
                 <Box
                   sx={{
                     width: '100%',
@@ -2757,7 +2780,8 @@ const TaskEditDialog = memo(
       department: 'IT',
       progress: 0,
       taskType: '일반',
-      loadedKpiTitle: ''
+      loadedKpiTitle: '',
+      loadedKpiData: null
     });
 
     // 현재 로그인한 사용자 정보
@@ -3088,6 +3112,7 @@ const TaskEditDialog = memo(
       if (field === 'taskType' && value === '일반') {
         dispatch({ type: 'SET_FIELD', field: 'loadedKpiTitle', value: '' });
         dispatch({ type: 'SET_FIELD', field: 'loadedKpiId', value: '' });
+        dispatch({ type: 'SET_LOADED_KPI_DATA', data: null });
       }
     }, []);
 
@@ -3104,6 +3129,7 @@ const TaskEditDialog = memo(
     // KPI 다이얼로그 닫기
     const handleCloseKpiDialog = useCallback(() => {
       setKpiDialogOpen(false);
+      setSelectedKpiData(null); // 선택 초기화
     }, []);
 
     // KPI 데이터 선택 시 처리
@@ -3117,9 +3143,18 @@ const TaskEditDialog = memo(
       dispatch({ type: 'SET_FIELD', field: 'department', value: kpiData.department || 'IT' });
       dispatch({ type: 'SET_FIELD', field: 'taskType', value: 'KPI' });
       dispatch({ type: 'SET_FIELD', field: 'loadedKpiTitle', value: workContent });
+      dispatch({ type: 'SET_LOADED_KPI_DATA', data: kpiData }); // 전체 KPI 데이터 저장
 
       setKpiDialogOpen(false);
     }, []);
+
+    // KPI 저장 버튼 클릭 핸들러
+    const handleSaveKpiData = useCallback(() => {
+      if (selectedKpiData) {
+        handleSelectKpiData(selectedKpiData);
+        setSelectedKpiData(null); // 선택 초기화
+      }
+    }, [selectedKpiData, handleSelectKpiData]);
 
     const handleSave = useCallback(async () => {
       // 저장 직전에 현재 입력 값들을 taskState에 강제 반영
@@ -3874,34 +3909,50 @@ const TaskEditDialog = memo(
           maxWidth={false}
           PaperProps={{
             sx: {
-              width: '900px',
-              height: '600px',
-              maxWidth: '900px',
-              maxHeight: '600px',
+              width: '1170px',
+              height: '780px',
+              maxWidth: '1170px',
+              maxHeight: '780px',
               m: 2
             }
           }}
         >
           <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             KPI 데이터 불러오기
-            <Button
-              onClick={handleCloseKpiDialog}
-              variant="outlined"
-              size="small"
-              sx={{
-                minWidth: '60px',
-                fontSize: '12px'
-              }}
-            >
-              취소
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                onClick={handleCloseKpiDialog}
+                variant="outlined"
+                size="small"
+                sx={{
+                  minWidth: '60px',
+                  fontSize: '12px'
+                }}
+              >
+                취소
+              </Button>
+              <Button
+                onClick={handleSaveKpiData}
+                variant="contained"
+                size="small"
+                disabled={!selectedKpiData}
+                sx={{
+                  minWidth: '60px',
+                  fontSize: '12px'
+                }}
+              >
+                저장
+              </Button>
+            </Box>
           </DialogTitle>
-          <DialogContent sx={{ px: 3, py: 2, display: 'flex', flexDirection: 'column', height: 'calc(600px - 64px - 60px)', p: 0 }}>
+          <DialogContent sx={{ px: 3, py: 2, display: 'flex', flexDirection: 'column', height: 'calc(780px - 64px - 60px)', p: 0 }}>
             {(() => {
               // KPI 데이터 선택: props로 받은 데이터가 없으면 목업 데이터 사용
               const actualKpiData = (kpiData && kpiData.length > 0) ? kpiData : mockKpiData;
               const isUsingMockData = !kpiData || kpiData.length === 0;
 
+              console.log('🔍 TaskEditDialog - kpiData prop:', kpiData);
+              console.log('🔍 TaskEditDialog - kpiData 길이:', kpiData?.length);
               console.log('🔍 KPI 데이터 소스:', isUsingMockData ? '목업 데이터' : 'Supabase 데이터');
               console.log('📊 사용할 KPI 데이터 개수:', actualKpiData?.length);
 
@@ -3943,38 +3994,43 @@ const TaskEditDialog = memo(
                       <Table size="small">
                       <TableHead>
                         <TableRow sx={{ backgroundColor: 'grey.50' }}>
-                          <TableCell padding="checkbox" sx={{ width: 35, fontSize: '12px', fontWeight: 600, px: 0.5 }}>선택</TableCell>
+                          <TableCell padding="checkbox" sx={{ width: 50, fontSize: '12px', fontWeight: 600, px: 0.5, whiteSpace: 'nowrap', textAlign: 'center' }}>선택</TableCell>
                           <TableCell sx={{ fontWeight: 600, width: 60, textAlign: 'center', fontSize: '12px' }}>NO</TableCell>
-                          <TableCell sx={{ fontWeight: 600, minWidth: 200, fontSize: '12px' }}>계획명</TableCell>
-                          <TableCell sx={{ fontWeight: 600, minWidth: 120, fontSize: '12px' }}>영향도</TableCell>
+                          <TableCell sx={{ fontWeight: 600, minWidth: 150, fontSize: '12px' }}>개요</TableCell>
+                          <TableCell sx={{ fontWeight: 600, minWidth: 120, fontSize: '12px' }}>Main</TableCell>
+                          <TableCell sx={{ fontWeight: 600, minWidth: 150, fontSize: '12px' }}>Sub</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 60, fontSize: '12px' }}>영향도</TableCell>
                           <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>팀</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>담당자</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 110, fontSize: '12px' }}>시작일</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 110, fontSize: '12px' }}>완료일</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 80, fontSize: '12px' }}>담당자</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>시작일</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>완료일</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
                         {paginatedData.map((kpi, index) => {
-                        const workContent = kpi.work_content || kpi.workContent || '';
-                        const impact = (kpi as any).impact || '-';
+                        // main_kpi_task 필드 매핑 (계층 구조)
+                        const overview = (kpi as any).kpi_work_content || '-'; // KPI의 work_content (주요과제)
+                        const main = (kpi as any).level === 0 ? (kpi as any).text : ((kpi as any).parent_task_text || '-'); // 레벨 0 또는 부모 태스크
+                        const sub = (kpi as any).level === 1 ? (kpi as any).text : '-'; // 레벨 1 태스크
+                        const impact = (kpi as any).priority || '-'; // priority를 영향도로 사용
                         const team = kpi.team || '-';
                         const assignee = kpi.assignee || '-';
                         const startDate = kpi.start_date || kpi.registration_date || kpi.registrationDate || '-';
-                        const completedDate = kpi.completed_date || kpi.completedDate || '-';
+                        const completedDate = (kpi as any).due_date || kpi.completed_date || kpi.completedDate || '-';
 
                         return (
                           <TableRow
                             key={kpi.id}
                             hover
-                            onClick={() => handleSelectKpiData(kpi)}
                             sx={{
-                              cursor: 'pointer',
                               '&:hover': { backgroundColor: 'action.hover' }
                             }}
                           >
-                            <TableCell padding="checkbox" sx={{ width: 35, px: 0.5 }}>
-                              <Checkbox
+                            <TableCell padding="checkbox" sx={{ width: 50, px: 0.5 }}>
+                              <Radio
                                 size="small"
+                                checked={selectedKpiData?.id === kpi.id}
+                                onChange={() => setSelectedKpiData(kpi)}
                                 sx={{
                                   padding: '0px',
                                   transform: 'scale(0.75)',
@@ -3989,15 +4045,25 @@ const TaskEditDialog = memo(
                             </TableCell>
                             <TableCell>
                               <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                                {workContent}
+                                {overview}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.secondary' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                                {main}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                                {sub}
+                              </Typography>
+                            </TableCell>
+                            <TableCell sx={{ width: 60 }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
                                 {impact}
                               </Typography>
                             </TableCell>
-                            <TableCell>
+                            <TableCell sx={{ width: 100 }}>
                               <Typography variant="body2" sx={{ fontSize: '12px' }}>
                                 {team}
                               </Typography>
@@ -4008,12 +4074,12 @@ const TaskEditDialog = memo(
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.secondary' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
                                 {startDate}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.secondary' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
                                 {completedDate}
                               </Typography>
                             </TableCell>

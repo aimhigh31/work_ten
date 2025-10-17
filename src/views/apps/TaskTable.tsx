@@ -70,6 +70,7 @@ interface TaskTableProps {
   selectedAssignee?: string;
   tasks?: TaskTableData[];
   setTasks?: React.Dispatch<React.SetStateAction<TaskTableData[]>>;
+  kpiData?: any[]; // KPI 데이터 추가
   addChangeLog?: (
     action: string,
     target: string,
@@ -89,6 +90,7 @@ export default function TaskTable({
   selectedAssignee = '전체',
   tasks,
   setTasks,
+  kpiData = [],
   addChangeLog
 }: TaskTableProps) {
   const theme = useTheme();
@@ -926,6 +928,7 @@ export default function TaskTable({
           statusOptions={taskStatusOptions}
           statusColors={taskStatusColors}
           teams={teams}
+          kpiData={kpiData}
         />
       )}
     </Box>

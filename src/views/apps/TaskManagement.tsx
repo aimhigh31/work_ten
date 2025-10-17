@@ -54,7 +54,7 @@ import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentMana
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseTaskManagement } from 'hooks/useSupabaseTaskManagement';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
-import { useSupabaseKpi } from 'hooks/useSupabaseKpi';
+import { useSupabaseKpiTask } from 'hooks/useSupabaseKpiTask';
 import { ChangeLogData } from 'types/changelog';
 import { useSession } from 'next-auth/react';
 import useUser from 'hooks/useUser';
@@ -838,7 +838,7 @@ function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssign
           statusOptions={taskStatusOptions}
           statusColors={taskStatusColors}
           teams={teams}
-          kpiData={kpis}
+          kpiData={kpiTasks}
         />
       )}
     </Box>
@@ -2449,19 +2449,29 @@ export default function TaskManagement() {
   const theme = useTheme();
   const searchParams = useSearchParams();
   const [value, setValue] = useState(0);
+  const user = useUser(); // 사용자 정보
 
   // Supabase 훅 사용 (즉시 렌더링 - loading 상태 제거)
   const { users } = useSupabaseUserManagement();
   const { departments, fetchDepartments } = useSupabaseDepartmentManagement();
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
   const { tasks: supabaseTasks, updateTask, addTask: addTaskToDb, deleteTask: deleteTaskFromDb } = useSupabaseTaskManagement();
-  const { kpis } = useSupabaseKpi();
+  const { tasks: kpiTasks, fetchAllTasksByUser } = useSupabaseKpiTask();
 
-  // KPI 데이터 로깅
+  // 사용자별 KPI Task 로드
   React.useEffect(() => {
-    console.log('🎯 TaskManagement - kpis 데이터:', kpis);
-    console.log('🎯 TaskManagement - kpis 개수:', kpis?.length);
-  }, [kpis]);
+    const userName = user?.korName || user?.name || '';
+    if (userName) {
+      console.log('🎯 TaskManagement - KPI Task 로드 시작:', userName);
+      fetchAllTasksByUser(userName);
+    }
+  }, [user, fetchAllTasksByUser]);
+
+  // KPI Task 데이터 로깅
+  React.useEffect(() => {
+    console.log('🎯 TaskManagement - kpiTasks 데이터:', kpiTasks);
+    console.log('🎯 TaskManagement - kpiTasks 개수:', kpiTasks?.length);
+  }, [kpiTasks]);
 
   // 부서 데이터 로드 (useEffect는 이미 병렬로 실행됨)
   React.useEffect(() => {
@@ -3160,6 +3170,7 @@ export default function TaskManagement() {
                   selectedAssignee={selectedAssignee}
                   tasks={tasks}
                   setTasks={() => {}}
+                  kpiData={kpiTasks}
                   addChangeLog={addChangeLog}
                 />
               </Box>
@@ -3339,7 +3350,7 @@ export default function TaskManagement() {
           statusOptions={taskStatusOptions}
           statusColors={taskStatusColors}
           teams={teams}
-          kpiData={kpis}
+          kpiData={kpiTasks}
         />
       )}
     </Box>

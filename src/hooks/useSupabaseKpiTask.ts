@@ -24,6 +24,9 @@ export interface KpiTaskData {
   weight?: number;
   created_at?: string;
   updated_at?: string;
+  // JOIN된 KPI 데이터
+  impact?: string | null;
+  kpi_work_content?: string | null;
 }
 
 export const useSupabaseKpiTask = (kpiId?: number) => {
@@ -91,6 +94,8 @@ export const useSupabaseKpiTask = (kpiId?: number) => {
   // 태스크 수정
   const updateTask = useCallback(async (id: number, updates: Partial<KpiTaskData>) => {
     try {
+      console.log('🔧 KPI Task 수정 시작:', { id, updates });
+
       const { data, error: updateError } = await supabase
         .from('main_kpi_task')
         .update(updates)
@@ -98,15 +103,28 @@ export const useSupabaseKpiTask = (kpiId?: number) => {
         .select()
         .single();
 
+      console.log('📥 Supabase update 응답:', { data, error: updateError });
+
       if (updateError) {
+        console.error('❌ Supabase update 에러 상세:', {
+          message: updateError.message,
+          details: updateError.details,
+          hint: updateError.hint,
+          code: updateError.code
+        });
         throw updateError;
       }
 
+      console.log('✅ KPI Task 수정 성공:', data);
       setTasks((prev) => prev.map((task) => (task.id === id ? data : task)));
       return data;
     } catch (err: any) {
-      console.error('KPI Task 수정 오류:', err);
-      setError(err.message);
+      console.error('❌ KPI Task 수정 오류 (catch):', err);
+      console.error('❌ 에러 타입:', typeof err);
+      console.error('❌ 에러 JSON:', JSON.stringify(err, null, 2));
+      console.error('❌ 에러 message:', err?.message);
+      console.error('❌ 에러 stack:', err?.stack);
+      setError(err?.message || JSON.stringify(err));
       throw err;
     }
   }, []);
@@ -164,6 +182,110 @@ export const useSupabaseKpiTask = (kpiId?: number) => {
     }
   }, [kpiId]);
 
+  // 사용자의 모든 KPI Task 조회 (KPI 데이터와 조인, 계층 구조 포함)
+  const fetchAllTasksByUser = useCallback(async (userName: string) => {
+    try {
+      console.log('🔍 fetchAllTasksByUser 시작:', userName);
+      setLoading(true);
+      setError(null);
+
+      // 1. 사용자의 모든 task 조회 (KPI 데이터 포함)
+      const { data, error: fetchError } = await supabase
+        .from('main_kpi_task')
+        .select(`
+          *,
+          main_kpi_data!main_kpi_task_kpi_id_fkey (
+            impact,
+            work_content,
+            selection_background
+          )
+        `)
+        .eq('assignee', userName)
+        .order('id', { ascending: false });
+
+      console.log('📥 Supabase 응답:', { data, error: fetchError });
+
+      if (fetchError) {
+        console.error('❌ Supabase 쿼리 에러:', fetchError);
+        throw fetchError;
+      }
+
+      console.log('📊 조회된 raw 데이터:', data);
+      console.log('📊 데이터 개수:', data?.length);
+
+      // 2. parent_id 수집 (조회되지 않은 parent task ID들)
+      const parentIds = new Set<number>();
+      (data || []).forEach((task: any) => {
+        if (task.parent_id) {
+          parentIds.add(task.parent_id);
+        }
+      });
+
+      // 3. 조회되지 않은 parent task들을 별도로 조회
+      let parentTasks: any[] = [];
+      if (parentIds.size > 0) {
+        const missingParentIds = Array.from(parentIds).filter(
+          (parentId) => !data?.some((task: any) => task.id === parentId)
+        );
+
+        if (missingParentIds.length > 0) {
+          console.log('🔍 누락된 parent task 조회:', missingParentIds);
+          const { data: parentData, error: parentError } = await supabase
+            .from('main_kpi_task')
+            .select(`
+              *,
+              main_kpi_data!main_kpi_task_kpi_id_fkey (
+                impact,
+                work_content,
+                selection_background
+              )
+            `)
+            .in('id', missingParentIds);
+
+          if (parentError) {
+            console.error('❌ Parent task 조회 에러:', parentError);
+          } else {
+            parentTasks = parentData || [];
+            console.log('📥 Parent task 조회 성공:', parentTasks.length);
+          }
+        }
+      }
+
+      // 4. 모든 task를 합쳐서 Map 생성
+      const taskMap = new Map();
+      [...(data || []), ...parentTasks].forEach((task: any) => {
+        taskMap.set(task.id, task);
+      });
+
+      // 5. 조인된 데이터를 평탄화 + parent task 정보 추가
+      const flattenedData = (data || []).map((item: any) => {
+        const parentTask = item.parent_id ? taskMap.get(item.parent_id) : null;
+
+        return {
+          ...item,
+          impact: item.main_kpi_data?.impact || null,
+          kpi_work_content: item.main_kpi_data?.work_content || null,
+          kpi_selection_background: item.main_kpi_data?.selection_background || null,
+          parent_task_text: parentTask?.text || null,
+          parent_task_level: parentTask?.level || null,
+          main_kpi_data: undefined // 중복 제거
+        };
+      });
+
+      console.log('✅ 평탄화된 데이터:', flattenedData);
+      console.log('✅ 최종 개수:', flattenedData.length);
+
+      setTasks(flattenedData);
+      return flattenedData;
+    } catch (err: any) {
+      console.error('❌ 사용자 KPI Task 조회 오류:', err);
+      setError(err.message);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // 초기 데이터 로드
   useEffect(() => {
     if (kpiId) {
@@ -176,6 +298,7 @@ export const useSupabaseKpiTask = (kpiId?: number) => {
     loading,
     error,
     fetchTasks,
+    fetchAllTasksByUser,
     addTask,
     updateTask,
     deleteTask,
