@@ -84,6 +84,7 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
     menu_page: '',
     menu_url: '',
     menu_description: '',
+    menu_database: '',
     display_order: 0
   });
 
@@ -174,6 +175,7 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
       menu_page: '',
       menu_url: '',
       menu_description: '',
+      menu_database: '',
       display_order: nextOrder
     });
     setAddDialogOpen(true);
@@ -196,6 +198,7 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
         page: newMenuData.menu_page,
         url: newMenuData.menu_url,
         description: newMenuData.menu_description,
+        database: newMenuData.menu_database,
         displayOrder: newMenuData.display_order,
         permissions: {
           enabled: true // 기본값: 사용
@@ -281,6 +284,7 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
       menu_page: menu.page,
       menu_url: menu.url,
       menu_description: menu.description || '',
+      menu_database: menu.database || '',
       display_order: menu.displayOrder || 1
     });
     setEditDialogOpen(true);
@@ -304,6 +308,7 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
         page: editingMenu.menu_page,
         url: editingMenu.menu_url,
         description: editingMenu.menu_description,
+        database: editingMenu.menu_database,
         displayOrder: editingMenu.display_order
       };
 
@@ -517,6 +522,18 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
                 설명
               </TableCell>
               <TableCell
+                sx={{
+                  fontWeight: 'bold',
+                  bgcolor: '#f8f9fa',
+                  py: 0.375,
+                  minWidth: 150,
+                  borderTop: '1px solid #e0e0e0',
+                  borderBottom: '1px solid #e0e0e0'
+                }}
+              >
+                Database
+              </TableCell>
+              <TableCell
                 align="center"
                 sx={{
                   fontWeight: 'bold',
@@ -627,6 +644,12 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
                   <TableCell sx={{ py: 0.625 }}>
                     <Typography variant="body2" sx={{ fontSize: '12px', color: textColor }}>
                       {menu.description || ''}
+                    </Typography>
+                  </TableCell>
+                  {/* Database */}
+                  <TableCell sx={{ py: 0.625 }}>
+                    <Typography variant="body2" sx={{ fontSize: '12px', color: textColor }}>
+                      {menu.database || ''}
                     </Typography>
                   </TableCell>
                   {/* 정렬순서 */}
@@ -928,6 +951,31 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
             />
 
             <TextField
+              label="Database"
+              value={newMenuData.menu_database}
+              onChange={(e) => setNewMenuData({ ...newMenuData, menu_database: e.target.value })}
+              fullWidth
+              placeholder="예: admin_systemsetting_menu"
+              sx={{
+                '& .MuiInputLabel-root': {
+                  fontSize: '12px',
+                  '&:not(.MuiInputLabel-shrink)': {
+                    top: '50%',
+                    transform: 'translate(14px, -50%)'
+                  }
+                },
+                '& .MuiInputBase-input': {
+                  display: 'flex',
+                  alignItems: 'center'
+                },
+                '& .MuiInputBase-input::placeholder': {
+                  fontSize: '12px',
+                  lineHeight: 'normal'
+                }
+              }}
+            />
+
+            <TextField
               label="정렬순서"
               type="number"
               value={newMenuData.display_order}
@@ -1206,6 +1254,31 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
                 multiline
                 rows={3}
                 placeholder="메뉴에 대한 설명을 입력하세요"
+                sx={{
+                  '& .MuiInputLabel-root': {
+                    fontSize: '12px',
+                    '&:not(.MuiInputLabel-shrink)': {
+                      top: '50%',
+                      transform: 'translate(14px, -50%)'
+                    }
+                  },
+                  '& .MuiInputBase-input': {
+                    display: 'flex',
+                    alignItems: 'center'
+                  },
+                  '& .MuiInputBase-input::placeholder': {
+                    fontSize: '12px',
+                    lineHeight: 'normal'
+                  }
+                }}
+              />
+
+              <TextField
+                label="Database"
+                value={editingMenu.menu_database}
+                onChange={(e) => setEditingMenu({ ...editingMenu, menu_database: e.target.value })}
+                fullWidth
+                placeholder="예: admin_systemsetting_menu"
                 sx={{
                   '& .MuiInputLabel-root': {
                     fontSize: '12px',

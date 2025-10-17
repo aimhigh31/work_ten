@@ -10,6 +10,7 @@ export interface Admin_Systemsetting_Menu {
   menu_icon: string;
   menu_page: string;
   menu_description: string;
+  menu_database?: string;
   menu_url: string;
   is_enabled: boolean;
   display_order: number;
@@ -30,6 +31,7 @@ export interface MenuData {
   icon?: string;
   page: string;
   description: string;
+  database?: string;
   url: string;
   permissions: MenuPermission;
   displayOrder: number;
@@ -46,6 +48,7 @@ export interface MenuInsert {
   menu_icon?: string;
   menu_page: string;
   menu_description: string;
+  menu_database?: string;
   menu_url: string;
   is_enabled: boolean;
   display_order: number;
@@ -59,6 +62,7 @@ export interface MenuUpdate {
   menu_icon?: string;
   menu_page?: string;
   menu_description?: string;
+  menu_database?: string;
   menu_url?: string;
   is_enabled?: boolean;
   display_order?: number;

@@ -356,20 +356,6 @@ function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssign
             />
             <span className="assignee-name">{task.assignee || '미할당'}</span>
           </div>
-          <div className="card-stats">
-            <div className="stat-item">
-              <span className="stat-icon">🤍</span>
-              <span className="stat-number">{task.likes || 0}</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-icon">👁</span>
-              <span className="stat-number">{task.views || 0}</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-icon">💬</span>
-              <span className="stat-number">{task.comments?.length || 0}</span>
-            </div>
-          </div>
         </div>
       </article>
     );
@@ -2079,7 +2065,8 @@ export default function ITEducationManagement() {
       team: string = '시스템',
       beforeValue?: string,
       afterValue?: string,
-      changedField?: string
+      changedField?: string,
+      title?: string
     ) => {
       try {
         const userName = currentUser?.user_name || currentUser?.name || user?.name || '시스템';
@@ -2088,6 +2075,7 @@ export default function ITEducationManagement() {
           page: 'it_education',
           record_id: target, // 코드를 record_id로 사용
           action_type: action,
+          title: title || null,
           description: description,
           before_value: beforeValue || null,
           after_value: afterValue || null,

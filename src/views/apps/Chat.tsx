@@ -17,6 +17,7 @@ import Box from '@mui/material/Box';
 
 // third-party
 import EmojiPicker, { SkinTones, EmojiClickData } from 'emoji-picker-react';
+import { useSession } from 'next-auth/react';
 
 // project-imports
 import CircularWithPath from 'components/@extended/progress/CircularWithPath';
@@ -72,122 +73,84 @@ const Main = styled('main', { shouldForwardProp: (prop: string) => prop !== 'ope
 
 // ==============================|| APPLICATION - CHAT ||============================== //
 
-// Mock data for AI conversations
-const initialConversations: ConversationData[] = [
-  {
-    id: '1',
-    title: 'AI 코드 리뷰 도움',
-    lastModified: '2024.12.20',
-    lastMessage: 'React 컴포넌트 최적화에 대해 문의...',
-    unread: true
-  },
-  {
-    id: '2',
-    title: '프로젝트 기획 논의',
-    lastModified: '2024.12.19',
-    lastMessage: '사용자 요구사항 분석 방법에 대해...',
-    unread: false
-  },
-  {
-    id: '3',
-    title: '데이터베이스 설계 상담',
-    lastModified: '2024.12.18',
-    lastMessage: 'ERD 작성 시 고려해야 할 사항들...',
-    unread: false
-  },
-  {
-    id: '4',
-    title: 'UI/UX 개선 아이디어',
-    lastModified: '2024.12.17',
-    lastMessage: '사용자 경험 향상을 위한 제안사항...',
-    unread: true
-  },
-  {
-    id: '5',
-    title: '성능 최적화 방안',
-    lastModified: '2024.12.16',
-    lastMessage: '웹 애플리케이션 로딩 속도 개선...',
-    unread: false
-  }
-];
+// localStorage 키
+const STORAGE_KEY_PREFIX = 'ai-chat';
 
 export default function Chat() {
   const { usersLoading, users } = useGetUsers();
+  const { data: session } = useSession();
+  const currentUserId = session?.user?.email || 'anonymous';
 
   const downLG = useMediaQuery((theme) => theme.breakpoints.down('lg'));
   const [user, setUser] = useState<UserProfile>({});
-  const [conversations, setConversations] = useState<ConversationData[]>(initialConversations);
+  const [conversations, setConversations] = useState<ConversationData[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<ConversationData | null>(null);
   const [anchorEl, setAnchorEl] = useState<Element | (() => Element) | null | undefined>(null);
 
   // 각 대화별 메시지 히스토리 관리
-  const [conversationMessages, setConversationMessages] = useState<{ [key: string]: any[] }>({
-    '1': [
-      {
-        id: 1,
-        from: 'AI 코드 리뷰 도움',
-        to: 'User1',
-        text: '안녕하세요! 코드 리뷰에 대해 어떤 도움이 필요하신가요?',
-        time: '10:30',
-        isInitial: true
-      }
-    ],
-    '2': [
-      {
-        id: 1,
-        from: '프로젝트 기획 논의',
-        to: 'User1',
-        text: '프로젝트 기획과 관련해서 궁금한 점이 있으시면 언제든 물어보세요.',
-        time: '09:15',
-        isInitial: true
-      }
-    ],
-    '3': [
-      {
-        id: 1,
-        from: '데이터베이스 설계 상담',
-        to: 'User1',
-        text: 'ERD 작성과 데이터베이스 설계에 대해 도움을 드릴 수 있습니다.',
-        time: '14:20',
-        isInitial: true
-      }
-    ],
-    '4': [
-      {
-        id: 1,
-        from: 'UI/UX 개선 아이디어',
-        to: 'User1',
-        text: '사용자 경험 향상을 위한 아이디어를 함께 논의해봅시다.',
-        time: '16:45',
-        isInitial: true
-      }
-    ],
-    '5': [
-      {
-        id: 1,
-        from: '성능 최적화 방안',
-        to: 'User1',
-        text: '웹 애플리케이션 성능 최적화에 대해 상담해드리겠습니다.',
-        time: '11:30',
-        isInitial: true
-      }
-    ]
-  });
+  const [conversationMessages, setConversationMessages] = useState<{ [key: string]: any[] }>({});
 
+  // localStorage에서 사용자별 대화 불러오기
   useEffect(() => {
-    // AI 대화 기본 설정 - 첫 번째 대화를 기본으로 선택
-    const defaultConversation = initialConversations[0];
-    const defaultAIUser = {
-      id: defaultConversation.id,
-      name: defaultConversation.title,
-      status: defaultConversation.lastMessage,
-      lastMessage: defaultConversation.lastModified,
-      avatar: 'ai-avatar.png',
-      online_status: 'available'
-    };
-    setUser(defaultAIUser);
-    setSelectedConversation(defaultConversation);
-  }, []);
+    if (!currentUserId) return;
+
+    const storageKey = `${STORAGE_KEY_PREFIX}-conversations-${currentUserId}`;
+    const messagesKey = `${STORAGE_KEY_PREFIX}-messages-${currentUserId}`;
+
+    try {
+      const savedConversations = localStorage.getItem(storageKey);
+      const savedMessages = localStorage.getItem(messagesKey);
+
+      if (savedConversations) {
+        const parsedConversations = JSON.parse(savedConversations);
+        setConversations(parsedConversations);
+
+        // 첫 번째 대화 선택
+        if (parsedConversations.length > 0) {
+          const defaultConversation = parsedConversations[0];
+          setSelectedConversation(defaultConversation);
+          setUser({
+            id: defaultConversation.id,
+            name: defaultConversation.title,
+            status: defaultConversation.lastMessage,
+            lastMessage: defaultConversation.lastModified,
+            avatar: 'ai-avatar.png',
+            online_status: 'available'
+          });
+        }
+      }
+
+      if (savedMessages) {
+        setConversationMessages(JSON.parse(savedMessages));
+      }
+    } catch (error) {
+      console.error('localStorage 불러오기 오류:', error);
+    }
+  }, [currentUserId]);
+
+  // 대화 목록 변경 시 localStorage에 저장
+  useEffect(() => {
+    if (!currentUserId || conversations.length === 0) return;
+
+    const storageKey = `${STORAGE_KEY_PREFIX}-conversations-${currentUserId}`;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(conversations));
+    } catch (error) {
+      console.error('localStorage 저장 오류:', error);
+    }
+  }, [conversations, currentUserId]);
+
+  // 메시지 히스토리 변경 시 localStorage에 저장
+  useEffect(() => {
+    if (!currentUserId || Object.keys(conversationMessages).length === 0) return;
+
+    const messagesKey = `${STORAGE_KEY_PREFIX}-messages-${currentUserId}`;
+    try {
+      localStorage.setItem(messagesKey, JSON.stringify(conversationMessages));
+    } catch (error) {
+      console.error('localStorage 저장 오류:', error);
+    }
+  }, [conversationMessages, currentUserId]);
 
   const handleClickSort = (event: React.MouseEvent<HTMLButtonElement> | undefined) => {
     setAnchorEl(event?.currentTarget);
@@ -197,21 +160,30 @@ export default function Chat() {
     setAnchorEl(null);
   };
 
-  // Delete 기능
+  // Delete 기능 (상단 메뉴에서)
   const handleDelete = () => {
     if (selectedConversation) {
-      // 대화 삭제
-      setConversations((prev) => prev.filter((conv) => conv.id !== selectedConversation.id));
+      handleConversationDelete(selectedConversation.id);
+    }
+    handleCloseSort();
+  };
 
-      // 메시지 히스토리도 삭제
-      setConversationMessages((prev) => {
-        const newMessages = { ...prev };
-        delete newMessages[selectedConversation.id];
-        return newMessages;
-      });
+  // 대화 삭제 핸들러 (카드에서 직접 삭제)
+  const handleConversationDelete = (conversationId: string) => {
+    // 대화 삭제
+    setConversations((prev) => prev.filter((conv) => conv.id !== conversationId));
 
+    // 메시지 히스토리도 삭제
+    setConversationMessages((prev) => {
+      const newMessages = { ...prev };
+      delete newMessages[conversationId];
+      return newMessages;
+    });
+
+    // 삭제된 대화가 현재 선택된 대화인 경우
+    if (selectedConversation?.id === conversationId) {
       // 남은 대화가 있으면 첫 번째 대화 선택, 없으면 null
-      const remainingConversations = conversations.filter((conv) => conv.id !== selectedConversation.id);
+      const remainingConversations = conversations.filter((conv) => conv.id !== conversationId);
       if (remainingConversations.length > 0) {
         const newSelected = remainingConversations[0];
         setSelectedConversation(newSelected);
@@ -228,7 +200,6 @@ export default function Chat() {
         setUser({});
       }
     }
-    handleCloseSort();
   };
 
   const handleAddConversation = (newConversation: ConversationData) => {
@@ -481,6 +452,7 @@ export default function Chat() {
         conversations={conversations}
         onAddConversation={handleAddConversation}
         onConversationSelect={handleConversationSelect}
+        onConversationDelete={handleConversationDelete}
       />
     ),
     [user, openChatDrawer, conversations, selectedConversation]
@@ -552,8 +524,35 @@ export default function Chat() {
                   >
                     <Box sx={{ pl: 3, pr: 3, pt: 1, height: '100%' }}>
                       {!selectedConversation ? (
-                        <Stack sx={{ alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                          <CircularWithPath />
+                        <Stack sx={{ alignItems: 'center', justifyContent: 'center', height: '100%', gap: 2 }}>
+                          <Typography variant="h4" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+                            💬 AI 대화를 시작해보세요
+                          </Typography>
+                          <Typography variant="body1" sx={{ color: 'text.secondary', textAlign: 'center', maxWidth: 400 }}>
+                            왼쪽 상단의 "새 채팅" 버튼을 클릭하여
+                            <br />
+                            AI와 대화를 시작할 수 있습니다.
+                          </Typography>
+                          <Box
+                            sx={{
+                              mt: 2,
+                              p: 3,
+                              borderRadius: 2,
+                              bgcolor: 'primary.lighter',
+                              maxWidth: 500
+                            }}
+                          >
+                            <Typography variant="body2" sx={{ color: 'primary.main', fontWeight: 500, mb: 1 }}>
+                              💡 사용 팁
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.8 }}>
+                              • 코드 리뷰, 프로젝트 기획, 기술 상담 등 다양한 주제로 대화할 수 있습니다
+                              <br />
+                              • 파일과 이미지를 첨부하여 질문할 수 있습니다
+                              <br />
+                              • 대화 내역은 자동으로 저장됩니다
+                            </Typography>
+                          </Box>
                         </Stack>
                       ) : (
                         <AIChatHistory

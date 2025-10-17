@@ -59,10 +59,11 @@ import { useSession } from 'next-auth/react';
 import useUser from 'hooks/useUser';
 import { ThemeMode } from 'config';
 
-// 변경로그 타입 정의 (12컬럼)
+// 변경로그 타입 정의 (13컬럼 - title 추가)
 interface ChangeLog {
   id: string;
   dateTime: string;
+  title: string;
   code: string;
   target: string;
   location: string;
@@ -417,20 +418,6 @@ function KanbanView({
               className="assignee-avatar"
             />
             <span className="assignee-name">{solution.assignee || '미할당'}</span>
-          </div>
-          <div className="card-stats">
-            <div className="stat-item">
-              <span className="stat-icon">👁️</span>
-              <span className="stat-number">{solution.views || 0}</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-icon">💬</span>
-              <span className="stat-number">{solution.comments || 0}</span>
-            </div>
-            <div className="stat-item" style={{ cursor: 'pointer' }}>
-              <span className="stat-icon">❤️</span>
-              <span className="stat-number">{solution.likes || 0}</span>
-            </div>
           </div>
         </div>
       </article>
@@ -2387,6 +2374,7 @@ export default function SolutionManagement() {
         minute: '2-digit',
         hour12: false
       }).replace(/\. /g, '-').replace('.', '').replace(',', '') : '',
+      title: log.title || '',
       code: log.record_id || '',
       target: log.record_id || '',
       location: '개요탭',
@@ -2483,7 +2471,8 @@ export default function SolutionManagement() {
     team: string = '시스템',
     beforeValue?: string,
     afterValue?: string,
-    changedField?: string
+    changedField?: string,
+    title?: string
   ) => {
     try {
       const supabase = createClient();
@@ -2497,6 +2486,7 @@ export default function SolutionManagement() {
         before_value: beforeValue || null,
         after_value: afterValue || null,
         changed_field: changedField || null,
+        title: title || null,
         user_name: userName,
         team: currentUser?.department || team,
         user_department: currentUser?.department,
@@ -3162,7 +3152,7 @@ export default function SolutionManagement() {
                           </TableCell>
                           <TableCell>
                             <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.target}
+                              {log.title}
                             </Typography>
                           </TableCell>
                           <TableCell>

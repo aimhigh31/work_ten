@@ -113,7 +113,7 @@ interface KanbanViewProps {
   selectedAssignee: string;
   educations: EducationTableData[];
   setEducations: React.Dispatch<React.SetStateAction<EducationTableData[]>>;
-  addChangeLog: (action: string, target: string, description: string, team?: string) => void;
+  addChangeLog: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string, title?: string) => void;
   assigneeList?: any[];
 }
 
@@ -227,8 +227,12 @@ function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssign
           addChangeLog(
             '개인교육관리 정보 수정',
             educationCode,
-            `${updatedEducation.content || '개인교육관리'} - ${changes.join(', ')}`,
-            updatedEducation.team || '미분류'
+            `${updatedEducation.title || '개인교육관리'} - ${changes.join(', ')}`,
+            updatedEducation.team || '미분류',
+            undefined,
+            undefined,
+            undefined,
+            updatedEducation.title
           );
         }
       } else {
@@ -275,10 +279,10 @@ function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssign
 
         // 변경로그 추가
         const educationCode = `MAIN-EDU-${new Date(currentEducation.registrationDate).getFullYear().toString().slice(-2)}-${String(currentEducation.no).padStart(3, '0')}`;
-        const educationContent = currentEducation.content || '개인교육관리내용 없음';
-        const description = `${educationContent} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
+        const educationTitle = currentEducation.title || '개인교육관리';
+        const description = `${educationTitle} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
 
-        addChangeLog('개인교육관리 상태 변경', educationCode, description, currentEducation.team || '미분류');
+        addChangeLog('개인교육관리 상태 변경', educationCode, description, currentEducation.team || '미분류', undefined, undefined, undefined, educationTitle);
       } else {
         console.error('❌ 드래그앤드롭 - DB 업데이트 실패');
         alert('상태 변경에 실패했습니다.');
@@ -456,20 +460,6 @@ function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssign
               className="assignee-avatar"
             />
             <span className="assignee-name">{education.assignee || '미할당'}</span>
-          </div>
-          <div className="card-stats">
-            <div className="stat-item">
-              <span className="stat-icon">👁️</span>
-              <span className="stat-number">0</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-icon">💬</span>
-              <span className="stat-number">0</span>
-            </div>
-            <div className="stat-item" style={{ cursor: 'pointer' }}>
-              <span className="stat-icon">❤️</span>
-              <span className="stat-number">0</span>
-            </div>
           </div>
         </div>
       </article>
@@ -2431,7 +2421,7 @@ export default function EducationManagement() {
         minute: '2-digit',
         hour12: false
       }),
-      title: log.title || log.description.split(' ')[1]?.split('(')[0] || '-',
+      title: log.title || '',
       code: log.record_id,
       action: log.action_type,
       location: '개인교육관리',
@@ -2470,15 +2460,27 @@ export default function EducationManagement() {
       changedField?: string,
       title?: string
     ) => {
+      console.log('🔥🔥🔥 addChangeLog 호출됨!', {
+        action,
+        target,
+        description,
+        team,
+        beforeValue,
+        afterValue,
+        changedField,
+        'title 파라미터': title,
+        'title 타입': typeof title
+      });
+
       const logData = {
         page: 'it_education',
         record_id: target,
         action_type: action,
+        title: title || null,
         description: description,
         before_value: beforeValue || null,
         after_value: afterValue || null,
         changed_field: changedField || null,
-        title: title || null,
         user_name: userName,
         team: currentUser?.department || '시스템',
         user_department: currentUser?.department,
@@ -2486,6 +2488,8 @@ export default function EducationManagement() {
         user_profile_image: currentUser?.profile_image_url,
         created_at: new Date().toISOString()
       };
+
+      console.log('🔥🔥🔥 logData 객체:', JSON.stringify(logData, null, 2));
 
       const supabase = createClient();
       const { data, error } = await supabase.from('common_log_data').insert(logData).select();
@@ -2549,7 +2553,7 @@ export default function EducationManagement() {
 
         if (changes.length > 0) {
           const educationCode = `MAIN-EDU-${new Date(updatedEducation.registrationDate).getFullYear().toString().slice(-2)}-${String(updatedEducation.no).padStart(3, '0')}`;
-          addChangeLog('교육 수정', educationCode, changes.join(', '), updatedEducation.team);
+          addChangeLog('교육 수정', educationCode, changes.join(', '), updatedEducation.team, undefined, undefined, undefined, updatedEducation.title);
         }
       } else {
         console.error('❌ DB 업데이트 실패');
@@ -2578,7 +2582,7 @@ export default function EducationManagement() {
 
         // 변경로그 추가
         const educationCode = `MAIN-EDU-${new Date(newEducation.registrationDate).getFullYear().toString().slice(-2)}-${String(newEducation.no).padStart(3, '0')}`;
-        addChangeLog('교육 생성', educationCode, `새로운 교육이 생성되었습니다: ${newEducation.title}`, newEducation.team);
+        addChangeLog('교육 생성', educationCode, `새로운 교육이 생성되었습니다: ${newEducation.title}`, newEducation.team, undefined, undefined, undefined, newEducation.title);
       } else {
         console.error('❌ DB 생성 실패');
         alert('교육 정보 생성에 실패했습니다.');

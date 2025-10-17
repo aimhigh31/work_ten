@@ -68,7 +68,7 @@ interface SolutionTableProps {
   selectedAssignee?: string;
   solutions?: SolutionTableData[];
   setSolutions?: React.Dispatch<React.SetStateAction<SolutionTableData[]>>;
-  addChangeLog?: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string) => void;
+  addChangeLog?: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string, title?: string) => void;
 }
 
 export default function SolutionTable({
@@ -238,11 +238,16 @@ export default function SolutionTable({
     if (addChangeLog) {
       const deletedSolutions = data.filter((solution) => selected.includes(solution.id));
       deletedSolutions.forEach((solution) => {
+        const solutionTitle = solution.title || solution.workContent || '업무';
         addChangeLog(
           '업무 삭제',
           solution.code || `IT-SOL-${new Date().getFullYear().toString().slice(-2)}-${String(solution.id).padStart(3, '0')}`,
-          `${solution.workContent || '업무'} 삭제`,
-          solution.team || '미분류'
+          `${solutionTitle} 삭제`,
+          solution.team || '미분류',
+          undefined,
+          undefined,
+          undefined,
+          solutionTitle
         );
       });
     }
@@ -311,7 +316,8 @@ export default function SolutionTable({
             updatedSolution.team || '미분류',
             originalSolution.solutionType || '',
             updatedSolution.solutionType || '',
-            '솔루션유형'
+            '솔루션유형',
+            solutionName
           );
         }
 
@@ -324,7 +330,8 @@ export default function SolutionTable({
             updatedSolution.team || '미분류',
             originalSolution.developmentType || '',
             updatedSolution.developmentType || '',
-            '개발유형'
+            '개발유형',
+            solutionName
           );
         }
 
@@ -337,7 +344,8 @@ export default function SolutionTable({
             updatedSolution.team || '미분류',
             originalSolution.title || '',
             updatedSolution.title || '',
-            '제목'
+            '제목',
+            solutionName
           );
         }
 
@@ -350,7 +358,8 @@ export default function SolutionTable({
             updatedSolution.team || '미분류',
             originalSolution.detailContent || '',
             updatedSolution.detailContent || '',
-            '세부내용'
+            '세부내용',
+            solutionName
           );
         }
 
@@ -363,7 +372,8 @@ export default function SolutionTable({
             updatedSolution.team || '미분류',
             originalSolution.team || '',
             updatedSolution.team || '',
-            '팀'
+            '팀',
+            solutionName
           );
         }
 
@@ -376,7 +386,8 @@ export default function SolutionTable({
             updatedSolution.team || '미분류',
             originalSolution.assignee || '',
             updatedSolution.assignee || '',
-            '담당자'
+            '담당자',
+            solutionName
           );
         }
 
@@ -389,7 +400,8 @@ export default function SolutionTable({
             updatedSolution.team || '미분류',
             originalSolution.status,
             updatedSolution.status,
-            '상태'
+            '상태',
+            solutionName
           );
         }
 
@@ -402,7 +414,8 @@ export default function SolutionTable({
             updatedSolution.team || '미분류',
             String(originalSolution.progress || 0),
             String(updatedSolution.progress || 0),
-            '진행율'
+            '진행율',
+            solutionName
           );
         }
 
@@ -415,7 +428,8 @@ export default function SolutionTable({
             updatedSolution.team || '미분류',
             originalSolution.startDate || '',
             updatedSolution.startDate || '',
-            '시작일'
+            '시작일',
+            solutionName
           );
         }
 
@@ -428,7 +442,8 @@ export default function SolutionTable({
             updatedSolution.team || '미분류',
             originalSolution.completedDate || '',
             updatedSolution.completedDate || '',
-            '완료일'
+            '완료일',
+            solutionName
           );
         }
       }
@@ -516,7 +531,11 @@ export default function SolutionTable({
               '새 업무 생성',
               createdSolution.code,
               `새로운 업무가 생성되었습니다: ${createdSolution.title}`,
-              createdSolution.team
+              createdSolution.team,
+              undefined,
+              undefined,
+              undefined,
+              createdSolution.title
             );
           }
 

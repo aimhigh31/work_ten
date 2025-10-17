@@ -360,7 +360,8 @@ export default function EducationDataTable({
 
   // Education 저장
   const handleEditEducationSave = async (updatedEducation: EducationData) => {
-    console.log('💾 Education 저장 요청:', updatedEducation);
+    console.log('🔥🔥🔥 EducationDataTable handleEditEducationSave 시작!', updatedEducation);
+    console.log('🔥🔥🔥 addChangeLog 함수 존재?', !!addChangeLog, typeof addChangeLog);
 
     try {
       const existingIndex = data.findIndex((education) => education.id === updatedEducation.id);
@@ -370,10 +371,32 @@ export default function EducationDataTable({
         // 기존 Education 업데이트
         const originalEducation = data[existingIndex];
 
+        console.log('🔥🔥🔥 변경로그 추가 시작!', {
+          'addChangeLog 존재': !!addChangeLog,
+          'originalEducation.title': originalEducation.title,
+          'updatedEducation.title': updatedEducation.title,
+          'title 변경됨?': originalEducation.title !== updatedEducation.title
+        });
+
         // 변경로그 추가 - DB 저장 전에 실행 (필드별 상세 추적)
         if (addChangeLog) {
+          console.log('🔥🔥🔥 addChangeLog 함수 실행!');
           const educationCode = `MAIN-EDU-${new Date(updatedEducation.registrationDate).getFullYear().toString().slice(-2)}-${String(updatedEducation.no).padStart(3, '0')}`;
           const educationTitle = updatedEducation.title || 'Education';
+
+          // 0. 교육명 변경
+          if (originalEducation.title !== updatedEducation.title) {
+            addChangeLog(
+              '수정',
+              educationCode,
+              `개인교육관리 ${educationTitle}(${educationCode}) 정보의 개요탭 교육명이 ${originalEducation.title || ''} → ${updatedEducation.title || ''} 로 수정 되었습니다.`,
+              updatedEducation.team || '미분류',
+              originalEducation.title || '',
+              updatedEducation.title || '',
+              '교육명',
+              updatedEducation.title
+            );
+          }
 
           // 1. Education유형 변경
           if (originalEducation.educationType !== updatedEducation.educationType) {

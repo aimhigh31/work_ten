@@ -375,20 +375,6 @@ function CostKanbanView({
             />
             <span className="assignee-name">{cost.assignee || '미할당'}</span>
           </div>
-          <div className="card-stats">
-            <div className="stat-item">
-              <span className="stat-icon">👁</span>
-              <span className="stat-number">0</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-icon">❤️</span>
-              <span className="stat-number">0</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-icon">💬</span>
-              <span className="stat-number">0</span>
-            </div>
-          </div>
         </div>
       </article>
     );
@@ -2218,7 +2204,7 @@ export default function CostManagement() {
         minute: '2-digit',
         hour12: false
       }),
-      title: log.title || log.description.split(' ')[1]?.split('(')[0] || '-',
+      title: log.title || '',
       code: log.record_id,
       action: log.action_type,
       location: log.description.includes('개요탭') ? '개요탭' : log.description.includes('데이터탭') ? '데이터탭' : '-',

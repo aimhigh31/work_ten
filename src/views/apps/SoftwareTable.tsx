@@ -72,7 +72,7 @@ interface SoftwareTableProps {
   selectedAssignee?: string;
   tasks?: TaskTableData[];
   setTasks?: React.Dispatch<React.SetStateAction<TaskTableData[]>>;
-  addChangeLog?: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string) => void;
+  addChangeLog?: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string, title?: string) => void;
   deleteMultipleSoftware?: (ids: number[]) => Promise<any>;
 }
 
@@ -248,7 +248,8 @@ export default function SoftwareTable({
       if (addChangeLog) {
         const deletedTasks = data.filter((task) => selected.includes(task.id));
         deletedTasks.forEach((task) => {
-          addChangeLog('소프트웨어 삭제', task.code || `SW-${task.id}`, `${task.workContent || '소프트웨어'} 삭제`, task.team || '미분류');
+          const softwareName = task.softwareName || task.workContent || '소프트웨어';
+          addChangeLog('소프트웨어 삭제', task.code || `SW-${task.id}`, `${task.workContent || '소프트웨어'} 삭제`, task.team || '미분류', undefined, undefined, undefined, softwareName);
         });
       }
 
@@ -319,7 +320,8 @@ export default function SoftwareTable({
             updatedTask.team || '미분류',
             originalTask.softwareCategory || '',
             updatedTask.softwareCategory || '',
-            '소프트웨어분류'
+            '소프트웨어분류',
+            softwareName
           );
         }
 
@@ -332,7 +334,8 @@ export default function SoftwareTable({
             updatedTask.team || '미분류',
             originalTask.softwareName || '',
             updatedTask.softwareName || '',
-            '소프트웨어명'
+            '소프트웨어명',
+            updatedTask.softwareName
           );
         }
 
@@ -345,7 +348,8 @@ export default function SoftwareTable({
             updatedTask.team || '미분류',
             originalTask.spec || '',
             updatedTask.spec || '',
-            '스펙'
+            '스펙',
+            softwareName
           );
         }
 
@@ -358,7 +362,8 @@ export default function SoftwareTable({
             updatedTask.team || '미분류',
             originalTask.currentUser || '',
             updatedTask.currentUser || '',
-            '사용자'
+            '사용자',
+            softwareName
           );
         }
 
@@ -371,7 +376,8 @@ export default function SoftwareTable({
             updatedTask.team || '미분류',
             originalTask.assignee || '',
             updatedTask.assignee || '',
-            '담당자'
+            '담당자',
+            softwareName
           );
         }
 
@@ -384,7 +390,8 @@ export default function SoftwareTable({
             updatedTask.team || '미분류',
             originalTask.status,
             updatedTask.status,
-            '상태'
+            '상태',
+            softwareName
           );
         }
 
@@ -397,7 +404,8 @@ export default function SoftwareTable({
             updatedTask.team || '미분류',
             originalTask.startDate || '',
             updatedTask.startDate || '',
-            '시작일'
+            '시작일',
+            softwareName
           );
         }
 
@@ -410,7 +418,8 @@ export default function SoftwareTable({
             updatedTask.team || '미분류',
             originalTask.completedDate || '',
             updatedTask.completedDate || '',
-            '완료일'
+            '완료일',
+            softwareName
           );
         }
 
@@ -423,7 +432,8 @@ export default function SoftwareTable({
             updatedTask.team || '미분류',
             originalTask.team || '',
             updatedTask.team || '',
-            '팀'
+            '팀',
+            softwareName
           );
         }
 
@@ -436,7 +446,8 @@ export default function SoftwareTable({
             updatedTask.team || '미분류',
             originalTask.description || '',
             updatedTask.description || '',
-            '설명'
+            '설명',
+            softwareName
           );
         }
 
@@ -449,7 +460,8 @@ export default function SoftwareTable({
             updatedTask.team || '미분류',
             originalTask.licenseKey || '',
             updatedTask.licenseKey || '',
-            '라이센스키'
+            '라이센스키',
+            softwareName
           );
         }
 
@@ -462,7 +474,8 @@ export default function SoftwareTable({
             updatedTask.team || '미분류',
             originalTask.solutionProvider || '',
             updatedTask.solutionProvider || '',
-            '솔루션업체'
+            '솔루션업체',
+            softwareName
           );
         }
 
@@ -475,7 +488,8 @@ export default function SoftwareTable({
             updatedTask.team || '미분류',
             String(originalTask.userCount || 0),
             String(updatedTask.userCount || 0),
-            '사용자수'
+            '사용자수',
+            softwareName
           );
         }
 
@@ -488,7 +502,8 @@ export default function SoftwareTable({
             updatedTask.team || '미분류',
             originalTask.licenseType || '',
             updatedTask.licenseType || '',
-            '라이센스유형'
+            '라이센스유형',
+            softwareName
           );
         }
       }
@@ -520,11 +535,16 @@ export default function SoftwareTable({
 
       // 변경로그 추가 - 새 업무 생성
       if (addChangeLog) {
+        const softwareName = newTaskWithNumber.softwareName || newTaskWithNumber.workContent || '새 업무';
         addChangeLog(
           '새 업무 생성',
           newTaskWithNumber.code,
           `${newTaskWithNumber.workContent || '새 업무'} 생성`,
-          newTaskWithNumber.team || '미분류'
+          newTaskWithNumber.team || '미분류',
+          undefined,
+          undefined,
+          undefined,
+          softwareName
         );
       }
 

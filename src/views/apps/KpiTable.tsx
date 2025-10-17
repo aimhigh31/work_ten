@@ -117,7 +117,7 @@ export default function KpiTable({
         업무분류: task.department || '분류없음',
         관리분류: (task as any).managementCategory || '-',
         주요과제: task.workContent,
-        목표KPI: (task as any).description || '-',
+        목표KPI: (task as any).targetKpi || (task as any).target_kpi || '-',
         팀: task.team,
         담당자: task.assignee || '-',
         진행율: `${task.progress || 0}%`,
@@ -524,7 +524,7 @@ export default function KpiTable({
                         maxWidth: 160
                       }}
                     >
-                      {(task as any).description || '-'}
+                      {(task as any).targetKpi || (task as any).target_kpi || '-'}
                     </Typography>
                   </TableCell>
                   <TableCell>

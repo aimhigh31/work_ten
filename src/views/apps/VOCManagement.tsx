@@ -413,20 +413,6 @@ function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssign
             />
             <span className="assignee-name">{voc.assignee || '미할당'}</span>
           </div>
-          <div className="card-stats">
-            <div className="stat-item">
-              <span className="stat-icon">👁️</span>
-              <span className="stat-number">0</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-icon">💬</span>
-              <span className="stat-number">0</span>
-            </div>
-            <div className="stat-item" style={{ cursor: 'pointer' }}>
-              <span className="stat-icon">❤️</span>
-              <span className="stat-number">0</span>
-            </div>
-          </div>
         </div>
       </article>
     );
@@ -2359,7 +2345,7 @@ export default function VOCManagement() {
         minute: '2-digit',
         hour12: false
       }),
-      title: log.title || log.description.split(' ')[1]?.split('(')[0] || '-',
+      title: log.title || '',
       code: log.record_id,
       action: log.action_type,
       location: 'VOC관리',

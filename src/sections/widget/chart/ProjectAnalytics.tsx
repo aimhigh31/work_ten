@@ -151,7 +151,7 @@ function EcommerceDataChart({ data }: { data: any[] }) {
 
 export default function ProjectAnalytics() {
   const [value, setValue] = useState(0);
-  const [age, setAge] = useState('30');
+  const [age, setAge] = useState('Total');
 
   const chartData = [
     [
@@ -208,10 +208,19 @@ export default function ProjectAnalytics() {
   };
 
   return (
-    <MainCard content={false}>
+    <MainCard
+      title="비용관리"
+      content={false}
+      divider={false}
+      sx={{
+        '& .MuiCardHeader-root': {
+          pb: 0
+        }
+      }}
+    >
       <Box sx={{ width: '100%' }}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs value={value} onChange={handleChange} aria-label="basic tabs example" sx={{ px: 3, pt: 1, '& .MuiTab-root': { mb: 0.5 } }}>
+          <Tabs value={value} onChange={handleChange} aria-label="basic tabs example" sx={{ px: 3, pt: 0.5, '& .MuiTab-root': { mb: 0.5 } }}>
             <Tab label="Overview" {...a11yProps(0)} />
             <Tab label="Marketing" {...a11yProps(1)} />
             <Tab label="Project" {...a11yProps(2)} />
@@ -226,21 +235,13 @@ export default function ProjectAnalytics() {
                   <Box sx={{ minWidth: 120 }}>
                     <FormControl fullWidth>
                       <Select id="demo-simple-select" value={age} onChange={handleChangeSelect}>
-                        <MenuItem value={10}>Today</MenuItem>
-                        <MenuItem value={20}>Weekly</MenuItem>
-                        <MenuItem value={30}>Monthly</MenuItem>
+                        <MenuItem value="Today">Today</MenuItem>
+                        <MenuItem value="Weekly">Weekly</MenuItem>
+                        <MenuItem value="Monthly">Monthly</MenuItem>
+                        <MenuItem value="Total">Total</MenuItem>
                       </Select>
                     </FormControl>
                   </Box>
-                  <IconButton color="secondary" variant="outlined" sx={{ color: 'text.secondary' }}>
-                    <Edit />
-                  </IconButton>
-                  <IconButton color="secondary" variant="outlined" sx={{ color: 'text.secondary' }}>
-                    <Maximize4 />
-                  </IconButton>
-                  <IconButton color="secondary" variant="outlined" sx={{ transform: 'rotate(90deg)', color: 'text.secondary' }}>
-                    <MoreIcon />
-                  </IconButton>
                 </Stack>
                 <EcommerceDataChart data={data} />
               </Stack>

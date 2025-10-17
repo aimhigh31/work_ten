@@ -11,25 +11,25 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// IT교육 데이터 타입 정의 (개요탭 필드와 일치)
+// IT교육 데이터 타입 정의 (비용관리 패턴: 핵심 필드는 required)
 export interface ItEducationData {
   id: number;
-  registration_date?: string;
-  code?: string;
-  education_type?: string;
-  education_name?: string;
-  description?: string;
-  location?: string;
-  participant_count?: number;
-  execution_date?: string;
-  status?: string;
-  team?: string;
-  assignee?: string;
-  // 교육실적보고 필드들
-  achievements?: string;        // 성과
-  improvements?: string;        // 개선사항
-  education_feedback?: string;  // 교육소감
-  report_notes?: string;        // 비고
+  registration_date: string;      // 필수 (비용관리 패턴)
+  code: string;                   // 필수 (비용관리 패턴)
+  education_type: string;         // 필수
+  education_name: string;         // 필수
+  location: string;               // 필수
+  execution_date: string;         // 필수
+  status: string;                 // 필수 (비용관리 패턴)
+  team: string;                   // 필수 (비용관리 패턴) - 손실 방지
+  assignee: string;               // 필수 (비용관리 패턴)
+  participant_count?: number;     // 옵셔널
+  description?: string;           // 옵셔널
+  // 교육실적보고 필드들 (옵셔널)
+  achievements?: string;          // 성과
+  improvements?: string;          // 개선사항
+  education_feedback?: string;    // 교육소감
+  report_notes?: string;          // 비고
   is_active?: boolean;
   created_at?: string;
   updated_at?: string;

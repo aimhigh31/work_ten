@@ -449,20 +449,6 @@ function KanbanView({
             />
             <span className="assignee-name">{task.assignee || '미할당'}</span>
           </div>
-          <div className="card-stats">
-            <div className="stat-item">
-              <span className="stat-icon">❤️</span>
-              <span className="stat-number">0</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-icon">👁</span>
-              <span className="stat-number">0</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-icon">💬</span>
-              <span className="stat-number">0</span>
-            </div>
-          </div>
         </div>
       </article>
     );
@@ -2533,7 +2519,7 @@ export default function KpiManagement() {
       return {
         id: String(log.id),
         dateTime: formattedDateTime,
-        title: log.title || kpi?.workContent || log.record_id,
+        title: log.title || '',
         code: log.record_id,
         action: log.action_type,
         location: log.description.includes('개요탭') ? '개요탭' : log.description.includes('데이터탭') ? '데이터탭' : '-',

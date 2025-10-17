@@ -12,10 +12,10 @@ import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 
 // project-imports
-import Dot from 'components/@extended/Dot';
+import IconButton from 'components/@extended/IconButton';
 
 // assets
-import { Message } from '@wandersonalwes/iconsax-react';
+import { Message, CloseCircle } from '@wandersonalwes/iconsax-react';
 
 // types
 import { KeyedObject } from 'types/root';
@@ -36,6 +36,7 @@ interface ConversationListProps {
   selectedUser: string | null;
   conversations: ConversationData[];
   onConversationSelect?: (conversation: ConversationData) => void;
+  onConversationDelete?: (conversationId: string) => void;
 }
 
 interface ConversationListItemProps {
@@ -43,11 +44,17 @@ interface ConversationListItemProps {
   setUser: (u: any) => void;
   selectedUser: string | null;
   onConversationSelect?: (conversation: ConversationData) => void;
+  onConversationDelete?: (conversationId: string) => void;
 }
 
 // ==============================|| CHAT - CONVERSATION ITEM ||============================== //
 
-function ConversationListItem({ conversation, setUser, selectedUser, onConversationSelect }: ConversationListItemProps) {
+function ConversationListItem({ conversation, setUser, selectedUser, onConversationSelect, onConversationDelete }: ConversationListItemProps) {
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onConversationDelete?.(conversation.id);
+  };
+
   return (
     <ListItemButton
       sx={{ pl: 1, borderRadius: 0, '&:hover': { borderRadius: 1 } }}
@@ -66,72 +73,83 @@ function ConversationListItem({ conversation, setUser, selectedUser, onConversat
       }}
       selected={conversation.id === selectedUser}
     >
-      <ListItemText
-        primary={
-          <Stack component="span" direction="row" sx={{ gap: 1, alignItems: 'center', justifyContent: 'space-between' }}>
-            <Stack component="span" direction="row" sx={{ gap: 1, alignItems: 'center', flex: 1 }}>
-              <Box
-                component="span"
-                sx={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: 32,
-                  height: 32,
-                  borderRadius: '50%',
-                  bgcolor: 'primary.lighter',
-                  color: 'primary.main'
-                }}
-              >
-                <Message size={16} />
-              </Box>
+      <Stack direction="row" sx={{ gap: 1, width: '100%', alignItems: 'flex-start' }}>
+        {/* 아이콘 */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            bgcolor: 'primary.lighter',
+            color: 'primary.main',
+            flexShrink: 0,
+            mt: 0.5
+          }}
+        >
+          <Message size={16} />
+        </Box>
+        {/* 텍스트 영역 */}
+        <ListItemText
+          sx={{ m: 0, flex: 1, minWidth: 0 }}
+          primary={
+            <Stack component="span" sx={{ gap: 0.5 }}>
+              {/* 일자 */}
+              <Stack component="span" direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography component="span" variant="caption" sx={{ color: 'text.secondary' }}>
+                  {conversation.lastModified}
+                </Typography>
+                <IconButton
+                  size="small"
+                  color="secondary"
+                  onClick={handleDelete}
+                  sx={{
+                    opacity: 0.6,
+                    '&:hover': { opacity: 1, color: 'error.main' }
+                  }}
+                >
+                  <CloseCircle size={16} />
+                </IconButton>
+              </Stack>
+              {/* 제목 */}
               <Typography
                 component="span"
                 variant="subtitle1"
                 sx={{
                   color: 'text.primary',
+                  fontWeight: 600,
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  flex: 1
+                  whiteSpace: 'nowrap'
                 }}
               >
                 {conversation.title}
               </Typography>
+              {/* 내용 */}
+              <Typography
+                component="span"
+                variant="body2"
+                sx={{
+                  color: 'text.secondary',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  fontSize: '0.813rem'
+                }}
+              >
+                {conversation.lastMessage}
+              </Typography>
             </Stack>
-            <Typography component="span" variant="caption" sx={{ color: 'text.secondary', minWidth: 'fit-content' }}>
-              {conversation.lastModified}
-            </Typography>
-          </Stack>
-        }
-        secondary={
-          <Stack component="span" direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mt: 0.5 }}>
-            <Typography
-              component="span"
-              variant="body2"
-              sx={{
-                color: 'text.secondary',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                flex: 1
-              }}
-            >
-              {conversation.lastMessage}
-            </Typography>
-            {conversation.unread && (
-              <Box component="span" sx={{ ml: 1 }}>
-                <Dot />
-              </Box>
-            )}
-          </Stack>
-        }
-      />
+          }
+        />
+      </Stack>
     </ListItemButton>
   );
 }
 
-export default function ConversationList({ setUser, search, selectedUser, conversations, onConversationSelect }: ConversationListProps) {
+export default function ConversationList({ setUser, search, selectedUser, conversations, onConversationSelect, onConversationDelete }: ConversationListProps) {
   const [data, setData] = useState<ConversationData[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -171,6 +189,7 @@ export default function ConversationList({ setUser, search, selectedUser, conver
             selectedUser={selectedUser}
             setUser={setUser}
             onConversationSelect={onConversationSelect}
+            onConversationDelete={onConversationDelete}
           />
           <Divider />
         </Fragment>

@@ -54,6 +54,7 @@ import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentMana
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseTaskManagement } from 'hooks/useSupabaseTaskManagement';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
+import { useSupabaseKpi } from 'hooks/useSupabaseKpi';
 import { ChangeLogData } from 'types/changelog';
 import { useSession } from 'next-auth/react';
 import useUser from 'hooks/useUser';
@@ -196,6 +197,8 @@ function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssign
 
   // 카드 클릭 핸들러
   const handleCardClick = (task: TaskTableData) => {
+    console.log('🔵 TaskManagement - 다이얼로그 열기 시 kpis:', kpis);
+    console.log('🔵 TaskManagement - 다이얼로그 열기 시 kpis 개수:', kpis?.length);
     setEditingTask(task);
     setEditDialog(true);
   };
@@ -488,20 +491,6 @@ function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssign
               alt={task.assignee || '미할당'}
             />
             <span className="assignee-name">{task.assignee || '미할당'}</span>
-          </div>
-          <div className="card-stats">
-            <div className="stat-item">
-              <span className="stat-icon">❤️</span>
-              <span className="stat-number">0</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-icon">👁</span>
-              <span className="stat-number">0</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-icon">💬</span>
-              <span className="stat-number">0</span>
-            </div>
           </div>
         </div>
       </article>
@@ -849,6 +838,7 @@ function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssign
           statusOptions={taskStatusOptions}
           statusColors={taskStatusColors}
           teams={teams}
+          kpiData={kpis}
         />
       )}
     </Box>
@@ -2465,6 +2455,13 @@ export default function TaskManagement() {
   const { departments, fetchDepartments } = useSupabaseDepartmentManagement();
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
   const { tasks: supabaseTasks, updateTask, addTask: addTaskToDb, deleteTask: deleteTaskFromDb } = useSupabaseTaskManagement();
+  const { kpis } = useSupabaseKpi();
+
+  // KPI 데이터 로깅
+  React.useEffect(() => {
+    console.log('🎯 TaskManagement - kpis 데이터:', kpis);
+    console.log('🎯 TaskManagement - kpis 개수:', kpis?.length);
+  }, [kpis]);
 
   // 부서 데이터 로드 (useEffect는 이미 병렬로 실행됨)
   React.useEffect(() => {
@@ -2480,10 +2477,12 @@ export default function TaskManagement() {
   const tasks = React.useMemo(() => {
     return supabaseTasks.map((task, index) => ({
       id: parseInt(task.id) || index,
+      no: index + 1,
       code: task.code,
       registrationDate: task.registration_date,
       startDate: task.start_date || '',
       completionDate: task.completed_date || '',
+      completedDate: task.completed_date || '',
       department: task.department || '',
       workContent: task.work_content || '',
       description: task.description || '',
@@ -2591,7 +2590,7 @@ export default function TaskManagement() {
       return {
         id: String(log.id),
         dateTime: formattedDateTime,
-        title: log.title || taskItem?.workContent || log.record_id,
+        title: log.title || '',
         code: log.record_id,
         action: log.action_type,
         location: log.description.includes('개요탭') ? '개요탭' : log.description.includes('데이터탭') ? '데이터탭' : '-',
@@ -2703,6 +2702,8 @@ export default function TaskManagement() {
 
   // 카드 클릭 핸들러
   const handleCardClick = (task: TaskTableData) => {
+    console.log('🔵 TaskManagement - 다이얼로그 열기 시 kpis:', kpis);
+    console.log('🔵 TaskManagement - 다이얼로그 열기 시 kpis 개수:', kpis?.length);
     setEditingTask(task);
     setEditDialog(true);
   };
@@ -3338,6 +3339,7 @@ export default function TaskManagement() {
           statusOptions={taskStatusOptions}
           statusColors={taskStatusColors}
           teams={teams}
+          kpiData={kpis}
         />
       )}
     </Box>

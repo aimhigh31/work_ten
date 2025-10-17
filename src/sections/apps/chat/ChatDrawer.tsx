@@ -32,6 +32,7 @@ interface ChatDrawerProps {
   conversations: ConversationData[];
   onAddConversation: (conversation: ConversationData) => void;
   onConversationSelect?: (conversation: ConversationData) => void;
+  onConversationDelete?: (conversationId: string) => void;
 }
 
 // ==============================|| CHAT - DRAWER ||============================== //
@@ -43,7 +44,8 @@ export default function ChatDrawer({
   selectedUser,
   conversations,
   onAddConversation,
-  onConversationSelect
+  onConversationSelect,
+  onConversationDelete
 }: ChatDrawerProps) {
   const theme = useTheme();
   const downLG = useMediaQuery((theme) => theme.breakpoints.down('lg'));
@@ -168,6 +170,7 @@ export default function ChatDrawer({
               selectedUser={selectedUser}
               conversations={conversations}
               onConversationSelect={onConversationSelect}
+              onConversationDelete={onConversationDelete}
             />
           </Box>
         </SimpleBar>

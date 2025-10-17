@@ -66,7 +66,7 @@ interface HardwareTableProps {
   selectedAssignee?: string;
   tasks?: HardwareTableData[];
   setTasks?: React.Dispatch<React.SetStateAction<HardwareTableData[]>>;
-  addChangeLog?: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string) => void;
+  addChangeLog?: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string, title?: string) => void;
   deleteMultipleHardware?: (ids: number[]) => Promise<any>;
   onHardwareSave?: (hardware: HardwareTableData) => Promise<void>;
   statusTypes?: any[];
@@ -235,7 +235,8 @@ export default function HardwareTable({
         if (addChangeLog) {
           const deletedTasks = data.filter((task) => selected.includes(task.id));
           deletedTasks.forEach((task) => {
-            addChangeLog('하드웨어 삭제', task.code || `HW-${task.id}`, `${task.assetName || task.workContent || '하드웨어'} 삭제`, task.team || '미분류');
+            const assetName = task.assetName || task.workContent || '하드웨어';
+            addChangeLog('하드웨어 삭제', task.code || `HW-${task.id}`, `${assetName} 삭제`, task.team || '미분류', undefined, undefined, undefined, assetName);
           });
         }
       }
@@ -348,7 +349,8 @@ export default function HardwareTable({
             convertedHardware.team || '미분류',
             originalHardware.assetCategory || '',
             convertedHardware.assetCategory || '',
-            '자산분류'
+            '자산분류',
+            hardwareName
           );
         }
 
@@ -361,7 +363,8 @@ export default function HardwareTable({
             convertedHardware.team || '미분류',
             originalHardware.assetName || '',
             convertedHardware.assetName || '',
-            '자산명'
+            '자산명',
+            hardwareName
           );
         }
 
@@ -374,7 +377,8 @@ export default function HardwareTable({
             convertedHardware.team || '미분류',
             originalHardware.model || '',
             convertedHardware.model || '',
-            '모델'
+            '모델',
+            hardwareName
           );
         }
 
@@ -387,7 +391,8 @@ export default function HardwareTable({
             convertedHardware.team || '미분류',
             originalHardware.manufacturer || '',
             convertedHardware.manufacturer || '',
-            '제조사'
+            '제조사',
+            hardwareName
           );
         }
 
@@ -400,7 +405,8 @@ export default function HardwareTable({
             convertedHardware.team || '미분류',
             originalHardware.vendor || '',
             convertedHardware.vendor || '',
-            '공급업체'
+            '공급업체',
+            hardwareName
           );
         }
 
@@ -413,7 +419,8 @@ export default function HardwareTable({
             convertedHardware.team || '미분류',
             originalHardware.detailSpec || '',
             convertedHardware.detailSpec || '',
-            '상세스펙'
+            '상세스펙',
+            hardwareName
           );
         }
 
@@ -426,7 +433,8 @@ export default function HardwareTable({
             convertedHardware.team || '미분류',
             originalHardware.currentUser || '',
             convertedHardware.currentUser || '',
-            '사용자'
+            '사용자',
+            hardwareName
           );
         }
 
@@ -439,7 +447,8 @@ export default function HardwareTable({
             convertedHardware.team || '미분류',
             originalHardware.location || '',
             convertedHardware.location || '',
-            '위치'
+            '위치',
+            hardwareName
           );
         }
 
@@ -452,7 +461,8 @@ export default function HardwareTable({
             convertedHardware.team || '미분류',
             originalHardware.assignee || '',
             convertedHardware.assignee || '',
-            '담당자'
+            '담당자',
+            hardwareName
           );
         }
 
@@ -465,7 +475,8 @@ export default function HardwareTable({
             convertedHardware.team || '미분류',
             originalHardware.status,
             convertedHardware.status,
-            '상태'
+            '상태',
+            hardwareName
           );
         }
 
@@ -478,7 +489,8 @@ export default function HardwareTable({
             convertedHardware.team || '미분류',
             originalHardware.purchaseDate || '',
             convertedHardware.purchaseDate || '',
-            '구매일'
+            '구매일',
+            hardwareName
           );
         }
 
@@ -491,7 +503,8 @@ export default function HardwareTable({
             convertedHardware.team || '미분류',
             originalHardware.warrantyEndDate || '',
             convertedHardware.warrantyEndDate || '',
-            '보증만료일'
+            '보증만료일',
+            hardwareName
           );
         }
 
@@ -504,7 +517,8 @@ export default function HardwareTable({
             convertedHardware.team || '미분류',
             originalHardware.serialNumber || '',
             convertedHardware.serialNumber || '',
-            '시리얼번호'
+            '시리얼번호',
+            hardwareName
           );
         }
 
@@ -517,7 +531,8 @@ export default function HardwareTable({
             convertedHardware.team || '미분류',
             originalHardware.team || '',
             convertedHardware.team || '',
-            '팀'
+            '팀',
+            hardwareName
           );
         }
 
@@ -530,7 +545,8 @@ export default function HardwareTable({
             convertedHardware.team || '미분류',
             originalHardware.assetDescription || '',
             convertedHardware.assetDescription || '',
-            '자산설명'
+            '자산설명',
+            hardwareName
           );
         }
       }

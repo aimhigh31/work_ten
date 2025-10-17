@@ -73,6 +73,7 @@ export function useSupabaseMenuManagement() {
       icon: dbMenu.menu_icon,
       page: dbMenu.menu_page,
       description: dbMenu.menu_description || '',
+      database: dbMenu.menu_database || '',
       url: dbMenu.menu_url,
       permissions: { enabled: dbMenu.is_enabled },
       displayOrder: dbMenu.display_order,
@@ -91,6 +92,7 @@ export function useSupabaseMenuManagement() {
       menu_icon: menuData.icon,
       menu_page: menuData.page,
       menu_description: menuData.description,
+      menu_database: menuData.database,
       menu_url: menuData.url,
       is_enabled: menuData.permissions.enabled,
       display_order: menuData.displayOrder,
@@ -434,6 +436,7 @@ export function useSupabaseMenuManagement() {
       if (updateData.icon !== undefined) dbUpdateData.menu_icon = updateData.icon;
       if (updateData.page !== undefined) dbUpdateData.menu_page = updateData.page;
       if (updateData.description !== undefined) dbUpdateData.menu_description = updateData.description;
+      if (updateData.database !== undefined) dbUpdateData.menu_database = updateData.database;
       if (updateData.url !== undefined) dbUpdateData.menu_url = updateData.url;
       if (updateData.permissions?.enabled !== undefined) dbUpdateData.is_enabled = updateData.permissions.enabled;
       if (updateData.displayOrder !== undefined) dbUpdateData.display_order = updateData.displayOrder;

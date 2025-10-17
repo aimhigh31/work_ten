@@ -117,7 +117,7 @@ interface KanbanViewProps {
   selectedAssignee: string;
   inspections: InspectionTableData[];
   setInspections: React.Dispatch<React.SetStateAction<InspectionTableData[]>>;
-  addChangeLog: (action: string, target: string, description: string, team?: string) => void;
+  addChangeLog: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string, title?: string) => void;
   generateInspectionCode?: () => Promise<string>;
   assigneeList?: any[];
 }
@@ -231,7 +231,11 @@ function KanbanView({
           '점검 정보 수정',
           inspectionCode,
           `${updatedInspection.inspectionTitle || '점검'} - ${changes.join(', ')}`,
-          updatedInspection.team || '미분류'
+          updatedInspection.team || '미분류',
+          undefined,
+          undefined,
+          undefined,
+          updatedInspection.inspectionContent || updatedInspection.inspectionTitle
         );
       }
     }
@@ -262,9 +266,10 @@ function KanbanView({
       // 변경로그 추가
       const inspectionCode = currentInspection.code || `TASK-${inspectionId}`;
       const inspectionTitle = currentInspection.inspectionTitle || '점검내용 없음';
+      const inspectionContent = currentInspection.inspectionContent || inspectionTitle;
       const description = `${inspectionTitle} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
 
-      addChangeLog('점검 상태 변경', inspectionCode, description, currentInspection.team || '미분류');
+      addChangeLog('점검 상태 변경', inspectionCode, description, currentInspection.team || '미분류', oldStatus, newStatus, '상태', inspectionContent);
     }
   };
 
@@ -419,20 +424,6 @@ function KanbanView({
               alt={inspection.assignee || '미할당'}
             />
             <span className="assignee-name">{inspection.assignee || '미할당'}</span>
-          </div>
-          <div className="card-stats">
-            <div className="stat-item">
-              <span className="stat-icon">🤍</span>
-              <span className="stat-number">{inspection.likes || 0}</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-icon">👁</span>
-              <span className="stat-number">{inspection.views || 0}</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-icon">💬</span>
-              <span className="stat-number">{inspection.comments?.length || 0}</span>
-            </div>
           </div>
         </div>
       </article>
@@ -2071,7 +2062,7 @@ export default function InspectionManagement() {
         id: log.id,
         dateTime: formattedDateTime,
         code: log.record_id, // record_id가 이미 코드임
-        target: inspection?.inspectionContent || log.record_id,
+        target: log.title || inspection?.inspectionContent || log.record_id,
         location: '개요탭', // 변경위치
         action: log.action_type,
         changedField: log.changed_field || '-', // 변경필드
@@ -2194,7 +2185,8 @@ export default function InspectionManagement() {
       team: string = '시스템',
       beforeValue?: string,
       afterValue?: string,
-      changedField?: string
+      changedField?: string,
+      title?: string
     ) => {
       try {
         const userName = currentUser?.user_name || currentUser?.name || user?.name || '시스템';
@@ -2203,6 +2195,7 @@ export default function InspectionManagement() {
           page: 'security_inspection',
           record_id: target, // 코드를 record_id로 사용
           action_type: action,
+          title: title || null,
           description: description,
           before_value: beforeValue || null,
           after_value: afterValue || null,
@@ -2366,7 +2359,7 @@ export default function InspectionManagement() {
       // 변경로그 추가
       const deletedInspections = inspections.filter((inspection) => ids.includes(inspection.id));
       deletedInspections.forEach((inspection) => {
-        addChangeLog('점검 삭제', inspection.code, `${inspection.inspectionContent} 삭제`, inspection.team);
+        addChangeLog('점검 삭제', inspection.code, `${inspection.inspectionContent} 삭제`, inspection.team, undefined, undefined, undefined, inspection.inspectionContent);
       });
 
       console.log('✅ 보안점검 데이터 삭제 완료');

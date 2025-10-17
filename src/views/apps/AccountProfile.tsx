@@ -59,6 +59,12 @@ export default function AccountProfile({ tab }: Props) {
     },
     '& .MuiOutlinedInput-root.Mui-disabled .MuiOutlinedInput-notchedOutline': {
       borderColor: 'rgba(0, 0, 0, 0.23)'
+    },
+    '& .MuiInputLabel-root.Mui-disabled': {
+      color: 'rgba(0, 0, 0, 0.6)',
+      backgroundColor: 'white',
+      paddingLeft: '8px',
+      paddingRight: '8px'
     }
   };
 
@@ -365,7 +371,7 @@ export default function AccountProfile({ tab }: Props) {
       </Box>
 
       {/* 탭 컨텐츠 */}
-      <Box sx={{ pt: GRID_COMMON_SPACING, px: 3, flex: 1, overflow: 'auto' }}>
+      <Box sx={{ pt: 3, px: 3, flex: 1, overflow: 'auto' }}>
         {isUserLoaded && currentUser ? (
           <Stack direction="row" spacing={3} key={currentUser.id}>
             {/* 왼쪽 섹션 - 프로필 사진 */}
@@ -531,7 +537,7 @@ export default function AccountProfile({ tab }: Props) {
             </Box>
 
             {/* 오른쪽 섹션 - 사용자 정보 */}
-            <Box sx={{ flex: 1, overflowY: 'auto' }}>
+            <Box sx={{ flex: 1, overflowY: 'auto', pt: 6 }}>
               <Stack spacing={3}>
                 {/* code */}
                 <TextField

@@ -119,7 +119,7 @@ interface KanbanViewProps {
   selectedAssignee: string;
   tasks: TaskTableData[];
   setTasks: React.Dispatch<React.SetStateAction<TaskTableData[]>>;
-  addChangeLog: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string) => void;
+  addChangeLog: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string, title?: string) => void;
   assigneeList?: any[];
   assignees: string[];
   teams: string[];
@@ -372,16 +372,6 @@ function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssign
               className="assignee-avatar"
             />
             <span className="assignee-name">{task.assignee || '미할당'}</span>
-          </div>
-          <div className="card-stats">
-            <div className="stat-item">
-              <span className="stat-icon">👁️</span>
-              <span className="stat-number">{task.viewCount || 0}</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-icon">💬</span>
-              <span className="stat-number">{task.commentCount || 0}</span>
-            </div>
           </div>
         </div>
       </article>
@@ -2436,7 +2426,7 @@ export default function SoftwareManagement() {
         id: log.id,
         dateTime: formattedDateTime,
         code: log.record_id,
-        target: software?.softwareName || software?.workContent || log.record_id,
+        target: log.title || software?.softwareName || software?.workContent || log.record_id,
         location: '개요탭',
         action: log.action_type,
         changedField: log.changed_field || '-',
@@ -2477,12 +2467,14 @@ export default function SoftwareManagement() {
       team: string = '시스템',
       beforeValue?: string,
       afterValue?: string,
-      changedField?: string
+      changedField?: string,
+      title?: string
     ) => {
       const logData = {
         page: 'it_software',
         record_id: target,
         action_type: action,
+        title: title || null,
         description: description,
         before_value: beforeValue || null,
         after_value: afterValue || null,

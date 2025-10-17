@@ -17,7 +17,7 @@ export interface ITEducationRecord {
   executionDate: string;
   status: ITEducationStatus;
   assignee: string;
-  team?: string;
+  team: string; // 필수 필드로 변경 (비용관리 패턴)
   department?: ITEducationDepartment;
   attachment?: boolean;
   attachmentCount?: number;

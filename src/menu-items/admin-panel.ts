@@ -1,5 +1,5 @@
 // assets
-import { Setting2, TaskSquare, Profile, Code } from '@wandersonalwes/iconsax-react';
+import { Setting2, TaskSquare, Profile, Code, DocumentText } from '@wandersonalwes/iconsax-react';
 
 // types
 import { NavItemType } from 'types/menu';
@@ -9,7 +9,8 @@ const icons = {
   systemSettings: Setting2,
   checklist: TaskSquare,
   userSettings: Profile,
-  masterCode: Code
+  masterCode: Code,
+  changeLog: DocumentText
 };
 
 // ==============================|| MENU ITEMS - ADMIN PANEL ||============================== //
@@ -50,6 +51,14 @@ const adminPanel: NavItemType = {
       type: 'item',
       icon: icons.userSettings,
       url: '/admin-panel/user-settings',
+      breadcrumbs: false
+    },
+    {
+      id: 'change-log',
+      title: '변경로그',
+      type: 'item',
+      icon: icons.changeLog,
+      url: '/admin-panel/change-log',
       breadcrumbs: false
     }
   ]

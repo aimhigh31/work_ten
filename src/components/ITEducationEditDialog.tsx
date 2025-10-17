@@ -81,6 +81,7 @@ const convertTableDataToRecord = (tableData: ITEducationTableData): ITEducationR
     executionDate: tableData.executionDate,
     status: tableData.status,
     assignee: tableData.assignee,
+    team: tableData.team, // 비용관리 패턴: 필수 필드 (누락 방지)
     attachment: Boolean(tableData.attachments?.length),
     attachmentCount: tableData.attachments?.length || 0,
     attachments: tableData.attachments || [],
@@ -101,8 +102,8 @@ const convertRecordToTableData = (record: ITEducationRecord): ITEducationTableDa
     executionDate: record.executionDate,
     status: record.status,
     assignee: record.assignee,
-    team: undefined, // 옵셔널
-    department: undefined, // 옵셔널
+    team: record.team, // 필수 필드 (비용관리 패턴)
+    department: (record as any).department || undefined, // 옵셔널
     attachments: record.attachments
   };
 };
@@ -3056,25 +3057,28 @@ export default function ITEducationDialog({ open, onClose, onSave, recordId, tas
         const loadEducationData = async () => {
           try {
             const supabaseData = await getItEducationById(recordId);
+            console.log('🔍 Supabase 로드 데이터:', supabaseData);
+            console.log('🔍 Team 값:', supabaseData?.team);
             if (supabaseData) {
               dispatch({
                 type: 'SET_EDUCATION',
                 education: {
                   id: recordId,
-                  educationName: supabaseData.education_name || '',
+                  educationName: supabaseData.education_name,
                   description: supabaseData.description || '',
                   participantCount: supabaseData.participant_count || 0,
-                  executionDate: supabaseData.execution_date || '',
-                  registrationDate: supabaseData.registration_date || '',
-                  code: supabaseData.code || '',
-                  educationType: (supabaseData.education_type as any) || '',
-                  assignee: supabaseData.assignee || '',
-                  location: supabaseData.location || '',
-                  status: (supabaseData.status as any) || '대기',
-                  team: (supabaseData as any).team || '',
+                  executionDate: supabaseData.execution_date,
+                  registrationDate: supabaseData.registration_date,
+                  code: supabaseData.code,
+                  educationType: supabaseData.education_type as any,
+                  assignee: supabaseData.assignee,
+                  location: supabaseData.location,
+                  status: supabaseData.status as any,
+                  team: supabaseData.team, // 비용관리 패턴: 직접 접근
                   attachments: []
                 }
               });
+              console.log('✅ educationState 초기화 완료, team:', supabaseData.team);
 
               // 교육실적보고 데이터 로드
               const tempKey = `it_education_report_temp_${recordId}`;
@@ -3274,7 +3278,10 @@ export default function ITEducationDialog({ open, onClose, onSave, recordId, tas
       console.log('feedback:', `"${finalEducationReport.feedback}"`, 'length:', finalEducationReport.feedback?.length || 0);
       console.log('notes:', `"${finalEducationReport.notes}"`, 'length:', finalEducationReport.notes?.length || 0);
 
-      const supabaseData: any = {
+      console.log('💾 저장 전 educationState.team:', educationState.team);
+
+      // 비용관리 패턴: 필수 필드는 항상 포함 (조건부 할당 금지)
+      const supabaseData = {
         registration_date: educationState.registrationDate,
         code: educationState.code,
         education_type: educationState.educationType,
@@ -3285,7 +3292,7 @@ export default function ITEducationDialog({ open, onClose, onSave, recordId, tas
         execution_date: educationState.executionDate,
         status: educationState.status,
         assignee: educationState.assignee,
-        team: educationState.team,
+        team: educationState.team, // 비용관리 패턴: 항상 포함 (필수 필드)
         // 교육실적보고 필드들 (빈 문자열은 null로 변환)
         achievements: finalEducationReport.achievements?.trim() || null,
         improvements: finalEducationReport.improvements?.trim() || null,
@@ -3387,16 +3394,17 @@ export default function ITEducationDialog({ open, onClose, onSave, recordId, tas
         // 기존 UI 업데이트를 위한 데이터 구조로 변환
         const educationData: ITEducationRecord = {
           id: result.id,
-          registrationDate: result.registration_date || '',
-          code: result.code || '',
-          educationType: (result.education_type as any) || '온라인',
-          educationName: result.education_name || '',
+          registrationDate: result.registration_date,
+          code: result.code,
+          educationType: result.education_type as any,
+          educationName: result.education_name,
           description: result.description || '',
-          location: result.location || '',
+          location: result.location,
           participantCount: result.participant_count || 0,
-          executionDate: result.execution_date || '',
-          status: (result.status as any) || '대기',
-          assignee: result.assignee || '',
+          executionDate: result.execution_date,
+          status: result.status as any,
+          assignee: result.assignee,
+          team: result.team, // 비용관리 패턴: 필수 필드 (프론트 손실 방지)
           attachment: false,
           attachmentCount: 0,
           attachments: [],

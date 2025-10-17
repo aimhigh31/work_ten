@@ -46,7 +46,7 @@ export function useSupabaseChangeLog(page: string, recordId?: string | number) {
 
       let query = supabase
         .from('common_log_data')
-        .select('id, page, record_id, action_type, description, before_value, after_value, changed_field, user_name, team, user_department, created_at')
+        .select('id, page, record_id, action_type, title, description, before_value, after_value, changed_field, user_name, team, user_department, created_at')
         .eq('page', page)
         .order('created_at', { ascending: false })
         .limit(100); // 최근 100개만 가져오기

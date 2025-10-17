@@ -31,7 +31,13 @@ import {
   ListItemButton,
   ListItemAvatar,
   LinearProgress,
-  Pagination
+  Pagination,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow
 } from '@mui/material';
 import { TaskTableData, TaskStatus } from '../types/task';
 import { useOptimizedInput } from '../hooks/useDebounce';
@@ -48,8 +54,8 @@ import { FileData } from '../types/files';
 // Icons
 import { TableDocument, Category, Element } from '@wandersonalwes/iconsax-react';
 
-// KPI 데이터 import
-import { taskData as kpiData } from '../data/kpi';
+// KPI 목업 데이터 (fallback용)
+import { taskData as mockKpiData } from '../data/kpi';
 
 // 상태 관리를 위한 reducer
 interface EditTaskState {
@@ -2738,6 +2744,7 @@ const TaskEditDialog = memo(
 
     const [editTab, setEditTab] = useState(0);
     const [draggedItemId, setDraggedItemId] = useState<number | null>(null);
+    const [kpiPage, setKpiPage] = useState(1); // KPI 다이얼로그 페이지네이션
     const [taskState, dispatch] = useReducer(editTaskReducer, {
       workContent: '',
       description: '',
@@ -3091,6 +3098,7 @@ const TaskEditDialog = memo(
     // KPI 다이얼로그 열기
     const handleOpenKpiDialog = useCallback(() => {
       setKpiDialogOpen(true);
+      setKpiPage(1); // 페이지를 1로 리셋
     }, []);
 
     // KPI 다이얼로그 닫기
@@ -3101,13 +3109,14 @@ const TaskEditDialog = memo(
     // KPI 데이터 선택 시 처리
     const handleSelectKpiData = useCallback((kpiData: any) => {
       // KPI 데이터로 폼 필드 채우기
-      dispatch({ type: 'SET_FIELD', field: 'workContent', value: kpiData.workContent || kpiData.title || '' });
+      const workContent = kpiData.work_content || kpiData.workContent || kpiData.title || '';
+      dispatch({ type: 'SET_FIELD', field: 'workContent', value: workContent });
       dispatch({ type: 'SET_FIELD', field: 'description', value: kpiData.description || '' });
       dispatch({ type: 'SET_FIELD', field: 'assignee', value: kpiData.assignee || '' });
       dispatch({ type: 'SET_FIELD', field: 'team', value: kpiData.team || '개발팀' });
       dispatch({ type: 'SET_FIELD', field: 'department', value: kpiData.department || 'IT' });
       dispatch({ type: 'SET_FIELD', field: 'taskType', value: 'KPI' });
-      dispatch({ type: 'SET_FIELD', field: 'loadedKpiTitle', value: kpiData.workContent || kpiData.title || '' });
+      dispatch({ type: 'SET_FIELD', field: 'loadedKpiTitle', value: workContent });
 
       setKpiDialogOpen(false);
     }, []);
@@ -3859,213 +3868,194 @@ const TaskEditDialog = memo(
         </Dialog>
 
         {/* KPI 데이터 선택 다이얼로그 */}
-        <Dialog open={kpiDialogOpen} onClose={handleCloseKpiDialog} maxWidth="lg" fullWidth>
-          <DialogTitle>
+        <Dialog
+          open={kpiDialogOpen}
+          onClose={handleCloseKpiDialog}
+          maxWidth={false}
+          PaperProps={{
+            sx: {
+              width: '900px',
+              height: '600px',
+              maxWidth: '900px',
+              maxHeight: '600px',
+              m: 2
+            }
+          }}
+        >
+          <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             KPI 데이터 불러오기
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              같은 팀의 KPI 계획 항목을 선택하세요
-            </Typography>
+            <Button
+              onClick={handleCloseKpiDialog}
+              variant="outlined"
+              size="small"
+              sx={{
+                minWidth: '60px',
+                fontSize: '12px'
+              }}
+            >
+              취소
+            </Button>
           </DialogTitle>
-          <DialogContent dividers>
+          <DialogContent sx={{ px: 3, py: 2, display: 'flex', flexDirection: 'column', height: 'calc(600px - 64px - 60px)', p: 0 }}>
             {(() => {
-              // 같은 팀명으로 필터링된 KPI 데이터에서 계획탭 형태의 체크리스트 항목 생성
-              const teamKpiData = (kpiData || []).filter((item) => item?.team === taskState.team);
+              // KPI 데이터 선택: props로 받은 데이터가 없으면 목업 데이터 사용
+              const actualKpiData = (kpiData && kpiData.length > 0) ? kpiData : mockKpiData;
+              const isUsingMockData = !kpiData || kpiData.length === 0;
 
-              if (teamKpiData.length === 0) {
+              console.log('🔍 KPI 데이터 소스:', isUsingMockData ? '목업 데이터' : 'Supabase 데이터');
+              console.log('📊 사용할 KPI 데이터 개수:', actualKpiData?.length);
+
+              // 로그인한 사용자의 KPI 데이터만 필터링 (Supabase 데이터인 경우에만)
+              let displayKpiData = actualKpiData;
+
+              if (!isUsingMockData) {
+                const userName = user?.korName || user?.name || '';
+                displayKpiData = actualKpiData.filter((item) => {
+                  const itemAssignee = item?.assignee?.trim();
+                  const currentUser = userName?.trim();
+                  return itemAssignee === currentUser;
+                });
+                console.log('✅ 필터링된 KPI 데이터:', displayKpiData.length);
+              }
+
+              if (displayKpiData.length === 0) {
                 return (
-                  <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
-                    같은 팀의 KPI 항목이 없습니다.
-                  </Typography>
+                  <Box sx={{ p: 3 }}>
+                    <Typography variant="body2" color="text.secondary" align="center">
+                      {isUsingMockData ? 'KPI 데이터가 없습니다.' : '나의 KPI 항목이 없습니다.'}
+                    </Typography>
+                  </Box>
                 );
               }
 
-              // KPI 데이터를 계획탭 체크리스트 형태로 변환
-              const kpiChecklistItems = teamKpiData.flatMap((kpi, kpiIndex) => {
-                // 각 KPI에 대해 메인 항목과 하위 항목들을 생성
-                const mainItem = {
-                  id: kpi.id,
-                  text: kpi.workContent,
-                  checked: false,
-                  level: 0,
-                  expanded: true,
-                  status: kpi.status,
-                  team: kpi.team,
-                  assignee: kpi.assignee,
-                  progress: kpi.progress || 0,
-                  weight: 100, // 최우선 리스트는 기본 비중도 100
-                  priority: 'High' as const,
-                  startDate: kpi.registrationDate,
-                  dueDate: kpi.completedDate,
-                  kpiData: kpi // 원본 KPI 데이터 저장
-                };
+              // 페이지네이션 계산
+              const itemsPerPage = 11;
+              const totalPages = Math.ceil(displayKpiData.length / itemsPerPage);
+              const startIndex = (kpiPage - 1) * itemsPerPage;
+              const endIndex = startIndex + itemsPerPage;
+              const paginatedData = displayKpiData.slice(startIndex, endIndex);
 
-                // 하위 항목들 생성 (예시로 몇 개 생성)
-                const subItems = [
-                  {
-                    id: kpi.id * 1000 + 1,
-                    text: `${kpi.workContent} - 세부계획 1`,
-                    checked: false,
-                    parentId: kpi.id,
-                    level: 1,
-                    expanded: false,
-                    status: '대기',
-                    team: kpi.team,
-                    assignee: kpi.assignee,
-                    progress: 0,
-                    weight: 50,
-                    priority: 'Medium' as const,
-                    startDate: kpi.registrationDate,
-                    dueDate: kpi.completedDate,
-                    kpiData: kpi
-                  },
-                  {
-                    id: kpi.id * 1000 + 2,
-                    text: `${kpi.workContent} - 세부계획 2`,
-                    checked: false,
-                    parentId: kpi.id,
-                    level: 1,
-                    expanded: false,
-                    status: '대기',
-                    team: kpi.team,
-                    assignee: kpi.assignee,
-                    progress: 0,
-                    weight: 50,
-                    priority: 'Medium' as const,
-                    startDate: kpi.registrationDate,
-                    dueDate: kpi.completedDate,
-                    kpiData: kpi
-                  }
-                ];
+              // 테이블 형태로 렌더링
+              return (
+                <>
+                  <Box sx={{ flex: 1, overflow: 'auto', px: 3, pt: 2 }}>
+                    <TableContainer>
+                      <Table size="small">
+                      <TableHead>
+                        <TableRow sx={{ backgroundColor: 'grey.50' }}>
+                          <TableCell padding="checkbox" sx={{ width: 35, fontSize: '12px', fontWeight: 600, px: 0.5 }}>선택</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 60, textAlign: 'center', fontSize: '12px' }}>NO</TableCell>
+                          <TableCell sx={{ fontWeight: 600, minWidth: 200, fontSize: '12px' }}>계획명</TableCell>
+                          <TableCell sx={{ fontWeight: 600, minWidth: 120, fontSize: '12px' }}>영향도</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>팀</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>담당자</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 110, fontSize: '12px' }}>시작일</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 110, fontSize: '12px' }}>완료일</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {paginatedData.map((kpi, index) => {
+                        const workContent = kpi.work_content || kpi.workContent || '';
+                        const impact = (kpi as any).impact || '-';
+                        const team = kpi.team || '-';
+                        const assignee = kpi.assignee || '-';
+                        const startDate = kpi.start_date || kpi.registration_date || kpi.registrationDate || '-';
+                        const completedDate = kpi.completed_date || kpi.completedDate || '-';
 
-                return [mainItem, ...subItems];
-              });
-
-              // 계획탭과 동일한 스타일로 렌더링
-              const renderKpiChecklistItem = (item: any) => {
-                const backgroundColor = item.level === 0 ? '#f8f9fa' : '#ffffff';
-                const paddingLeft = item.level * 24 + 16;
-
-                return (
-                  <Box
-                    key={item.id}
-                    onClick={() => handleSelectKpiData(item.kpiData)}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '12px 16px',
-                      paddingLeft: `${paddingLeft}px`,
-                      backgroundColor,
-                      border: item.level === 0 ? '1px solid #e9ecef' : 'none',
-                      borderRadius: item.level === 0 ? '8px' : '0',
-                      marginBottom: item.level === 0 ? '8px' : '2px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      '&:hover': {
-                        backgroundColor: item.level === 0 ? '#e9ecef' : '#f8f9fa',
-                        transform: 'translateX(4px)'
-                      }
-                    }}
-                  >
-                    {/* 체크박스 */}
-                    <Checkbox checked={item.checked} size="small" sx={{ mr: 2 }} disabled />
-
-                    {/* 텍스트 */}
-                    <Box sx={{ flex: 1, mr: 2 }}>
-                      <Typography
-                        variant={item.level === 0 ? 'subtitle2' : 'body2'}
-                        sx={{
-                          fontWeight: item.level === 0 ? 600 : 400,
-                          color: item.level === 0 ? '#495057' : '#6c757d'
-                        }}
-                      >
-                        {item.text}
-                      </Typography>
-                    </Box>
-
-                    {/* 팀 */}
-                    <Box sx={{ minWidth: '80px', mr: 2 }}>
-                      <Chip label={item.team} size="small" variant="outlined" sx={{ height: '24px', fontSize: '0.7rem' }} />
-                    </Box>
-
-                    {/* 비중도 */}
-                    <Box sx={{ minWidth: '60px', mr: 2, textAlign: 'center' }}>
-                      <Typography variant="caption" color="text.secondary">
-                        {item.weight}%
-                      </Typography>
-                    </Box>
-
-                    {/* 진행율 */}
-                    <Box sx={{ minWidth: '80px', mr: 2 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Box
-                          sx={{
-                            width: '40px',
-                            height: '6px',
-                            backgroundColor: '#e9ecef',
-                            borderRadius: '3px',
-                            overflow: 'hidden'
-                          }}
-                        >
-                          <Box
+                        return (
+                          <TableRow
+                            key={kpi.id}
+                            hover
+                            onClick={() => handleSelectKpiData(kpi)}
                             sx={{
-                              width: `${item.progress}%`,
-                              height: '100%',
-                              backgroundColor: item.progress >= 100 ? '#28a745' : item.progress >= 50 ? '#ffc107' : '#dc3545',
-                              borderRadius: '3px'
+                              cursor: 'pointer',
+                              '&:hover': { backgroundColor: 'action.hover' }
                             }}
-                          />
-                        </Box>
-                        <Typography variant="caption" color="text.secondary" sx={{ minWidth: '35px' }}>
-                          {item.progress}%
-                        </Typography>
-                      </Box>
-                    </Box>
+                          >
+                            <TableCell padding="checkbox" sx={{ width: 35, px: 0.5 }}>
+                              <Checkbox
+                                size="small"
+                                sx={{
+                                  padding: '0px',
+                                  transform: 'scale(0.75)',
+                                  '& .MuiSvgIcon-root': { fontSize: 14 }
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell sx={{ textAlign: 'center' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                                {startIndex + index + 1}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                                {workContent}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.secondary' }}>
+                                {impact}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                                {team}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                                {assignee}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.secondary' }}>
+                                {startDate}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.secondary' }}>
+                                {completedDate}
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
 
-                    {/* 상태 */}
-                    <Box sx={{ minWidth: '60px' }}>
-                      <Chip
-                        label={item.status}
+                  {/* 페이지네이션 - 하단 고정 */}
+                  {totalPages > 1 && (
+                    <Box sx={{
+                      flexShrink: 0,
+                      display: 'flex',
+                      justifyContent: 'center',
+                      p: 2,
+                      borderTop: '1px solid',
+                      borderColor: 'divider',
+                      backgroundColor: 'background.paper'
+                    }}>
+                      <Pagination
+                        count={totalPages}
+                        page={kpiPage}
+                        onChange={(event, value) => setKpiPage(value)}
+                        color="primary"
                         size="small"
-                        color={statusColors[item.status] || 'default'}
-                        sx={{ height: '24px', fontSize: '0.7rem' }}
+                        sx={{
+                          '& .MuiPaginationItem-root': {
+                            fontSize: '12px'
+                          }
+                        }}
                       />
                     </Box>
-                  </Box>
-                );
-              };
-
-              return (
-                <Box sx={{ maxHeight: '400px', overflow: 'auto' }}>
-                  {/* 헤더 */}
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '8px 16px',
-                      backgroundColor: '#f8f9fa',
-                      borderBottom: '1px solid #e9ecef',
-                      fontWeight: 600,
-                      fontSize: '0.875rem',
-                      color: '#495057'
-                    }}
-                  >
-                    <Box sx={{ flex: 1, paddingLeft: '40px' }}>계획명</Box>
-                    <Box sx={{ minWidth: '80px', textAlign: 'center' }}>팀</Box>
-                    <Box sx={{ minWidth: '60px', textAlign: 'center' }}>비중도</Box>
-                    <Box sx={{ minWidth: '80px', textAlign: 'center' }}>진행율</Box>
-                    <Box sx={{ minWidth: '60px', textAlign: 'center' }}>상태</Box>
-                  </Box>
-
-                  {/* 리스트 */}
-                  {kpiChecklistItems.map((item) => renderKpiChecklistItem(item))}
-                </Box>
+                  )}
+                </>
               );
             })()}
           </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseKpiDialog}>취소</Button>
-          </DialogActions>
         </Dialog>
+
       </>
     );
   }

@@ -77,7 +77,7 @@ interface InspectionTableProps {
   selectedAssignee?: string;
   inspections?: InspectionTableData[];
   setInspections?: React.Dispatch<React.SetStateAction<InspectionTableData[]>>;
-  addChangeLog?: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string) => void;
+  addChangeLog?: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string, title?: string) => void;
   onSave?: (inspection: InspectionTableData) => Promise<void>;
   onDelete?: (ids: number[]) => Promise<void>;
   generateInspectionCode?: () => Promise<string>;
@@ -266,7 +266,8 @@ export default function InspectionTable({
               inspection.team || '미분류',
               '',
               '',
-              '-'
+              '-',
+              inspectionTitle
             );
           });
         }
@@ -296,7 +297,8 @@ export default function InspectionTable({
               inspection.team || '미분류',
               '',
               '',
-              '-'
+              '-',
+              inspectionTitle
             );
           });
         }
@@ -346,7 +348,8 @@ export default function InspectionTable({
               updatedInspection.team || '미분류',
               originalInspection.status,
               updatedInspection.status,
-              '상태'
+              '상태',
+              inspectionTitle
             );
           }
 
@@ -359,7 +362,8 @@ export default function InspectionTable({
               updatedInspection.team || '미분류',
               originalInspection.assignee || '미할당',
               updatedInspection.assignee || '미할당',
-              '담당자'
+              '담당자',
+              inspectionTitle
             );
           }
 
@@ -372,7 +376,8 @@ export default function InspectionTable({
               updatedInspection.team || '미분류',
               originalInspection.inspectionContent || '',
               updatedInspection.inspectionContent || '',
-              '점검내용'
+              '점검내용',
+              updatedInspection.inspectionContent
             );
           }
 
@@ -385,7 +390,8 @@ export default function InspectionTable({
               updatedInspection.team || '미분류',
               originalInspection.inspectionType,
               updatedInspection.inspectionType,
-              '점검유형'
+              '점검유형',
+              inspectionTitle
             );
           }
 
@@ -398,7 +404,8 @@ export default function InspectionTable({
               updatedInspection.team || '미분류',
               originalInspection.inspectionTarget,
               updatedInspection.inspectionTarget,
-              '점검대상'
+              '점검대상',
+              inspectionTitle
             );
           }
 
@@ -411,7 +418,8 @@ export default function InspectionTable({
               updatedInspection.team || '미분류',
               originalInspection.inspectionDate || '미정',
               updatedInspection.inspectionDate || '미정',
-              '점검일'
+              '점검일',
+              inspectionTitle
             );
           }
 
@@ -424,7 +432,8 @@ export default function InspectionTable({
               updatedInspection.team || '미분류',
               originalInspection.team || '미분류',
               updatedInspection.team || '미분류',
-              '팀'
+              '팀',
+              inspectionTitle
             );
           }
 
@@ -437,7 +446,8 @@ export default function InspectionTable({
               updatedInspection.team || '미분류',
               originalInspection.details || '',
               updatedInspection.details || '',
-              '세부설명'
+              '세부설명',
+              inspectionTitle
             );
           }
         }
@@ -453,7 +463,8 @@ export default function InspectionTable({
             updatedInspection.team || '미분류',
             '',
             '',
-            '-'
+            '-',
+            inspectionTitle
           );
         }
 
@@ -494,7 +505,8 @@ export default function InspectionTable({
               updatedInspection.team || '미분류',
               originalInspection.status,
               updatedInspection.status,
-              '상태'
+              '상태',
+              inspectionTitle
             );
           }
 
@@ -507,7 +519,8 @@ export default function InspectionTable({
               updatedInspection.team || '미분류',
               originalInspection.assignee || '미할당',
               updatedInspection.assignee || '미할당',
-              '담당자'
+              '담당자',
+              inspectionTitle
             );
           }
 
@@ -520,7 +533,8 @@ export default function InspectionTable({
               updatedInspection.team || '미분류',
               originalInspection.inspectionContent || '',
               updatedInspection.inspectionContent || '',
-              '점검내용'
+              '점검내용',
+              updatedInspection.inspectionContent
             );
           }
 
@@ -533,7 +547,8 @@ export default function InspectionTable({
               updatedInspection.team || '미분류',
               originalInspection.inspectionType,
               updatedInspection.inspectionType,
-              '점검유형'
+              '점검유형',
+              inspectionTitle
             );
           }
 
@@ -546,7 +561,8 @@ export default function InspectionTable({
               updatedInspection.team || '미분류',
               originalInspection.inspectionTarget,
               updatedInspection.inspectionTarget,
-              '점검대상'
+              '점검대상',
+              inspectionTitle
             );
           }
 
@@ -559,7 +575,8 @@ export default function InspectionTable({
               updatedInspection.team || '미분류',
               originalInspection.inspectionDate || '미정',
               updatedInspection.inspectionDate || '미정',
-              '점검일'
+              '점검일',
+              inspectionTitle
             );
           }
 
@@ -572,7 +589,8 @@ export default function InspectionTable({
               updatedInspection.team || '미분류',
               originalInspection.team || '미분류',
               updatedInspection.team || '미분류',
-              '팀'
+              '팀',
+              inspectionTitle
             );
           }
 
@@ -585,7 +603,8 @@ export default function InspectionTable({
               updatedInspection.team || '미분류',
               originalInspection.details || '',
               updatedInspection.details || '',
-              '세부설명'
+              '세부설명',
+              inspectionTitle
             );
           }
         }
@@ -624,7 +643,8 @@ export default function InspectionTable({
             newInspectionWithNumber.team || '미분류',
             '',
             '',
-            '-'
+            '-',
+            inspectionTitle
           );
         }
 

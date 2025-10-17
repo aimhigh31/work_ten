@@ -37,9 +37,10 @@ const AI_ENDPOINT = 'http://localhost:1234/v1/chat/completions';
 export async function sendMessageToAI(messages: AIMessage[]): Promise<string> {
   try {
     const requestBody: AIChatRequest = {
+      model: 'openai/gpt-oss-20b:2',
       messages,
       temperature: 0.7,
-      max_tokens: 1000,
+      max_tokens: -1,
       stream: false
     };
 

@@ -127,7 +127,7 @@ interface KanbanViewProps {
   selectedAssignee: string;
   tasks: SecurityIncidentRecord[];
   setTasks: React.Dispatch<React.SetStateAction<SecurityIncidentRecord[]>>;
-  addChangeLog: (action: string, target: string, description: string, team?: string) => void;
+  addChangeLog: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string, title?: string) => void;
   onCardClick?: (task: SecurityIncidentRecord) => void;
   assigneeList?: any[];
 }
@@ -209,7 +209,7 @@ function KanbanView({
       const mainContent = currentTask.mainContent || '사고내용 없음';
       const description = `${mainContent} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
 
-      addChangeLog('업무 상태 변경', taskCode, description, currentTask.team || '미분류');
+      addChangeLog('업무 상태 변경', taskCode, description, currentTask.team || '미분류', oldStatus, newStatus, '상태', mainContent);
     }
   };
 
@@ -445,41 +445,6 @@ function KanbanView({
               alt={task.assignee || '김철수'}
             />
             <span className="assignee-name">{task.assignee || '김철수'}</span>
-          </div>
-          <div className="card-stats">
-            <span
-              className="stat-item clickable"
-              onClick={(e) => {
-                e.stopPropagation();
-                const currentUser = '현재사용자'; // 실제로는 로그인한 사용자 정보
-                const updatedTasks = tasks.map((t) => {
-                  if (t.id === task.id) {
-                    const likedBy = t.likedBy || [];
-                    const isLiked = likedBy.includes(currentUser);
-                    return {
-                      ...t,
-                      likes: isLiked ? (t.likes || 0) - 1 : (t.likes || 0) + 1,
-                      likedBy: isLiked ? likedBy.filter((u) => u !== currentUser) : [...likedBy, currentUser]
-                    };
-                  }
-                  return t;
-                });
-                setTasks(updatedTasks);
-              }}
-            >
-              <span className={`stat-icon ${task.likedBy?.includes('현재사용자') ? 'liked' : ''}`}>
-                {task.likedBy?.includes('현재사용자') ? '♥' : '♡'}
-              </span>
-              <span className="stat-number">{task.likes || 0}</span>
-            </span>
-            <span className="stat-item">
-              <span className="stat-icon">👁</span>
-              <span className="stat-number">{task.views || 0}</span>
-            </span>
-            <span className="stat-item">
-              <span className="stat-icon">💬</span>
-              <span className="stat-number">{task.comments?.length || 0}</span>
-            </span>
           </div>
         </div>
       </article>
@@ -2195,7 +2160,7 @@ export default function SecurityIncidentManagement() {
         id: log.id,
         dateTime: formattedDateTime,
         code: log.record_id, // record_id가 이미 코드임
-        target: incident?.mainContent || log.record_id,
+        target: log.title || incident?.mainContent || log.record_id, // title 우선 사용
         location: '개요탭', // 변경위치
         action: log.action_type,
         changedField: log.changed_field || '-', // 변경필드
@@ -2259,7 +2224,8 @@ export default function SecurityIncidentManagement() {
       team: string = '시스템',
       beforeValue?: string,
       afterValue?: string,
-      changedField?: string
+      changedField?: string,
+      title?: string
     ) => {
       try {
         const userName = currentUser?.user_name || currentUser?.name || user?.name || '시스템';
@@ -2268,6 +2234,7 @@ export default function SecurityIncidentManagement() {
           page: 'security_incident',
           record_id: target, // 코드를 record_id로 사용
           action_type: action,
+          title: title || null, // 제목 필드 추가
           description: description,
           before_value: beforeValue || null,
           after_value: afterValue || null,
@@ -2332,7 +2299,7 @@ export default function SecurityIncidentManagement() {
       }
 
       if (changes.length > 0) {
-        addChangeLog('업무 수정', updatedTask.code, changes.join(', '), updatedTask.team);
+        addChangeLog('업무 수정', updatedTask.code, changes.join(', '), updatedTask.team, undefined, undefined, undefined, updatedTask.mainContent);
       }
     } else {
       // 새로 생성
@@ -2342,7 +2309,7 @@ export default function SecurityIncidentManagement() {
         console.log('✨ 생성 후 tasks:', newTasks);
         return newTasks;
       });
-      addChangeLog('사고 생성', updatedTask.code, `새로운 보안사고가 생성되었습니다: ${updatedTask.mainContent}`, updatedTask.team);
+      addChangeLog('사고 생성', updatedTask.code, `새로운 보안사고가 생성되었습니다: ${updatedTask.mainContent}`, updatedTask.team, undefined, undefined, undefined, updatedTask.mainContent);
     }
 
     handleEditDialogClose();
@@ -2864,7 +2831,7 @@ export default function SecurityIncidentManagement() {
                     <TableHead>
                       <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
                         <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 110 }}>변경시간</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 150 }}>변경시간</TableCell>
                         <TableCell sx={{ fontWeight: 600, width: 180 }}>제목</TableCell>
                         <TableCell sx={{ fontWeight: 600, width: 140 }}>코드</TableCell>
                         <TableCell sx={{ fontWeight: 600, width: 70 }}>변경분류</TableCell>
@@ -2973,16 +2940,9 @@ export default function SecurityIncidentManagement() {
                             </Typography>
                           </TableCell>
                           <TableCell>
-                            <Chip
-                              label={log.team}
-                              size="small"
-                              sx={{
-                                height: 22,
-                                fontSize: '13px',
-                                backgroundColor: getTeamColor(log.team),
-                                color: '#333333'
-                              }}
-                            />
+                            <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                              {log.team}
+                            </Typography>
                           </TableCell>
                           <TableCell>
                             <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>

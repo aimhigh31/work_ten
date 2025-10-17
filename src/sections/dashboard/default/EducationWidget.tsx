@@ -7,64 +7,48 @@ import ListItemText from '@mui/material/ListItemText';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
+import Pagination from '@mui/material/Pagination';
+import Stack from '@mui/material/Stack';
 import FormControl from '@mui/material/FormControl';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
-import Pagination from '@mui/material/Pagination';
-import Stack from '@mui/material/Stack';
 
 // project-imports
 import MainCard from 'components/MainCard';
 import useUser from 'hooks/useUser';
-import { createClient } from '@/lib/supabase/client';
+import { useSupabaseEducation } from 'hooks/useSupabaseEducation';
 
 // utils
 import dayjs from 'dayjs';
 
-// =========================|| DATA WIDGET - CHANGE LOG ||========================= //
+// =========================|| 개인교육관리 WIDGET ||========================= //
 
-export default function ProjectRelease() {
+export default function EducationWidget() {
   const user = useUser();
-  const [logs, setLogs] = useState<any[]>([]);
+  const { getEducations } = useSupabaseEducation();
+  const [educations, setEducations] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [filter, setFilter] = useState('Total');
   const [page, setPage] = useState(1);
-  const itemsPerPage = 4;
+  const [filter, setFilter] = useState('Total');
+  const itemsPerPage = 5;
 
-  // 변경로그 데이터 로드
+  // 개인교육 데이터 로드
   useEffect(() => {
-    const fetchChangeLogs = async () => {
+    const fetchEducations = async () => {
       setLoading(true);
       try {
-        const supabase = createClient();
-
-        const { data, error } = await supabase
-          .from('common_log_data')
-          .select('id, created_at, page, title, description, action_type, user_name')
-          .order('created_at', { ascending: false })
-          .limit(100);
-
-        if (error) {
-          if (error.code === '57014') {
-            console.warn('⚠️ 변경로그 조회 타임아웃');
-            setLogs([]);
-          } else {
-            console.error('❌ 변경로그 조회 실패:', error);
-            setLogs([]);
-          }
-        } else {
-          setLogs(data || []);
-        }
+        const data = await getEducations();
+        setEducations(data || []);
       } catch (err) {
-        console.error('❌ 변경로그 조회 예외:', err);
-        setLogs([]);
+        console.error('❌ 개인교육 조회 예외:', err);
+        setEducations([]);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchChangeLogs();
-  }, []);
+    fetchEducations();
+  }, [getEducations]);
 
   // 필터 핸들러
   const handleFilterChange = (event: SelectChangeEvent) => {
@@ -77,8 +61,8 @@ export default function ProjectRelease() {
     setPage(value);
   };
 
-  // 로그인한 사용자의 변경로그만 필터링 (전체)
-  const userChangeLogs = useMemo(() => {
+  // 로그인한 사용자의 개인교육만 필터링 (날짜 필터 포함)
+  const userEducations = useMemo(() => {
     const userName = user?.korName || user?.name || '';
     if (!userName) return [];
 
@@ -99,31 +83,50 @@ export default function ProjectRelease() {
       case 'Total':
       default:
         // Total인 경우 날짜 필터링 없이 전체 반환
-        return logs.filter((log) => log.user_name === userName);
+        return educations.filter((edu) => edu.assignee_name === userName);
     }
 
-    return logs.filter((log) => {
+    return educations.filter((edu) => {
       // 사용자 필터
-      if (log.user_name !== userName) return false;
+      if (edu.assignee_name !== userName) return false;
 
       // 날짜 필터
-      const logDate = dayjs(log.created_at);
-      return logDate.isAfter(startDate);
+      if (edu.start_date) {
+        const eduDate = dayjs(edu.start_date);
+        return eduDate.isAfter(startDate);
+      }
+      return true;
     });
-  }, [logs, user, filter]);
+  }, [educations, user, filter]);
 
   // 페이지네이션 적용
-  const paginatedLogs = useMemo(() => {
+  const paginatedEducations = useMemo(() => {
     const startIndex = (page - 1) * itemsPerPage;
-    return userChangeLogs.slice(startIndex, startIndex + itemsPerPage);
-  }, [userChangeLogs, page, itemsPerPage]);
+    return userEducations.slice(startIndex, startIndex + itemsPerPage);
+  }, [userEducations, page]);
 
   // 총 페이지 수
-  const totalPages = Math.ceil(userChangeLogs.length / itemsPerPage);
+  const totalPages = Math.ceil(userEducations.length / itemsPerPage);
+
+  // 상태별 색상
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case '대기':
+        return { backgroundColor: '#FFF4E5', color: '#FF9800' };
+      case '진행':
+        return { backgroundColor: '#E3F2FD', color: '#1976D2' };
+      case '완료':
+        return { backgroundColor: '#E8F5E9', color: '#4CAF50' };
+      case '홀딩':
+        return { backgroundColor: '#FFEBEE', color: '#F44336' };
+      default:
+        return { backgroundColor: '#F5F5F5', color: '#757575' };
+    }
+  };
 
   return (
     <MainCard
-      title="변경로그"
+      title="개인교육관리"
       divider={false}
       secondary={
         <FormControl size="small" sx={{ minWidth: 90 }}>
@@ -175,60 +178,59 @@ export default function ProjectRelease() {
       }}>
         <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
           <List disablePadding sx={{ '& .MuiListItem-root': { px: 0, py: 0.75 } }}>
-        {paginatedLogs.length > 0 ? (
-          paginatedLogs.map((log) => (
-            <ListItem
-              key={log.id}
-              sx={{
-                flexDirection: 'column',
-                alignItems: 'flex-start',
-                borderBottom: 1,
-                borderColor: 'divider',
-                '&:last-child': { borderBottom: 0 }
-              }}
-            >
-              <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 500 }}>
-                    {log.page || '페이지'}
+          {paginatedEducations.length > 0 ? (
+            paginatedEducations.map((edu) => (
+              <ListItem
+                key={edu.id}
+                sx={{
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',
+                  borderBottom: 1,
+                  borderColor: 'divider',
+                  '&:last-child': { borderBottom: 0 }
+                }}
+              >
+                <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 500 }}>
+                      {edu.title || '제목 없음'}
+                    </Typography>
+                    <Chip
+                      label={edu.status}
+                      size="small"
+                      sx={{
+                        ...getStatusColor(edu.status),
+                        fontWeight: 500,
+                        fontSize: '11px',
+                        height: '20px'
+                      }}
+                    />
+                  </Box>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                    {dayjs(edu.start_date).format('YYYY-MM-DD')}
                   </Typography>
-                  <Chip
-                    label={log.action_type}
-                    size="small"
-                    sx={{
-                      backgroundColor: '#E3F2FD',
-                      color: '#1976D2',
-                      fontWeight: 500,
-                      fontSize: '11px',
-                      height: '20px'
-                    }}
-                  />
                 </Box>
-                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  {dayjs(log.created_at).format('YYYY-MM-DD HH:mm')}
-                </Typography>
-              </Box>
+                <ListItemText
+                  primary={
+                    <Typography variant="body2" sx={{ fontWeight: 400, color: 'text.secondary' }}>
+                      {edu.description || edu.education_category || '설명 없음'}
+                    </Typography>
+                  }
+                />
+              </ListItem>
+            ))
+          ) : (
+            <ListItem sx={{ py: 2 }}>
               <ListItemText
                 primary={
-                  <Typography variant="body2" sx={{ fontWeight: 400, color: 'text.secondary' }}>
-                    {log.description}
+                  <Typography variant="body2" color="text.secondary" textAlign="center">
+                    개인교육 데이터가 없습니다
                   </Typography>
                 }
               />
             </ListItem>
-          ))
-        ) : (
-          <ListItem sx={{ py: 2 }}>
-            <ListItemText
-              primary={
-                <Typography variant="body2" color="text.secondary" textAlign="center">
-                  변경로그가 없습니다
-                </Typography>
-              }
-            />
-          </ListItem>
-        )}
-        </List>
+          )}
+          </List>
         </Box>
 
         {/* 페이지네이션 - 하단 고정 */}

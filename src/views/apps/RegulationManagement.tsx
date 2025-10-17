@@ -2757,41 +2757,6 @@ function KanbanView({
             />
             <span className="assignee-name">{task.assignee || '담당자'}</span>
           </div>
-          <div className="card-stats">
-            <span
-              className="stat-item clickable"
-              onClick={(e) => {
-                e.stopPropagation();
-                const currentUser = '현재사용자'; // 실제로는 로그인한 사용자 정보
-                const updatedTasks = tasks.map((t) => {
-                  if (t.id === task.id) {
-                    const likedBy = (t as any).likedBy || [];
-                    const isLiked = likedBy.includes(currentUser);
-                    return {
-                      ...t,
-                      likes: isLiked ? ((t as any).likes || 0) - 1 : ((t as any).likes || 0) + 1,
-                      likedBy: isLiked ? likedBy.filter((u: string) => u !== currentUser) : [...likedBy, currentUser]
-                    };
-                  }
-                  return t;
-                });
-                setTasks(updatedTasks);
-              }}
-            >
-              <span className={`stat-icon ${(task as any).likedBy?.includes('현재사용자') ? 'liked' : ''}`}>
-                {(task as any).likedBy?.includes('현재사용자') ? '♥' : '♡'}
-              </span>
-              <span className="stat-number">{(task as any).likes || 0}</span>
-            </span>
-            <span className="stat-item">
-              <span className="stat-icon">👁</span>
-              <span className="stat-number">{(task as any).views || 0}</span>
-            </span>
-            <span className="stat-item">
-              <span className="stat-icon">💬</span>
-              <span className="stat-number">{(task as any).comments?.length || 0}</span>
-            </span>
-          </div>
         </div>
       </article>
     );

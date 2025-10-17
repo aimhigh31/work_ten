@@ -60,10 +60,11 @@ import { createClient } from '@/lib/supabase/client';
 import { useSession } from 'next-auth/react';
 import useUser from 'hooks/useUser';
 
-// 변경로그 타입 정의 (12필드 - 소프트웨어관리와 동일)
+// 변경로그 타입 정의 (13필드 - title 추가)
 interface ChangeLog {
   id: string;
   dateTime: string;
+  title: string;
   code: string;
   target: string;
   location: string;
@@ -381,16 +382,6 @@ function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssign
               className="assignee-avatar"
             />
             <span className="assignee-name">{task.assignee || '미할당'}</span>
-          </div>
-          <div className="card-stats">
-            <div className="stat-item">
-              <span className="stat-icon">👁️</span>
-              <span className="stat-number">{task.viewCount || 0}</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-icon">💬</span>
-              <span className="stat-number">{task.commentCount || 0}</span>
-            </div>
           </div>
         </div>
       </article>
@@ -2072,6 +2063,7 @@ export default function HardwareManagement() {
         minute: '2-digit',
         hour12: false
       }).replace(/\. /g, '-').replace('.', '').replace(',', '') : '',
+      title: log.title || '',
       code: log.record_id || '',
       target: log.record_id || '',
       location: '개요탭',
@@ -2104,7 +2096,7 @@ export default function HardwareManagement() {
     yearOptions.push(i.toString());
   }
 
-  // 변경로그 추가 함수 (Supabase 기반, 7 파라미터)
+  // 변경로그 추가 함수 (Supabase 기반, 8 파라미터)
   const addChangeLog = async (
     action: string,
     target: string,
@@ -2112,7 +2104,8 @@ export default function HardwareManagement() {
     team: string = '시스템',
     beforeValue?: string,
     afterValue?: string,
-    changedField?: string
+    changedField?: string,
+    title?: string
   ) => {
     try {
       const supabase = createClient();
@@ -2126,6 +2119,7 @@ export default function HardwareManagement() {
         before_value: beforeValue || null,
         after_value: afterValue || null,
         changed_field: changedField || null,
+        title: title || null,
         user_name: userName,
         team: currentUser?.department || '시스템',
         user_department: currentUser?.department,
@@ -2800,7 +2794,7 @@ export default function HardwareManagement() {
                           </TableCell>
                           <TableCell>
                             <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.target}
+                              {log.title}
                             </Typography>
                           </TableCell>
                           <TableCell>

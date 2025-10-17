@@ -55,6 +55,7 @@ const convertTableDataToRecord = (tableData: ITEducationTableData): ITEducationR
     executionDate: tableData.executionDate,
     status: tableData.status,
     assignee: tableData.assignee,
+    team: tableData.team, // 비용관리 패턴: 직접 접근 (필수 필드)
     attachment: Boolean(tableData.attachments?.length),
     attachmentCount: tableData.attachments?.length || 0,
     attachments: tableData.attachments || [],
@@ -75,7 +76,7 @@ const convertRecordToTableData = (record: ITEducationRecord): ITEducationTableDa
     attendeeCount: record.participantCount,
     executionDate: record.executionDate,
     status: record.status,
-    team: (record as any).team || '',
+    team: record.team, // 비용관리 패턴: team은 required field
     assignee: record.assignee,
     department: undefined,
     attachments: record.attachments
@@ -109,7 +110,7 @@ interface ITEducationTableProps {
   selectedAssignee?: string;
   tasks?: ITEducationTableData[];
   setTasks?: React.Dispatch<React.SetStateAction<ITEducationTableData[]>>;
-  addChangeLog?: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string) => void;
+  addChangeLog?: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string, title?: string) => void;
 }
 
 export default function ITEducationTable({
@@ -209,19 +210,19 @@ export default function ITEducationTable({
           const supabaseData = await getItEducationData();
           console.log('🔍 Supabase 원본 데이터 (첫 번째):', supabaseData[0]);
           const convertedData: ITEducationTableData[] = supabaseData.map((item) => ({
-            id: item.id!,
-            no: item.id!,
-            registrationDate: item.registration_date || '',
-            code: item.code || '',
-            educationType: (item.education_type as any) || '온라인',
-            educationName: item.education_name || '',
+            id: item.id,
+            no: item.id,
+            registrationDate: item.registration_date,
+            code: item.code,
+            educationType: item.education_type as any,
+            educationName: item.education_name,
             description: item.description || '',
-            location: item.location || '',
+            location: item.location,
             attendeeCount: item.participant_count || 0,
-            executionDate: item.execution_date || '',
-            status: (item.status as any) || '계획',
-            team: item.team || '',
-            assignee: item.assignee || '',
+            executionDate: item.execution_date,
+            status: item.status as any,
+            team: item.team, // 비용관리 패턴: 직접 접근 (필수 필드)
+            assignee: item.assignee,
             department: undefined,
             attachments: []
           }));
@@ -327,7 +328,7 @@ export default function ITEducationTable({
         // 변경로그 추가
         if (addChangeLog) {
           deletedTasks.forEach((task) => {
-            addChangeLog('교육 삭제', task.code || `IT-EDU-${task.id}`, `${task.educationName || '교육'} 삭제`);
+            addChangeLog('교육 삭제', task.code || `IT-EDU-${task.id}`, `${task.educationName || '교육'} 삭제`, undefined, undefined, undefined, undefined, task.educationName);
           });
         }
 
@@ -386,8 +387,16 @@ export default function ITEducationTable({
           const taskCode = updatedTask.code || `IT-EDU-${updatedTask.id}`;
           const educationName = updatedTask.educationName || 'IT교육';
 
+          // 정규화 함수: 빈 값(null, undefined, '')을 빈 문자열로 통일
+          const normalizeValue = (value: any): string => {
+            if (value === null || value === undefined || value === '') {
+              return '';
+            }
+            return String(value);
+          };
+
           // 교육유형 변경
-          if (originalTask.educationType !== updatedTask.educationType) {
+          if (normalizeValue(originalTask.educationType) !== normalizeValue(updatedTask.educationType)) {
             addChangeLog(
               '수정',
               taskCode,
@@ -395,12 +404,13 @@ export default function ITEducationTable({
               updatedTask.team || '미분류',
               originalTask.educationType,
               updatedTask.educationType,
-              '교육유형'
+              '교육유형',
+              educationName
             );
           }
 
           // 교육명 변경
-          if (originalTask.educationName !== updatedTask.educationName) {
+          if (normalizeValue(originalTask.educationName) !== normalizeValue(updatedTask.educationName)) {
             addChangeLog(
               '수정',
               taskCode,
@@ -408,12 +418,13 @@ export default function ITEducationTable({
               updatedTask.team || '미분류',
               originalTask.educationName || '',
               updatedTask.educationName || '',
-              '교육명'
+              '교육명',
+              updatedTask.educationName
             );
           }
 
           // 장소 변경
-          if (originalTask.location !== updatedTask.location) {
+          if (normalizeValue(originalTask.location) !== normalizeValue(updatedTask.location)) {
             addChangeLog(
               '수정',
               taskCode,
@@ -421,7 +432,8 @@ export default function ITEducationTable({
               updatedTask.team || '미분류',
               originalTask.location || '',
               updatedTask.location || '',
-              '장소'
+              '장소',
+              educationName
             );
           }
 
@@ -434,7 +446,8 @@ export default function ITEducationTable({
               updatedTask.team || '미분류',
               String(originalTask.attendeeCount),
               String(updatedTask.attendeeCount),
-              '참석수'
+              '참석수',
+              educationName
             );
           }
 
@@ -447,12 +460,13 @@ export default function ITEducationTable({
               updatedTask.team || '미분류',
               originalTask.status,
               updatedTask.status,
-              '상태'
+              '상태',
+              educationName
             );
           }
 
           // 담당자 변경
-          if (originalTask.assignee !== updatedTask.assignee) {
+          if (normalizeValue(originalTask.assignee) !== normalizeValue(updatedTask.assignee)) {
             addChangeLog(
               '수정',
               taskCode,
@@ -460,12 +474,13 @@ export default function ITEducationTable({
               updatedTask.team || '미분류',
               originalTask.assignee || '',
               updatedTask.assignee || '',
-              '담당자'
+              '담당자',
+              educationName
             );
           }
 
           // 팀 변경
-          if (originalTask.team !== updatedTask.team) {
+          if (normalizeValue(originalTask.team) !== normalizeValue(updatedTask.team)) {
             addChangeLog(
               '수정',
               taskCode,
@@ -473,12 +488,13 @@ export default function ITEducationTable({
               updatedTask.team || '미분류',
               originalTask.team || '',
               updatedTask.team || '',
-              '팀'
+              '팀',
+              educationName
             );
           }
 
           // 실행일 변경
-          if (originalTask.executionDate !== updatedTask.executionDate) {
+          if (normalizeValue(originalTask.executionDate) !== normalizeValue(updatedTask.executionDate)) {
             addChangeLog(
               '수정',
               taskCode,
@@ -486,12 +502,13 @@ export default function ITEducationTable({
               updatedTask.team || '미분류',
               originalTask.executionDate || '',
               updatedTask.executionDate || '',
-              '실행일'
+              '실행일',
+              educationName
             );
           }
 
           // 교육설명 변경
-          if (originalTask.description !== updatedTask.description) {
+          if (normalizeValue(originalTask.description) !== normalizeValue(updatedTask.description)) {
             addChangeLog(
               '수정',
               taskCode,
@@ -499,7 +516,8 @@ export default function ITEducationTable({
               updatedTask.team || '미분류',
               originalTask.description || '',
               updatedTask.description || '',
-              '교육설명'
+              '교육설명',
+              educationName
             );
           }
         }
@@ -515,19 +533,19 @@ export default function ITEducationTable({
           const supabaseData = await getItEducationData();
           console.log('🔍 Supabase 원본 데이터 (첫 번째):', supabaseData[0]);
           const convertedData: ITEducationTableData[] = supabaseData.map((item) => ({
-            id: item.id!,
-            no: item.id!,
-            registrationDate: item.registration_date || '',
-            code: item.code || '',
-            educationType: (item.education_type as any) || '온라인',
-            educationName: item.education_name || '',
+            id: item.id,
+            no: item.id,
+            registrationDate: item.registration_date,
+            code: item.code,
+            educationType: item.education_type as any,
+            educationName: item.education_name,
             description: item.description || '',
-            location: item.location || '',
+            location: item.location,
             attendeeCount: item.participant_count || 0,
-            executionDate: item.execution_date || '',
-            status: (item.status as any) || '계획',
-            team: item.team || '',
-            assignee: item.assignee || '',
+            executionDate: item.execution_date,
+            status: item.status as any,
+            team: item.team, // 비용관리 패턴: 직접 접근 (필수 필드)
+            assignee: item.assignee,
             department: undefined,
             attachments: []
           }));

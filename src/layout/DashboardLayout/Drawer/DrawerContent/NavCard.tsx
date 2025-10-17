@@ -1,6 +1,5 @@
 // material-ui
 import Button from '@mui/material/Button';
-import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 
@@ -22,7 +21,7 @@ export default function NavCard() {
           </Typography>
         </Stack>
         <AnimateButton>
-          <Button variant="shadow" size="small" component={Link} href="#" target="_blank">
+          <Button variant="shadow" size="small" disabled>
             Manual 바로가기
           </Button>
         </AnimateButton>

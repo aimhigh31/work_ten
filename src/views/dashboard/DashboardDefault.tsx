@@ -1,10 +1,13 @@
 'use client';
 
+import { useState, useEffect, useMemo } from 'react';
+
 // material-ui
 import { useTheme } from '@mui/material/styles';
 import Grid from '@mui/material/Grid2';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import Box from '@mui/material/Box';
 
 // project-imports
 import EcommerceDataCard from 'components/cards/statistics/EcommerceDataCard';
@@ -12,110 +15,315 @@ import { GRID_COMMON_SPACING } from 'config';
 
 import WelcomeBanner from 'sections/dashboard/default/WelcomeBanner';
 import ProjectRelease from 'sections/dashboard/default/ProjectRelease';
-import EcommerceDataChart from 'sections/widget/chart/EcommerceDataChart';
-import TotalIncome from 'sections/widget/chart/TotalIncome';
-import RepeatCustomerRate from 'sections/widget/chart/RepeatCustomerRate';
-import ProjectOverview from 'sections/widget/chart/ProjectOverview';
+import KpiWidget from 'sections/dashboard/default/KpiWidget';
+import EducationWidget from 'sections/dashboard/default/EducationWidget';
 import Transactions from 'sections/widget/data/Transactions';
-import AssignUsers from 'sections/widget/statistics/AssignUsers';
+import DashboardCalendar from 'sections/admin-panel/online-courses/dashboard/DashboardCalendar';
+import ProjectAnalytics from 'sections/widget/chart/ProjectAnalytics';
+
+// hooks
+import useUser from 'hooks/useUser';
+import { useSupabaseTaskManagement } from 'hooks/useSupabaseTaskManagement';
+import { useSupabaseEducation } from 'hooks/useSupabaseEducation';
+import { useSupabaseCalendar } from 'hooks/useSupabaseCalendar';
+import { useSupabaseCost } from 'hooks/useSupabaseCost';
 
 // assets
-import { ArrowUp2, Profile2User, Activity, Monitor, TrendUp } from '@wandersonalwes/iconsax-react';
+import { ArrowUp2, Task, Book, Calendar, DollarCircle } from '@wandersonalwes/iconsax-react';
 
 // ==============================|| DASHBOARD - ADMIN ||============================== //
 
 export default function DashboardDefault() {
   const theme = useTheme();
+  const user = useUser();
+
+  // 업무관리 데이터
+  const { tasks } = useSupabaseTaskManagement();
+
+  // 개인교육관리 데이터
+  const { getEducations } = useSupabaseEducation();
+  const [educations, setEducations] = useState<any[]>([]);
+
+  // 일정관리 데이터
+  const { events } = useSupabaseCalendar();
+
+  // 비용관리 데이터
+  const { getCosts } = useSupabaseCost();
+  const [costs, setCosts] = useState<any[]>([]);
+
+  // 개인교육관리 데이터 로드
+  useEffect(() => {
+    const loadEducations = async () => {
+      const data = await getEducations();
+      setEducations(data);
+    };
+    loadEducations();
+  }, [getEducations]);
+
+  // 비용관리 데이터 로드
+  useEffect(() => {
+    const loadCosts = async () => {
+      const data = await getCosts();
+      setCosts(data);
+    };
+    loadCosts();
+  }, [getCosts]);
+
+  // 사용자 이름으로 필터링된 데이터 계산
+  const dashboardStats = useMemo(() => {
+    console.log('📊 대시보드 통계 계산 시작');
+    console.log('👤 user 객체:', user);
+    console.log('👤 user.korName:', user?.korName);
+    console.log('👤 user.name:', user?.name);
+
+    const userName = user?.korName || user?.name || '';
+
+    console.log('👤 최종 사용자 이름:', userName);
+    console.log('📋 전체 업무 데이터:', tasks.length, '건');
+
+    if (tasks.length > 0) {
+      console.log('📋 업무 데이터 샘플:', tasks.slice(0, 3));
+      console.log('📋 첫번째 업무의 assignee_name:', tasks[0]?.assignee_name);
+    }
+
+    // 업무관리 통계
+    const userTasks = tasks.filter((task) => task.assignee_name === userName);
+    console.log('✅ 필터링된 사용자 업무:', userTasks.length, '건');
+
+    if (userTasks.length > 0) {
+      console.log('📋 사용자 업무 샘플:', userTasks.slice(0, 3));
+    }
+
+    const taskStats = {
+      total: userTasks.length,
+      waiting: userTasks.filter((t) => t.status === '대기').length,
+      progress: userTasks.filter((t) => t.status === '진행').length,
+      completed: userTasks.filter((t) => t.status === '완료').length,
+      holding: userTasks.filter((t) => t.status === '홀딩').length
+    };
+    console.log('📊 업무 통계:', taskStats);
+
+    // 개인교육관리 통계
+    const userEducations = educations.filter((edu) => edu.assignee_name === userName);
+    const educationStats = {
+      total: userEducations.length,
+      waiting: userEducations.filter((e) => e.status === '대기').length,
+      progress: userEducations.filter((e) => e.status === '진행').length,
+      completed: userEducations.filter((e) => e.status === '완료').length,
+      holding: userEducations.filter((e) => e.status === '홀딩').length
+    };
+
+    // 일정관리 통계 (오늘, 이번주, 당월)
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay());
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    const userEvents = events.filter((event) => event.assignee === userName);
+    const calendarStats = {
+      total: userEvents.length,
+      today: userEvents.filter((e) => {
+        const eventDate = new Date(e.start_date);
+        return eventDate >= today && eventDate < new Date(today.getTime() + 24 * 60 * 60 * 1000);
+      }).length,
+      thisWeek: userEvents.filter((e) => {
+        const eventDate = new Date(e.start_date);
+        return eventDate >= startOfWeek && eventDate <= endOfWeek;
+      }).length,
+      thisMonth: userEvents.filter((e) => {
+        const eventDate = new Date(e.start_date);
+        return eventDate >= startOfMonth && eventDate <= endOfMonth;
+      }).length
+    };
+
+    // 비용관리 통계
+    const userCosts = costs.filter((cost) => cost.assignee === userName);
+    const costStats = {
+      total: userCosts.length,
+      waiting: userCosts.filter((c) => c.status === '대기').length,
+      progress: userCosts.filter((c) => c.status === '진행').length,
+      completed: userCosts.filter((c) => c.status === '완료').length,
+      holding: userCosts.filter((c) => c.status === '홀딩').length
+    };
+
+    return {
+      task: taskStats,
+      education: educationStats,
+      calendar: calendarStats,
+      cost: costStats
+    };
+  }, [user, tasks, educations, events, costs]);
 
   return (
-    <Grid container spacing={GRID_COMMON_SPACING}>
+    <Box sx={{ height: '100%', overflow: 'auto', p: 3 }}>
+      <Grid container spacing={GRID_COMMON_SPACING}>
       <Grid size={12}>
         <WelcomeBanner />
       </Grid>
-      {/* row 1 - Admin 통계 카드 */}
+      {/* row 1 - 개인 업무 통계 카드 */}
       <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
         <EcommerceDataCard
-          title="총 사용자"
-          count="1,234"
-          iconPrimary={<Profile2User />}
+          title="업무관리"
+          count={`총 ${dashboardStats.task.total}건`}
+          iconPrimary={<Task />}
           percentage={
-            <Typography color="primary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <ArrowUp2 size={16} style={{ transform: 'rotate(45deg)' }} /> 12.5%
-            </Typography>
+            <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap', fontSize: '0.875rem' }}>
+              <Typography component="span" sx={{ color: 'text.secondary' }}>
+                대기
+              </Typography>
+              <Typography component="span" color="primary" sx={{ fontWeight: 600 }}>
+                {dashboardStats.task.waiting}
+              </Typography>
+              <Typography component="span" sx={{ color: 'text.secondary' }}>
+                진행
+              </Typography>
+              <Typography component="span" color="primary" sx={{ fontWeight: 600 }}>
+                {dashboardStats.task.progress}
+              </Typography>
+              <Typography component="span" sx={{ color: 'text.secondary' }}>
+                완료
+              </Typography>
+              <Typography component="span" color="primary" sx={{ fontWeight: 600 }}>
+                {dashboardStats.task.completed}
+              </Typography>
+              <Typography component="span" sx={{ color: 'text.secondary' }}>
+                홀딩
+              </Typography>
+              <Typography component="span" color="primary" sx={{ fontWeight: 600 }}>
+                {dashboardStats.task.holding}
+              </Typography>
+            </Stack>
           }
-        >
-          <EcommerceDataChart color={theme.palette.primary.main} />
-        </EcommerceDataCard>
+        />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
         <EcommerceDataCard
-          title="일일 방문자"
-          count="856"
+          title="개인교육관리"
+          count={`총 ${dashboardStats.education.total}건`}
           color="warning"
-          iconPrimary={<Activity />}
+          iconPrimary={<Book />}
           percentage={
-            <Typography sx={{ color: 'warning.dark', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <ArrowUp2 size={16} style={{ transform: 'rotate(45deg)' }} /> 8.2%
-            </Typography>
+            <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap', fontSize: '0.875rem' }}>
+              <Typography component="span" sx={{ color: 'text.secondary' }}>
+                대기
+              </Typography>
+              <Typography component="span" sx={{ color: 'warning.dark', fontWeight: 600 }}>
+                {dashboardStats.education.waiting}
+              </Typography>
+              <Typography component="span" sx={{ color: 'text.secondary' }}>
+                진행
+              </Typography>
+              <Typography component="span" sx={{ color: 'warning.dark', fontWeight: 600 }}>
+                {dashboardStats.education.progress}
+              </Typography>
+              <Typography component="span" sx={{ color: 'text.secondary' }}>
+                완료
+              </Typography>
+              <Typography component="span" sx={{ color: 'warning.dark', fontWeight: 600 }}>
+                {dashboardStats.education.completed}
+              </Typography>
+              <Typography component="span" sx={{ color: 'text.secondary' }}>
+                홀딩
+              </Typography>
+              <Typography component="span" sx={{ color: 'warning.dark', fontWeight: 600 }}>
+                {dashboardStats.education.holding}
+              </Typography>
+            </Stack>
           }
-        >
-          <EcommerceDataChart color={theme.palette.warning.dark} />
-        </EcommerceDataCard>
+        />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
         <EcommerceDataCard
-          title="시스템 업타임"
-          count="99.9%"
+          title="일정관리"
+          count={`총 ${dashboardStats.calendar.total}건`}
           color="success"
-          iconPrimary={<Monitor />}
+          iconPrimary={<Calendar />}
           percentage={
-            <Typography sx={{ color: 'success.darker', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <ArrowUp2 size={16} style={{ transform: 'rotate(45deg)' }} /> 0.1%
-            </Typography>
+            <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap', fontSize: '0.875rem' }}>
+              <Typography component="span" sx={{ color: 'text.secondary' }}>
+                오늘
+              </Typography>
+              <Typography component="span" sx={{ color: 'success.darker', fontWeight: 600 }}>
+                {dashboardStats.calendar.today}
+              </Typography>
+              <Typography component="span" sx={{ color: 'text.secondary' }}>
+                이번주
+              </Typography>
+              <Typography component="span" sx={{ color: 'success.darker', fontWeight: 600 }}>
+                {dashboardStats.calendar.thisWeek}
+              </Typography>
+              <Typography component="span" sx={{ color: 'text.secondary' }}>
+                당월
+              </Typography>
+              <Typography component="span" sx={{ color: 'success.darker', fontWeight: 600 }}>
+                {dashboardStats.calendar.thisMonth}
+              </Typography>
+            </Stack>
           }
-        >
-          <EcommerceDataChart color={theme.palette.success.darker} />
-        </EcommerceDataCard>
+        />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
         <EcommerceDataCard
-          title="월간 성장률"
-          count="15.3%"
+          title="비용관리"
+          count={`총 ${dashboardStats.cost.total}건`}
           color="error"
-          iconPrimary={<TrendUp />}
+          iconPrimary={<DollarCircle />}
           percentage={
-            <Typography sx={{ color: 'success.dark', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <ArrowUp2 size={16} style={{ transform: 'rotate(45deg)' }} /> 2.1%
-            </Typography>
+            <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap', fontSize: '0.875rem' }}>
+              <Typography component="span" sx={{ color: 'text.secondary' }}>
+                대기
+              </Typography>
+              <Typography component="span" sx={{ color: 'error.dark', fontWeight: 600 }}>
+                {dashboardStats.cost.waiting}
+              </Typography>
+              <Typography component="span" sx={{ color: 'text.secondary' }}>
+                진행
+              </Typography>
+              <Typography component="span" sx={{ color: 'error.dark', fontWeight: 600 }}>
+                {dashboardStats.cost.progress}
+              </Typography>
+              <Typography component="span" sx={{ color: 'text.secondary' }}>
+                완료
+              </Typography>
+              <Typography component="span" sx={{ color: 'error.dark', fontWeight: 600 }}>
+                {dashboardStats.cost.completed}
+              </Typography>
+              <Typography component="span" sx={{ color: 'text.secondary' }}>
+                홀딩
+              </Typography>
+              <Typography component="span" sx={{ color: 'error.dark', fontWeight: 600 }}>
+                {dashboardStats.cost.holding}
+              </Typography>
+            </Stack>
           }
-        >
-          <EcommerceDataChart color={theme.palette.success.dark} />
-        </EcommerceDataCard>
+        />
       </Grid>
-      {/* row 2 - 차트 및 통계 */}
+      {/* row 2 - 업무관리 & 달력 */}
       <Grid size={{ xs: 12, md: 8, lg: 9 }}>
-        <Grid container spacing={GRID_COMMON_SPACING}>
-          <Grid size={12}>
-            <RepeatCustomerRate />
-          </Grid>
-          <Grid size={12}>
-            <ProjectOverview />
-          </Grid>
-        </Grid>
-      </Grid>
-      <Grid size={{ xs: 12, md: 4, lg: 3 }}>
-        <Stack sx={{ gap: GRID_COMMON_SPACING }}>
-          <ProjectRelease />
-          <AssignUsers />
-        </Stack>
-      </Grid>
-      {/* row 3 - 활동 및 수익 */}
-      <Grid size={{ xs: 12, md: 6 }}>
         <Transactions />
       </Grid>
-      <Grid size={{ xs: 12, md: 6 }}>
-        <TotalIncome />
+      <Grid size={{ xs: 12, md: 4, lg: 3 }}>
+        <DashboardCalendar />
       </Grid>
-    </Grid>
+      {/* row 3 - KPI관리, 개인교육관리, 변경로그 */}
+      <Grid size={{ xs: 12, md: 4 }}>
+        <KpiWidget />
+      </Grid>
+      <Grid size={{ xs: 12, md: 4 }}>
+        <EducationWidget />
+      </Grid>
+      <Grid size={{ xs: 12, md: 4 }}>
+        <ProjectRelease />
+      </Grid>
+      {/* row 4 - Project Analytics */}
+      <Grid size={12}>
+        <ProjectAnalytics />
+      </Grid>
+      </Grid>
+    </Box>
   );
 }

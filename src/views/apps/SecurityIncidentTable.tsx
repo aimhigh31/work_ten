@@ -86,7 +86,7 @@ interface SecurityIncidentTableProps {
   selectedAssignee?: string;
   tasks: SecurityIncidentRecord[];
   setTasks: React.Dispatch<React.SetStateAction<SecurityIncidentRecord[]>>;
-  addChangeLog: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string) => void;
+  addChangeLog: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string, title?: string) => void;
   error?: string | null;
   onDataRefresh?: () => Promise<void>;
 }
@@ -252,7 +252,8 @@ export default function SecurityIncidentTable({
             task.team || '미분류',
             '',
             '',
-            '-'
+            '-',
+            incidentTitle
           );
         });
       }
@@ -335,7 +336,8 @@ export default function SecurityIncidentTable({
                 updatedIncident.team || '미분류',
                 originalIncident.status,
                 updatedIncident.status,
-                '상태'
+                '상태',
+                incidentTitle
               );
             }
 
@@ -348,7 +350,8 @@ export default function SecurityIncidentTable({
                 updatedIncident.team || '미분류',
                 originalIncident.assignee || '미할당',
                 updatedIncident.assignee || '미할당',
-                '담당자'
+                '담당자',
+                incidentTitle
               );
             }
 
@@ -361,7 +364,8 @@ export default function SecurityIncidentTable({
                 updatedIncident.team || '미분류',
                 originalIncident.mainContent || '',
                 updatedIncident.mainContent || '',
-                '사고내용'
+                '사고내용',
+                updatedIncident.mainContent
               );
             }
 
@@ -374,7 +378,8 @@ export default function SecurityIncidentTable({
                 updatedIncident.team || '미분류',
                 originalIncident.completedDate || '미정',
                 updatedIncident.completedDate || '미정',
-                '완료일'
+                '완료일',
+                incidentTitle
               );
             }
 
@@ -387,7 +392,8 @@ export default function SecurityIncidentTable({
                 updatedIncident.team || '미분류',
                 originalIncident.team || '미분류',
                 updatedIncident.team || '미분류',
-                '팀'
+                '팀',
+                incidentTitle
               );
             }
 
@@ -400,7 +406,8 @@ export default function SecurityIncidentTable({
                 updatedIncident.team || '미분류',
                 originalIncident.incidentType,
                 updatedIncident.incidentType,
-                '사고유형'
+                '사고유형',
+                incidentTitle
               );
             }
 
@@ -413,7 +420,8 @@ export default function SecurityIncidentTable({
                 updatedIncident.team || '미분류',
                 originalIncident.responseAction || '',
                 updatedIncident.responseAction || '',
-                '대응조치'
+                '대응조치',
+                incidentTitle
               );
             }
 
@@ -426,7 +434,8 @@ export default function SecurityIncidentTable({
                 updatedIncident.team || '미분류',
                 originalIncident.startDate || '미정',
                 updatedIncident.startDate || '미정',
-                '시작일'
+                '시작일',
+                incidentTitle
               );
             }
           }
@@ -494,7 +503,8 @@ export default function SecurityIncidentTable({
               updatedIncident.team || '미분류',
               '',
               '',
-              '-'
+              '-',
+              incidentTitle
             );
           }
           console.log('✅ 새 보안사고 추가 완료:', newIncident);
