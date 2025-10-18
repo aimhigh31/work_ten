@@ -53,10 +53,9 @@ import { InvestmentTableData, InvestmentStatus, InvestmentData } from 'types/inv
 import { ThemeMode } from 'config';
 
 // hooks
+import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
 import { useSupabaseInvestment } from 'hooks/useSupabaseInvestment';
 import { useSupabaseInvestmentFinance } from 'hooks/useSupabaseInvestmentFinance';
-import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
-import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
 import { ChangeLogData } from 'types/changelog';
@@ -2123,11 +2122,12 @@ export default function InvestmentManagement() {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [value, setValue] = useState(0);
 
+  // 🏪 공용 창고에서 재료 가져오기
+  const { users, departments } = useCommonData();
+
   // Supabase 투자관리 연동
   const { getInvestments, createInvestment, updateInvestment, deleteInvestment, convertToInvestmentData, convertToDbInvestmentData, loading, error } = useSupabaseInvestment();
   const { saveFinanceItems } = useSupabaseInvestmentFinance();
-  const { departments, fetchDepartments } = useSupabaseDepartmentManagement();
-  const { users } = useSupabaseUserManagement();
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
   // Supabase 변경로그 연동
@@ -2136,20 +2136,6 @@ export default function InvestmentManagement() {
   const userName = user?.name || session?.user?.name || '시스템';
   const currentUser = users.find((u) => u.email === session?.user?.email);
   const { logs: changeLogData, fetchChangeLogs } = useSupabaseChangeLog('plan_investment');
-
-  // userName 디버깅
-  React.useEffect(() => {
-    console.log('🔍 userName 디버깅:', {
-      'user?.name': user?.name,
-      'session?.user?.name': session?.user?.name,
-      '최종 userName': userName
-    });
-  }, [user, session, userName]);
-
-  // 부서 데이터 로드
-  React.useEffect(() => {
-    fetchDepartments();
-  }, [fetchDepartments]);
 
   // 마스터코드에서 상태 옵션 가져오기
   const statusTypes = React.useMemo(() => {

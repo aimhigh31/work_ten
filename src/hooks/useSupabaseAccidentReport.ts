@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 // 사고보고 데이터 타입
 export interface AccidentReport {
@@ -50,6 +51,14 @@ export function useSupabaseAccidentReport() {
 
   // 사고보고 조회 (accident_id 기준)
   const fetchReportByAccidentId = useCallback(async (accidentId: number): Promise<AccidentReport | null> => {
+    // 1. 동적 캐시 키 생성
+    const cacheKey = createCacheKey('accident_report', `accident_${accidentId}`);
+    const cachedData = loadFromCache<AccidentReport>(cacheKey, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      console.log('⚡ [AccidentReport] 캐시 데이터 반환');
+      return cachedData;
+    }
+
     try {
       console.log('📋 사고보고 조회 시작:', accidentId);
       setLoading(true);
@@ -69,6 +78,12 @@ export function useSupabaseAccidentReport() {
       }
 
       console.log('✅ 사고보고 조회 성공:', data);
+
+      // 2. 캐시에 저장
+      if (data) {
+        saveToCache(cacheKey, data);
+      }
+
       return data;
     } catch (err) {
       console.error('🔴 예상치 못한 오류:', err);

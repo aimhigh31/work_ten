@@ -95,8 +95,24 @@ export default function TaskTable({
 }: TaskTableProps) {
   const theme = useTheme();
 
-  // Supabase 훅 사용
-  const { tasks: supabaseTasks, loading, error, addTask, updateTask, deleteTask, checkCodeExists } = useSupabaseTaskManagement();
+  // Supabase 훅 사용 (투자관리 방식)
+  const { getTasks, loading, error, addTask, updateTask, deleteTask, checkCodeExists } = useSupabaseTaskManagement();
+
+  // 업무 데이터 상태
+  const [supabaseTasks, setSupabaseTasks] = useState<any[]>([]);
+
+  // 업무 데이터 로드
+  useEffect(() => {
+    const loadTasks = async () => {
+      try {
+        const data = await getTasks();
+        setSupabaseTasks(data);
+      } catch (error) {
+        console.error('TaskTable - 업무 데이터 로드 실패:', error);
+      }
+    };
+    loadTasks();
+  }, [getTasks]);
 
   const [selected, setSelected] = useState<number[]>([]);
   const [page, setPage] = useState(0);

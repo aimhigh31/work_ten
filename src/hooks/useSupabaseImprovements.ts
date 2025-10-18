@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 // 보안사고 개선사항 데이터 타입
 export interface SecurityImprovementItem {
@@ -39,6 +40,16 @@ export function useSupabaseImprovements() {
   const fetchImprovementsByAccidentId = useCallback(async (accidentId: number) => {
     try {
       console.log('🟡 fetchImprovementsByAccidentId 시작, accidentId:', accidentId, '타입:', typeof accidentId);
+
+      // 1. 동적 캐시 키 생성
+      const cacheKey = createCacheKey('improvements', `accident_${accidentId}`);
+      const cachedData = loadFromCache<SecurityImprovementItem[]>(cacheKey, DEFAULT_CACHE_EXPIRY_MS);
+      if (cachedData) {
+        console.log('⚡ [Improvements] 캐시 데이터 반환');
+        setItems(cachedData);
+        return cachedData;
+      }
+
       setLoading(true);
       setError(null);
 
@@ -67,6 +78,10 @@ export function useSupabaseImprovements() {
 
       console.log('🟡 fetchImprovementsByAccidentId 응답:', data, '개수:', data?.length);
       setItems(data || []);
+
+      // 2. 캐시에 저장
+      saveToCache(cacheKey, data || []);
+
       return data || [];
     } catch (error) {
       console.error('🔴 fetchImprovementsByAccidentId catch 오류:', error);

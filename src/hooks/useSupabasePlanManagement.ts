@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import supabase from '../lib/supabaseClient';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 // 계획 항목 타입 (DB 스키마)
 export interface PlanItem {
@@ -45,6 +46,16 @@ export const useSupabasePlanManagement = () => {
 
   // 특정 task의 계획 항목 조회
   const fetchPlanItems = useCallback(async (taskId: string): Promise<PlanItem[]> => {
+    // 캐시 키 동적 생성
+    const cacheKey = createCacheKey('plan_management', taskId);
+
+    // 1. 캐시 확인 (캐시가 있으면 즉시 반환)
+    const cachedData = loadFromCache<PlanItem[]>(cacheKey, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      console.log('⚡ [PlanManagement] 캐시 데이터 반환 (깜빡임 방지)');
+      return cachedData;
+    }
+
     try {
       console.log('🔄 계획 항목 조회 시작:', taskId);
       setLoading(true);
@@ -64,6 +75,10 @@ export const useSupabasePlanManagement = () => {
       }
 
       console.log(`✅ 계획 항목 ${data?.length || 0}개 조회 성공`);
+
+      // 2. 캐시에 저장
+      saveToCache(cacheKey, data || []);
+
       return data || [];
     } catch (err) {
       console.error('❌ 계획 항목 조회 중 오류:', err);
@@ -137,6 +152,11 @@ export const useSupabasePlanManagement = () => {
       }
 
       console.log('✅ 계획 항목 저장 성공');
+
+      // 캐시 무효화 (최신 데이터 보장)
+      const cacheKey = createCacheKey('plan_management', taskId);
+      sessionStorage.removeItem(cacheKey);
+
       return true;
     } catch (err: any) {
       console.error('❌ 계획 항목 저장 중 오류:', err);

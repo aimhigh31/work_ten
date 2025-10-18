@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { ChangeLogData, CreateChangeLogInput } from 'types/changelog';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 /**
  * 변경로그 관리 Hook
@@ -10,6 +11,9 @@ import { ChangeLogData, CreateChangeLogInput } from 'types/changelog';
 export function useSupabaseChangeLog(page: string, recordId?: string | number) {
   // recordId를 명시적으로 string으로 변환
   const normalizedRecordId = recordId != null ? String(recordId) : undefined;
+
+  // 캐시 키 동적 생성 (page와 recordId에 따라 다른 캐시)
+  const CACHE_KEY = createCacheKey('change_log', `${page}_${normalizedRecordId || 'all'}`);
 
   console.log('🔍 useSupabaseChangeLog 초기화:', {
     '원본 recordId': recordId,
@@ -108,6 +112,9 @@ export function useSupabaseChangeLog(page: string, recordId?: string | number) {
       } else {
         console.log(`📊 변경로그 ${data?.length || 0}개 로드 완료`, data);
         setLogs(data || []);
+
+        // 캐시에 저장
+        saveToCache(CACHE_KEY, data || []);
       }
     } catch (err: any) {
       console.error('❌ 변경로그 조회 예외:', err);
@@ -116,13 +123,24 @@ export function useSupabaseChangeLog(page: string, recordId?: string | number) {
     } finally {
       setLoading(false);
     }
-  }, [page, normalizedRecordId]);
+  }, [page, normalizedRecordId, CACHE_KEY]);
 
-  // 초기 로드 및 refreshKey 변경 시 데이터 가져오기
+  // 초기 로드 및 refreshKey 변경 시 데이터 가져오기 (캐시 우선 전략)
   useEffect(() => {
     console.log('🔄 useEffect 실행 - 변경로그 데이터 가져오기');
+
+    // 1. 캐시에서 먼저 로드 (즉시 표시)
+    const cachedLogs = loadFromCache<ChangeLogData[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
+
+    if (cachedLogs) {
+      setLogs(cachedLogs);
+      setLoading(false);
+      console.log('⚡ [ChangeLog] 캐시 데이터 즉시 표시 (깜빡임 방지)');
+    }
+
+    // 2. 백그라운드에서 최신 데이터 가져오기 (항상 실행)
     fetchChangeLogs();
-  }, [fetchChangeLogs, refreshKey]);
+  }, [fetchChangeLogs, refreshKey, CACHE_KEY]);
 
   // 변경로그 추가
   const addChangeLog = async (input: CreateChangeLogInput) => {

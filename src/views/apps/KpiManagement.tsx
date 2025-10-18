@@ -45,8 +45,7 @@ import KpiEditDialog from 'components/KpiEditDialog';
 import { taskStatusColors, assigneeAvatars } from 'data/kpi';
 import { TaskTableData, TaskStatus } from 'types/kpi';
 import { ThemeMode } from 'config';
-import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
-import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
+import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseKpi, KpiData } from 'hooks/useSupabaseKpi';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
@@ -2409,8 +2408,7 @@ export default function KpiManagement() {
   const [value, setValue] = useState(0);
 
   // Supabase 훅 사용
-  const { users } = useSupabaseUserManagement();
-  const { departments, fetchDepartments } = useSupabaseDepartmentManagement();
+  const { users, departments } = useCommonData(); // 🏪 공용 창고에서 가져오기
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
   const { kpis, loading: kpisLoading, addKpi, updateKpi, deleteKpi, deleteKpis, fetchKpis } = useSupabaseKpi();
 
@@ -2420,11 +2418,6 @@ export default function KpiManagement() {
   // 사용자 정보
   const { data: session } = useSession();
   const { user: currentUser } = useUser();
-
-  // 부서 데이터 로드
-  React.useEffect(() => {
-    fetchDepartments();
-  }, [fetchDepartments]);
 
   // 변경로그탭이 활성화될 때 데이터 강제 새로고침
   React.useEffect(() => {

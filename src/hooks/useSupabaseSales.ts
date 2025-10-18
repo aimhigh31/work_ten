@@ -8,6 +8,7 @@ import {
   convertSalesFromDB,
   convertSalesToDB
 } from '../types/sales';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 // Supabase 클라이언트 설정 (RLS 해지 후 ANON_KEY 사용)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -39,8 +40,18 @@ export const useSupabaseSales = (): UseSupabaseSalesReturn => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 캐시 키 (상수로 정의하여 재사용)
+  const CACHE_KEY = createCacheKey('sales', 'data');
+
   // DB에서 모든 매출 데이터 조회 (registration_date 기준 역순정렬)
   const getSales = useCallback(async (): Promise<SalesRecord[]> => {
+    // 1. 캐시 확인 (캐시가 있으면 즉시 반환)
+    const cachedData = loadFromCache<SalesRecord[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      console.log('⚡ [Sales] 캐시 데이터 반환 (깜빡임 방지)');
+      return cachedData;
+    }
+
     try {
       console.log('📞 getSales 호출');
       setLoading(true);
@@ -60,6 +71,10 @@ export const useSupabaseSales = (): UseSupabaseSalesReturn => {
 
       // DB 데이터를 프론트엔드 형식으로 변환
       const salesRecords = (data || []).map((dbData: SalesRecordDB) => convertSalesFromDB(dbData));
+
+      // 2. 캐시에 저장
+      saveToCache(CACHE_KEY, salesRecords);
+
       return salesRecords;
 
     } catch (error) {
@@ -151,6 +166,10 @@ export const useSupabaseSales = (): UseSupabaseSalesReturn => {
       }
 
       console.log('✅ createSales 성공:', data);
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return convertSalesFromDB(data as SalesRecordDB);
 
     } catch (error) {
@@ -213,6 +232,10 @@ export const useSupabaseSales = (): UseSupabaseSalesReturn => {
 
       console.log('✅ 업데이트된 데이터:', data);
       console.log('✅ updateSales 성공');
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return true;
 
     } catch (error) {
@@ -243,6 +266,10 @@ export const useSupabaseSales = (): UseSupabaseSalesReturn => {
       }
 
       console.log('✅ deleteSales 성공');
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return true;
 
     } catch (error) {

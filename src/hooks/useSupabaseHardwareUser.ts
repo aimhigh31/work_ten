@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 // Supabase 클라이언트 설정
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -99,6 +100,16 @@ export const useSupabaseHardwareUser = () => {
       return;
     }
 
+    // 1. 동적 캐시 키 생성
+    const cacheKey = createCacheKey('hardware_user', `hw_${hardwareId}`);
+    const cachedData = loadFromCache<HardwareUserHistory[]>(cacheKey, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      console.log('⚡ [HardwareUser] 캐시 데이터 반환');
+      setUserHistories(cachedData);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -126,6 +137,9 @@ export const useSupabaseHardwareUser = () => {
 
       console.log('✅ Supabase 조회 성공:', data?.length || 0, '개');
       setUserHistories(data || []);
+
+      // 2. 캐시에 저장
+      saveToCache(cacheKey, data || []);
 
     } catch (err: any) {
       console.log('❌ fetchUserHistories 오류:', JSON.stringify(err, null, 2));

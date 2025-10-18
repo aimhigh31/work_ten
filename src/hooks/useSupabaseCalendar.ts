@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+const CACHE_KEY = createCacheKey('calendar', 'events');
 
 export interface CalendarEvent {
   id: number;
@@ -42,8 +45,15 @@ export function useSupabaseCalendar() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 전체 이벤트 조회
-  const fetchEvents = useCallback(async () => {
+  // 전체 이벤트 조회 (Investment 패턴 - 데이터 직접 반환)
+  const getEvents = useCallback(async (): Promise<CalendarEvent[]> => {
+    // 1. 캐시에서 먼저 로드 (즉시 반환)
+    const cachedData = loadFromCache<CalendarEvent[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      console.log('⚡ [Calendar] 캐시 데이터 반환');
+      return cachedData;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -59,7 +69,9 @@ export function useSupabaseCalendar() {
         return [];
       }
 
-      setEvents(data || []);
+      // 2. 캐시에 저장
+      saveToCache(CACHE_KEY, data || []);
+
       return data || [];
     } catch (err: any) {
       console.error('이벤트 조회 예외:', err);
@@ -69,6 +81,13 @@ export function useSupabaseCalendar() {
       setLoading(false);
     }
   }, []);
+
+  // 전체 이벤트 조회 (내부 상태 업데이트용 - 후방 호환성)
+  const fetchEvents = useCallback(async () => {
+    const data = await getEvents();
+    setEvents(data);
+    return data;
+  }, [getEvents]);
 
   // 다음 이벤트 코드 생성
   const generateNextEventCode = useCallback(async () => {
@@ -207,16 +226,15 @@ export function useSupabaseCalendar() {
     }
   }, [fetchEvents]);
 
-  // 초기 로드
-  useEffect(() => {
-    fetchEvents();
-  }, [fetchEvents]);
+  // Investment 패턴: 자동 로딩 제거 (페이지에서 수동 호출)
+  // useEffect 제거로 병렬 로딩 가능
 
   return {
     events,
     loading,
     error,
-    fetchEvents,
+    getEvents, // ⭐ Investment 패턴: 데이터 직접 반환
+    fetchEvents, // 후방 호환성: 내부 상태 업데이트
     createEvent,
     updateEvent,
     deleteEvent

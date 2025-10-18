@@ -71,8 +71,7 @@ import { Folder, DocumentText, Element, Calendar } from '@wandersonalwes/iconsax
 import { useSupabaseSecurityRegulation } from 'hooks/useSupabaseSecurityRegulation';
 import { useSupabaseSecurityRevision } from 'hooks/useSupabaseSecurityRevision';
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
-import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
-import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
+import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
 import useUser from 'hooks/useUser';
 import { useSupabaseFeedback } from 'hooks/useSupabaseFeedback';
 import { PAGE_IDENTIFIERS, FeedbackData } from 'types/feedback';
@@ -1586,7 +1585,7 @@ const OverviewPanel = React.memo(
     // 사용자 정보
     const { data: session } = useSession();
     const user = useUser();
-    const { users } = useSupabaseUserManagement();
+    const { users } = useCommonData(); // 🏪 공용 창고에서 가져오기
 
     // 현재 사용자 찾기
     const currentUser = React.useMemo(() => {
@@ -4823,11 +4822,8 @@ export default function TaskManagement() {
   // 마스터코드 훅 (GROUP007 서브코드 가져오기)
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
-  // 사용자관리 훅 (담당자 목록 가져오기)
-  const { users } = useSupabaseUserManagement();
-
-  // 부서관리 훅 (팀 필터용)
-  const { departments, fetchDepartments } = useSupabaseDepartmentManagement();
+  // 사용자 및 부서 데이터
+  const { users, departments } = useCommonData(); // 🏪 공용 창고에서 가져오기
 
   // 로그인한 사용자 정보
   const user = useUser();
@@ -4838,11 +4834,6 @@ export default function TaskManagement() {
     if (!session?.user?.email || users.length === 0) return null;
     return users.find((u) => u.email === session.user.email);
   }, [session, users]);
-
-  // 컴포넌트 마운트 시 부서 목록 로드
-  React.useEffect(() => {
-    fetchDepartments();
-  }, [fetchDepartments]);
 
   // GROUP007 서브코드 목록 (문서유형용)
   const documentTypes = React.useMemo(() => {

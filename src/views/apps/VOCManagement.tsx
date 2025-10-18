@@ -44,8 +44,7 @@ import VOCDataTable from 'views/apps/VOCDataTable';
 import VOCEditDialog from 'components/VOCEditDialog';
 import { vocData, vocStatusColors, assigneeAvatars, assignees, teams, vocStatusOptions } from 'data/voc';
 import { VOCTableData, VOCStatus } from 'types/voc';
-import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
-import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
+import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
 import { ChangeLogData } from 'types/changelog';
@@ -2298,8 +2297,7 @@ export default function VOCManagement() {
   const userName = user?.name || session?.user?.name || '시스템';
 
   // Supabase 훅 사용 (즉시 렌더링 - loading 상태 제거)
-  const { users } = useSupabaseUserManagement();
-  const { departments, fetchDepartments } = useSupabaseDepartmentManagement();
+  const { users, departments } = useCommonData(); // 🏪 공용 창고에서 가져오기
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
   // 현재 로그인한 사용자 정보
@@ -2307,11 +2305,6 @@ export default function VOCManagement() {
     if (!session?.user?.email || users.length === 0) return null;
     return users.find((u) => u.email === session.user.email);
   }, [session, users]);
-
-  // 부서 데이터 로드 (useEffect는 이미 병렬로 실행됨)
-  React.useEffect(() => {
-    fetchDepartments();
-  }, [fetchDepartments]);
 
   // 마스터코드에서 상태 옵션 가져오기
   const statusTypes = React.useMemo(() => {

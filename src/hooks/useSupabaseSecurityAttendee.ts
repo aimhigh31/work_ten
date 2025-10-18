@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
+
+const CACHE_KEY = createCacheKey('security_attendee', 'data');
 
 export interface SecurityAttendeeItem {
   id: number;
@@ -46,6 +49,7 @@ export const useSupabaseSecurityAttendee = () => {
       }
 
       setData(attendees || []);
+      saveToCache(CACHE_KEY, attendees || []);
     } catch (err) {
       console.error('참석자 데이터 조회 중 오류:', err);
       setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
@@ -259,6 +263,12 @@ export const useSupabaseSecurityAttendee = () => {
   );
 
   useEffect(() => {
+    const cachedData = loadFromCache<SecurityAttendeeItem[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      setData(cachedData);
+      setLoading(false);
+      console.log('⚡ [SecurityAttendee] 캐시 데이터 즉시 표시');
+    }
     fetchData();
   }, [fetchData]);
 

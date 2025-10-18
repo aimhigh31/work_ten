@@ -37,37 +37,57 @@ export default function DashboardDefault() {
   const theme = useTheme();
   const user = useUser();
 
-  // 업무관리 데이터
-  const { tasks } = useSupabaseTaskManagement();
-
-  // 개인교육관리 데이터
+  // ⭐ Investment 패턴: 데이터 로딩 함수만 가져오기
+  const { getTasks } = useSupabaseTaskManagement();
   const { getEducations } = useSupabaseEducation();
-  const [educations, setEducations] = useState<any[]>([]);
-
-  // 일정관리 데이터
-  const { events } = useSupabaseCalendar();
-
-  // 비용관리 데이터
+  const { getEvents } = useSupabaseCalendar();
   const { getCosts } = useSupabaseCost();
+
+  // ⭐ 페이지 레벨 상태 관리
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [educations, setEducations] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
   const [costs, setCosts] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // 개인교육관리 데이터 로드
+  // ⭐ 병렬 로딩: Promise.all로 모든 데이터 동시 로딩
   useEffect(() => {
-    const loadEducations = async () => {
-      const data = await getEducations();
-      setEducations(data);
-    };
-    loadEducations();
-  }, [getEducations]);
+    const loadAllData = async () => {
+      try {
+        console.time('⚡ Dashboard - 병렬 로딩');
+        setIsLoading(true);
 
-  // 비용관리 데이터 로드
-  useEffect(() => {
-    const loadCosts = async () => {
-      const data = await getCosts();
-      setCosts(data);
+        // 🍽️ 4명의 요리사가 동시에 작업 시작!
+        const [tasksData, educationsData, eventsData, costsData] = await Promise.all([
+          getTasks(),       // 요리사 A: 업무 데이터
+          getEducations(),  // 요리사 B: 교육 데이터
+          getEvents(),      // 요리사 C: 일정 데이터
+          getCosts()        // 요리사 D: 비용 데이터
+        ]);
+
+        console.timeEnd('⚡ Dashboard - 병렬 로딩');
+
+        // 상태 업데이트
+        setTasks(tasksData);
+        setEducations(educationsData);
+        setEvents(eventsData);
+        setCosts(costsData);
+
+        console.log('✅ 모든 데이터 로딩 완료', {
+          tasks: tasksData.length,
+          educations: educationsData.length,
+          events: eventsData.length,
+          costs: costsData.length
+        });
+      } catch (error) {
+        console.error('❌ 데이터 로딩 실패:', error);
+      } finally {
+        setIsLoading(false);
+      }
     };
-    loadCosts();
-  }, [getCosts]);
+
+    loadAllData();
+  }, [getTasks, getEducations, getEvents, getCosts]);
 
   // 사용자 이름으로 필터링된 데이터 계산
   const dashboardStats = useMemo(() => {

@@ -1,6 +1,10 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import type { CostRecord } from '../types/cost';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
+
+// 캐시 키
+const CACHE_KEY = createCacheKey('cost', 'data');
 
 // Supabase DB 타입
 export interface DbCostData {
@@ -112,6 +116,13 @@ export function useSupabaseCost() {
 
   // 모든 비용 데이터 조회
   const getCosts = useCallback(async (): Promise<CostRecord[]> => {
+    // 1. 캐시 확인 (캐시가 있으면 즉시 반환)
+    const cachedData = loadFromCache<CostRecord[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      console.log('⚡ [Cost] 캐시 데이터 반환 (깜빡임 방지)');
+      return cachedData;
+    }
+
     try {
       console.log('📞 getCosts 호출');
       setLoading(true);
@@ -129,7 +140,12 @@ export function useSupabaseCost() {
       }
 
       console.log('✅ getCosts 성공:', data?.length || 0, '개');
-      return (data || []).map(convertToFrontendData);
+      const result = (data || []).map(convertToFrontendData);
+
+      // 2. 캐시에 저장
+      saveToCache(CACHE_KEY, result);
+
+      return result;
 
     } catch (err) {
       console.error('❌ getCosts 실패:', err);
@@ -182,6 +198,10 @@ export function useSupabaseCost() {
       }
 
       console.log('✅ createCost 성공:', data);
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return convertToFrontendData(data, true);
 
     } catch (err) {
@@ -224,6 +244,10 @@ export function useSupabaseCost() {
       }
 
       console.log('✅ updateCost 성공:', data);
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return convertToFrontendData(data);
 
     } catch (err) {
@@ -257,6 +281,10 @@ export function useSupabaseCost() {
       }
 
       console.log('✅ deleteCost 성공');
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return true;
 
     } catch (err) {

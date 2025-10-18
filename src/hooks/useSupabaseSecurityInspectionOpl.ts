@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
@@ -26,6 +27,14 @@ export function useSupabaseSecurityInspectionOpl() {
 
   // OPL 항목 조회 (특정 점검 ID)
   const getOplItemsByInspectionId = useCallback(async (inspectionId: number): Promise<OPLItem[]> => {
+    // 1. 동적 캐시 키 생성 (점검 ID별로 별도 캐시)
+    const cacheKey = createCacheKey('security_opl', `inspection_${inspectionId}`);
+    const cachedData = loadFromCache<OPLItem[]>(cacheKey, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      console.log('⚡ [SecurityOpl] 캐시 데이터 반환 (깜빡임 방지)');
+      return cachedData;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -40,6 +49,9 @@ export function useSupabaseSecurityInspectionOpl() {
         console.error('OPL 항목 조회 실패:', error);
         throw error;
       }
+
+      // 2. 캐시에 저장
+      saveToCache(cacheKey, data || []);
 
       return data || [];
     } catch (err) {

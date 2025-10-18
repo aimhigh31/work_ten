@@ -1,5 +1,9 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
+
+// 캐시 키
+const CACHE_KEY = createCacheKey('security_inspection', 'data');
 
 // 보안점검 데이터 타입
 export interface SecurityInspectionData {
@@ -34,6 +38,13 @@ export function useSupabaseSecurityInspection() {
 
   // 모든 보안점검 데이터 조회
   const fetchAllInspections = useCallback(async (): Promise<SecurityInspectionData[]> => {
+    // 1. 캐시 확인 (캐시가 있으면 즉시 반환)
+    const cachedData = loadFromCache<SecurityInspectionData[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      console.log('⚡ [SecurityInspection] 캐시 데이터 반환 (깜빡임 방지)');
+      return cachedData;
+    }
+
     try {
       console.log('📋 보안점검 데이터 조회 시작');
       setLoading(true);
@@ -52,6 +63,10 @@ export function useSupabaseSecurityInspection() {
       }
 
       console.log('✅ 보안점검 데이터 조회 성공:', data);
+
+      // 2. 캐시에 저장
+      saveToCache(CACHE_KEY, data || []);
+
       return data || [];
     } catch (err) {
       console.error('🔴 예상치 못한 오류:', err);
@@ -138,6 +153,10 @@ export function useSupabaseSecurityInspection() {
         }
 
         console.log('✅ 보안점검 데이터 생성 성공:', data);
+
+        // 캐시 무효화 (최신 데이터 보장)
+        sessionStorage.removeItem(CACHE_KEY);
+
         return data;
       } catch (err: any) {
         console.error('🔴 보안점검 데이터 생성 실패 (catch) - Full Object:', err);
@@ -180,6 +199,10 @@ export function useSupabaseSecurityInspection() {
         }
 
         console.log('✅ 보안점검 데이터 수정 성공:', data);
+
+        // 캐시 무효화 (최신 데이터 보장)
+        sessionStorage.removeItem(CACHE_KEY);
+
         return data;
       } catch (err: any) {
         console.error('🔴 보안점검 데이터 수정 실패:', err);
@@ -215,6 +238,10 @@ export function useSupabaseSecurityInspection() {
       }
 
       console.log('✅ 보안점검 데이터 삭제 성공 (is_active = false)');
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return true;
     } catch (err: any) {
       console.error('🔴 보안점검 데이터 삭제 실패:', err);

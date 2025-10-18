@@ -51,8 +51,7 @@ import { ThemeMode } from 'config';
 
 // Supabase hook
 import { useSupabaseSoftware, SoftwareData } from 'hooks/useSupabaseSoftware';
-import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
-import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
+import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
 import { ChangeLogData } from 'types/changelog';
@@ -2270,11 +2269,14 @@ export default function SoftwareManagement() {
   const theme = useTheme();
   const [value, setValue] = useState(0);
 
-  // Supabase 훅 사용
-  const { software, loading, error, fetchSoftware, createSoftware, updateSoftware, deleteSoftware, deleteMultipleSoftware } = useSupabaseSoftware();
-  const { users } = useSupabaseUserManagement();
-  const { departments, fetchDepartments } = useSupabaseDepartmentManagement();
+  // ⭐ Investment 패턴: 데이터 로딩 함수만 가져오기
+  const { getSoftware, createSoftware, updateSoftware, deleteSoftware, deleteMultipleSoftware, loading: softwareLoading, error } = useSupabaseSoftware();
+  const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 모두 가져오기
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
+
+  // ⭐ 페이지 레벨 상태 관리
+  const [software, setSoftware] = useState<SoftwareData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // 변경로그 Supabase 훅
   const { logs: dbChangeLogs, loading: changeLogsLoading, fetchChangeLogs } = useSupabaseChangeLog('it_software');
@@ -2288,10 +2290,36 @@ export default function SoftwareManagement() {
   }, [session, users]);
   const userName = currentUser?.user_name || currentUser?.name || user?.name || session?.user?.name || '시스템';
 
-  // 부서 데이터 로드
+  // ⭐ 병렬 로딩: Promise.all로 모든 데이터 동시 로딩
   React.useEffect(() => {
-    fetchDepartments();
-  }, [fetchDepartments]);
+    const loadAllData = async () => {
+      try {
+        console.time('⚡ SoftwareManagement - 페이지 데이터 로딩');
+        setIsLoading(true);
+
+        // ⚡ software만 로딩! (users, departments, masterCodes는 CommonData에 이미 있음)
+        const softwareData = await getSoftware();
+
+        console.timeEnd('⚡ SoftwareManagement - 페이지 데이터 로딩');
+
+        // 상태 업데이트
+        setSoftware(softwareData);
+
+        console.log('✅ SoftwareManagement 로딩 완료', {
+          users: users.length,
+          departments: departments.length,
+          masterCodes: masterCodes.length,
+          software: softwareData.length
+        });
+      } catch (error) {
+        console.error('❌ 데이터 로딩 실패:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadAllData();
+  }, [getSoftware]); // ⚡ software만 로딩 (나머지는 CommonData 사용)
 
   // 마스터코드에서 상태 옵션 가져오기
   const statusTypes = React.useMemo(() => {
@@ -2394,12 +2422,12 @@ export default function SoftwareManagement() {
   useEffect(() => {
     console.log('🔍 Supabase 소프트웨어 데이터 상태:', {
       length: software.length,
-      loading,
+      loading: softwareLoading,
       error,
       sampleData: software.slice(0, 2)
     });
 
-    if (!loading) {
+    if (!softwareLoading) {
       const convertedTasks = software.map(convertSoftwareToTask);
       setTasks(convertedTasks);
       console.log('🔄 Supabase 소프트웨어 데이터를 TaskTableData로 변환 완료:', convertedTasks.length + '개');
@@ -2408,7 +2436,7 @@ export default function SoftwareManagement() {
         console.log('📝 변환된 첫 번째 태스크 샘플:', convertedTasks[0]);
       }
     }
-  }, [software, loading]);
+  }, [software, softwareLoading]);
 
   // 변경로그 데이터 변환 (Supabase → UI)
   const changeLogs = React.useMemo(() => {

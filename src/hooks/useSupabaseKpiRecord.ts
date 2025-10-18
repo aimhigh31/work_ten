@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -34,6 +35,15 @@ export const useSupabaseKpiRecord = (kpiId?: number) => {
       return;
     }
 
+    // 1. 동적 캐시 키 생성
+    const cacheKey = createCacheKey('kpi_record', `kpi_${fetchKpiId}`);
+    const cachedData = loadFromCache<KpiRecordData[]>(cacheKey, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      console.log('⚡ [KpiRecord] 캐시 데이터 반환');
+      setRecords(cachedData);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -49,6 +59,10 @@ export const useSupabaseKpiRecord = (kpiId?: number) => {
       }
 
       setRecords(data || []);
+
+      // 2. 캐시에 저장
+      saveToCache(cacheKey, data || []);
+
     } catch (err: any) {
       console.error('KPI Record 조회 오류:', err);
       setError(err.message);

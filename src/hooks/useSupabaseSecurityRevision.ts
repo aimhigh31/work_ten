@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 // 리비전 데이터 타입
 export interface SecurityRevisionItem {
@@ -38,6 +39,15 @@ export function useSupabaseSecurityRevision() {
 
   // 특정 파일의 리비전 목록 조회
   const fetchRevisions = useCallback(async (regulationId: number) => {
+    // 1. 동적 캐시 키 생성 (규정 ID별로 별도 캐시)
+    const cacheKey = createCacheKey('security_revision', `reg_${regulationId}`);
+    const cachedData = loadFromCache<SecurityRevisionItem[]>(cacheKey, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      console.log('⚡ [SecurityRevision] 캐시 데이터 반환 (깜빡임 방지)');
+      setRevisions(cachedData);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -50,6 +60,8 @@ export function useSupabaseSecurityRevision() {
 
       if (result.success) {
         setRevisions(result.data || []);
+        // 2. 캐시에 저장
+        saveToCache(cacheKey, result.data || []);
       } else {
         setError(result.error || '데이터 조회에 실패했습니다.');
       }

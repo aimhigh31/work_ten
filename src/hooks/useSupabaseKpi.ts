@@ -1,10 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// 캐시 키
+const CACHE_KEY = createCacheKey('kpi', 'data');
 
 export interface KpiData {
   id: number;
@@ -54,6 +58,9 @@ export const useSupabaseKpi = () => {
       }
 
       setKpis(data || []);
+
+      // 캐시에 저장
+      saveToCache(CACHE_KEY, data || []);
     } catch (err: any) {
       console.error('KPI 조회 오류:', err);
       setError(err.message);
@@ -170,8 +177,18 @@ export const useSupabaseKpi = () => {
     []
   );
 
-  // 초기 데이터 로드
+  // 초기 데이터 로드 (캐시 우선 전략)
   useEffect(() => {
+    // 1. 캐시에서 먼저 로드 (즉시 표시)
+    const cachedKpis = loadFromCache<KpiData[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
+
+    if (cachedKpis) {
+      setKpis(cachedKpis);
+      setLoading(false);
+      console.log('⚡ [KPI] 캐시 데이터 즉시 표시 (깜빡임 방지)');
+    }
+
+    // 2. 백그라운드에서 최신 데이터 가져오기 (항상 실행)
     fetchKpis();
   }, [fetchKpis]);
 

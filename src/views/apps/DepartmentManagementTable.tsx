@@ -39,6 +39,7 @@ import DepartmentEditDialog from 'components/DepartmentEditDialog';
 
 // Hooks
 import { useSupabaseDepartmentManagement, Department } from 'hooks/useSupabaseDepartmentManagement';
+import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
 
 // 부서 데이터 타입 정의 (기존 호환성 유지)
 interface DepartmentData {
@@ -163,9 +164,11 @@ export default function DepartmentManagementTable({
 }: DepartmentManagementTableProps) {
   const theme = useTheme();
 
-  // Supabase 훅 사용
+  // 🏪 공용 창고에서 데이터 가져오기 (중복 로딩 방지!)
+  const { departments: supabaseDepartments } = useCommonData();
+
+  // Supabase 훅 사용 (데이터 수정 함수만)
   const {
-    departments: supabaseDepartments,
     loading,
     error,
     clearError,

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import supabaseClient from '../lib/supabaseClient';
 import { Admin_Systemsetting_Menu, MenuData, MenuInsert, MenuUpdate, MenuFilters, MenuResponse } from 'types/menu-management';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 // 메뉴 아이템 import (폴백용)
 import menuItems from 'menu-items';
@@ -58,6 +59,9 @@ const initializeSupabase = () => {
 };
 
 const { client: supabase, configured: isSupabaseConfigured } = initializeSupabase();
+
+// 캐시 키
+const CACHE_KEY = createCacheKey('menu_management', 'data');
 
 export function useSupabaseMenuManagement() {
   const [menus, setMenus] = useState<MenuData[]>([]);
@@ -313,11 +317,13 @@ export function useSupabaseMenuManagement() {
         const transformedMenus = data.map(transformDbToFrontend);
         setMenus(transformedMenus);
         saveToLocalStorage(transformedMenus);
+        saveToCache(CACHE_KEY, transformedMenus); // 캐시에 저장
       } else {
         console.log('⚠️ DB에 데이터가 없어 기본 데이터 생성');
         const defaultMenus = createDefaultMenus();
         setMenus(defaultMenus);
         saveToLocalStorage(defaultMenus);
+        saveToCache(CACHE_KEY, defaultMenus); // 캐시에 저장
       }
     } catch (err: any) {
       // 상세한 오류 분석 및 처리
@@ -580,8 +586,17 @@ export function useSupabaseMenuManagement() {
     }
   };
 
-  // 초기 데이터 로드
+  // 초기 데이터 로드 (캐시 우선 전략)
   useEffect(() => {
+    // 1. 캐시에서 먼저 로드 (즉시 표시)
+    const cachedData = loadFromCache<MenuData[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      setMenus(cachedData);
+      setLoading(false);
+      console.log('⚡ [MenuManagement] 캐시 데이터 즉시 표시 (깜빡임 방지)');
+    }
+
+    // 2. 백그라운드에서 최신 데이터 가져오기 (항상 실행)
     fetchMenus();
   }, []);
 

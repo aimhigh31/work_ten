@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 console.log('Supabase 환경변수 확인:', {
   url: process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -10,6 +11,9 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
+
+// 캐시 키
+const CACHE_KEY = createCacheKey('it_education', 'data');
 
 // IT교육 데이터 타입 정의 (비용관리 패턴: 핵심 필드는 required)
 export interface ItEducationData {
@@ -41,6 +45,13 @@ export function useSupabaseItEducation() {
 
   // IT교육 데이터 조회
   const getItEducationData = useCallback(async (): Promise<ItEducationData[]> => {
+    // 1. 캐시 확인 (캐시가 있으면 즉시 반환)
+    const cachedData = loadFromCache<ItEducationData[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      console.log('⚡ [ItEducation] 캐시 데이터 반환 (깜빡임 방지)');
+      return cachedData;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -61,6 +72,9 @@ export function useSupabaseItEducation() {
         });
         throw error;
       }
+
+      // 2. 캐시에 저장
+      saveToCache(CACHE_KEY, data || []);
 
       return data || [];
     } catch (err) {
@@ -152,6 +166,10 @@ export function useSupabaseItEducation() {
       }
 
       console.log('✅ IT교육 데이터 추가 성공:', data);
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return data;
     } catch (err) {
       console.error('❌ IT교육 데이터 추가 오류 (catch):', {
@@ -198,6 +216,10 @@ export function useSupabaseItEducation() {
       }
 
       console.log('✅ IT교육 데이터 업데이트 성공:', data);
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return data;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'IT교육 데이터 수정 중 오류가 발생했습니다.';
@@ -249,6 +271,10 @@ export function useSupabaseItEducation() {
       }
 
       console.log('✅ 삭제 성공:', updateResult);
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return true;
 
     } catch (err) {

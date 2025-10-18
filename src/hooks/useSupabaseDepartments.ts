@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
+
+// 캐시 키
+const CACHE_KEY = createCacheKey('departments', 'data');
 
 // 부서 데이터 타입 (기본 정보만)
 export interface SimpleDepartment {
@@ -36,6 +40,7 @@ export function useSupabaseDepartments() {
 
       console.log('🏢 부서 목록 조회 성공:', data);
       setDepartments(data || []);
+      saveToCache(CACHE_KEY, data || []); // 캐시에 저장
     } catch (err) {
       console.error('🔴 부서 목록 조회 실패:', err);
       setError(err instanceof Error ? err.message : '부서 목록을 불러오는데 실패했습니다.');
@@ -69,8 +74,17 @@ export function useSupabaseDepartments() {
     }
   }, []);
 
-  // 컴포넌트 마운트 시 데이터 로드
+  // 컴포넌트 마운트 시 데이터 로드 (캐시 우선 전략)
   useEffect(() => {
+    // 1. 캐시에서 먼저 로드 (즉시 표시)
+    const cachedData = loadFromCache<SimpleDepartment[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      setDepartments(cachedData);
+      setLoading(false);
+      console.log('⚡ [Departments] 캐시 데이터 즉시 표시 (깜빡임 방지)');
+    }
+
+    // 2. 백그라운드에서 최신 데이터 가져오기 (항상 실행)
     fetchDepartments();
   }, [fetchDepartments]);
 

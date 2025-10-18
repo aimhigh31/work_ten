@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { ChecklistEditorItem } from '../types/checklist';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 // DB 데이터 타입
 export interface ChecksheetData {
@@ -83,6 +84,15 @@ export function useSupabaseSecurityInspectionChecksheet() {
 
   // 체크시트 항목 조회
   const fetchChecksheetItems = useCallback(async (inspectionId: number): Promise<ChecklistEditorItem[]> => {
+    // 1. 동적 캐시 키 생성 (점검 ID별로 별도 캐시)
+    const cacheKey = createCacheKey('security_checksheet', `inspection_${inspectionId}`);
+    const cachedData = loadFromCache<ChecklistEditorItem[]>(cacheKey, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      console.log('⚡ [SecurityChecksheet] 캐시 데이터 반환 (깜빡임 방지)');
+      setChecksheetItems(cachedData);
+      return cachedData;
+    }
+
     try {
       console.log('🔄 체크시트 항목 조회 시작...', { inspectionId });
       setLoading(true);
@@ -101,6 +111,8 @@ export function useSupabaseSecurityInspectionChecksheet() {
         const items = result.data.map((data: ChecksheetData) => convertToChecklistEditorItem(data));
         console.log('✅ 변환된 체크시트 항목:', items.length, '개');
         setChecksheetItems(items);
+        // 2. 캐시에 저장
+        saveToCache(cacheKey, items);
         return items;
       } else {
         console.error('❌ 체크시트 API 오류:', result.error);

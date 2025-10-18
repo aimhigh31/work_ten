@@ -44,8 +44,7 @@ import EducationDataTable from 'views/apps/EducationDataTable';
 import EducationEditDialog from 'components/EducationEditDialog';
 import { educationData, educationStatusColors, assigneeAvatars, assignees, teams, educationStatusOptions } from 'data/education';
 import { EducationTableData, EducationStatus } from 'types/education';
-import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
-import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
+import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
 import { useSupabaseEducation } from 'hooks/useSupabaseEducation';
@@ -2348,8 +2347,7 @@ export default function EducationManagement() {
   const userName = user?.name || session?.user?.name || '시스템';
 
   // Supabase 훅 사용 (즉시 렌더링 - loading 상태 제거)
-  const { users } = useSupabaseUserManagement();
-  const { departments, fetchDepartments } = useSupabaseDepartmentManagement();
+  const { users, departments } = useCommonData(); // 🏪 공용 창고에서 가져오기
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
   // 현재 로그인한 사용자 정보
@@ -2371,11 +2369,6 @@ export default function EducationManagement() {
 
   // 공유 Educations 상태
   const [educations, setEducations] = useState<EducationTableData[]>([]);
-
-  // 부서 데이터 로드 (useEffect는 이미 병렬로 실행됨)
-  React.useEffect(() => {
-    fetchDepartments();
-  }, [fetchDepartments]);
 
   // DB에서 교육 데이터 로드
   React.useEffect(() => {

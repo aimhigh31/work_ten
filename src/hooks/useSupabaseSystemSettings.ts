@@ -5,6 +5,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { systemSettingsService } from 'services/supabase/system-settings.service';
 import { SystemSettings, MenuSetting, SystemSettingUpdate, MenuStatusUpdate, LogoUploadResult } from 'types/system-settings';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
+
+// 캐시 키
+const CACHE_KEY = createCacheKey('system_settings', 'data');
 
 // 훅의 반환 타입 정의
 export interface UseSupabaseSystemSettingsReturn {
@@ -75,6 +79,11 @@ export function useSupabaseSystemSettings(): UseSupabaseSystemSettingsReturn {
       const settings = await systemSettingsService.getFormattedSystemSettings();
 
       setSystemSettings(settings);
+
+      // 캐시 업데이트 (기존 메뉴 설정과 함께 저장)
+      const cachedData = loadFromCache<any>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS) || {};
+      saveToCache(CACHE_KEY, { ...cachedData, systemSettings: settings });
+
       console.log('✅ System settings refreshed successfully');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '시스템 설정을 불러오는 중 오류가 발생했습니다.';
@@ -222,6 +231,10 @@ export function useSupabaseSystemSettings(): UseSupabaseSystemSettingsReturn {
       setMenuSettings(settings);
       setMenuStatusMap(statusMap);
 
+      // 캐시 업데이트 (기존 시스템 설정과 함께 저장)
+      const cachedData = loadFromCache<any>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS) || {};
+      saveToCache(CACHE_KEY, { ...cachedData, menuSettings: settings, menuStatusMap: statusMap });
+
       console.log('✅ Menu settings refreshed successfully:', settings.length, 'items');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '메뉴 설정을 불러오는 중 오류가 발생했습니다.';
@@ -318,6 +331,22 @@ export function useSupabaseSystemSettings(): UseSupabaseSystemSettingsReturn {
   // ========================================
 
   useEffect(() => {
+    // 1. 캐시에서 먼저 로드 (즉시 표시)
+    const cachedData = loadFromCache<{
+      systemSettings?: SystemSettings;
+      menuSettings?: MenuSetting[];
+      menuStatusMap?: Record<string, boolean>;
+    }>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
+
+    if (cachedData) {
+      if (cachedData.systemSettings) setSystemSettings(cachedData.systemSettings);
+      if (cachedData.menuSettings) setMenuSettings(cachedData.menuSettings);
+      if (cachedData.menuStatusMap) setMenuStatusMap(cachedData.menuStatusMap);
+      setLoading(false);
+      console.log('⚡ [SystemSettings] 캐시 데이터 즉시 표시 (깜빡임 방지)');
+    }
+
+    // 2. 백그라운드에서 최신 데이터 가져오기 (항상 실행)
     refreshAll();
   }, [refreshAll]);
 

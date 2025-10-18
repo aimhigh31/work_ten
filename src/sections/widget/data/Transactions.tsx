@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, MouseEvent, ReactNode, SyntheticEvent, useMemo } from 'react';
+import { useState, useEffect, MouseEvent, ReactNode, SyntheticEvent, useMemo } from 'react';
 
 // material-ui
 import Button from '@mui/material/Button';
@@ -59,7 +59,17 @@ function a11yProps(index: number) {
 export default function Transactions() {
   const [value, setValue] = useState(0);
   const user = useUser();
-  const { tasks } = useSupabaseTaskManagement();
+  const { getTasks } = useSupabaseTaskManagement();
+  const [tasks, setTasks] = useState<any[]>([]);
+
+  // 업무 데이터 로드
+  useEffect(() => {
+    const loadTasks = async () => {
+      const data = await getTasks();
+      setTasks(data);
+    };
+    loadTasks();
+  }, [getTasks]);
 
   const handleChange = (event: SyntheticEvent, newValue: number) => {
     setValue(newValue);

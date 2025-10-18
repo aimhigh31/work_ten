@@ -1,4 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
+
+// 캐시 키
+const CACHE_KEY = createCacheKey('security_regulation', 'tree');
 
 // 보안규정 데이터 타입
 export interface SecurityRegulationItem {
@@ -100,6 +104,7 @@ export function useSupabaseSecurityRegulation() {
         const tree = buildTree(allItems);
         console.log('🌳 fetchTree: 트리 구조로 변환 완료:', tree);
         setItems(tree);
+        saveToCache(CACHE_KEY, tree); // 캐시에 저장
       } else {
         console.error('❌ fetchTree: API 실패:', result.error);
         setError(result.error || '데이터 조회에 실패했습니다.');
@@ -288,9 +293,19 @@ export function useSupabaseSecurityRegulation() {
     [items]
   );
 
-  // 컴포넌트 마운트 시 데이터 로드
+  // 컴포넌트 마운트 시 데이터 로드 (캐시 우선 전략)
   useEffect(() => {
     console.log('🚀 useSupabaseSecurityRegulation: 마운트 시 데이터 로드 시작');
+
+    // 1. 캐시에서 먼저 로드 (즉시 표시)
+    const cachedData = loadFromCache<SecurityRegulationItem[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      setItems(cachedData);
+      setLoading(false);
+      console.log('⚡ [SecurityRegulation] 캐시 데이터 즉시 표시 (깜빡임 방지)');
+    }
+
+    // 2. 백그라운드에서 최신 데이터 가져오기 (항상 실행)
     fetchTree();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

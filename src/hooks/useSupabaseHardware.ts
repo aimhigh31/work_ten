@@ -1,10 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// 캐시 키
+const CACHE_KEY = createCacheKey('hardware', 'data');
 
 export interface HardwareData {
   id?: number;
@@ -40,16 +44,23 @@ export interface HardwareData {
 }
 
 export const useSupabaseHardware = () => {
-  const [hardware, setHardware] = useState<HardwareData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 하드웨어 목록 조회
-  const fetchHardware = async () => {
-    console.log('🔍 하드웨어 데이터 조회 시작...');
+  // 하드웨어 목록 조회 (투자관리 방식: 캐시 우선 전략)
+  const getHardware = useCallback(async (): Promise<HardwareData[]> => {
+    // 1. 캐시 확인 (캐시가 있으면 즉시 반환)
+    const cachedData = loadFromCache<HardwareData[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      console.log('⚡ [Hardware] 캐시 데이터 반환 (깜빡임 방지)');
+      return cachedData;
+    }
 
+    // 2. 캐시 없으면 DB 조회
     try {
+      console.log('📞 getHardware 호출');
       setLoading(true);
+      setError(null);
 
       const { data, error } = await supabase
         .from('it_hardware_data')
@@ -58,40 +69,40 @@ export const useSupabaseHardware = () => {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.warn('❌ 하드웨어 데이터 조회 실패:', error);
+        console.log('❌ Supabase 조회 오류:', error);
         throw error;
       }
 
-      console.log('✅ 하드웨어 데이터 조회 성공:', data?.length + '개');
-      setHardware(data || []);
-      setError(null);
+      console.log('✅ getHardware 성공:', data?.length || 0, '개');
+
+      // 3. 캐시에 저장
+      saveToCache(CACHE_KEY, data || []);
+
+      return data || [];
 
     } catch (err: any) {
-      console.warn('❌ fetchHardware 오류:', err);
-      setError(err.message || '데이터 조회 중 오류가 발생했습니다.');
-      setHardware([]);
+      console.log('❌ getHardware 실패:', err);
+      setError(err.message || '하드웨어 데이터 조회 실패');
+      return [];
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // 하드웨어 생성
-  const createHardware = async (hardwareData: Omit<HardwareData, 'id' | 'created_at' | 'updated_at'>) => {
+  const createHardware = useCallback(async (hardwareData: Omit<HardwareData, 'id' | 'created_at' | 'updated_at'>) => {
     console.log('🆕 하드웨어 생성 시작:', hardwareData);
-    console.log('🖼️ 이미지 URL 확인:', {
-      image_1_url: hardwareData.image_1_url,
-      image_2_url: hardwareData.image_2_url
-    });
 
     const insertData = {
       ...hardwareData,
       is_active: true,
-      registration_date: new Date().toISOString().split('T')[0]  // YYYY-MM-DD 형식으로
+      registration_date: new Date().toISOString().split('T')[0]
     };
 
-    console.log('📤 Supabase로 전송할 데이터:', insertData);
-
     try {
+      setLoading(true);
+      setError(null);
+
       const { data, error } = await supabase
         .from('it_hardware_data')
         .insert([insertData])
@@ -99,40 +110,34 @@ export const useSupabaseHardware = () => {
         .single();
 
       if (error) {
-        console.warn('❌ 하드웨어 생성 실패:', error);
-        console.warn('❌ 에러 상세:', {
-          message: error?.message,
-          details: error?.details,
-          hint: error?.hint,
-          code: error?.code
-        });
-        console.warn('❌ 전송한 데이터:', {
-          ...hardwareData,
-          is_active: true,
-          registration_date: new Date().toISOString().split('T')[0]
-        });
+        console.log('❌ Supabase 생성 오류:', error);
         throw error;
       }
 
-      console.log('✅ 하드웨어 생성 성공:', data);
-      await fetchHardware();
+      console.log('✅ createHardware 성공:', data);
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return data;
 
     } catch (err: any) {
-      console.warn('❌ createHardware 오류:', err);
+      console.log('❌ createHardware 실패:', err);
+      setError(err.message || '하드웨어 생성 실패');
       throw err;
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
   // 하드웨어 수정
-  const updateHardware = async (id: number, hardwareData: Partial<HardwareData>) => {
+  const updateHardware = useCallback(async (id: number, hardwareData: Partial<HardwareData>) => {
     console.log('🔄 하드웨어 수정 시작:', { id, hardwareData });
-    console.log('🖼️ 수정 - 이미지 URL 확인:', {
-      image_1_url: hardwareData.image_1_url,
-      image_2_url: hardwareData.image_2_url
-    });
 
     try {
+      setLoading(true);
+      setError(null);
+
       // null 값들을 제거하여 실제 업데이트할 데이터만 전송
       const cleanData = Object.fromEntries(
         Object.entries(hardwareData).filter(([_, value]) => value !== null && value !== undefined)
@@ -174,25 +179,30 @@ export const useSupabaseHardware = () => {
         throw new Error('수정된 데이터가 반환되지 않았습니다.');
       }
 
-      console.log('✅ 하드웨어 수정 성공:', data);
-      await fetchHardware();
+      console.log('✅ updateHardware 성공:', data);
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return data;
 
     } catch (err: any) {
-      console.warn('❌ updateHardware 전체 오류:', {
-        message: err.message,
-        stack: err.stack,
-        err
-      });
+      console.log('❌ updateHardware 실패:', err);
+      setError(err.message || '하드웨어 수정 실패');
       throw err;
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
   // 하드웨어 삭제 (soft delete)
-  const deleteHardware = async (id: number) => {
+  const deleteHardware = useCallback(async (id: number) => {
     console.log('🗑️ 하드웨어 삭제 시작:', id);
 
     try {
+      setLoading(true);
+      setError(null);
+
       const { data, error } = await supabase
         .from('it_hardware_data')
         .update({ is_active: false })
@@ -201,30 +211,39 @@ export const useSupabaseHardware = () => {
         .single();
 
       if (error) {
-        console.warn('❌ 하드웨어 삭제 실패:', error);
+        console.log('❌ Supabase 삭제 오류:', error);
         throw error;
       }
 
-      console.log('✅ 하드웨어 삭제 성공:', data);
-      await fetchHardware();
+      console.log('✅ deleteHardware 성공:', data);
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return data;
 
     } catch (err: any) {
-      console.warn('❌ deleteHardware 오류:', err);
+      console.log('❌ deleteHardware 실패:', err);
+      setError(err.message || '하드웨어 삭제 실패');
       throw err;
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
   // 여러 하드웨어 삭제 (soft delete)
-  const deleteMultipleHardware = async (ids: number[]) => {
+  const deleteMultipleHardware = useCallback(async (ids: number[]) => {
     console.log('🗑️ 여러 하드웨어 삭제 시작:', ids);
 
     if (!ids || ids.length === 0) {
-      console.warn('⚠️ 삭제할 하드웨어 ID가 없습니다.');
+      console.log('⚠️ 삭제할 하드웨어 ID가 없습니다.');
       return [];
     }
 
     try {
+      setLoading(true);
+      setError(null);
+
       const { data, error } = await supabase
         .from('it_hardware_data')
         .update({
@@ -235,33 +254,33 @@ export const useSupabaseHardware = () => {
         .select();
 
       if (error) {
-        console.warn('❌ 여러 하드웨어 삭제 실패:', error);
+        console.log('❌ Supabase 일괄삭제 오류:', error);
         throw error;
       }
 
-      console.log(`✅ ${ids.length}개 하드웨어 삭제 성공:`, data);
-      await fetchHardware();
+      console.log(`✅ deleteMultipleHardware 성공: ${ids.length}개`, data);
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return data;
 
     } catch (err: any) {
-      console.warn('❌ deleteMultipleHardware 오류:', err);
+      console.log('❌ deleteMultipleHardware 실패:', err);
+      setError(err.message || '여러 하드웨어 삭제 실패');
       throw err;
+    } finally {
+      setLoading(false);
     }
-  };
-
-  // 컴포넌트 마운트 시 데이터 조회
-  useEffect(() => {
-    fetchHardware();
   }, []);
 
   return {
-    hardware,
-    loading,
-    error,
-    fetchHardware,
+    getHardware,
     createHardware,
     updateHardware,
     deleteHardware,
-    deleteMultipleHardware
+    deleteMultipleHardware,
+    loading,
+    error
   };
 };

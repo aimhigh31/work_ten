@@ -2,14 +2,26 @@ import { useState } from 'react';
 import useSWR from 'swr';
 import { createClient } from '@/lib/supabase/client';
 import { FileData, CreateFileInput, UpdateFileInput } from 'types/files';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 // Storage 버킷명
 const STORAGE_BUCKET = 'common-files';
 
-// SWR fetcher 함수
+// SWR fetcher 함수 (sessionStorage 캐싱 추가)
 const filesFetcher = async (key: string) => {
-  console.time('⏱️ Files Fetch');
   const [, page, recordId] = key.split('|');
+
+  // 캐시 키 동적 생성 (page와 recordId에 따라 다른 캐시)
+  const cacheKey = createCacheKey('files', `${page}_${recordId || 'all'}`);
+
+  // 1. 캐시 확인 (캐시가 있으면 즉시 반환)
+  const cachedData = loadFromCache<FileData[]>(cacheKey, DEFAULT_CACHE_EXPIRY_MS);
+  if (cachedData) {
+    console.log('⚡ [Files] 캐시 데이터 반환 (깜빡임 방지)');
+    return cachedData;
+  }
+
+  console.time('⏱️ Files Fetch');
   const supabase = createClient();
 
   console.log('🔍 filesFetcher 쿼리 파라미터:', {
@@ -42,6 +54,9 @@ const filesFetcher = async (key: string) => {
 
   console.timeEnd('⏱️ Files Fetch');
   console.log(`📊 파일 ${count || 0}개 로드 완료`);
+
+  // 2. 캐시에 저장
+  saveToCache(cacheKey, data || []);
 
   return data || [];
 };
@@ -208,6 +223,10 @@ export function useSupabaseFiles(page: string, recordId?: string | number) {
       console.log(`✅ uploadFile 완료: ${(endTime - startTime).toFixed(2)}ms`);
       console.timeEnd('⏱️ uploadFile Total');
 
+      // 캐시 무효화 (최신 데이터 보장)
+      const cacheKey = createCacheKey('files', `${page}_${normalizedRecordId || 'all'}`);
+      sessionStorage.removeItem(cacheKey);
+
       return { success: true, data: dbData };
     } catch (err: any) {
       // 7. 실패: 롤백 (임시 항목 제거)
@@ -275,6 +294,10 @@ export function useSupabaseFiles(page: string, recordId?: string | number) {
       const endTime = performance.now();
       console.log(`✅ updateFile 완료: ${(endTime - startTime).toFixed(2)}ms`);
       console.timeEnd('⏱️ updateFile Total');
+
+      // 캐시 무효화 (최신 데이터 보장)
+      const cacheKey = createCacheKey('files', `${page}_${normalizedRecordId || 'all'}`);
+      sessionStorage.removeItem(cacheKey);
 
       return { success: true, data };
     } catch (err: any) {
@@ -359,6 +382,10 @@ export function useSupabaseFiles(page: string, recordId?: string | number) {
       const endTime = performance.now();
       console.log(`✅ deleteFile 완료: ${(endTime - startTime).toFixed(2)}ms`);
       console.timeEnd('⏱️ deleteFile Total');
+
+      // 캐시 무효화 (최신 데이터 보장)
+      const cacheKey = createCacheKey('files', `${page}_${normalizedRecordId || 'all'}`);
+      sessionStorage.removeItem(cacheKey);
 
       return { success: true };
     } catch (err: any) {

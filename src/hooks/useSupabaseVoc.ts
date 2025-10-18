@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { VocData, DbVocData } from '../types/voc';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 // Supabase 클라이언트 설정 (RLS 해지 후 ANON_KEY 사용)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -34,8 +35,18 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 캐시 키 (상수로 정의하여 재사용)
+  const CACHE_KEY = createCacheKey('voc', 'data');
+
   // DB에서 모든 VOC 데이터 조회 (created_at 기준 역순정렬)
   const getVocs = useCallback(async (): Promise<DbVocData[]> => {
+    // 1. 캐시 확인 (캐시가 있으면 즉시 반환)
+    const cachedData = loadFromCache<DbVocData[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      console.log('⚡ [VOC] 캐시 데이터 반환 (깜빡임 방지)');
+      return cachedData;
+    }
+
     try {
       console.log('📞 getVocs 호출');
       setLoading(true);
@@ -53,6 +64,10 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
       }
 
       console.log('✅ getVocs 성공:', data?.length || 0, '개');
+
+      // 2. 캐시에 저장
+      saveToCache(CACHE_KEY, data || []);
+
       return data || [];
 
     } catch (error) {
@@ -144,6 +159,10 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
       }
 
       console.log('✅ createVoc 성공:', data);
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return data;
 
     } catch (error) {
@@ -183,6 +202,10 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
       }
 
       console.log('✅ updateVoc 성공');
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return true;
 
     } catch (error) {
@@ -216,6 +239,10 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
       }
 
       console.log('✅ deleteVoc 성공');
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return true;
 
     } catch (error) {

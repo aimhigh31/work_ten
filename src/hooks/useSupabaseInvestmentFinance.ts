@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 // 투자금액 항목 타입
 export interface InvestmentFinanceItem {
@@ -24,6 +25,14 @@ export function useSupabaseInvestmentFinance() {
 
   // 특정 투자의 금액 항목 조회
   const getFinanceItems = useCallback(async (investmentId: number): Promise<InvestmentFinanceItem[]> => {
+    // 1. 동적 캐시 키 생성 (투자 ID별로 별도 캐시)
+    const cacheKey = createCacheKey('investment_finance', `id_${investmentId}`);
+    const cachedData = loadFromCache<InvestmentFinanceItem[]>(cacheKey, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      console.log('⚡ [InvestmentFinance] 캐시 데이터 반환 (깜빡임 방지)');
+      return cachedData;
+    }
+
     try {
       console.log('📞 getFinanceItems 호출:', investmentId);
       setLoading(true);
@@ -42,6 +51,10 @@ export function useSupabaseInvestmentFinance() {
       }
 
       console.log('✅ getFinanceItems 성공:', data?.length, '개');
+
+      // 2. 캐시에 저장
+      saveToCache(cacheKey, data || []);
+
       return data || [];
 
     } catch (err) {

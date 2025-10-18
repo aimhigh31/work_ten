@@ -50,8 +50,7 @@ import { SecurityEducationTableData, SecurityEducationStatus, SecurityEducationR
 import { ThemeMode } from 'config';
 import { useSupabaseSecurityEducation, SecurityEducationItem } from '../../hooks/useSupabaseSecurityEducation';
 import { useSupabaseMasterCode3 } from '../../hooks/useSupabaseMasterCode3';
-import { useSupabaseUserManagement } from '../../hooks/useSupabaseUserManagement';
-import { useSupabaseDepartmentManagement } from '../../hooks/useSupabaseDepartmentManagement';
+import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
 import { useSupabaseChangeLog } from '../../hooks/useSupabaseChangeLog';
 import { ChangeLogData } from '../../types/changelog';
 import { safeJsonParse } from '../../utils/changeLogHelper';
@@ -2434,7 +2433,7 @@ export default function SecurityEducationManagement() {
   // 현재 사용자 정보
   const user = useUser();
   const { data: session } = useSession();
-  const { users } = useSupabaseUserManagement();
+  const { users, departments } = useCommonData(); // 🏪 공용 창고에서 가져오기
 
   // 세션 email로 DB에서 사용자 찾기
   const currentUser = React.useMemo(() => {
@@ -2452,12 +2451,6 @@ export default function SecurityEducationManagement() {
     fetchEducations
   } = useSupabaseSecurityEducation();
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
-  const { departments, fetchDepartments } = useSupabaseDepartmentManagement();
-
-  // 컴포넌트 마운트 시 부서 목록 로드
-  React.useEffect(() => {
-    fetchDepartments();
-  }, [fetchDepartments]);
 
   // GROUP002 서브코드 목록 (상태용)
   const statusTypes = React.useMemo(() => {

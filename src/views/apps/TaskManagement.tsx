@@ -49,8 +49,7 @@ import TaskEditDialog from 'components/TaskEditDialog';
 import { taskData, taskStatusColors, taskStatusOptions, teams } from 'data/task';
 import { TaskTableData, TaskStatus } from 'types/task';
 import { ThemeMode } from 'config';
-import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
-import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
+import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseTaskManagement } from 'hooks/useSupabaseTaskManagement';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
@@ -59,6 +58,7 @@ import { ChangeLogData } from 'types/changelog';
 import { useSession } from 'next-auth/react';
 import useUser from 'hooks/useUser';
 import { createClient } from '@/lib/supabase/client';
+import { startPageLoad, logPageEvent, endPageLoad } from 'utils/performanceLogger';
 
 // 변경로그 타입 정의 (UI용)
 interface ChangeLog {
@@ -2451,14 +2451,54 @@ export default function TaskManagement() {
   const [value, setValue] = useState(0);
   const user = useUser(); // 사용자 정보
 
-  // Supabase 훅 사용 (즉시 렌더링 - loading 상태 제거)
-  const { users } = useSupabaseUserManagement();
-  const { departments, fetchDepartments } = useSupabaseDepartmentManagement();
+  // 🏪 공용 창고에서 재료 가져오기 (즉시 사용 가능!)
+  const { users, departments, isLoading: commonDataLoading } = useCommonData();
+
+  // ⭐ Investment 패턴: 페이지별 데이터만 로딩
+  const { getTasks, updateTask, addTask: addTaskToDb, deleteTask: deleteTaskFromDb, loading: taskLoading, error: taskError } = useSupabaseTaskManagement();
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
-  const { tasks: supabaseTasks, updateTask, addTask: addTaskToDb, deleteTask: deleteTaskFromDb } = useSupabaseTaskManagement();
   const { tasks: kpiTasks, fetchAllTasksByUser } = useSupabaseKpiTask();
 
-  // 사용자별 KPI Task 로드
+  // ⭐ 페이지별 데이터 상태
+  const [supabaseTasks, setSupabaseTasks] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // ⚡ 병렬 로딩: CommonData 기다리지 않고 즉시 시작!
+  React.useEffect(() => {
+    startPageLoad('TaskManagement'); // 🚀 성능 측정 시작
+    logPageEvent('TaskManagement', 'useEffect 시작');
+
+    const loadPageData = async () => {
+      try {
+        logPageEvent('TaskManagement', 'loadPageData 함수 시작');
+        setIsLoading(true);
+
+        // ⚡ CommonData 로딩 완료를 기다리지 않고 즉시 시작!
+        logPageEvent('TaskManagement', 'getTasks() 호출 전');
+        const tasksData = await getTasks();
+        logPageEvent('TaskManagement', 'getTasks() 완료');
+
+        // 상태 업데이트
+        setSupabaseTasks(tasksData);
+        logPageEvent('TaskManagement', 'setSupabaseTasks 완료');
+
+        console.log('✅ TaskManagement 로딩 완료 (병렬)', {
+          tasks: tasksData.length
+        });
+
+        endPageLoad('TaskManagement'); // 🏁 성능 측정 종료
+      } catch (error) {
+        console.error('❌ 데이터 로딩 실패:', error);
+        endPageLoad('TaskManagement');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadPageData(); // ⚡ 즉시 실행! (대기 없음)
+  }, [getTasks]); // ⚡ commonDataLoading 의존성 제거
+
+  // 사용자별 KPI Task 로드 (독립적 실행)
   React.useEffect(() => {
     const userName = user?.korName || user?.name || '';
     if (userName) {
@@ -2466,17 +2506,6 @@ export default function TaskManagement() {
       fetchAllTasksByUser(userName);
     }
   }, [user, fetchAllTasksByUser]);
-
-  // KPI Task 데이터 로깅
-  React.useEffect(() => {
-    console.log('🎯 TaskManagement - kpiTasks 데이터:', kpiTasks);
-    console.log('🎯 TaskManagement - kpiTasks 개수:', kpiTasks?.length);
-  }, [kpiTasks]);
-
-  // 부서 데이터 로드 (useEffect는 이미 병렬로 실행됨)
-  React.useEffect(() => {
-    fetchDepartments();
-  }, [fetchDepartments]);
 
   // 마스터코드에서 상태 옵션 가져오기
   const statusTypes = React.useMemo(() => {

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 // Supabase 클라이언트 설정
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -248,6 +249,14 @@ export const useSupabaseSoftwareHistory = () => {
   const getPurchaseHistories = async (softwareId: number): Promise<PurchaseHistory[]> => {
     console.log('📖 구매/유지보수이력 조회:', softwareId);
 
+    // 1. 동적 캐시 키 생성
+    const cacheKey = createCacheKey('software_history', `sw_${softwareId}`);
+    const cachedData = loadFromCache<PurchaseHistory[]>(cacheKey, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      console.log('⚡ [SoftwareHistory] 캐시 데이터 반환');
+      return cachedData;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -297,6 +306,10 @@ export const useSupabaseSoftwareHistory = () => {
       });
 
       console.log('✅ 이력 조회 성공:', histories.length + '개');
+
+      // 2. 캐시에 저장
+      saveToCache(cacheKey, histories);
+
       return histories;
 
     } catch (err: any) {

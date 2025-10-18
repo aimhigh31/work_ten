@@ -1,10 +1,14 @@
 import { useState, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { InvestmentData, DbInvestmentData } from '../types/investment';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 // Supabase 클라이언트 설정 (RLS 해지 후 ANON_KEY 사용)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+// 캐시 키
+const CACHE_KEY = createCacheKey('investment', 'data');
 
 if (!supabaseUrl || !supabaseKey) {
   console.log('❌ Supabase Investment 환경 변수가 설정되지 않았습니다!');
@@ -36,6 +40,13 @@ export const useSupabaseInvestment = (): UseSupabaseInvestmentReturn => {
 
   // DB에서 모든 투자 데이터 조회 (created_at 기준 역순정렬)
   const getInvestments = useCallback(async (): Promise<DbInvestmentData[]> => {
+    // 1. 캐시 확인 (캐시가 있으면 즉시 반환)
+    const cachedData = loadFromCache<DbInvestmentData[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      console.log('⚡ [Investment] 캐시 데이터 반환 (깜빡임 방지)');
+      return cachedData;
+    }
+
     try {
       console.log('📞 getInvestments 호출');
       setLoading(true);
@@ -53,6 +64,10 @@ export const useSupabaseInvestment = (): UseSupabaseInvestmentReturn => {
       }
 
       console.log('✅ getInvestments 성공:', data?.length || 0, '개');
+
+      // 2. 캐시에 저장
+      saveToCache(CACHE_KEY, data || []);
+
       return data || [];
 
     } catch (error) {
@@ -131,6 +146,10 @@ export const useSupabaseInvestment = (): UseSupabaseInvestmentReturn => {
       }
 
       console.log('✅ createInvestment 성공:', data);
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return data;
 
     } catch (error) {
@@ -179,8 +198,11 @@ export const useSupabaseInvestment = (): UseSupabaseInvestmentReturn => {
       }
 
       console.log('✅ 업데이트된 데이터:', data);
-
       console.log('✅ updateInvestment 성공');
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return true;
 
     } catch (error) {
@@ -214,6 +236,10 @@ export const useSupabaseInvestment = (): UseSupabaseInvestmentReturn => {
       }
 
       console.log('✅ deleteInvestment 성공');
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return true;
 
     } catch (error) {

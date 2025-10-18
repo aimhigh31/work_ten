@@ -1,10 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// 캐시 키
+const CACHE_KEY = createCacheKey('software', 'data');
 
 export interface SoftwareData {
   id?: number;
@@ -36,16 +40,23 @@ export interface SoftwareData {
 }
 
 export const useSupabaseSoftware = () => {
-  const [software, setSoftware] = useState<SoftwareData[]>([]);
-  const [loading, setLoading] = useState(false); // 즉시 UI 렌더링을 위해 false로 설정
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 소프트웨어 목록 조회
-  const fetchSoftware = async () => {
-    console.log('🔍 소프트웨어 데이터 조회 시작...');
+  // 소프트웨어 목록 조회 (투자관리 방식: 캐시 우선 전략)
+  const getSoftware = useCallback(async (): Promise<SoftwareData[]> => {
+    // 1. 캐시 확인 (캐시가 있으면 즉시 반환)
+    const cachedData = loadFromCache<SoftwareData[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      console.log('⚡ [Software] 캐시 데이터 반환 (깜빡임 방지)');
+      return cachedData;
+    }
 
+    // 2. 캐시 없으면 DB 조회
     try {
+      console.log('📞 getSoftware 호출');
       setLoading(true);
+      setError(null);
 
       const { data, error } = await supabase
         .from('it_software_data')
@@ -54,65 +65,76 @@ export const useSupabaseSoftware = () => {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.warn('❌ 소프트웨어 데이터 조회 실패:', error);
+        console.log('❌ Supabase 조회 오류:', error);
         throw error;
       }
 
-      console.log('✅ 소프트웨어 데이터 조회 성공:', data?.length + '개');
-      setSoftware(data || []);
-      setError(null);
+      console.log('✅ getSoftware 성공:', data?.length || 0, '개');
+
+      // 3. 캐시에 저장
+      saveToCache(CACHE_KEY, data || []);
+
+      return data || [];
 
     } catch (err: any) {
-      console.warn('❌ fetchSoftware 오류:', err);
-      setError(err.message || '데이터 조회 중 오류가 발생했습니다.');
-      setSoftware([]);
+      console.log('❌ getSoftware 실패:', err);
+      setError(err.message || '소프트웨어 데이터 조회 실패');
+      return [];
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // 소프트웨어 생성
-  const createSoftware = async (softwareData: Omit<SoftwareData, 'id' | 'created_at' | 'updated_at'>) => {
+  const createSoftware = useCallback(async (softwareData: Omit<SoftwareData, 'id' | 'created_at' | 'updated_at'>) => {
     console.log('🆕 소프트웨어 생성 시작:', softwareData);
 
     try {
+      setLoading(true);
+      setError(null);
+
       const { data, error } = await supabase
         .from('it_software_data')
         .insert([{
           ...softwareData,
           is_active: true,
-          registration_date: new Date().toISOString().split('T')[0]  // YYYY-MM-DD 형식으로
+          registration_date: new Date().toISOString().split('T')[0]
         }])
         .select()
         .single();
 
       if (error) {
-        console.warn('❌ 소프트웨어 생성 실패:', error);
+        console.log('❌ Supabase 생성 오류:', error);
         throw error;
       }
 
-      console.log('✅ 소프트웨어 생성 성공:', data);
-      await fetchSoftware();
+      console.log('✅ createSoftware 성공:', data);
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return data;
 
     } catch (err: any) {
-      console.warn('❌ createSoftware 오류:', err);
+      console.log('❌ createSoftware 실패:', err);
+      setError(err.message || '소프트웨어 생성 실패');
       throw err;
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
   // 소프트웨어 수정
-  const updateSoftware = async (id: number, softwareData: Partial<SoftwareData>) => {
+  const updateSoftware = useCallback(async (id: number, softwareData: Partial<SoftwareData>) => {
     console.log('🔄 소프트웨어 수정 시작:', { id, softwareData });
 
     try {
-      // null 값들을 제거하여 실제 업데이트할 데이터만 전송
+      setLoading(true);
+      setError(null);
+
       const cleanData = Object.fromEntries(
         Object.entries(softwareData).filter(([_, value]) => value !== null && value !== undefined)
       );
-
-      console.log('📝 정제된 업데이트 데이터:', cleanData);
-      console.log('🔍 Supabase 업데이트 쿼리 실행:', { table: 'it_software_data', id, cleanData });
 
       const { data, error } = await supabase
         .from('it_software_data')
@@ -121,45 +143,39 @@ export const useSupabaseSoftware = () => {
         .select()
         .single();
 
-      console.log('🔍 Supabase 업데이트 응답:', { data: !!data, error: !!error });
-
       if (error) {
-        console.warn('❌ 소프트웨어 수정 실패 (Supabase 에러):', error);
-        console.warn('❌ 에러 상세:', {
-          message: error?.message,
-          details: error?.details,
-          hint: error?.hint,
-          code: error?.code,
-          keys: Object.keys(error || {}),
-          errorString: JSON.stringify(error, null, 2)
-        });
-        console.warn('❌ 수정 시도 데이터:', { id, cleanData });
-        throw new Error(`DB 수정 실패: ${error?.message || 'Unknown error'}`);
+        console.log('❌ Supabase 수정 오류:', error);
+        throw error;
       }
 
       if (!data) {
         throw new Error('수정된 데이터가 반환되지 않았습니다.');
       }
 
-      console.log('✅ 소프트웨어 수정 성공:', data);
-      await fetchSoftware();
+      console.log('✅ updateSoftware 성공:', data);
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return data;
 
     } catch (err: any) {
-      console.warn('❌ updateSoftware 전체 오류:', {
-        message: err.message,
-        stack: err.stack,
-        err
-      });
+      console.log('❌ updateSoftware 실패:', err);
+      setError(err.message || '소프트웨어 수정 실패');
       throw err;
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
   // 소프트웨어 삭제 (soft delete)
-  const deleteSoftware = async (id: number) => {
+  const deleteSoftware = useCallback(async (id: number) => {
     console.log('🗑️ 소프트웨어 삭제 시작:', id);
 
     try {
+      setLoading(true);
+      setError(null);
+
       const { data, error } = await supabase
         .from('it_software_data')
         .update({ is_active: false })
@@ -168,30 +184,39 @@ export const useSupabaseSoftware = () => {
         .single();
 
       if (error) {
-        console.warn('❌ 소프트웨어 삭제 실패:', error);
+        console.log('❌ Supabase 삭제 오류:', error);
         throw error;
       }
 
-      console.log('✅ 소프트웨어 삭제 성공:', data);
-      await fetchSoftware();
+      console.log('✅ deleteSoftware 성공:', data);
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return data;
 
     } catch (err: any) {
-      console.warn('❌ deleteSoftware 오류:', err);
+      console.log('❌ deleteSoftware 실패:', err);
+      setError(err.message || '소프트웨어 삭제 실패');
       throw err;
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
   // 여러 소프트웨어 삭제 (soft delete)
-  const deleteMultipleSoftware = async (ids: number[]) => {
+  const deleteMultipleSoftware = useCallback(async (ids: number[]) => {
     console.log('🗑️ 여러 소프트웨어 삭제 시작:', ids);
 
     if (!ids || ids.length === 0) {
-      console.warn('⚠️ 삭제할 소프트웨어 ID가 없습니다.');
+      console.log('⚠️ 삭제할 소프트웨어 ID가 없습니다.');
       return [];
     }
 
     try {
+      setLoading(true);
+      setError(null);
+
       const { data, error } = await supabase
         .from('it_software_data')
         .update({
@@ -202,33 +227,33 @@ export const useSupabaseSoftware = () => {
         .select();
 
       if (error) {
-        console.warn('❌ 여러 소프트웨어 삭제 실패:', error);
+        console.log('❌ Supabase 일괄삭제 오류:', error);
         throw error;
       }
 
-      console.log(`✅ ${ids.length}개 소프트웨어 삭제 성공:`, data);
-      await fetchSoftware();
+      console.log(`✅ deleteMultipleSoftware 성공: ${ids.length}개`, data);
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return data;
 
     } catch (err: any) {
-      console.warn('❌ deleteMultipleSoftware 오류:', err);
+      console.log('❌ deleteMultipleSoftware 실패:', err);
+      setError(err.message || '여러 소프트웨어 삭제 실패');
       throw err;
+    } finally {
+      setLoading(false);
     }
-  };
-
-  // 컴포넌트 마운트 시 데이터 조회
-  useEffect(() => {
-    fetchSoftware();
   }, []);
 
   return {
-    software,
-    loading,
-    error,
-    fetchSoftware,
+    getSoftware,
     createSoftware,
     updateSoftware,
     deleteSoftware,
-    deleteMultipleSoftware
+    deleteMultipleSoftware,
+    loading,
+    error
   };
 };

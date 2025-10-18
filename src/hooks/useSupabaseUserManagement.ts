@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 // 사용자 데이터 타입
 export interface UserProfile {
@@ -56,9 +57,7 @@ export interface UpdateUserProfileRequest extends CreateUserProfileRequest {
 // API 기반 데이터 처리
 
 // 캐시 키
-const USERS_CACHE_KEY = 'nexwork_users_cache';
-const CACHE_TIMESTAMP_KEY = 'nexwork_users_cache_timestamp';
-const CACHE_EXPIRY_MS = 30 * 60 * 1000; // 30분 (성능 최적화)
+const CACHE_KEY = createCacheKey('user_management', 'data');
 
 export function useSupabaseUserManagement() {
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -70,46 +69,15 @@ export function useSupabaseUserManagement() {
     setError(null);
   }, []);
 
-  // 캐시에서 데이터 로드
-  const loadFromCache = useCallback(() => {
-    try {
-      const cachedData = sessionStorage.getItem(USERS_CACHE_KEY);
-      const cachedTimestamp = sessionStorage.getItem(CACHE_TIMESTAMP_KEY);
-
-      if (cachedData && cachedTimestamp) {
-        const timestamp = parseInt(cachedTimestamp, 10);
-        const now = Date.now();
-
-        // 캐시가 유효한 경우
-        if (now - timestamp < CACHE_EXPIRY_MS) {
-          const parsedData = JSON.parse(cachedData) as UserProfile[];
-          console.log('✅ 캐시에서 사용자 데이터 로드:', parsedData.length, '명');
-          setUsers(parsedData);
-          return true;
-        } else {
-          console.log('⏰ 캐시 만료됨');
-        }
-      }
-      return false;
-    } catch (err) {
-      console.error('❌ 캐시 로드 실패:', err);
-      return false;
+  // 사용자 목록 조회 (Investment 패턴 - 데이터 직접 반환)
+  const getUsers = useCallback(async (): Promise<UserProfile[]> => {
+    // 1. 캐시 확인 (캐시가 있으면 즉시 반환)
+    const cachedData = loadFromCache<UserProfile[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      console.log('⚡ [UserManagement] 캐시 데이터 반환 (깜빡임 방지)');
+      return cachedData;
     }
-  }, []);
 
-  // 캐시에 데이터 저장
-  const saveToCache = useCallback((data: UserProfile[]) => {
-    try {
-      sessionStorage.setItem(USERS_CACHE_KEY, JSON.stringify(data));
-      sessionStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
-      console.log('💾 사용자 데이터 캐시 저장:', data.length, '명');
-    } catch (err) {
-      console.error('❌ 캐시 저장 실패:', err);
-    }
-  }, []);
-
-  // 사용자 목록 조회
-  const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -118,18 +86,26 @@ export function useSupabaseUserManagement() {
       const result = await response.json();
 
       if (result.success) {
-        setUsers(result.data);
-        saveToCache(result.data); // 캐시에 저장
+        saveToCache(CACHE_KEY, result.data); // 캐시에 저장
+        return result.data || [];
       } else {
         setError(result.error || '사용자 목록을 불러오는데 실패했습니다.');
+        return [];
       }
     } catch (err) {
       console.error('사용자 목록 조회 실패:', err);
       setError('사용자 목록을 불러오는데 실패했습니다.');
+      return [];
     } finally {
       setLoading(false);
     }
-  }, [saveToCache]);
+  }, []);
+
+  // 사용자 목록 조회 (내부 상태 업데이트용 - 후방 호환성)
+  const fetchUsers = useCallback(async () => {
+    const data = await getUsers();
+    setUsers(data);
+  }, [getUsers]);
 
   // 사용자 생성
   const createUser = useCallback(
@@ -260,27 +236,16 @@ export function useSupabaseUserManagement() {
     [fetchUsers]
   );
 
-  // 컴포넌트 마운트 시 데이터 로드 (캐시 우선 전략)
-  useEffect(() => {
-    // 1. 캐시에서 먼저 로드 (즉시 표시)
-    const hasCachedData = loadFromCache();
-
-    if (hasCachedData) {
-      // 캐시 데이터가 있으면 로딩 상태 해제
-      setLoading(false);
-      console.log('⚡ 캐시 데이터 즉시 표시 (깜빡임 방지)');
-    }
-
-    // 2. 백그라운드에서 최신 데이터 가져오기 (항상 실행)
-    fetchUsers();
-  }, [fetchUsers, loadFromCache]);
+  // Investment 패턴: 자동 로딩 제거 (페이지에서 수동 호출)
+  // useEffect 제거로 병렬 로딩 가능
 
   return {
     users,
     loading,
     error,
     clearError,
-    fetchUsers,
+    getUsers, // ⭐ Investment 패턴: 데이터 직접 반환
+    fetchUsers, // 후방 호환성: 내부 상태 업데이트
     createUser,
     updateUser,
     deleteUser,

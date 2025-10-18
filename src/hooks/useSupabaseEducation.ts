@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { EducationData, DbEducationData } from '../types/education';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 // Supabase 클라이언트 설정 (RLS 해지 후 ANON_KEY 사용)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -36,6 +37,16 @@ export const useSupabaseEducation = (): UseSupabaseEducationReturn => {
 
   // DB에서 모든 Education 데이터 조회 (created_at 기준 역순정렬)
   const getEducations = useCallback(async (): Promise<DbEducationData[]> => {
+    // 캐시 키 생성
+    const cacheKey = createCacheKey('education', 'data');
+
+    // 1. 캐시 확인 (캐시가 있으면 즉시 반환)
+    const cachedData = loadFromCache<DbEducationData[]>(cacheKey, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      console.log('⚡ [Education] 캐시 데이터 반환 (깜빡임 방지)');
+      return cachedData;
+    }
+
     try {
       console.log('📞 getEducations 호출');
       setLoading(true);
@@ -53,6 +64,10 @@ export const useSupabaseEducation = (): UseSupabaseEducationReturn => {
       }
 
       console.log('✅ getEducations 성공:', data?.length || 0, '개');
+
+      // 2. 캐시에 저장
+      saveToCache(cacheKey, data || []);
+
       return data || [];
 
     } catch (error) {
@@ -146,6 +161,11 @@ export const useSupabaseEducation = (): UseSupabaseEducationReturn => {
       }
 
       console.log('✅ createEducation 성공:', data);
+
+      // 캐시 무효화 (최신 데이터 보장)
+      const cacheKey = createCacheKey('education', 'data');
+      sessionStorage.removeItem(cacheKey);
+
       return data;
 
     } catch (error) {
@@ -185,6 +205,11 @@ export const useSupabaseEducation = (): UseSupabaseEducationReturn => {
       }
 
       console.log('✅ updateEducation 성공');
+
+      // 캐시 무효화 (최신 데이터 보장)
+      const cacheKey = createCacheKey('education', 'data');
+      sessionStorage.removeItem(cacheKey);
+
       return true;
 
     } catch (error) {
@@ -218,6 +243,11 @@ export const useSupabaseEducation = (): UseSupabaseEducationReturn => {
       }
 
       console.log('✅ deleteEducation 성공');
+
+      // 캐시 무효화 (최신 데이터 보장)
+      const cacheKey = createCacheKey('education', 'data');
+      sessionStorage.removeItem(cacheKey);
+
       return true;
 
     } catch (error) {

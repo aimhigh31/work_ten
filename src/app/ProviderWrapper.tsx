@@ -8,6 +8,7 @@ import { SessionProvider } from 'next-auth/react';
 // project-imports
 import ThemeCustomization from 'themes';
 import { ConfigProvider } from 'contexts/ConfigContext';
+import { CommonDataProvider } from 'contexts/CommonDataContext'; // ⭐ 공용 창고
 import RTLLayout from 'components/RTLLayout';
 import Locales from 'components/Locales';
 import ScrollTop from 'components/ScrollTop';
@@ -187,10 +188,13 @@ export default function ProviderWrapper({ children }: { children: ReactElement }
               <Locales>
                 <ScrollTop>
                   <SessionProvider refetchInterval={0}>
-                    <Notistack>
-                      <Snackbar />
-                      {children}
-                    </Notistack>
+                    <CommonDataProvider>
+                      {/* 🏪 공용 창고: 모든 페이지에서 users, departments, masterCodes 공유 */}
+                      <Notistack>
+                        <Snackbar />
+                        {children}
+                      </Notistack>
+                    </CommonDataProvider>
                   </SessionProvider>
                 </ScrollTop>
               </Locales>

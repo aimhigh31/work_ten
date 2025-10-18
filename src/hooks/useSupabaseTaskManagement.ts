@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import supabase from '../lib/supabaseClient';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 // 업무 데이터 타입 (DB 스키마)
 export interface TaskRecord {
@@ -51,15 +52,25 @@ export interface TaskUpdate {
   status?: string;
 }
 
+// 캐시 키
+const CACHE_KEY = createCacheKey('task_management', 'tasks');
+
 export const useSupabaseTaskManagement = () => {
-  const [tasks, setTasks] = useState<TaskRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 업무 목록 조회
-  const fetchTasks = useCallback(async () => {
+  // 업무 목록 조회 (투자관리 방식: 캐시 우선 전략)
+  const getTasks = useCallback(async (): Promise<TaskRecord[]> => {
+    // 1. 캐시 확인 (캐시가 있으면 즉시 반환)
+    const cachedData = loadFromCache<TaskRecord[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      console.log('⚡ [TaskManagement] 캐시 데이터 반환 (깜빡임 방지)');
+      return cachedData;
+    }
+
+    // 2. 캐시 없으면 DB 조회
     try {
-      console.log('🔄 업무 목록 조회 시작...');
+      console.log('📞 getTasks 호출');
       setLoading(true);
       setError(null);
 
@@ -69,33 +80,33 @@ export const useSupabaseTaskManagement = () => {
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
-      console.log('📥 업무 조회 응답:', { data, error: fetchError });
-
       if (fetchError) {
-        console.error('❌ 업무 조회 실패:', fetchError);
-        setError(fetchError.message);
-        return;
+        console.log('❌ Supabase 조회 오류:', fetchError);
+        throw fetchError;
       }
 
-      console.log(`✅ 업무 ${data?.length || 0}개 조회 성공`);
-      setTasks(data || []);
-    } catch (err) {
-      console.error('❌ 업무 조회 중 오류:', err);
-      setError('업무를 불러오는데 실패했습니다.');
+      console.log('✅ getTasks 성공:', data?.length || 0, '개');
+
+      // 3. 캐시에 저장
+      saveToCache(CACHE_KEY, data || []);
+
+      return data || [];
+
+    } catch (err: any) {
+      console.log('❌ getTasks 실패:', err);
+      setError(err.message || '업무 데이터 조회 실패');
+      return [];
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // 컴포넌트 마운트 시 데이터 로드
-  useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
-
   // 업무 추가
-  const addTask = async (task: TaskInput): Promise<TaskRecord | null> => {
+  const addTask = useCallback(async (task: TaskInput): Promise<TaskRecord | null> => {
     try {
-      console.log('📝 업무 추가 요청 데이터:', task);
+      console.log('🆕 업무 추가 시작:', task);
+      setLoading(true);
+      setError(null);
 
       const insertData = {
         code: task.code,
@@ -112,88 +123,111 @@ export const useSupabaseTaskManagement = () => {
         status: task.status || '대기'
       };
 
-      console.log('📤 Supabase insert 데이터:', insertData);
-
-      const response = await supabase
+      const { data, error } = await supabase
         .from('main_task_data')
         .insert([insertData])
         .select()
         .single();
 
-      console.log('📥 Supabase 응답:', response);
-
-      if (response.error) {
-        console.error('❌ 업무 추가 실패 - error 객체:', response.error);
-        console.error('❌ 업무 추가 실패 - error 타입:', typeof response.error);
-        console.error('❌ 업무 추가 실패 - error keys:', Object.keys(response.error));
-        console.error('❌ 업무 추가 실패 - JSON:', JSON.stringify(response.error, null, 2));
-        setError(response.error.message || '업무 추가 실패');
-        return null;
+      if (error) {
+        console.log('❌ Supabase 생성 오류:', error);
+        throw error;
       }
 
-      console.log('✅ 업무 추가 성공:', response.data);
-      await fetchTasks();
-      return response.data;
-    } catch (err) {
-      console.error('❌ 업무 추가 중 예외 발생:', err);
-      console.error('❌ 예외 타입:', typeof err);
-      console.error('❌ 예외 JSON:', JSON.stringify(err, null, 2));
-      setError('업무 추가에 실패했습니다.');
-      return null;
+      console.log('✅ addTask 성공:', data);
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
+      return data;
+    } catch (err: any) {
+      console.log('❌ addTask 실패:', err);
+      setError(err.message || '업무 추가 실패');
+      throw err;
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
   // 업무 수정
-  const updateTask = async (id: string, updates: TaskUpdate): Promise<boolean> => {
+  const updateTask = useCallback(async (id: string, updates: TaskUpdate): Promise<boolean> => {
+    console.log('🔄 업무 수정 시작:', { id, updates });
+
     try {
-      const { error: updateError } = await supabase
+      setLoading(true);
+      setError(null);
+
+      const { data, error } = await supabase
         .from('main_task_data')
         .update({
           ...updates,
           updated_at: new Date().toISOString()
         })
-        .eq('id', id);
+        .eq('id', id)
+        .select()
+        .single();
 
-      if (updateError) {
-        console.error('업무 수정 실패:', updateError);
-        setError(updateError.message);
-        return false;
+      if (error) {
+        console.log('❌ Supabase 수정 오류:', error);
+        throw error;
       }
 
-      await fetchTasks();
+      if (!data) {
+        throw new Error('수정된 데이터가 반환되지 않았습니다.');
+      }
+
+      console.log('✅ updateTask 성공:', data);
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return true;
-    } catch (err) {
-      console.error('업무 수정 중 오류:', err);
-      setError('업무 수정에 실패했습니다.');
+    } catch (err: any) {
+      console.log('❌ updateTask 실패:', err);
+      setError(err.message || '업무 수정 실패');
       return false;
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
   // 업무 삭제 (soft delete)
-  const deleteTask = async (id: string): Promise<boolean> => {
+  const deleteTask = useCallback(async (id: string): Promise<boolean> => {
+    console.log('🗑️ 업무 삭제 시작:', id);
+
     try {
-      const { error: deleteError } = await supabase
+      setLoading(true);
+      setError(null);
+
+      const { data, error } = await supabase
         .from('main_task_data')
         .update({ is_active: false })
-        .eq('id', id);
+        .eq('id', id)
+        .select()
+        .single();
 
-      if (deleteError) {
-        console.error('업무 삭제 실패:', deleteError);
-        setError(deleteError.message);
-        return false;
+      if (error) {
+        console.log('❌ Supabase 삭제 오류:', error);
+        throw error;
       }
 
-      await fetchTasks();
+      console.log('✅ deleteTask 성공:', data);
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
       return true;
-    } catch (err) {
-      console.error('업무 삭제 중 오류:', err);
-      setError('업무 삭제에 실패했습니다.');
+    } catch (err: any) {
+      console.log('❌ deleteTask 실패:', err);
+      setError(err.message || '업무 삭제 실패');
       return false;
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
   // 코드 중복 확인
-  const checkCodeExists = async (code: string): Promise<boolean> => {
+  const checkCodeExists = useCallback(async (code: string): Promise<boolean> => {
     try {
       const { data, error: checkError } = await supabase
         .from('main_task_data')
@@ -211,16 +245,15 @@ export const useSupabaseTaskManagement = () => {
       console.error('코드 확인 중 오류:', err);
       return false;
     }
-  };
+  }, []);
 
   return {
-    tasks,
+    getTasks,
     loading,
     error,
     addTask,
     updateTask,
     deleteTask,
-    checkCodeExists,
-    fetchTasks
+    checkCodeExists
   };
 };

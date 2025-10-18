@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -184,12 +185,23 @@ export const useSupabaseKpiTask = (kpiId?: number) => {
 
   // 사용자의 모든 KPI Task 조회 (KPI 데이터와 조인, 계층 구조 포함)
   const fetchAllTasksByUser = useCallback(async (userName: string) => {
+    // 캐시 키 (사용자별로 다르게 생성)
+    const cacheKey = createCacheKey('kpi_task', `user_${userName}`);
+
+    // 1. 캐시에서 먼저 로드 (즉시 표시)
+    const cachedData = loadFromCache<any[]>(cacheKey, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      setTasks(cachedData);
+      setLoading(false);
+      console.log('⚡ [KpiTask] 캐시 데이터 즉시 표시 (깜빡임 방지)');
+    }
+
     try {
       console.log('🔍 fetchAllTasksByUser 시작:', userName);
       setLoading(true);
       setError(null);
 
-      // 1. 사용자의 모든 task 조회 (KPI 데이터 포함)
+      // 2. 사용자의 모든 task 조회 (KPI 데이터 포함)
       const { data, error: fetchError } = await supabase
         .from('main_kpi_task')
         .select(`
@@ -213,7 +225,7 @@ export const useSupabaseKpiTask = (kpiId?: number) => {
       console.log('📊 조회된 raw 데이터:', data);
       console.log('📊 데이터 개수:', data?.length);
 
-      // 2. parent_id 수집 (조회되지 않은 parent task ID들)
+      // 3. parent_id 수집 (조회되지 않은 parent task ID들)
       const parentIds = new Set<number>();
       (data || []).forEach((task: any) => {
         if (task.parent_id) {
@@ -221,7 +233,7 @@ export const useSupabaseKpiTask = (kpiId?: number) => {
         }
       });
 
-      // 3. 조회되지 않은 parent task들을 별도로 조회
+      // 4. 조회되지 않은 parent task들을 별도로 조회
       let parentTasks: any[] = [];
       if (parentIds.size > 0) {
         const missingParentIds = Array.from(parentIds).filter(
@@ -251,13 +263,13 @@ export const useSupabaseKpiTask = (kpiId?: number) => {
         }
       }
 
-      // 4. 모든 task를 합쳐서 Map 생성
+      // 5. 모든 task를 합쳐서 Map 생성
       const taskMap = new Map();
       [...(data || []), ...parentTasks].forEach((task: any) => {
         taskMap.set(task.id, task);
       });
 
-      // 5. 조인된 데이터를 평탄화 + parent task 정보 추가
+      // 6. 조인된 데이터를 평탄화 + parent task 정보 추가
       const flattenedData = (data || []).map((item: any) => {
         const parentTask = item.parent_id ? taskMap.get(item.parent_id) : null;
 
@@ -274,6 +286,9 @@ export const useSupabaseKpiTask = (kpiId?: number) => {
 
       console.log('✅ 평탄화된 데이터:', flattenedData);
       console.log('✅ 최종 개수:', flattenedData.length);
+
+      // 캐시에 저장
+      saveToCache(cacheKey, flattenedData);
 
       setTasks(flattenedData);
       return flattenedData;

@@ -37,8 +37,7 @@ import { useTheme } from '@mui/material/styles';
 // Project imports
 import SalesDataTable from './SalesDataTable';
 import SalesEditDialog from '../../components/SalesEditDialog';
-import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
-import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
+import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseSales } from 'hooks/useSupabaseSales';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
@@ -1673,9 +1672,10 @@ function SalesMonthlyScheduleView({
 export default function SalesManagement() {
   const [value, setValue] = useState(0);
 
+  // 🏪 공용 창고에서 재료 가져오기
+  const { users, departments } = useCommonData();
+
   // Supabase 훅 사용
-  const { users } = useSupabaseUserManagement();
-  const { departments, fetchDepartments } = useSupabaseDepartmentManagement();
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
   const { getSales, createSales, updateSales, loading: salesLoading, error: salesError } = useSupabaseSales();
 
@@ -1685,11 +1685,6 @@ export default function SalesManagement() {
   const userName = user?.name || session?.user?.name || '시스템';
   const currentUser = users.find((u) => u.email === session?.user?.email);
   const { logs: changeLogData, fetchChangeLogs } = useSupabaseChangeLog('plan_sales');
-
-  // 부서 데이터 로드
-  React.useEffect(() => {
-    fetchDepartments();
-  }, [fetchDepartments]);
 
   // 마스터코드에서 상태 옵션 가져오기
   const statusTypes = React.useMemo(() => {

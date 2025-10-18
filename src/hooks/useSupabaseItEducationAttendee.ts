@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 console.log('Supabase 환경변수 확인:', {
   url: process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -52,6 +53,14 @@ export function useSupabaseItEducationAttendee() {
 
   // IT교육 참석자 데이터 조회 (교육 ID별)
   const getAttendeesByEducationId = useCallback(async (educationId: number): Promise<ItEducationAttendeeData[]> => {
+    // 1. 동적 캐시 키 생성
+    const cacheKey = createCacheKey('it_education_attendee', `edu_${educationId}`);
+    const cachedData = loadFromCache<ItEducationAttendeeData[]>(cacheKey, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      console.log('⚡ [ItEducationAttendee] 캐시 데이터 반환');
+      return cachedData;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -78,6 +87,10 @@ export function useSupabaseItEducationAttendee() {
       }
 
       console.log('✅ 참석자 데이터 조회 성공:', { educationId, count: data?.length || 0 });
+
+      // 2. 캐시에 저장
+      saveToCache(cacheKey, data || []);
+
       return data || [];
     } catch (err) {
       console.error('❌ 참석자 데이터 조회 오류 상세:', {

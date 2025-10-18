@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 // 체크리스트 에디터 데이터 타입 (DB 구조에 맞춤)
 export interface ChecklistEditorData {
@@ -83,6 +84,15 @@ export function useSupabaseChecklistEditor() {
 
   // 체크리스트 에디터 항목 조회
   const fetchEditorItems = useCallback(async (checklistId: number): Promise<ChecklistEditorItem[]> => {
+    // 1. 동적 캐시 키 생성
+    const cacheKey = createCacheKey('checklist_editor', `checklist_${checklistId}`);
+    const cachedData = loadFromCache<ChecklistEditorItem[]>(cacheKey, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      console.log('⚡ [ChecklistEditor] 캐시 데이터 반환');
+      setEditorItems(cachedData);
+      return cachedData;
+    }
+
     try {
       console.log('🔄 체크리스트 에디터 항목 조회 시작...', { checklistId });
       setLoading(true);
@@ -102,6 +112,7 @@ export function useSupabaseChecklistEditor() {
         const items = result.data.map((editorData: ChecklistEditorData) => convertToChecklistEditorItem(editorData));
         console.log('✅ 변환된 ChecklistEditorItem:', items.length, '개');
         setEditorItems(items);
+        saveToCache(cacheKey, items); // 2. 캐시에 저장
         return items;
       } else {
         // 테이블이 존재하지 않는 경우 조용히 처리

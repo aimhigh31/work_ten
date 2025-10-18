@@ -1,4 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
+
+// 캐시 키
+const CACHE_KEY = createCacheKey('role_management', 'data');
 
 // 역할 데이터 타입
 export interface Role {
@@ -70,6 +74,7 @@ export function useSupabaseRoleManagement() {
 
       if (result.success) {
         setRoles(result.data);
+        saveToCache(CACHE_KEY, result.data); // 캐시에 저장
       } else {
         setError(result.error || '역할 목록을 불러오는데 실패했습니다.');
       }
@@ -205,8 +210,17 @@ export function useSupabaseRoleManagement() {
     [fetchRoles]
   );
 
-  // 컴포넌트 마운트 시 데이터 로드
+  // 컴포넌트 마운트 시 데이터 로드 (캐시 우선 전략)
   useEffect(() => {
+    // 1. 캐시에서 먼저 로드 (즉시 표시)
+    const cachedData = loadFromCache<Role[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      setRoles(cachedData);
+      setLoading(false);
+      console.log('⚡ [RoleManagement] 캐시 데이터 즉시 표시 (깜빡임 방지)');
+    }
+
+    // 2. 백그라운드에서 최신 데이터 가져오기 (항상 실행)
     fetchRoles();
   }, [fetchRoles]);
 

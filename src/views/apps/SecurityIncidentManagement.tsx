@@ -47,8 +47,7 @@ import SecurityIncidentTable from 'views/apps/SecurityIncidentTable';
 import SecurityIncidentEditDialog from 'components/SecurityIncidentEditDialog';
 import { SecurityIncidentRecord } from 'types/security-incident';
 import { useSupabaseSecurityAccident } from 'hooks/useSupabaseSecurityAccident';
-import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
-import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
+import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
 import { ChangeLogData } from 'types/changelog';
@@ -2047,14 +2046,8 @@ export default function SecurityIncidentManagement() {
 
   // Supabase 연동 (병렬 호출 최적화)
   const { items, error, fetchAccidents } = useSupabaseSecurityAccident();
-  const { users } = useSupabaseUserManagement();
-  const { departments, fetchDepartments } = useSupabaseDepartmentManagement();
+  const { users, departments } = useCommonData(); // 🏪 공용 창고에서 가져오기
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
-
-  // 컴포넌트 마운트 시 부서 목록 로드
-  React.useEffect(() => {
-    fetchDepartments();
-  }, [fetchDepartments]);
 
   // GROUP002 서브코드 목록 (상태용)
   const statusTypes = React.useMemo(() => {

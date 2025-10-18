@@ -49,8 +49,7 @@ import SolutionEditDialog from 'components/SolutionEditDialog';
 import { solutionData, solutionStatusColors, assigneeAvatars, assignees, teams, solutionStatusOptions } from 'data/solution';
 import { SolutionTableData, SolutionStatus, DbSolutionData } from 'types/solution';
 import { useSupabaseSolution } from '../../hooks/useSupabaseSolution';
-import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
-import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
+import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
 import { ChangeLogData } from 'types/changelog';
@@ -2335,19 +2334,13 @@ export default function SolutionManagement() {
     deleteSolution,
     convertToDbSolutionData
   } = useSupabaseSolution();
-  const { users } = useSupabaseUserManagement();
-  const { departments, fetchDepartments } = useSupabaseDepartmentManagement();
+  const { users, departments } = useCommonData(); // 🏪 공용 창고에서 가져오기
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
   // 변경로그 Supabase 훅
   const { logs: changeLogData, loading: changeLogLoading, error: changeLogError, fetchChangeLogs } = useSupabaseChangeLog('it_solution');
   const { data: session } = useSession();
   const { user } = useUser();
-
-  // 부서 데이터 로드
-  React.useEffect(() => {
-    fetchDepartments();
-  }, [fetchDepartments]);
 
   // 마스터코드에서 상태 옵션 가져오기
   const statusTypes = React.useMemo(() => {

@@ -48,8 +48,7 @@ import ITEducationEditDialog from 'components/ITEducationEditDialog';
 import { itEducationData, itEducationStatusColors, itEducationStatusOptions, assigneeAvatars } from 'data/it-education';
 import { ITEducationTableData, ITEducationStatus } from 'types/it-education';
 import { useSupabaseItEducation, ItEducationData } from 'hooks/useSupabaseItEducation';
-import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
-import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
+import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { ThemeMode } from 'config';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
@@ -1906,14 +1905,8 @@ export default function ITEducationManagement() {
 
   // Supabase 훅 사용
   const { loading, error, getItEducationData } = useSupabaseItEducation();
-  const { users } = useSupabaseUserManagement();
-  const { departments, fetchDepartments } = useSupabaseDepartmentManagement();
+  const { users, departments } = useCommonData(); // 🏪 공용 창고에서 가져오기
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
-
-  // 부서 데이터 로드
-  React.useEffect(() => {
-    fetchDepartments();
-  }, [fetchDepartments]);
 
   // 마스터코드에서 상태 옵션 가져오기
   const statusTypes = React.useMemo(() => {

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 // Supabase 설정
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -67,6 +68,9 @@ const testSupabaseConnection = async (): Promise<boolean> => {
 
 // localStorage 키
 const STORAGE_KEY = 'nexwork_roles_data';
+
+// 캐시 키
+const CACHE_KEY = createCacheKey('roles', 'data');
 
 export const useSupabaseRoles = () => {
   const [roles, setRoles] = useState<RoleData[]>([]);
@@ -221,6 +225,7 @@ export const useSupabaseRoles = () => {
           }
         ];
         setRoles(defaultRoles);
+        saveToCache(CACHE_KEY, defaultRoles); // 캐시에 저장
         return;
       }
 
@@ -256,6 +261,7 @@ export const useSupabaseRoles = () => {
         }
       ];
       setRoles(defaultRoles);
+      saveToCache(CACHE_KEY, defaultRoles); // 캐시에 저장
     } catch (err: any) {
       console.error('역할 조회 오류:', err);
       setError('역할 데이터 조회 실패');
@@ -278,6 +284,7 @@ export const useSupabaseRoles = () => {
         }
       ];
       setRoles(defaultRoles);
+      saveToCache(CACHE_KEY, defaultRoles); // 캐시에 저장
     } finally {
       setLoading(false);
     }
@@ -383,8 +390,17 @@ export const useSupabaseRoles = () => {
     }
   };
 
-  // 컴포넌트 마운트 시 데이터 로드
+  // 컴포넌트 마운트 시 데이터 로드 (캐시 우선 전략)
   useEffect(() => {
+    // 1. 캐시에서 먼저 로드 (즉시 표시)
+    const cachedData = loadFromCache<RoleData[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      setRoles(cachedData);
+      setLoading(false);
+      console.log('⚡ [Roles] 캐시 데이터 즉시 표시 (깜빡임 방지)');
+    }
+
+    // 2. 백그라운드에서 최신 데이터 가져오기 (항상 실행)
     fetchRoles();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

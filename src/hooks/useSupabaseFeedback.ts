@@ -2,12 +2,24 @@ import { useState } from 'react';
 import useSWR from 'swr';
 import { createClient } from '@/lib/supabase/client';
 import { FeedbackData, CreateFeedbackInput, UpdateFeedbackInput } from 'types/feedback';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
-// Phase 2-1: SWR fetcher 함수
+// Phase 2-1: SWR fetcher 함수 (sessionStorage 캐싱 추가)
 // 🚀 최적화: 전체 데이터 조회 (클라이언트 측에서 페이지네이션)
 const feedbackFetcher = async (key: string) => {
-  console.time('⏱️ Feedback Fetch');
   const [, page, recordId] = key.split('|');
+
+  // 캐시 키 동적 생성 (page와 recordId에 따라 다른 캐시)
+  const cacheKey = createCacheKey('feedback', `${page}_${recordId || 'all'}`);
+
+  // 1. 캐시 확인 (캐시가 있으면 즉시 반환)
+  const cachedData = loadFromCache<FeedbackData[]>(cacheKey, DEFAULT_CACHE_EXPIRY_MS);
+  if (cachedData) {
+    console.log('⚡ [Feedback] 캐시 데이터 반환 (깜빡임 방지)');
+    return cachedData;
+  }
+
+  console.time('⏱️ Feedback Fetch');
   const supabase = createClient();
 
   // 디버깅: 쿼리 파라미터 확인
@@ -41,6 +53,9 @@ const feedbackFetcher = async (key: string) => {
 
   console.timeEnd('⏱️ Feedback Fetch');
   console.log(`📊 피드백 ${count || 0}개 로드 완료`);
+
+  // 2. 캐시에 저장
+  saveToCache(cacheKey, data || []);
 
   return data || [];
 };
@@ -175,6 +190,10 @@ export function useSupabaseFeedback(page: string, recordId?: string | number) {
       console.log(`✅ addFeedback 완료: ${(endTime - startTime).toFixed(2)}ms`);
       console.timeEnd('⏱️ addFeedback Total');
 
+      // 캐시 무효화 (최신 데이터 보장)
+      const cacheKey = createCacheKey('feedback', `${page}_${normalizedRecordId || 'all'}`);
+      sessionStorage.removeItem(cacheKey);
+
       return { success: true, data };
     } catch (err: any) {
       // 4. 실패: 롤백 (임시 항목 제거)
@@ -246,6 +265,10 @@ export function useSupabaseFeedback(page: string, recordId?: string | number) {
       console.log(`✅ updateFeedback 완료: ${(endTime - startTime).toFixed(2)}ms`);
       console.timeEnd('⏱️ updateFeedback Total');
 
+      // 캐시 무효화 (최신 데이터 보장)
+      const cacheKey = createCacheKey('feedback', `${page}_${normalizedRecordId || 'all'}`);
+      sessionStorage.removeItem(cacheKey);
+
       return { success: true, data };
     } catch (err: any) {
       // 5. 실패: 롤백 (이전 데이터로 복원)
@@ -310,6 +333,10 @@ export function useSupabaseFeedback(page: string, recordId?: string | number) {
       const endTime = performance.now();
       console.log(`✅ deleteFeedback 완료: ${(endTime - startTime).toFixed(2)}ms`);
       console.timeEnd('⏱️ deleteFeedback Total');
+
+      // 캐시 무효화 (최신 데이터 보장)
+      const cacheKey = createCacheKey('feedback', `${page}_${normalizedRecordId || 'all'}`);
+      sessionStorage.removeItem(cacheKey);
 
       return { success: true };
     } catch (err: any) {

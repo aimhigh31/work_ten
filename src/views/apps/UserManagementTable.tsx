@@ -41,7 +41,7 @@ import UserEditDialog from 'components/UserEditDialog';
 
 // Hooks
 import { useSupabaseUserManagement, UserProfile } from 'hooks/useSupabaseUserManagement';
-import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
+import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 
 // 사용자 데이터 타입 정의 (기존 호환성 유지)
@@ -153,9 +153,11 @@ export default function UserManagementTable({
   const searchParams = useSearchParams();
   const { data: session } = useSession();
 
-  // Supabase 훅 사용
+  // 🏪 공용 창고에서 데이터 가져오기 (중복 로딩 방지!)
+  const { users: supabaseUsers, departments: supabaseDepartments } = useCommonData();
+
+  // Supabase 훅 사용 (데이터 수정 함수만)
   const {
-    users: supabaseUsers,
     loading,
     error,
     clearError,
@@ -165,9 +167,6 @@ export default function UserManagementTable({
     toggleUserStatus,
     deleteUser
   } = useSupabaseUserManagement();
-
-  // 부서 데이터 가져오기
-  const { departments: supabaseDepartments } = useSupabaseDepartmentManagement();
 
   // 마스터코드3 Supabase 훅 사용 (플랫 구조)
   const { subCodes: allSubCodes } = useSupabaseMasterCode3();

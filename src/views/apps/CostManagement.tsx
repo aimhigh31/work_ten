@@ -48,8 +48,7 @@ import CostDataTable from 'views/apps/CostDataTable';
 import { useSupabaseCost } from '../../hooks/useSupabaseCost';
 import { costTypeOptions } from 'types/cost';
 import { CostRecord } from 'types/cost';
-import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
-import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
+import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
 import { ChangeLogData } from 'types/changelog';
@@ -2117,8 +2116,7 @@ export default function CostManagement() {
 
   // Supabase 비용 데이터 연동
   const { getCosts, createCost, updateCost, deleteCost, checkCodeExists, loading, error } = useSupabaseCost();
-  const { users } = useSupabaseUserManagement();
-  const { departments, fetchDepartments } = useSupabaseDepartmentManagement();
+  const { users, departments } = useCommonData(); // 🏪 공용 창고에서 가져오기
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
   // Supabase 변경로그 연동
@@ -2127,11 +2125,6 @@ export default function CostManagement() {
   const userName = user?.name || session?.user?.name || '시스템';
   const currentUser = users.find((u) => u.email === session?.user?.email);
   const { logs: changeLogData, fetchChangeLogs } = useSupabaseChangeLog('main_cost');
-
-  // 부서 데이터 로드
-  React.useEffect(() => {
-    fetchDepartments();
-  }, [fetchDepartments]);
 
   // 마스터코드에서 상태 옵션 가져오기
   const statusTypes = React.useMemo(() => {

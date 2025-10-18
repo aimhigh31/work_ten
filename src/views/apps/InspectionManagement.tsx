@@ -49,8 +49,7 @@ import { inspectionData, teams, assignees, inspectionStatusOptions, inspectionSt
 import { InspectionTableData, InspectionStatus } from 'types/inspection';
 import { useSupabaseSecurityInspection, SecurityInspectionData } from 'hooks/useSupabaseSecurityInspection';
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
-import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
-import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
+import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
 import { ThemeMode } from 'config';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
 import { ChangeLogData } from 'types/changelog';
@@ -1989,16 +1988,8 @@ export default function InspectionManagement() {
   // 마스터코드 훅 (점검유형 가져오기)
   const { getSubCodesByGroup, subCodes } = useSupabaseMasterCode3();
 
-  // 사용자관리 훅
-  const { users } = useSupabaseUserManagement();
-
-  // 부서관리 훅
-  const { departments, fetchDepartments } = useSupabaseDepartmentManagement();
-
-  // 컴포넌트 마운트 시 부서 목록 로드
-  React.useEffect(() => {
-    fetchDepartments();
-  }, [fetchDepartments]);
+  // 사용자 및 부서 데이터
+  const { users, departments } = useCommonData(); // 🏪 공용 창고에서 가져오기
 
   // 점검유형 목록 가져오기 (GROUP033) - useMemo로 감싸서 마스터코드 로드 후 자동 업데이트
   const inspectionTypesList = React.useMemo(() => {

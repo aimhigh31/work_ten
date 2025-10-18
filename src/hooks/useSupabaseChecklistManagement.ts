@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { TaskTableData } from 'types/task';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
+
+const CACHE_KEY = createCacheKey('checklist_management', 'data');
 
 // 체크리스트 데이터 타입 (DB 구조에 맞춤)
 export interface ChecklistData {
@@ -116,6 +119,7 @@ export function useSupabaseChecklistManagement() {
         console.log('✅ 변환된 TaskTableData:', taskData.length, '개');
         console.log('📋 첫 번째 데이터 샘플:', taskData[0]);
         setChecklists(taskData);
+        saveToCache(CACHE_KEY, taskData); // 캐시에 저장
       } else {
         console.error('❌ API 오류:', result.error);
         setError(result.error || '체크리스트 목록을 불러오는데 실패했습니다.');
@@ -295,8 +299,14 @@ export function useSupabaseChecklistManagement() {
     }
   }, [checklists]);
 
-  // 컴포넌트 마운트 시 데이터 로드
+  // 컴포넌트 마운트 시 데이터 로드 (캐시 우선 전략)
   useEffect(() => {
+    const cachedData = loadFromCache<TaskTableData[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      setChecklists(cachedData);
+      setLoading(false);
+      console.log('⚡ [ChecklistManagement] 캐시 데이터 즉시 표시');
+    }
     fetchChecklists();
   }, [fetchChecklists]);
 

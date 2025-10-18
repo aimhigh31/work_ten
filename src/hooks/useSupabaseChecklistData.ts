@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 // 체크리스트 개요 타입
 export interface ChecklistOverview {
@@ -39,6 +40,14 @@ export function useSupabaseChecklistData() {
 
   // 체크리스트 데이터 조회
   const fetchChecklistData = useCallback(async (checklistId: number): Promise<ChecklistData | null> => {
+    // 1. 동적 캐시 키 생성
+    const cacheKey = createCacheKey('checklist_data', `checklist_${checklistId}`);
+    const cachedData = loadFromCache<ChecklistData>(cacheKey, DEFAULT_CACHE_EXPIRY_MS);
+    if (cachedData) {
+      console.log('⚡ [ChecklistData] 캐시 데이터 반환');
+      return cachedData;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -53,6 +62,12 @@ export function useSupabaseChecklistData() {
       }
 
       console.log('✅ 체크리스트 데이터 조회 완료');
+
+      // 2. 캐시에 저장
+      if (result.data) {
+        saveToCache(cacheKey, result.data);
+      }
+
       return result.data;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '알 수 없는 오류';
