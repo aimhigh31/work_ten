@@ -141,10 +141,18 @@ export default function EducationWidget() {
               }
             }}
           >
-            <MenuItem value="Today" sx={{ fontSize: '0.75rem' }}>Today</MenuItem>
-            <MenuItem value="Weekly" sx={{ fontSize: '0.75rem' }}>Weekly</MenuItem>
-            <MenuItem value="Monthly" sx={{ fontSize: '0.75rem' }}>Monthly</MenuItem>
-            <MenuItem value="Total" sx={{ fontSize: '0.75rem' }}>Total</MenuItem>
+            <MenuItem value="Today" sx={{ fontSize: '0.75rem' }}>
+              Today
+            </MenuItem>
+            <MenuItem value="Weekly" sx={{ fontSize: '0.75rem' }}>
+              Weekly
+            </MenuItem>
+            <MenuItem value="Monthly" sx={{ fontSize: '0.75rem' }}>
+              Monthly
+            </MenuItem>
+            <MenuItem value="Total" sx={{ fontSize: '0.75rem' }}>
+              Total
+            </MenuItem>
           </Select>
         </FormControl>
       }
@@ -169,67 +177,69 @@ export default function EducationWidget() {
         }
       }}
     >
-      <Box sx={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        minHeight: 0
-      }}>
+      <Box
+        sx={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          minHeight: 0
+        }}
+      >
         <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
           <List disablePadding sx={{ '& .MuiListItem-root': { px: 0, py: 0.75 } }}>
-          {paginatedEducations.length > 0 ? (
-            paginatedEducations.map((edu) => (
-              <ListItem
-                key={edu.id}
-                sx={{
-                  flexDirection: 'column',
-                  alignItems: 'flex-start',
-                  borderBottom: 1,
-                  borderColor: 'divider',
-                  '&:last-child': { borderBottom: 0 }
-                }}
-              >
-                <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 500 }}>
-                      {edu.title || '제목 없음'}
+            {paginatedEducations.length > 0 ? (
+              paginatedEducations.map((edu) => (
+                <ListItem
+                  key={edu.id}
+                  sx={{
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    borderBottom: 1,
+                    borderColor: 'divider',
+                    '&:last-child': { borderBottom: 0 }
+                  }}
+                >
+                  <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 500 }}>
+                        {edu.title || '제목 없음'}
+                      </Typography>
+                      <Chip
+                        label={edu.status}
+                        size="small"
+                        sx={{
+                          ...getStatusColor(edu.status),
+                          fontWeight: 500,
+                          fontSize: '11px',
+                          height: '20px'
+                        }}
+                      />
+                    </Box>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      {dayjs(edu.start_date).format('YYYY-MM-DD')}
                     </Typography>
-                    <Chip
-                      label={edu.status}
-                      size="small"
-                      sx={{
-                        ...getStatusColor(edu.status),
-                        fontWeight: 500,
-                        fontSize: '11px',
-                        height: '20px'
-                      }}
-                    />
                   </Box>
-                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                    {dayjs(edu.start_date).format('YYYY-MM-DD')}
-                  </Typography>
-                </Box>
+                  <ListItemText
+                    primary={
+                      <Typography variant="body2" sx={{ fontWeight: 400, color: 'text.secondary' }}>
+                        {edu.description || edu.education_category || '설명 없음'}
+                      </Typography>
+                    }
+                  />
+                </ListItem>
+              ))
+            ) : (
+              <ListItem sx={{ py: 2 }}>
                 <ListItemText
                   primary={
-                    <Typography variant="body2" sx={{ fontWeight: 400, color: 'text.secondary' }}>
-                      {edu.description || edu.education_category || '설명 없음'}
+                    <Typography variant="body2" color="text.secondary" textAlign="center">
+                      개인교육 데이터가 없습니다
                     </Typography>
                   }
                 />
               </ListItem>
-            ))
-          ) : (
-            <ListItem sx={{ py: 2 }}>
-              <ListItemText
-                primary={
-                  <Typography variant="body2" color="text.secondary" textAlign="center">
-                    개인교육 데이터가 없습니다
-                  </Typography>
-                }
-              />
-            </ListItem>
-          )}
+            )}
           </List>
         </Box>
 

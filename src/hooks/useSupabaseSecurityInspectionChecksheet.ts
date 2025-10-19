@@ -54,11 +54,7 @@ function convertToChecklistEditorItem(data: ChecksheetData): ChecklistEditorItem
 }
 
 // ChecklistEditorItem을 DB 데이터로 변환
-function convertToChecksheetData(
-  item: ChecklistEditorItem,
-  inspectionId: number,
-  checklistId?: number | null
-): CreateChecksheetRequest {
+function convertToChecksheetData(item: ChecklistEditorItem, inspectionId: number, checklistId?: number | null): CreateChecksheetRequest {
   return {
     inspection_id: inspectionId,
     checklist_id: checklistId,
@@ -132,44 +128,39 @@ export function useSupabaseSecurityInspectionChecksheet() {
   }, []);
 
   // 특정 체크리스트 항목만 조회
-  const fetchChecksheetItemsByChecklist = useCallback(
-    async (inspectionId: number, checklistId: number): Promise<ChecklistEditorItem[]> => {
-      try {
-        console.log('🔄 체크시트 항목 조회 시작...', { inspectionId, checklistId });
-        setLoading(true);
-        setError(null);
+  const fetchChecksheetItemsByChecklist = useCallback(async (inspectionId: number, checklistId: number): Promise<ChecklistEditorItem[]> => {
+    try {
+      console.log('🔄 체크시트 항목 조회 시작...', { inspectionId, checklistId });
+      setLoading(true);
+      setError(null);
 
-        const response = await fetch(
-          `/api/security-inspection-checksheet?inspection_id=${inspectionId}&checklist_id=${checklistId}`
-        );
-        const result = await response.json();
+      const response = await fetch(`/api/security-inspection-checksheet?inspection_id=${inspectionId}&checklist_id=${checklistId}`);
+      const result = await response.json();
 
-        console.log('📡 체크시트 API 응답:', {
-          success: result.success,
-          dataLength: result.data?.length || 0,
-          error: result.error
-        });
+      console.log('📡 체크시트 API 응답:', {
+        success: result.success,
+        dataLength: result.data?.length || 0,
+        error: result.error
+      });
 
-        if (result.success) {
-          const items = result.data.map((data: ChecksheetData) => convertToChecklistEditorItem(data));
-          console.log('✅ 변환된 체크시트 항목:', items.length, '개');
-          return items;
-        } else {
-          console.error('❌ 체크시트 API 오류:', result.error);
-          setError(result.error || '체크시트 항목을 불러오는데 실패했습니다.');
-          return [];
-        }
-      } catch (err) {
-        console.error('💥 체크시트 항목 조회 실패:', err);
-        setError('체크시트 항목을 불러오는데 실패했습니다.');
+      if (result.success) {
+        const items = result.data.map((data: ChecksheetData) => convertToChecklistEditorItem(data));
+        console.log('✅ 변환된 체크시트 항목:', items.length, '개');
+        return items;
+      } else {
+        console.error('❌ 체크시트 API 오류:', result.error);
+        setError(result.error || '체크시트 항목을 불러오는데 실패했습니다.');
         return [];
-      } finally {
-        setLoading(false);
-        console.log('🏁 체크시트 항목 조회 완료');
       }
-    },
-    []
-  );
+    } catch (err) {
+      console.error('💥 체크시트 항목 조회 실패:', err);
+      setError('체크시트 항목을 불러오는데 실패했습니다.');
+      return [];
+    } finally {
+      setLoading(false);
+      console.log('🏁 체크시트 항목 조회 완료');
+    }
+  }, []);
 
   // 체크시트 항목 생성 (일괄)
   const createChecksheetItems = useCallback(

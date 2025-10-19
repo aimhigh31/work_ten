@@ -351,9 +351,7 @@ const RecordTab = memo(
           }}
         >
           <Typography variant="body2" color="text.secondary">
-            {comments.length > 0
-              ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}`
-              : '0-0 of 0'}
+            {comments.length > 0 ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}` : '0-0 of 0'}
           </Typography>
           {comments.length > 0 && (
             <Pagination
@@ -1296,7 +1294,7 @@ export default function InspectionEditDialog({
     };
 
     // 로컬 state에만 추가 (즉시 반응)
-    setPendingFeedbacks(prev => [newFeedback, ...prev]);
+    setPendingFeedbacks((prev) => [newFeedback, ...prev]);
     setNewComment('');
   }, [newComment, inspection, currentUser]);
 
@@ -1309,13 +1307,7 @@ export default function InspectionEditDialog({
     if (!editingCommentText.trim() || !editingCommentId) return;
 
     // 로컬 state만 업데이트 (즉시 반응)
-    setPendingFeedbacks(prev =>
-      prev.map(fb =>
-        fb.id === editingCommentId
-          ? { ...fb, description: editingCommentText }
-          : fb
-      )
-    );
+    setPendingFeedbacks((prev) => prev.map((fb) => (fb.id === editingCommentId ? { ...fb, description: editingCommentText } : fb)));
 
     setEditingCommentId(null);
     setEditingCommentText('');
@@ -1328,7 +1320,7 @@ export default function InspectionEditDialog({
 
   const handleDeleteComment = useCallback((id: string) => {
     // 로컬 state에서만 제거 (즉시 반응)
-    setPendingFeedbacks(prev => prev.filter(fb => fb.id !== id));
+    setPendingFeedbacks((prev) => prev.filter((fb) => fb.id !== id));
   }, []);
 
   // OPL 관련 핸들러 함수들 (Supabase 연동)
@@ -1567,22 +1559,19 @@ export default function InspectionEditDialog({
 
     if (inspection?.id) {
       // 추가된 기록 (temp- ID)
-      const addedFeedbacks = pendingFeedbacks.filter(fb =>
-        fb.id.toString().startsWith('temp-') &&
-        !initialFeedbacks.find(initial => initial.id === fb.id)
+      const addedFeedbacks = pendingFeedbacks.filter(
+        (fb) => fb.id.toString().startsWith('temp-') && !initialFeedbacks.find((initial) => initial.id === fb.id)
       );
 
       // 수정된 기록
-      const updatedFeedbacks = pendingFeedbacks.filter(fb => {
+      const updatedFeedbacks = pendingFeedbacks.filter((fb) => {
         if (fb.id.toString().startsWith('temp-')) return false;
-        const initial = initialFeedbacks.find(initial => initial.id === fb.id);
+        const initial = initialFeedbacks.find((initial) => initial.id === fb.id);
         return initial && initial.description !== fb.description;
       });
 
       // 삭제된 기록
-      const deletedFeedbacks = initialFeedbacks.filter(initial =>
-        !pendingFeedbacks.find(pending => pending.id === initial.id)
-      );
+      const deletedFeedbacks = initialFeedbacks.filter((initial) => !pendingFeedbacks.find((pending) => pending.id === initial.id));
 
       console.log('📊 변경사항:', {
         추가: addedFeedbacks.length,
@@ -1608,7 +1597,7 @@ export default function InspectionEditDialog({
       // 삭제 - feedbacks 배열에 존재하는 항목만 삭제
       for (const feedback of deletedFeedbacks) {
         // feedbacks 배열에 해당 ID가 존재하는지 확인
-        const existsInFeedbacks = feedbacks.some(fb => String(fb.id) === String(feedback.id));
+        const existsInFeedbacks = feedbacks.some((fb) => String(fb.id) === String(feedback.id));
         if (existsInFeedbacks) {
           await deleteFeedback(String(feedback.id));
         } else {
@@ -1621,7 +1610,19 @@ export default function InspectionEditDialog({
     }
 
     onClose();
-  }, [formData, inspection, onSave, onClose, generateInspectionCode, pendingFeedbacks, initialFeedbacks, feedbacks, addFeedback, updateFeedback, deleteFeedback]);
+  }, [
+    formData,
+    inspection,
+    onSave,
+    onClose,
+    generateInspectionCode,
+    pendingFeedbacks,
+    initialFeedbacks,
+    feedbacks,
+    addFeedback,
+    updateFeedback,
+    deleteFeedback
+  ]);
 
   // 닫기 핸들러
   const handleClose = useCallback(() => {
@@ -1973,8 +1974,7 @@ export default function InspectionEditDialog({
                       {checklists.map((checklist) => (
                         <MenuItem key={checklist.id} value={checklist.id}>
                           <Typography variant="body2" sx={{ fontWeight: 400, width: '100%', color: 'black' }}>
-                            {checklist.code} | {checklist.department} | {checklist.workContent} |{' '}
-                            {checklist.description || '설명 없음'}
+                            {checklist.code} | {checklist.department} | {checklist.workContent} | {checklist.description || '설명 없음'}
                           </Typography>
                         </MenuItem>
                       ))}

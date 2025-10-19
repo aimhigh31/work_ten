@@ -39,7 +39,6 @@ import ITEducationEditDialog from 'components/ITEducationEditDialog';
 import { itEducationData, teams, assignees, itEducationStatusOptions, itEducationStatusColors, assigneeAvatars } from 'data/it-education';
 import { ITEducationTableData, ITEducationStatus, ITEducationRecord } from 'types/it-education';
 import { useSupabaseItEducation, ItEducationData } from 'hooks/useSupabaseItEducation';
-import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
 
 // 데이터 변환 함수
 const convertTableDataToRecord = (tableData: ITEducationTableData): ITEducationRecord => {
@@ -110,7 +109,17 @@ interface ITEducationTableProps {
   selectedAssignee?: string;
   tasks?: ITEducationTableData[];
   setTasks?: React.Dispatch<React.SetStateAction<ITEducationTableData[]>>;
-  addChangeLog?: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string, title?: string) => void;
+  addChangeLog?: (
+    action: string,
+    target: string,
+    description: string,
+    team?: string,
+    beforeValue?: string,
+    afterValue?: string,
+    changedField?: string,
+    title?: string
+  ) => void;
+  users?: any[]; // CommonData에서 전달받은 사용자 목록
 }
 
 export default function ITEducationTable({
@@ -120,20 +129,29 @@ export default function ITEducationTable({
   selectedAssignee = '전체',
   tasks,
   setTasks,
-  addChangeLog
+  addChangeLog,
+  users = [] // CommonData에서 전달받은 사용자 목록
 }: ITEducationTableProps) {
   const theme = useTheme();
 
   // Supabase 훅 사용
   const { loading, error, getItEducationData, deleteItEducation } = useSupabaseItEducation();
 
-  // 사용자관리 훅 사용 (프로필 이미지 가져오기)
-  const { users: allUsers } = useSupabaseUserManagement();
-
-  // 사용자 이름으로 프로필 이미지 찾기
-  const getUserProfileImage = (userName: string): string | undefined => {
-    const user = allUsers.find(u => u.user_name === userName);
-    return user?.profile_image_url || user?.avatar_url;
+  // 사용자 이름으로 사용자 데이터 찾기 (CommonData의 users 사용)
+  const findUserByName = (userName: string) => {
+    const foundUser = users.find((user) => user.user_name === userName);
+    if (userName && !foundUser) {
+      console.log('🔍 [ITEducationTable] 사용자를 찾을 수 없음:', userName);
+      console.log('🔍 [ITEducationTable] 전체 users 배열:', users);
+    }
+    if (foundUser) {
+      console.log('✅ [ITEducationTable] 사용자 찾음:', {
+        userName,
+        avatar_url: foundUser.avatar_url,
+        profile_image_url: foundUser.profile_image_url
+      });
+    }
+    return foundUser;
   };
 
   const [data, setData] = useState<ITEducationTableData[]>(tasks ? tasks : []);
@@ -318,17 +336,26 @@ export default function ITEducationTable({
       const deletedTasks = data.filter((task) => selected.includes(task.id));
 
       // 각 선택된 항목을 Supabase에서 소프트 삭제
-      const deletePromises = selected.map(id => deleteItEducation(id));
+      const deletePromises = selected.map((id) => deleteItEducation(id));
       const deleteResults = await Promise.all(deletePromises);
 
       // 성공한 삭제만 처리
-      const successfulDeletes = deleteResults.filter(result => result);
+      const successfulDeletes = deleteResults.filter((result) => result);
 
       if (successfulDeletes.length > 0) {
         // 변경로그 추가
         if (addChangeLog) {
           deletedTasks.forEach((task) => {
-            addChangeLog('교육 삭제', task.code || `IT-EDU-${task.id}`, `${task.educationName || '교육'} 삭제`, undefined, undefined, undefined, undefined, task.educationName);
+            addChangeLog(
+              '교육 삭제',
+              task.code || `IT-EDU-${task.id}`,
+              `${task.educationName || '교육'} 삭제`,
+              undefined,
+              undefined,
+              undefined,
+              undefined,
+              task.educationName
+            );
           });
         }
 
@@ -529,7 +556,7 @@ export default function ITEducationTable({
 
         // 즉시 데이터 새로 로드 (await 사용)
         try {
-          await new Promise(resolve => setTimeout(resolve, 300)); // 짧은 지연으로 Supabase 저장 완료 보장
+          await new Promise((resolve) => setTimeout(resolve, 300)); // 짧은 지연으로 Supabase 저장 완료 보장
           const supabaseData = await getItEducationData();
           console.log('🔍 Supabase 원본 데이터 (첫 번째):', supabaseData[0]);
           const convertedData: ITEducationTableData[] = supabaseData.map((item) => ({
@@ -808,7 +835,7 @@ export default function ITEducationTable({
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Avatar
-                        src={getUserProfileImage(task.assignee)}
+                        src={findUserByName(task.assignee)?.avatar_url || findUserByName(task.assignee)?.profile_image_url}
                         alt={task.assignee}
                         sx={{ width: 24, height: 24 }}
                       >

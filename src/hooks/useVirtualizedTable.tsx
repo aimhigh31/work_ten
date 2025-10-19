@@ -14,12 +14,7 @@ export interface VirtualizedTableRow<T> {
   data: T;
 }
 
-export function useVirtualizedTable<T>({
-  data,
-  height,
-  itemHeight,
-  overscan = 5
-}: VirtualizedTableProps<T>) {
+export function useVirtualizedTable<T>({ data, height, itemHeight, overscan = 5 }: VirtualizedTableProps<T>) {
   const [scrollOffset, setScrollOffset] = useState(0);
 
   const itemCount = data.length;
@@ -30,14 +25,7 @@ export function useVirtualizedTable<T>({
 
   const ListComponent = useMemo(() => {
     return ({ children }: { children: React.ReactNode }) => (
-      <List
-        height={height}
-        itemCount={itemCount}
-        itemSize={itemHeight}
-        itemData={data}
-        overscanCount={overscan}
-        onScroll={handleScroll}
-      >
+      <List height={height} itemCount={itemCount} itemSize={itemHeight} itemData={data} overscanCount={overscan} onScroll={handleScroll}>
         {children}
       </List>
     );
@@ -48,9 +36,6 @@ export function useVirtualizedTable<T>({
     scrollOffset,
     itemCount,
     visibleStartIndex: Math.floor(scrollOffset / itemHeight),
-    visibleStopIndex: Math.min(
-      Math.floor((scrollOffset + height) / itemHeight),
-      itemCount - 1
-    )
+    visibleStopIndex: Math.min(Math.floor((scrollOffset + height) / itemHeight), itemCount - 1)
   };
 }

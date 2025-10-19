@@ -21,11 +21,7 @@ export async function GET(request: NextRequest) {
     console.log('🔍 역할 권한 조회 시작...', roleCode ? `roleCode: ${roleCode}` : '전체');
 
     // 역할 조회
-    let rolesQuery = supabase
-      .from('admin_users_rules')
-      .select('*')
-      .eq('is_active', true)
-      .order('display_order', { ascending: true });
+    let rolesQuery = supabase.from('admin_users_rules').select('*').eq('is_active', true).order('display_order', { ascending: true });
 
     if (roleCode) {
       rolesQuery = rolesQuery.eq('role_code', roleCode);
@@ -44,7 +40,8 @@ export async function GET(request: NextRequest) {
     for (let role of roles || []) {
       const { data: permissions, error: permError } = await supabase
         .from('admin_users_rules_permissions')
-        .select(`
+        .select(
+          `
           menu_id,
           can_read,
           can_write,
@@ -54,7 +51,8 @@ export async function GET(request: NextRequest) {
             menu_page,
             menu_description
           )
-        `)
+        `
+        )
         .eq('role_id', role.id)
         .order('menu_id', { ascending: true });
 
@@ -254,10 +252,7 @@ export async function POST(request: NextRequest) {
       console.log(`🔄 역할 ID ${roleId}의 권한을 업데이트 시작:`, permissions);
 
       // 1. 기존 권한 삭제
-      const { error: deleteError } = await supabase
-        .from('admin_users_rules_permissions')
-        .delete()
-        .eq('role_id', roleId);
+      const { error: deleteError } = await supabase.from('admin_users_rules_permissions').delete().eq('role_id', roleId);
 
       if (deleteError) {
         console.error('기존 권한 삭제 실패:', deleteError);
@@ -297,9 +292,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (permissionsToInsert.length > 0) {
-        const { error: insertError } = await supabase
-          .from('admin_users_rules_permissions')
-          .insert(permissionsToInsert);
+        const { error: insertError } = await supabase.from('admin_users_rules_permissions').insert(permissionsToInsert);
 
         if (insertError) {
           console.error('권한 추가 실패:', insertError);
@@ -349,10 +342,7 @@ export async function DELETE(request: NextRequest) {
     console.log('삭제할 역할 IDs:', ids);
 
     // 1. 먼저 해당 역할들의 권한 삭제
-    const { error: deletePermError } = await supabase
-      .from('admin_users_rules_permissions')
-      .delete()
-      .in('role_id', ids);
+    const { error: deletePermError } = await supabase.from('admin_users_rules_permissions').delete().in('role_id', ids);
 
     if (deletePermError) {
       console.error('권한 삭제 실패:', deletePermError);

@@ -335,9 +335,7 @@ const RecordTab = memo(
           }}
         >
           <Typography variant="body2" color="text.secondary">
-            {comments.length > 0
-              ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}`
-              : '0-0 of 0'}
+            {comments.length > 0 ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}` : '0-0 of 0'}
           </Typography>
           {comments.length > 0 && (
             <Pagination
@@ -766,25 +764,25 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
   // GROUP035 사업부 서브코드 목록
   const businessUnits = useMemo(() => {
     const group035Codes = getSubCodesByGroup('GROUP035');
-    return group035Codes.map(code => code.subcode_name);
+    return group035Codes.map((code) => code.subcode_name);
   }, [getSubCodesByGroup]);
 
   // GROUP039 고객명 서브코드 목록
   const customerNames = useMemo(() => {
     const group039Codes = getSubCodesByGroup('GROUP039');
-    return group039Codes.map(code => code.subcode_name);
+    return group039Codes.map((code) => code.subcode_name);
   }, [getSubCodesByGroup]);
 
   // GROUP036 판매유형 서브코드 목록
   const salesTypes = useMemo(() => {
     const group036Codes = getSubCodesByGroup('GROUP036');
-    return group036Codes.map(code => code.subcode_name);
+    return group036Codes.map((code) => code.subcode_name);
   }, [getSubCodesByGroup]);
 
   // GROUP002 상태 서브코드 목록
   const statusOptions = useMemo(() => {
     const group002Codes = getSubCodesByGroup('GROUP002');
-    return group002Codes.map(code => code.subcode_name);
+    return group002Codes.map((code) => code.subcode_name);
   }, [getSubCodesByGroup]);
 
   // 사용자관리 훅 (담당자 목록용)
@@ -806,19 +804,21 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentText, setEditingCommentText] = useState('');
   // 임시 저장된 기록들 (저장 버튼 클릭 시 DB에 저장)
-  const [pendingComments, setPendingComments] = useState<Array<{
-    id: string;
-    content: string;
-    timestamp: string;
-    author: string;
-    avatar?: string;
-    department?: string;
-    position?: string;
-    role?: string;
-    isNew: boolean; // 새로 추가된 것인지 표시
-  }>>([]);
+  const [pendingComments, setPendingComments] = useState<
+    Array<{
+      id: string;
+      content: string;
+      timestamp: string;
+      author: string;
+      avatar?: string;
+      department?: string;
+      position?: string;
+      role?: string;
+      isNew: boolean; // 새로 추가된 것인지 표시
+    }>
+  >([]);
   // 수정된 기록들 추적
-  const [modifiedComments, setModifiedComments] = useState<{[key: string]: string}>({});
+  const [modifiedComments, setModifiedComments] = useState<{ [key: string]: string }>({});
   // 삭제된 기록 ID들
   const [deletedCommentIds, setDeletedCommentIds] = useState<string[]>([]);
 
@@ -826,7 +826,7 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
   const comments = useMemo(() => {
     // 기존 DB의 feedbacks (삭제된 것 제외)
     const existingComments = feedbacks
-      .filter(feedback => !deletedCommentIds.includes(String(feedback.id)))
+      .filter((feedback) => !deletedCommentIds.includes(String(feedback.id)))
       .map((feedback) => {
         // user_name으로 사용자 찾기
         const feedbackUser = users.find((u) => u.user_name === feedback.user_name);
@@ -849,7 +849,7 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
       });
 
     // 임시 저장된 새 기록들
-    const newComments = pendingComments.map(comment => ({
+    const newComments = pendingComments.map((comment) => ({
       ...comment,
       isNew: true
     }));
@@ -857,7 +857,6 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
     // 합쳐서 반환 (최신 순으로 정렬 - 새 기록이 위로)
     return [...newComments, ...existingComments];
   }, [feedbacks, users, pendingComments, modifiedComments, deletedCommentIds]);
-
 
   // 유효성 검사 상태
   const [validationError, setValidationError] = useState('');
@@ -1018,7 +1017,7 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
         for (const comment of pendingComments) {
           const feedbackInput = {
             page: PAGE_IDENTIFIERS.SALES,
-            record_id: String(formData.id),  // 숫자를 문자열로 변환
+            record_id: String(formData.id), // 숫자를 문자열로 변환
             action_type: '기록',
             description: comment.content,
             user_name: comment.author,
@@ -1030,9 +1029,9 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
           };
 
           console.log('📝 기록 추가 상세:', {
-            'record_id': feedbackInput.record_id,
+            record_id: feedbackInput.record_id,
             'record_id 타입': typeof feedbackInput.record_id,
-            'description': comment.content.substring(0, 30) + '...'
+            description: comment.content.substring(0, 30) + '...'
           });
 
           await addFeedback(feedbackInput);
@@ -1097,7 +1096,7 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
       isNew: true
     };
 
-    setPendingComments(prev => [tempComment, ...prev]);
+    setPendingComments((prev) => [tempComment, ...prev]);
     setNewComment('');
   }, [newComment, users, user]);
 
@@ -1112,16 +1111,12 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
     // 임시 저장된 기록인지 확인 (ID가 temp_로 시작)
     if (editingCommentId.startsWith('temp_')) {
       // pendingComments에서 직접 수정
-      setPendingComments(prev =>
-        prev.map(comment =>
-          comment.id === editingCommentId
-            ? { ...comment, content: editingCommentText }
-            : comment
-        )
+      setPendingComments((prev) =>
+        prev.map((comment) => (comment.id === editingCommentId ? { ...comment, content: editingCommentText } : comment))
       );
     } else {
       // 기존 DB 데이터는 수정 목록에 추가 (저장 시 DB 업데이트)
-      setModifiedComments(prev => ({
+      setModifiedComments((prev) => ({
         ...prev,
         [editingCommentId]: editingCommentText
       }));
@@ -1140,10 +1135,10 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
     // 임시 저장된 기록인지 확인 (ID가 temp_로 시작)
     if (commentId.startsWith('temp_')) {
       // pendingComments에서 직접 삭제
-      setPendingComments(prev => prev.filter(comment => comment.id !== commentId));
+      setPendingComments((prev) => prev.filter((comment) => comment.id !== commentId));
     } else {
       // 기존 DB 데이터는 삭제 목록에 추가 (저장 시 DB에서 삭제)
-      setDeletedCommentIds(prev => [...prev, commentId]);
+      setDeletedCommentIds((prev) => [...prev, commentId]);
     }
   }, []);
 
@@ -1209,425 +1204,452 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
             <TabPanel value={value} index={0}>
               {/* 개요 탭 */}
               <Stack spacing={3}>
-            {/* 사업부-고객명 */}
-            <Stack direction="row" spacing={2}>
-              <FormControl fullWidth>
-                <InputLabel shrink>사업부 <span style={{ color: 'red' }}>*</span></InputLabel>
-                <Select
-                  value={formData.businessUnit || ''}
-                  label="사업부 *"
-                  onChange={(e) => handleInputChange('businessUnit', e.target.value)}
-                  displayEmpty
-                  sx={{
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#e0e0e0'
-                    }
-                  }}
-                >
-                  <MenuItem value="">선택</MenuItem>
-                  {businessUnits.map((unit) => (
-                    <MenuItem key={unit} value={unit}>
-                      {unit}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <FormControl fullWidth>
-                <InputLabel shrink>고객명 <span style={{ color: 'red' }}>*</span></InputLabel>
-                <Select
-                  value={formData.customerName || ''}
-                  label="고객명 *"
-                  onChange={(e) => handleInputChange('customerName', e.target.value)}
-                  displayEmpty
-                  sx={{
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#e0e0e0'
-                    }
-                  }}
-                >
-                  <MenuItem value="">선택</MenuItem>
-                  {customerNames.map((name) => (
-                    <MenuItem key={name} value={name}>
-                      {name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Stack>
-
-            {/* 모델코드-품목코드-품목명 */}
-            <Stack direction="row" spacing={2}>
-              <TextField
-                fullWidth
-                label={<>모델코드 <span style={{ color: 'red' }}>*</span></>}
-                value={formData.modelCode || ''}
-                onChange={(e) => handleInputChange('modelCode', e.target.value)}
-                placeholder="모델코드를 입력하세요 (예: PRJ-2024-001)"
-                variant="outlined"
-                InputLabelProps={{ shrink: true }}
-                sx={{
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#e0e0e0'
-                  }
-                }}
-              />
-
-              <TextField
-                fullWidth
-                label={<>품목코드 <span style={{ color: 'red' }}>*</span></>}
-                value={formData.itemCode || ''}
-                onChange={(e) => handleInputChange('itemCode', e.target.value)}
-                placeholder="품목코드를 입력하세요 (예: PROD-SEC-001)"
-                variant="outlined"
-                InputLabelProps={{ shrink: true }}
-                sx={{
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#e0e0e0'
-                  }
-                }}
-              />
-
-              <TextField
-                fullWidth
-                label={<>품목명 <span style={{ color: 'red' }}>*</span></>}
-                value={formData.itemName || ''}
-                onChange={(e) => handleInputChange('itemName', e.target.value)}
-                placeholder="품목명을 입력하세요"
-                variant="outlined"
-                InputLabelProps={{ shrink: true }}
-                sx={{
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#e0e0e0'
-                  }
-                }}
-              />
-            </Stack>
-
-            {/* 수량-단가-총금액 */}
-            <Stack direction="row" spacing={2}>
-              <TextField
-                fullWidth
-                label={<>수량 <span style={{ color: 'red' }}>*</span></>}
-                type="number"
-                value={formData.quantity === 0 ? '' : formData.quantity}
-                onChange={(e) => {
-                  const quantity = parseInt(e.target.value) || 0;
-                  const totalAmount = quantity * (formData.unitPrice || 0);
-                  setFormData({
-                    ...formData,
-                    quantity,
-                    totalAmount
-                  });
-                }}
-                placeholder="수량 입력"
-                variant="outlined"
-                InputLabelProps={{ shrink: true }}
-                InputProps={{ inputProps: { min: 0 } }}
-                sx={{
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#e0e0e0'
-                  }
-                }}
-              />
-
-              <TextField
-                fullWidth
-                label={<>단가 <span style={{ color: 'red' }}>*</span></>}
-                type="number"
-                value={formData.unitPrice === 0 ? '' : formData.unitPrice}
-                onChange={(e) => {
-                  const unitPrice = parseInt(e.target.value) || 0;
-                  const totalAmount = (formData.quantity || 0) * unitPrice;
-                  setFormData({
-                    ...formData,
-                    unitPrice,
-                    totalAmount
-                  });
-                }}
-                placeholder="단가 입력"
-                variant="outlined"
-                InputLabelProps={{ shrink: true }}
-                InputProps={{ inputProps: { min: 0 } }}
-                sx={{
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#e0e0e0'
-                  }
-                }}
-              />
-
-              <TextField
-                fullWidth
-                label="총금액"
-                value={formData.totalAmount === 0 ? '' : formData.totalAmount}
-                disabled
-                variant="outlined"
-                InputLabelProps={{ shrink: true }}
-                placeholder="자동 계산"
-                helperText="수량 × 단가로 자동 계산됩니다"
-                sx={{
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#e0e0e0'
-                  }
-                }}
-              />
-            </Stack>
-
-            {/* 판매유형-배송일-상태 */}
-            <Stack direction="row" spacing={2}>
-              <FormControl fullWidth>
-                <InputLabel shrink>판매유형 <span style={{ color: 'red' }}>*</span></InputLabel>
-                <Select
-                  value={formData.salesType || ''}
-                  label="판매유형 *"
-                  onChange={(e) => handleInputChange('salesType', e.target.value)}
-                  displayEmpty
-                  sx={{
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#e0e0e0'
-                    }
-                  }}
-                >
-                  <MenuItem value="">선택</MenuItem>
-                  {salesTypes.map((type) => (
-                    <MenuItem key={type} value={type}>
-                      {type}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <TextField
-                fullWidth
-                label={<>배송일 <span style={{ color: 'red' }}>*</span></>}
-                type="date"
-                value={formData.deliveryDate || ''}
-                onChange={(e) => handleInputChange('deliveryDate', e.target.value)}
-                variant="outlined"
-                InputLabelProps={{ shrink: true }}
-                sx={{
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#e0e0e0'
-                  }
-                }}
-              />
-
-              <FormControl fullWidth>
-                <InputLabel shrink>상태</InputLabel>
-                <Select
-                  value={formData.status || ''}
-                  label="상태"
-                  onChange={(e) => handleInputChange('status', e.target.value)}
-                  sx={{
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#e0e0e0'
-                    }
-                  }}
-                >
-                  {statusOptions.map((status) => {
-                    const getStatusColor = (statusName: string) => {
-                      switch (statusName) {
-                        case '대기':
-                          return { bgcolor: '#F5F5F5', color: '#757575' };
-                        case '진행':
-                          return { bgcolor: '#E3F2FD', color: '#1976D2' };
-                        case '완료':
-                          return { bgcolor: '#E8F5E9', color: '#388E3C' };
-                        case '홀딩':
-                          return { bgcolor: '#FFEBEE', color: '#D32F2F' };
-                        default:
-                          return { bgcolor: '#F5F5F5', color: '#757575' };
-                      }
-                    };
-                    return (
-                      <MenuItem key={status} value={status}>
-                        <Chip
-                          label={status}
-                          size="small"
-                          sx={{
-                            backgroundColor: getStatusColor(status).bgcolor,
-                            color: getStatusColor(status).color,
-                            fontSize: '13px',
-                            fontWeight: 400
-                          }}
-                        />
-                      </MenuItem>
-                    );
-                  })}
-                </Select>
-              </FormControl>
-            </Stack>
-
-            {/* 팀-등록자 */}
-            <Stack direction="row" spacing={2}>
-              <TextField
-                fullWidth
-                label="팀"
-                value={formData.team || ''}
-                InputLabelProps={{ shrink: true }}
-                variant="outlined"
-                InputProps={{
-                  readOnly: true
-                }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: '#f5f5f5',
-                    '& fieldset': {
-                      borderColor: '#e0e0e0'
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#e0e0e0'
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#e0e0e0'
-                    }
-                  },
-                  '& .MuiInputBase-input': {
-                    color: '#666666'
-                  }
-                }}
-              />
-
-              <TextField
-                fullWidth
-                label="등록자"
-                value={formData.registrant || ''}
-                InputLabelProps={{ shrink: true }}
-                variant="outlined"
-                InputProps={{
-                  readOnly: true,
-                  startAdornment: (
-                    <Avatar
-                      src={currentUser.profileImage}
-                      sx={{ width: 24, height: 24, mr: 0 }}
+                {/* 사업부-고객명 */}
+                <Stack direction="row" spacing={2}>
+                  <FormControl fullWidth>
+                    <InputLabel shrink>
+                      사업부 <span style={{ color: 'red' }}>*</span>
+                    </InputLabel>
+                    <Select
+                      value={formData.businessUnit || ''}
+                      label="사업부 *"
+                      onChange={(e) => handleInputChange('businessUnit', e.target.value)}
+                      displayEmpty
+                      sx={{
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: '#e0e0e0'
+                        }
+                      }}
                     >
-                      {currentUser.name[0]}
-                    </Avatar>
-                  )
-                }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: '#f5f5f5',
-                    '& fieldset': {
-                      borderColor: '#e0e0e0'
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#e0e0e0'
-                    },
-                    '&.Mui-focused fieldset': {
+                      <MenuItem value="">선택</MenuItem>
+                      {businessUnits.map((unit) => (
+                        <MenuItem key={unit} value={unit}>
+                          {unit}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  <FormControl fullWidth>
+                    <InputLabel shrink>
+                      고객명 <span style={{ color: 'red' }}>*</span>
+                    </InputLabel>
+                    <Select
+                      value={formData.customerName || ''}
+                      label="고객명 *"
+                      onChange={(e) => handleInputChange('customerName', e.target.value)}
+                      displayEmpty
+                      sx={{
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: '#e0e0e0'
+                        }
+                      }}
+                    >
+                      <MenuItem value="">선택</MenuItem>
+                      {customerNames.map((name) => (
+                        <MenuItem key={name} value={name}>
+                          {name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Stack>
+
+                {/* 모델코드-품목코드-품목명 */}
+                <Stack direction="row" spacing={2}>
+                  <TextField
+                    fullWidth
+                    label={
+                      <>
+                        모델코드 <span style={{ color: 'red' }}>*</span>
+                      </>
+                    }
+                    value={formData.modelCode || ''}
+                    onChange={(e) => handleInputChange('modelCode', e.target.value)}
+                    placeholder="모델코드를 입력하세요 (예: PRJ-2024-001)"
+                    variant="outlined"
+                    InputLabelProps={{ shrink: true }}
+                    sx={{
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#e0e0e0'
+                      }
+                    }}
+                  />
+
+                  <TextField
+                    fullWidth
+                    label={
+                      <>
+                        품목코드 <span style={{ color: 'red' }}>*</span>
+                      </>
+                    }
+                    value={formData.itemCode || ''}
+                    onChange={(e) => handleInputChange('itemCode', e.target.value)}
+                    placeholder="품목코드를 입력하세요 (예: PROD-SEC-001)"
+                    variant="outlined"
+                    InputLabelProps={{ shrink: true }}
+                    sx={{
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#e0e0e0'
+                      }
+                    }}
+                  />
+
+                  <TextField
+                    fullWidth
+                    label={
+                      <>
+                        품목명 <span style={{ color: 'red' }}>*</span>
+                      </>
+                    }
+                    value={formData.itemName || ''}
+                    onChange={(e) => handleInputChange('itemName', e.target.value)}
+                    placeholder="품목명을 입력하세요"
+                    variant="outlined"
+                    InputLabelProps={{ shrink: true }}
+                    sx={{
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#e0e0e0'
+                      }
+                    }}
+                  />
+                </Stack>
+
+                {/* 수량-단가-총금액 */}
+                <Stack direction="row" spacing={2}>
+                  <TextField
+                    fullWidth
+                    label={
+                      <>
+                        수량 <span style={{ color: 'red' }}>*</span>
+                      </>
+                    }
+                    type="number"
+                    value={formData.quantity === 0 ? '' : formData.quantity}
+                    onChange={(e) => {
+                      const quantity = parseInt(e.target.value) || 0;
+                      const totalAmount = quantity * (formData.unitPrice || 0);
+                      setFormData({
+                        ...formData,
+                        quantity,
+                        totalAmount
+                      });
+                    }}
+                    placeholder="수량 입력"
+                    variant="outlined"
+                    InputLabelProps={{ shrink: true }}
+                    InputProps={{ inputProps: { min: 0 } }}
+                    sx={{
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#e0e0e0'
+                      }
+                    }}
+                  />
+
+                  <TextField
+                    fullWidth
+                    label={
+                      <>
+                        단가 <span style={{ color: 'red' }}>*</span>
+                      </>
+                    }
+                    type="number"
+                    value={formData.unitPrice === 0 ? '' : formData.unitPrice}
+                    onChange={(e) => {
+                      const unitPrice = parseInt(e.target.value) || 0;
+                      const totalAmount = (formData.quantity || 0) * unitPrice;
+                      setFormData({
+                        ...formData,
+                        unitPrice,
+                        totalAmount
+                      });
+                    }}
+                    placeholder="단가 입력"
+                    variant="outlined"
+                    InputLabelProps={{ shrink: true }}
+                    InputProps={{ inputProps: { min: 0 } }}
+                    sx={{
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#e0e0e0'
+                      }
+                    }}
+                  />
+
+                  <TextField
+                    fullWidth
+                    label="총금액"
+                    value={formData.totalAmount === 0 ? '' : formData.totalAmount}
+                    disabled
+                    variant="outlined"
+                    InputLabelProps={{ shrink: true }}
+                    placeholder="자동 계산"
+                    helperText="수량 × 단가로 자동 계산됩니다"
+                    sx={{
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#e0e0e0'
+                      }
+                    }}
+                  />
+                </Stack>
+
+                {/* 판매유형-배송일-상태 */}
+                <Stack direction="row" spacing={2}>
+                  <FormControl fullWidth>
+                    <InputLabel shrink>
+                      판매유형 <span style={{ color: 'red' }}>*</span>
+                    </InputLabel>
+                    <Select
+                      value={formData.salesType || ''}
+                      label="판매유형 *"
+                      onChange={(e) => handleInputChange('salesType', e.target.value)}
+                      displayEmpty
+                      sx={{
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: '#e0e0e0'
+                        }
+                      }}
+                    >
+                      <MenuItem value="">선택</MenuItem>
+                      {salesTypes.map((type) => (
+                        <MenuItem key={type} value={type}>
+                          {type}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  <TextField
+                    fullWidth
+                    label={
+                      <>
+                        배송일 <span style={{ color: 'red' }}>*</span>
+                      </>
+                    }
+                    type="date"
+                    value={formData.deliveryDate || ''}
+                    onChange={(e) => handleInputChange('deliveryDate', e.target.value)}
+                    variant="outlined"
+                    InputLabelProps={{ shrink: true }}
+                    sx={{
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#e0e0e0'
+                      }
+                    }}
+                  />
+
+                  <FormControl fullWidth>
+                    <InputLabel shrink>상태</InputLabel>
+                    <Select
+                      value={formData.status || ''}
+                      label="상태"
+                      onChange={(e) => handleInputChange('status', e.target.value)}
+                      sx={{
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: '#e0e0e0'
+                        }
+                      }}
+                    >
+                      {statusOptions.map((status) => {
+                        const getStatusColor = (statusName: string) => {
+                          switch (statusName) {
+                            case '대기':
+                              return { bgcolor: '#F5F5F5', color: '#757575' };
+                            case '진행':
+                              return { bgcolor: '#E3F2FD', color: '#1976D2' };
+                            case '완료':
+                              return { bgcolor: '#E8F5E9', color: '#388E3C' };
+                            case '홀딩':
+                              return { bgcolor: '#FFEBEE', color: '#D32F2F' };
+                            default:
+                              return { bgcolor: '#F5F5F5', color: '#757575' };
+                          }
+                        };
+                        return (
+                          <MenuItem key={status} value={status}>
+                            <Chip
+                              label={status}
+                              size="small"
+                              sx={{
+                                backgroundColor: getStatusColor(status).bgcolor,
+                                color: getStatusColor(status).color,
+                                fontSize: '13px',
+                                fontWeight: 400
+                              }}
+                            />
+                          </MenuItem>
+                        );
+                      })}
+                    </Select>
+                  </FormControl>
+                </Stack>
+
+                {/* 팀-등록자 */}
+                <Stack direction="row" spacing={2}>
+                  <TextField
+                    fullWidth
+                    label="팀"
+                    value={formData.team || ''}
+                    InputLabelProps={{ shrink: true }}
+                    variant="outlined"
+                    InputProps={{
+                      readOnly: true
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        backgroundColor: '#f5f5f5',
+                        '& fieldset': {
+                          borderColor: '#e0e0e0'
+                        },
+                        '&:hover fieldset': {
+                          borderColor: '#e0e0e0'
+                        },
+                        '&.Mui-focused fieldset': {
+                          borderColor: '#e0e0e0'
+                        }
+                      },
+                      '& .MuiInputBase-input': {
+                        color: '#666666'
+                      }
+                    }}
+                  />
+
+                  <TextField
+                    fullWidth
+                    label="등록자"
+                    value={formData.registrant || ''}
+                    InputLabelProps={{ shrink: true }}
+                    variant="outlined"
+                    InputProps={{
+                      readOnly: true,
+                      startAdornment: (
+                        <Avatar src={currentUser.profileImage} sx={{ width: 24, height: 24, mr: 0 }}>
+                          {currentUser.name[0]}
+                        </Avatar>
+                      )
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        backgroundColor: '#f5f5f5',
+                        '& fieldset': {
+                          borderColor: '#e0e0e0'
+                        },
+                        '&:hover fieldset': {
+                          borderColor: '#e0e0e0'
+                        },
+                        '&.Mui-focused fieldset': {
+                          borderColor: '#e0e0e0'
+                        }
+                      },
+                      '& .MuiInputBase-input': {
+                        color: '#666666'
+                      }
+                    }}
+                  />
+                </Stack>
+
+                {/* 등록일-코드 */}
+                <Stack direction="row" spacing={2}>
+                  <TextField
+                    fullWidth
+                    label="등록일"
+                    type="date"
+                    value={formData.registrationDate || ''}
+                    InputLabelProps={{ shrink: true }}
+                    variant="outlined"
+                    InputProps={{
+                      readOnly: true
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        backgroundColor: '#f5f5f5',
+                        '& fieldset': {
+                          borderColor: '#e0e0e0'
+                        },
+                        '&:hover fieldset': {
+                          borderColor: '#e0e0e0'
+                        },
+                        '&.Mui-focused fieldset': {
+                          borderColor: '#e0e0e0'
+                        }
+                      },
+                      '& .MuiInputBase-input': {
+                        color: '#666666'
+                      }
+                    }}
+                  />
+
+                  <TextField
+                    fullWidth
+                    label="코드"
+                    value={formData.code || ''}
+                    InputLabelProps={{ shrink: true }}
+                    variant="outlined"
+                    InputProps={{
+                      readOnly: true
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        backgroundColor: '#f5f5f5',
+                        '& fieldset': {
+                          borderColor: '#e0e0e0'
+                        },
+                        '&:hover fieldset': {
+                          borderColor: '#e0e0e0'
+                        },
+                        '&.Mui-focused fieldset': {
+                          borderColor: '#e0e0e0'
+                        }
+                      },
+                      '& .MuiInputBase-input': {
+                        color: '#666666'
+                      }
+                    }}
+                  />
+                </Stack>
+
+                {/* 비고 - 전체 너비 */}
+                <TextField
+                  fullWidth
+                  label="비고"
+                  multiline
+                  rows={4}
+                  value={formData.notes || ''}
+                  onChange={(e) => handleInputChange('notes', e.target.value)}
+                  placeholder="추가 정보를 입력하세요"
+                  variant="outlined"
+                  InputLabelProps={{ shrink: true }}
+                  sx={{
+                    '& .MuiOutlinedInput-notchedOutline': {
                       borderColor: '#e0e0e0'
                     }
-                  },
-                  '& .MuiInputBase-input': {
-                    color: '#666666'
-                  }
-                }}
+                  }}
+                />
+              </Stack>
+            </TabPanel>
+
+            <TabPanel value={value} index={1}>
+              <RecordTab
+                comments={comments}
+                newComment={newComment}
+                onNewCommentChange={setNewComment}
+                onAddComment={handleAddComment}
+                editingCommentId={editingCommentId}
+                editingCommentText={editingCommentText}
+                onEditComment={handleEditComment}
+                onSaveEditComment={handleSaveEditComment}
+                onCancelEditComment={handleCancelEditComment}
+                onDeleteComment={handleDeleteComment}
+                onEditCommentTextChange={setEditingCommentText}
+                currentUserName={currentUser.name}
+                currentUserAvatar={currentUser.profileImage}
+                currentUserRole={currentUser.role}
+                currentUserDepartment={currentUser.department}
               />
-            </Stack>
+            </TabPanel>
 
-            {/* 등록일-코드 */}
-            <Stack direction="row" spacing={2}>
-              <TextField
-                fullWidth
-                label="등록일"
-                type="date"
-                value={formData.registrationDate || ''}
-                InputLabelProps={{ shrink: true }}
-                variant="outlined"
-                InputProps={{
-                  readOnly: true
-                }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: '#f5f5f5',
-                    '& fieldset': {
-                      borderColor: '#e0e0e0'
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#e0e0e0'
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#e0e0e0'
-                    }
-                  },
-                  '& .MuiInputBase-input': {
-                    color: '#666666'
-                  }
-                }}
-              />
-
-              <TextField
-                fullWidth
-                label="코드"
-                value={formData.code || ''}
-                InputLabelProps={{ shrink: true }}
-                variant="outlined"
-                InputProps={{
-                  readOnly: true
-                }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: '#f5f5f5',
-                    '& fieldset': {
-                      borderColor: '#e0e0e0'
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#e0e0e0'
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#e0e0e0'
-                    }
-                  },
-                  '& .MuiInputBase-input': {
-                    color: '#666666'
-                  }
-                }}
-              />
-            </Stack>
-
-            {/* 비고 - 전체 너비 */}
-            <TextField
-              fullWidth
-              label="비고"
-              multiline
-              rows={4}
-              value={formData.notes || ''}
-              onChange={(e) => handleInputChange('notes', e.target.value)}
-              placeholder="추가 정보를 입력하세요"
-              variant="outlined"
-              InputLabelProps={{ shrink: true }}
-              sx={{
-                '& .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#e0e0e0'
-                }
-              }}
-            />
-          </Stack>
-        </TabPanel>
-
-        <TabPanel value={value} index={1}>
-          <RecordTab
-            comments={comments}
-            newComment={newComment}
-            onNewCommentChange={setNewComment}
-            onAddComment={handleAddComment}
-            editingCommentId={editingCommentId}
-            editingCommentText={editingCommentText}
-            onEditComment={handleEditComment}
-            onSaveEditComment={handleSaveEditComment}
-            onCancelEditComment={handleCancelEditComment}
-            onDeleteComment={handleDeleteComment}
-            onEditCommentTextChange={setEditingCommentText}
-            currentUserName={currentUser.name}
-            currentUserAvatar={currentUser.profileImage}
-            currentUserRole={currentUser.role}
-            currentUserDepartment={currentUser.department}
-          />
-        </TabPanel>
-
-        <TabPanel value={value} index={2}>
-          <MaterialTab recordId={formData?.id} currentUser={currentUser} />
-        </TabPanel>
+            <TabPanel value={value} index={2}>
+              <MaterialTab recordId={formData?.id} currentUser={currentUser} />
+            </TabPanel>
           </>
         )}
       </DialogContent>

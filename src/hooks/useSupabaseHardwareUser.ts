@@ -71,9 +71,7 @@ export const useSupabaseHardwareUser = () => {
       console.log('📍 Supabase URL:', supabaseUrl);
       console.log('🔑 Supabase Key (첫 20자):', supabaseKey?.substring(0, 20) + '...');
 
-      const { count, error } = await supabase
-        .from('it_hardware_user')
-        .select('*', { count: 'exact', head: true });
+      const { count, error } = await supabase.from('it_hardware_user').select('*', { count: 'exact', head: true });
 
       if (error) {
         console.log('❌ Supabase 연결 실패:', JSON.stringify(error, null, 2));
@@ -140,7 +138,6 @@ export const useSupabaseHardwareUser = () => {
 
       // 2. 캐시에 저장
       saveToCache(cacheKey, data || []);
-
     } catch (err: any) {
       console.log('❌ fetchUserHistories 오류:', JSON.stringify(err, null, 2));
       setError('사용자 이력을 불러오는데 실패했습니다.');
@@ -151,7 +148,9 @@ export const useSupabaseHardwareUser = () => {
   }, []);
 
   // 사용자 이력 생성 (실제 DB 연동)
-  const createUserHistory = async (userHistoryData: CreateHardwareUserRequest): Promise<{ success: boolean; data?: any; error?: string }> => {
+  const createUserHistory = async (
+    userHistoryData: CreateHardwareUserRequest
+  ): Promise<{ success: boolean; data?: any; error?: string }> => {
     console.log('🆕 사용자 이력 생성 시작:', userHistoryData);
 
     // 데이터 유효성 검사
@@ -185,11 +184,7 @@ export const useSupabaseHardwareUser = () => {
 
     console.log('📝 Supabase에 삽입할 데이터:', newHistoryData);
 
-    const { data, error } = await supabase
-      .from('it_hardware_user')
-      .insert([newHistoryData])
-      .select()
-      .single();
+    const { data, error } = await supabase.from('it_hardware_user').insert([newHistoryData]).select().single();
 
     console.log('📊 Supabase 응답 - data:', data);
     console.log('📊 Supabase 응답 - error:', error);
@@ -244,12 +239,7 @@ export const useSupabaseHardwareUser = () => {
         updated_by: 'system'
       };
 
-      const { data, error } = await supabase
-        .from('it_hardware_user')
-        .update(updateData)
-        .eq('id', id)
-        .select()
-        .single();
+      const { data, error } = await supabase.from('it_hardware_user').update(updateData).eq('id', id).select().single();
 
       if (error) {
         console.log('❌ 사용자 이력 수정 실패:', JSON.stringify(error, null, 2));
@@ -259,15 +249,10 @@ export const useSupabaseHardwareUser = () => {
       console.log('✅ 사용자 이력 수정 성공:', data);
 
       // 로컬 상태 업데이트
-      setUserHistories(prev =>
-        prev.map(history =>
-          history.id === id ? { ...history, ...data } : history
-        )
-      );
+      setUserHistories((prev) => prev.map((history) => (history.id === id ? { ...history, ...data } : history)));
       setError(null);
 
       return data;
-
     } catch (err: any) {
       console.log('❌ updateUserHistory 오류:', JSON.stringify(err, null, 2));
       throw err;
@@ -279,10 +264,7 @@ export const useSupabaseHardwareUser = () => {
     console.log('🗑️ 사용자 이력 삭제 시작:', id);
 
     try {
-      const { error } = await supabase
-        .from('it_hardware_user')
-        .update({ is_active: false, updated_by: 'system' })
-        .eq('id', id);
+      const { error } = await supabase.from('it_hardware_user').update({ is_active: false, updated_by: 'system' }).eq('id', id);
 
       if (error) {
         console.log('❌ 사용자 이력 삭제 실패:', JSON.stringify(error, null, 2));
@@ -292,11 +274,10 @@ export const useSupabaseHardwareUser = () => {
       console.log('✅ 사용자 이력 삭제 성공');
 
       // 로컬 상태에서 제거
-      setUserHistories(prev => prev.filter(history => history.id !== id));
+      setUserHistories((prev) => prev.filter((history) => history.id !== id));
       setError(null);
 
       return { id };
-
     } catch (err: any) {
       console.log('❌ deleteUserHistory 오류:', JSON.stringify(err, null, 2));
       throw err;
@@ -315,13 +296,13 @@ export const useSupabaseHardwareUser = () => {
         .is('end_date', null)
         .single();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116: No rows found
+      if (error && error.code !== 'PGRST116') {
+        // PGRST116: No rows found
         console.log('❌ 현재 사용자 조회 실패:', JSON.stringify(error, null, 2));
         throw error;
       }
 
       return data || null;
-
     } catch (err: any) {
       console.log('❌ getCurrentUser 오류:', JSON.stringify(err, null, 2));
       return null;
@@ -331,11 +312,7 @@ export const useSupabaseHardwareUser = () => {
   // 사용자 이력 통계
   const getUserHistoryStats = async (hardwareId: number) => {
     try {
-      const { data, error } = await supabase
-        .from('it_hardware_user')
-        .select('status')
-        .eq('hardware_id', hardwareId)
-        .eq('is_active', true);
+      const { data, error } = await supabase.from('it_hardware_user').select('status').eq('hardware_id', hardwareId).eq('is_active', true);
 
       if (error) {
         console.log('❌ 통계 조회 실패:', JSON.stringify(error, null, 2));
@@ -343,11 +320,10 @@ export const useSupabaseHardwareUser = () => {
       }
 
       const total = data.length;
-      const active = data.filter(item => item.status === 'active').length;
-      const inactive = data.filter(item => item.status === 'inactive').length;
+      const active = data.filter((item) => item.status === 'active').length;
+      const inactive = data.filter((item) => item.status === 'inactive').length;
 
       return { total, active, inactive };
-
     } catch (err: any) {
       console.log('❌ getUserHistoryStats 오류:', JSON.stringify(err, null, 2));
       return { total: 0, active: 0, inactive: 0 };
@@ -379,7 +355,6 @@ export const useSupabaseHardwareUser = () => {
       console.log('✅ getUserHistories 조회 성공:', data?.length || 0, '개');
       console.log('📋 조회된 데이터:', data);
       return data || [];
-
     } catch (err: any) {
       console.error('❌ getUserHistories 오류:', err);
       setError('사용자 이력을 불러오는데 실패했습니다.');
@@ -418,10 +393,7 @@ export const useSupabaseHardwareUser = () => {
 
     try {
       // 기존 데이터 삭제 (소프트웨어와 동일하게)
-      const { error: deleteError } = await supabase
-        .from('it_hardware_user')
-        .update({ is_active: false })
-        .eq('hardware_id', hardwareId);
+      const { error: deleteError } = await supabase.from('it_hardware_user').update({ is_active: false }).eq('hardware_id', hardwareId);
 
       if (deleteError) {
         console.error('❌ 기존 데이터 비활성화 실패:', deleteError);
@@ -487,10 +459,7 @@ export const useSupabaseHardwareUser = () => {
 
         console.log('📝 최종 삽입할 데이터:', JSON.stringify(insertData, null, 2));
 
-        const { data, error: insertError } = await supabase
-          .from('it_hardware_user')
-          .insert(insertData)
-          .select();
+        const { data, error: insertError } = await supabase.from('it_hardware_user').insert(insertData).select();
 
         if (insertError) {
           console.error('❌ 사용자이력 삽입 실패');
@@ -521,7 +490,6 @@ export const useSupabaseHardwareUser = () => {
 
       console.log('✅ 하드웨어 사용자이력 일괄 저장 완료');
       return true;
-
     } catch (error) {
       console.error('❌ saveUserHistories 오류:', error);
       return false;

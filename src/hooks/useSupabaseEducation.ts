@@ -69,7 +69,6 @@ export const useSupabaseEducation = (): UseSupabaseEducationReturn => {
       saveToCache(cacheKey, data || []);
 
       return data || [];
-
     } catch (error) {
       console.log('❌ getEducations 실패:', error);
       setError(error instanceof Error ? error.message : 'Education 데이터 조회 실패');
@@ -100,7 +99,6 @@ export const useSupabaseEducation = (): UseSupabaseEducationReturn => {
 
       console.log('✅ getEducationById 성공:', data);
       return data;
-
     } catch (error) {
       console.log('❌ getEducationById 실패:', error);
       setError(error instanceof Error ? error.message : 'Education 데이터 조회 실패');
@@ -111,77 +109,70 @@ export const useSupabaseEducation = (): UseSupabaseEducationReturn => {
   }, []);
 
   // 새 Education 생성
-  const createEducation = useCallback(async (
-    education: Omit<DbEducationData, 'id' | 'created_at' | 'updated_at'>
-  ): Promise<DbEducationData | null> => {
-    try {
-      console.log('🚀 createEducation 시작');
-      console.log('📝 생성할 Education 데이터:', education);
-      setLoading(true);
-      setError(null);
+  const createEducation = useCallback(
+    async (education: Omit<DbEducationData, 'id' | 'created_at' | 'updated_at'>): Promise<DbEducationData | null> => {
+      try {
+        console.log('🚀 createEducation 시작');
+        console.log('📝 생성할 Education 데이터:', education);
+        setLoading(true);
+        setError(null);
 
-      // 현재 최대 no 값 확인
-      const { data: maxNoData, error: maxNoError } = await supabase
-        .from('main_education_data')
-        .select('no')
-        .order('no', { ascending: false })
-        .limit(1);
+        // 현재 최대 no 값 확인
+        const { data: maxNoData, error: maxNoError } = await supabase
+          .from('main_education_data')
+          .select('no')
+          .order('no', { ascending: false })
+          .limit(1);
 
-      if (maxNoError) {
-        console.log('❌ 최대 no 조회 실패:', maxNoError);
-        throw maxNoError;
-      }
+        if (maxNoError) {
+          console.log('❌ 최대 no 조회 실패:', maxNoError);
+          throw maxNoError;
+        }
 
-      const nextNo = maxNoData && maxNoData.length > 0 ? maxNoData[0].no + 1 : 1;
-      console.log('📊 다음 no 값:', nextNo);
+        const nextNo = maxNoData && maxNoData.length > 0 ? maxNoData[0].no + 1 : 1;
+        console.log('📊 다음 no 값:', nextNo);
 
-      const insertData = {
-        ...education,
-        no: nextNo, // 자동 증가 번호 설정
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
+        const insertData = {
+          ...education,
+          no: nextNo, // 자동 증가 번호 설정
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
 
-      console.log('💾 최종 삽입 데이터:', insertData);
+        console.log('💾 최종 삽입 데이터:', insertData);
 
-      const { data, error: supabaseError } = await supabase
-        .from('main_education_data')
-        .insert([insertData])
-        .select()
-        .single();
+        const { data, error: supabaseError } = await supabase.from('main_education_data').insert([insertData]).select().single();
 
-      if (supabaseError) {
-        console.log('❌ Supabase 생성 오류:', supabaseError);
-        console.log('❌ 오류 메시지:', supabaseError.message);
-        console.log('❌ 상세 오류:', supabaseError.details);
-        console.log('❌ 힌트:', supabaseError.hint);
-        console.log('❌ 오류 코드:', supabaseError.code);
-        setError(`개인교육관리 생성 오류: ${supabaseError.message || '알 수 없는 오류'}`);
+        if (supabaseError) {
+          console.log('❌ Supabase 생성 오류:', supabaseError);
+          console.log('❌ 오류 메시지:', supabaseError.message);
+          console.log('❌ 상세 오류:', supabaseError.details);
+          console.log('❌ 힌트:', supabaseError.hint);
+          console.log('❌ 오류 코드:', supabaseError.code);
+          setError(`개인교육관리 생성 오류: ${supabaseError.message || '알 수 없는 오류'}`);
+          return null;
+        }
+
+        console.log('✅ createEducation 성공:', data);
+
+        // 캐시 무효화 (최신 데이터 보장)
+        const cacheKey = createCacheKey('education', 'data');
+        sessionStorage.removeItem(cacheKey);
+
+        return data;
+      } catch (error) {
+        console.log('❌ createEducation 실패:', error);
+        setError(error instanceof Error ? error.message : '개인교육관리 생성 실패');
         return null;
+      } finally {
+        setLoading(false);
       }
-
-      console.log('✅ createEducation 성공:', data);
-
-      // 캐시 무효화 (최신 데이터 보장)
-      const cacheKey = createCacheKey('education', 'data');
-      sessionStorage.removeItem(cacheKey);
-
-      return data;
-
-    } catch (error) {
-      console.log('❌ createEducation 실패:', error);
-      setError(error instanceof Error ? error.message : '개인교육관리 생성 실패');
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   // Education 업데이트
-  const updateEducation = useCallback(async (
-    id: number,
-    education: Partial<DbEducationData>
-  ): Promise<boolean> => {
+  const updateEducation = useCallback(async (id: number, education: Partial<DbEducationData>): Promise<boolean> => {
     try {
       console.log('📞 updateEducation 호출:', id);
       setLoading(true);
@@ -192,11 +183,7 @@ export const useSupabaseEducation = (): UseSupabaseEducationReturn => {
         updated_at: new Date().toISOString()
       };
 
-      const { error: supabaseError } = await supabase
-        .from('main_education_data')
-        .update(updateData)
-        .eq('id', id)
-        .eq('is_active', true);
+      const { error: supabaseError } = await supabase.from('main_education_data').update(updateData).eq('id', id).eq('is_active', true);
 
       if (supabaseError) {
         console.log('❌ Supabase 업데이트 오류:', supabaseError);
@@ -211,7 +198,6 @@ export const useSupabaseEducation = (): UseSupabaseEducationReturn => {
       sessionStorage.removeItem(cacheKey);
 
       return true;
-
     } catch (error) {
       console.log('❌ updateEducation 실패:', error);
       setError(error instanceof Error ? error.message : 'Education 업데이트 실패');
@@ -249,7 +235,6 @@ export const useSupabaseEducation = (): UseSupabaseEducationReturn => {
       sessionStorage.removeItem(cacheKey);
 
       return true;
-
     } catch (error) {
       console.log('❌ deleteEducation 실패:', error);
       setError(error instanceof Error ? error.message : 'Education 삭제 실패');
@@ -284,9 +269,7 @@ export const useSupabaseEducation = (): UseSupabaseEducationReturn => {
   }, []);
 
   // 프론트엔드 데이터를 DB 형식으로 변환
-  const convertToDbEducationData = useCallback((
-    frontendData: EducationData
-  ): any => {
+  const convertToDbEducationData = useCallback((frontendData: EducationData): any => {
     // 코드 생성: MAIN-EDU-{YY}-{NNN}
     const year = new Date(frontendData.registrationDate || Date.now()).getFullYear().toString().slice(-2);
     const no = frontendData.no || 0;

@@ -65,7 +65,7 @@ export function useSupabaseDepartments() {
         throw fetchError;
       }
 
-      const names = data?.map(d => d.department_name) || [];
+      const names = data?.map((d) => d.department_name) || [];
       console.log('🏢 활성화된 부서명 조회 성공:', names);
       return names;
     } catch (err) {

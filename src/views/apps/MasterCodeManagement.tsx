@@ -780,6 +780,8 @@ export default function MasterCodeManagement() {
     subCodes: allSubCodes,
     loading,
     error,
+    getAllMasterCodes,
+    processAllData,
     refreshData,
     createGroup,
     updateGroup,
@@ -1270,6 +1272,20 @@ export default function MasterCodeManagement() {
       }
     };
   }, [clickTimeout]);
+
+  // 초기 데이터 로드
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        const data = await getAllMasterCodes();
+        processAllData(data);
+      } catch (err) {
+        console.error('마스터코드 데이터 로드 실패:', err);
+      }
+    };
+
+    loadInitialData();
+  }, [getAllMasterCodes, processAllData]);
 
   // ========================================
   // 렌더링

@@ -199,12 +199,7 @@ const SecurityIncidentOverviewTab = memo(
                   사고유형 <span style={{ color: 'red' }}>*</span>
                 </span>
               </InputLabel>
-              <Select
-                value={taskState.incidentType}
-                label="사고유형 *"
-                onChange={handleFieldChange('incidentType')}
-                displayEmpty
-              >
+              <Select value={taskState.incidentType} label="사고유형 *" onChange={handleFieldChange('incidentType')} displayEmpty>
                 <MenuItem value="">선택</MenuItem>
                 {incidentTypeOptions.length > 0
                   ? incidentTypeOptions.map((option) => (

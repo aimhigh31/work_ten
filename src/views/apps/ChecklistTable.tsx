@@ -40,7 +40,7 @@ import { teams, assignees, taskStatusOptions, taskStatusColors, assigneeAvatars 
 import { TaskTableData, TaskStatus } from 'types/task';
 
 // hooks
-import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
+import { useSupabaseUsers } from 'hooks/useSupabaseUsers';
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseChecklistManagement } from 'hooks/useSupabaseChecklistManagement';
 
@@ -83,8 +83,8 @@ export default function ChecklistTable({
 }: ChecklistTableProps) {
   const theme = useTheme();
 
-  // 사용자 관리 훅 사용
-  const { users } = useSupabaseUserManagement();
+  // 사용자 관리 훅 사용 (Auto-loading 패턴)
+  const { users } = useSupabaseUsers();
 
   // 마스터코드 훅 사용
   const { subCodes } = useSupabaseMasterCode3();
@@ -101,7 +101,20 @@ export default function ChecklistTable({
 
   // user_code로 user 정보를 찾는 헬퍼 함수
   const getUserByCode = (userCode: string) => {
-    return users.find((u) => u.user_code === userCode);
+    const foundUser = users.find((u) => u.user_code === userCode);
+    if (userCode && !foundUser) {
+      console.log('🔍 [ChecklistTable] 사용자를 찾을 수 없음:', userCode);
+      console.log('🔍 [ChecklistTable] 전체 users 배열:', users);
+    }
+    if (foundUser) {
+      console.log('✅ [ChecklistTable] 사용자 찾음:', {
+        userCode,
+        user_name: foundUser.user_name,
+        avatar_url: foundUser.avatar_url,
+        profile_image_url: foundUser.profile_image_url
+      });
+    }
+    return foundUser;
   };
 
   // user_code로 user_name을 찾는 헬퍼 함수

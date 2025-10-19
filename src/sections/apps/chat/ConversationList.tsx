@@ -49,7 +49,13 @@ interface ConversationListItemProps {
 
 // ==============================|| CHAT - CONVERSATION ITEM ||============================== //
 
-function ConversationListItem({ conversation, setUser, selectedUser, onConversationSelect, onConversationDelete }: ConversationListItemProps) {
+function ConversationListItem({
+  conversation,
+  setUser,
+  selectedUser,
+  onConversationSelect,
+  onConversationDelete
+}: ConversationListItemProps) {
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     onConversationDelete?.(conversation.id);
@@ -149,7 +155,14 @@ function ConversationListItem({ conversation, setUser, selectedUser, onConversat
   );
 }
 
-export default function ConversationList({ setUser, search, selectedUser, conversations, onConversationSelect, onConversationDelete }: ConversationListProps) {
+export default function ConversationList({
+  setUser,
+  search,
+  selectedUser,
+  conversations,
+  onConversationSelect,
+  onConversationDelete
+}: ConversationListProps) {
   const [data, setData] = useState<ConversationData[]>([]);
   const [loading, setLoading] = useState(false);
 

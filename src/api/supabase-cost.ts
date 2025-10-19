@@ -246,7 +246,7 @@ export class SupabaseCostAPI {
     const fileExt = file.name.split('.').pop();
     const fileName = `${user.id}/${costRecordId}/${Date.now()}.${fileExt}`;
 
-    const { data: uploadData, error: uploadError } = await supabase.storage.from('cost-attachments').upload(fileName, file, {
+    const { error: uploadError } = await supabase.storage.from('cost-attachments').upload(fileName, file, {
       cacheControl: '3600',
       upsert: false
     });

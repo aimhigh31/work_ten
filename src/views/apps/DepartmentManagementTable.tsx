@@ -168,15 +168,8 @@ export default function DepartmentManagementTable({
   const { departments: supabaseDepartments } = useCommonData();
 
   // Supabase 훅 사용 (데이터 수정 함수만)
-  const {
-    loading,
-    error,
-    clearError,
-    createDepartment,
-    updateDepartment,
-    deleteDepartment,
-    toggleDepartmentStatus
-  } = useSupabaseDepartmentManagement();
+  const { loading, error, clearError, createDepartment, updateDepartment, deleteDepartment, toggleDepartmentStatus } =
+    useSupabaseDepartmentManagement();
 
   // 변환된 부서 데이터
   const transformedDepartments = useMemo(() => {

@@ -26,7 +26,7 @@ export default function useUser() {
     const provider = session?.provider;
 
     // DB에서 현재 사용자의 프로필 정보 가져오기
-    const dbUser = users.find(u => u.email === user?.email);
+    const dbUser = users.find((u) => u.email === user?.email);
     const profileImage = dbUser?.profile_image_url || dbUser?.avatar_url;
 
     let thumb = profileImage || user?.image || '/assets/images/users/avatar-1.png';

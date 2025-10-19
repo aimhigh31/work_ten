@@ -321,26 +321,18 @@ const OverviewTab = memo(
                     </TableHead>
                     <TableBody>
                       <TableRow>
-                        <TableCell sx={{ fontSize: '0.7rem', py: 0.5, px: 1 }}>
-                          {taskState.loadedKpiData.kpi_work_content || '-'}
-                        </TableCell>
+                        <TableCell sx={{ fontSize: '0.7rem', py: 0.5, px: 1 }}>{taskState.loadedKpiData.kpi_work_content || '-'}</TableCell>
                         <TableCell sx={{ fontSize: '0.7rem', py: 0.5, px: 1 }}>
                           {taskState.loadedKpiData.level === 0
                             ? taskState.loadedKpiData.text
-                            : (taskState.loadedKpiData.parent_task_text || '-')}
+                            : taskState.loadedKpiData.parent_task_text || '-'}
                         </TableCell>
                         <TableCell sx={{ fontSize: '0.7rem', py: 0.5, px: 1 }}>
                           {taskState.loadedKpiData.level === 1 ? taskState.loadedKpiData.text : '-'}
                         </TableCell>
-                        <TableCell sx={{ fontSize: '0.7rem', py: 0.5, px: 1 }}>
-                          {taskState.loadedKpiData.priority || '-'}
-                        </TableCell>
-                        <TableCell sx={{ fontSize: '0.7rem', py: 0.5, px: 1 }}>
-                          {taskState.loadedKpiData.team || '-'}
-                        </TableCell>
-                        <TableCell sx={{ fontSize: '0.7rem', py: 0.5, px: 1 }}>
-                          {taskState.loadedKpiData.assignee || '-'}
-                        </TableCell>
+                        <TableCell sx={{ fontSize: '0.7rem', py: 0.5, px: 1 }}>{taskState.loadedKpiData.priority || '-'}</TableCell>
+                        <TableCell sx={{ fontSize: '0.7rem', py: 0.5, px: 1 }}>{taskState.loadedKpiData.team || '-'}</TableCell>
+                        <TableCell sx={{ fontSize: '0.7rem', py: 0.5, px: 1 }}>{taskState.loadedKpiData.assignee || '-'}</TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>
@@ -427,69 +419,67 @@ const OverviewTab = memo(
             <FormControl fullWidth>
               <InputLabel shrink>상태</InputLabel>
               <Select value={taskState.status} label="상태" onChange={handleFieldChange('status')}>
-                {statusOptionsFromDB.length > 0 ? (
-                  statusOptionsFromDB.map((option) => {
-                    const getStatusColor = (statusName: string) => {
-                      switch (statusName) {
-                        case '대기':
-                          return { bgcolor: '#F5F5F5', color: '#757575' };
-                        case '진행':
-                          return { bgcolor: '#E3F2FD', color: '#1976D2' };
-                        case '완료':
-                          return { bgcolor: '#E8F5E9', color: '#388E3C' };
-                        case '홀딩':
-                          return { bgcolor: '#FFEBEE', color: '#D32F2F' };
-                        default:
-                          return { bgcolor: '#F5F5F5', color: '#757575' };
-                      }
-                    };
-                    return (
-                      <MenuItem key={option.code} value={option.name}>
-                        <Chip
-                          label={option.name}
-                          size="small"
-                          sx={{
-                            backgroundColor: getStatusColor(option.name).bgcolor,
-                            color: getStatusColor(option.name).color,
-                            fontSize: '13px',
-                            fontWeight: 400
-                          }}
-                        />
-                      </MenuItem>
-                    );
-                  })
-                ) : (
-                  statusOptions.map((status) => {
-                    const getStatusColor = (statusName: string) => {
-                      switch (statusName) {
-                        case '대기':
-                          return { bgcolor: '#F5F5F5', color: '#757575' };
-                        case '진행':
-                          return { bgcolor: '#E3F2FD', color: '#1976D2' };
-                        case '완료':
-                          return { bgcolor: '#E8F5E9', color: '#388E3C' };
-                        case '홀딩':
-                          return { bgcolor: '#FFEBEE', color: '#D32F2F' };
-                        default:
-                          return { bgcolor: '#F5F5F5', color: '#757575' };
-                      }
-                    };
-                    return (
-                      <MenuItem key={status} value={status}>
-                        <Chip
-                          label={status}
-                          size="small"
-                          sx={{
-                            backgroundColor: getStatusColor(status).bgcolor,
-                            color: getStatusColor(status).color,
-                            fontSize: '13px',
-                            fontWeight: 400
-                          }}
-                        />
-                      </MenuItem>
-                    );
-                  })
-                )}
+                {statusOptionsFromDB.length > 0
+                  ? statusOptionsFromDB.map((option) => {
+                      const getStatusColor = (statusName: string) => {
+                        switch (statusName) {
+                          case '대기':
+                            return { bgcolor: '#F5F5F5', color: '#757575' };
+                          case '진행':
+                            return { bgcolor: '#E3F2FD', color: '#1976D2' };
+                          case '완료':
+                            return { bgcolor: '#E8F5E9', color: '#388E3C' };
+                          case '홀딩':
+                            return { bgcolor: '#FFEBEE', color: '#D32F2F' };
+                          default:
+                            return { bgcolor: '#F5F5F5', color: '#757575' };
+                        }
+                      };
+                      return (
+                        <MenuItem key={option.code} value={option.name}>
+                          <Chip
+                            label={option.name}
+                            size="small"
+                            sx={{
+                              backgroundColor: getStatusColor(option.name).bgcolor,
+                              color: getStatusColor(option.name).color,
+                              fontSize: '13px',
+                              fontWeight: 400
+                            }}
+                          />
+                        </MenuItem>
+                      );
+                    })
+                  : statusOptions.map((status) => {
+                      const getStatusColor = (statusName: string) => {
+                        switch (statusName) {
+                          case '대기':
+                            return { bgcolor: '#F5F5F5', color: '#757575' };
+                          case '진행':
+                            return { bgcolor: '#E3F2FD', color: '#1976D2' };
+                          case '완료':
+                            return { bgcolor: '#E8F5E9', color: '#388E3C' };
+                          case '홀딩':
+                            return { bgcolor: '#FFEBEE', color: '#D32F2F' };
+                          default:
+                            return { bgcolor: '#F5F5F5', color: '#757575' };
+                        }
+                      };
+                      return (
+                        <MenuItem key={status} value={status}>
+                          <Chip
+                            label={status}
+                            size="small"
+                            sx={{
+                              backgroundColor: getStatusColor(status).bgcolor,
+                              color: getStatusColor(status).color,
+                              fontSize: '13px',
+                              fontWeight: 400
+                            }}
+                          />
+                        </MenuItem>
+                      );
+                    })}
               </Select>
             </FormControl>
           </Stack>
@@ -969,9 +959,7 @@ const RecordTab = memo(
           }}
         >
           <Typography variant="body2" color="text.secondary">
-            {comments.length > 0
-              ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}`
-              : '0-0 of 0'}
+            {comments.length > 0 ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}` : '0-0 of 0'}
           </Typography>
           {comments.length > 0 && (
             <Pagination
@@ -2814,18 +2802,20 @@ const TaskEditDialog = memo(
     const [userOptions, setUserOptions] = useState<Array<{ code: string; name: string; profileImage?: string }>>([]);
 
     // 기록탭 임시 상태 관리 (저장 전까지 메모리에만 보관)
-    const [pendingComments, setPendingComments] = useState<Array<{
-      id: string;
-      content: string;
-      timestamp: string;
-      author: string;
-      avatar?: string;
-      department?: string;
-      position?: string;
-      role?: string;
-      isNew: boolean;
-    }>>([]);
-    const [modifiedComments, setModifiedComments] = useState<{[key: string]: string}>({});
+    const [pendingComments, setPendingComments] = useState<
+      Array<{
+        id: string;
+        content: string;
+        timestamp: string;
+        author: string;
+        avatar?: string;
+        department?: string;
+        position?: string;
+        role?: string;
+        isNew: boolean;
+      }>
+    >([]);
+    const [modifiedComments, setModifiedComments] = useState<{ [key: string]: string }>({});
     const [deletedCommentIds, setDeletedCommentIds] = useState<string[]>([]);
 
     // 마스터코드 및 부서 데이터 로드 (컴포넌트 마운트 시 한번만)
@@ -2844,8 +2834,8 @@ const TaskEditDialog = memo(
             console.error('업무유형 조회 실패:', taskTypeError);
           } else {
             const taskTypeOpts = taskTypes
-              .filter(item => item.subcode && item.subcode_name)
-              .map(item => ({
+              .filter((item) => item.subcode && item.subcode_name)
+              .map((item) => ({
                 code: item.subcode,
                 name: item.subcode_name
               }));
@@ -2864,8 +2854,8 @@ const TaskEditDialog = memo(
             console.error('업무분류 조회 실패:', deptError);
           } else {
             const deptOpts = departments
-              .filter(item => item.subcode && item.subcode_name)
-              .map(item => ({
+              .filter((item) => item.subcode && item.subcode_name)
+              .map((item) => ({
                 code: item.subcode,
                 name: item.subcode_name
               }));
@@ -2884,8 +2874,8 @@ const TaskEditDialog = memo(
             console.error('상태 조회 실패:', statusError);
           } else {
             const statusOpts = statuses
-              .filter(item => item.subcode && item.subcode_name)
-              .map(item => ({
+              .filter((item) => item.subcode && item.subcode_name)
+              .map((item) => ({
                 code: item.subcode,
                 name: item.subcode_name
               }));
@@ -2902,7 +2892,7 @@ const TaskEditDialog = memo(
           if (teamError) {
             console.error('팀 조회 실패:', teamError);
           } else {
-            const teamOpts = teams.map(item => ({
+            const teamOpts = teams.map((item) => ({
               code: item.department_code,
               name: item.department_name
             }));
@@ -2919,7 +2909,7 @@ const TaskEditDialog = memo(
           if (userError) {
             console.error('사용자 조회 실패:', userError);
           } else {
-            const userOpts = users.map(item => ({
+            const userOpts = users.map((item) => ({
               code: item.user_code,
               name: item.user_name,
               profileImage: item.profile_image_url
@@ -3023,8 +3013,8 @@ const TaskEditDialog = memo(
     const comments = useMemo(() => {
       // DB에서 가져온 피드백 데이터를 댓글 형식으로 변환
       const dbComments = feedbacks
-        .filter(fb => !deletedCommentIds.includes(String(fb.id)))
-        .map(fb => ({
+        .filter((fb) => !deletedCommentIds.includes(String(fb.id)))
+        .map((fb) => ({
           id: String(fb.id),
           author: fb.user_name,
           content: modifiedComments[String(fb.id)] !== undefined ? modifiedComments[String(fb.id)] : fb.description,
@@ -3036,7 +3026,7 @@ const TaskEditDialog = memo(
         }));
 
       // 임시로 추가된 댓글들 (temp_ prefix가 있는 것들)
-      const tempComments = pendingComments.map(pc => ({
+      const tempComments = pendingComments.map((pc) => ({
         id: pc.id,
         author: pc.author,
         content: pc.content,
@@ -3075,7 +3065,7 @@ const TaskEditDialog = memo(
 
           if (planItems.length > 0) {
             // DB 데이터를 프론트엔드 형식으로 변환
-            const convertedItems = planItems.map(item => ({
+            const convertedItems = planItems.map((item) => ({
               id: item.item_id,
               text: item.text,
               checked: item.checked,
@@ -3216,7 +3206,7 @@ const TaskEditDialog = memo(
           // 계획 항목 저장 (신규 생성)
           console.log('💾 계획 항목 저장 시작 (신규):', taskState.code, '항목 수:', checklistItems.length);
           if (checklistItems.length > 0) {
-            const planItemsToSave: PlanItemInput[] = checklistItems.map(item => ({
+            const planItemsToSave: PlanItemInput[] = checklistItems.map((item) => ({
               task_id: taskState.code,
               item_id: item.id,
               text: item.text,
@@ -3260,7 +3250,7 @@ const TaskEditDialog = memo(
 
           // 계획 항목 저장 (기존 수정)
           console.log('💾 계획 항목 저장 시작:', task.code, '항목 수:', checklistItems.length);
-          const planItemsToSave: PlanItemInput[] = checklistItems.map(item => ({
+          const planItemsToSave: PlanItemInput[] = checklistItems.map((item) => ({
             task_id: task.code,
             item_id: item.id,
             text: item.text,
@@ -3339,7 +3329,22 @@ const TaskEditDialog = memo(
 
         onClose();
       }, 50); // 50ms 지연
-    }, [task, taskState, onSave, onClose, dispatch, checklistItems, savePlanItems, deletedCommentIds, modifiedComments, pendingComments, deleteFeedback, updateFeedback, addFeedback, fetchFeedbacks]);
+    }, [
+      task,
+      taskState,
+      onSave,
+      onClose,
+      dispatch,
+      checklistItems,
+      savePlanItems,
+      deletedCommentIds,
+      modifiedComments,
+      pendingComments,
+      deleteFeedback,
+      updateFeedback,
+      addFeedback,
+      fetchFeedbacks
+    ]);
 
     const handleClose = useCallback(() => {
       setEditTab(0);
@@ -3673,7 +3678,7 @@ const TaskEditDialog = memo(
         isNew: true
       };
 
-      setPendingComments(prev => [tempComment, ...prev]);
+      setPendingComments((prev) => [tempComment, ...prev]);
       setNewComment('');
     }, [newComment, users, user]);
 
@@ -3688,16 +3693,12 @@ const TaskEditDialog = memo(
       // temp_ ID인지 확인
       if (editingCommentId.startsWith('temp_')) {
         // 임시 댓글 수정
-        setPendingComments(prev =>
-          prev.map(comment =>
-            comment.id === editingCommentId
-              ? { ...comment, content: editingCommentText }
-              : comment
-          )
+        setPendingComments((prev) =>
+          prev.map((comment) => (comment.id === editingCommentId ? { ...comment, content: editingCommentText } : comment))
         );
       } else {
         // DB 댓글 수정 (modifiedComments에 저장)
-        setModifiedComments(prev => ({
+        setModifiedComments((prev) => ({
           ...prev,
           [editingCommentId]: editingCommentText
         }));
@@ -3716,10 +3717,10 @@ const TaskEditDialog = memo(
       // temp_ ID인지 확인
       if (commentId.startsWith('temp_')) {
         // 임시 댓글 삭제
-        setPendingComments(prev => prev.filter(comment => comment.id !== commentId));
+        setPendingComments((prev) => prev.filter((comment) => comment.id !== commentId));
       } else {
         // DB 댓글 삭제 예약
-        setDeletedCommentIds(prev => [...prev, commentId]);
+        setDeletedCommentIds((prev) => [...prev, commentId]);
       }
     }, []);
 
@@ -3740,7 +3741,21 @@ const TaskEditDialog = memo(
         userOptions,
         users
       }),
-      [taskState, handleFieldChange, assignees, assigneeAvatars, statusOptions, statusColors, handleOpenKpiDialog, taskTypeOptions, departmentOptions, statusOptionsFromDB, teamOptions, userOptions, users]
+      [
+        taskState,
+        handleFieldChange,
+        assignees,
+        assigneeAvatars,
+        statusOptions,
+        statusColors,
+        handleOpenKpiDialog,
+        taskTypeOptions,
+        departmentOptions,
+        statusOptionsFromDB,
+        teamOptions,
+        userOptions,
+        users
+      ]
     );
 
     const planTabProps = useMemo(
@@ -3948,7 +3963,7 @@ const TaskEditDialog = memo(
           <DialogContent sx={{ px: 3, py: 2, display: 'flex', flexDirection: 'column', height: 'calc(780px - 64px - 60px)', p: 0 }}>
             {(() => {
               // KPI 데이터 선택: props로 받은 데이터가 없으면 목업 데이터 사용
-              const actualKpiData = (kpiData && kpiData.length > 0) ? kpiData : mockKpiData;
+              const actualKpiData = kpiData && kpiData.length > 0 ? kpiData : mockKpiData;
               const isUsingMockData = !kpiData || kpiData.length === 0;
 
               console.log('🔍 TaskEditDialog - kpiData prop:', kpiData);
@@ -3992,116 +4007,123 @@ const TaskEditDialog = memo(
                   <Box sx={{ flex: 1, overflow: 'auto', px: 3, pt: 2 }}>
                     <TableContainer>
                       <Table size="small">
-                      <TableHead>
-                        <TableRow sx={{ backgroundColor: 'grey.50' }}>
-                          <TableCell padding="checkbox" sx={{ width: 50, fontSize: '12px', fontWeight: 600, px: 0.5, whiteSpace: 'nowrap', textAlign: 'center' }}>선택</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 60, textAlign: 'center', fontSize: '12px' }}>NO</TableCell>
-                          <TableCell sx={{ fontWeight: 600, minWidth: 150, fontSize: '12px' }}>개요</TableCell>
-                          <TableCell sx={{ fontWeight: 600, minWidth: 120, fontSize: '12px' }}>Main</TableCell>
-                          <TableCell sx={{ fontWeight: 600, minWidth: 150, fontSize: '12px' }}>Sub</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 60, fontSize: '12px' }}>영향도</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>팀</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 80, fontSize: '12px' }}>담당자</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>시작일</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>완료일</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {paginatedData.map((kpi, index) => {
-                        // main_kpi_task 필드 매핑 (계층 구조)
-                        const overview = (kpi as any).kpi_work_content || '-'; // KPI의 work_content (주요과제)
-                        const main = (kpi as any).level === 0 ? (kpi as any).text : ((kpi as any).parent_task_text || '-'); // 레벨 0 또는 부모 태스크
-                        const sub = (kpi as any).level === 1 ? (kpi as any).text : '-'; // 레벨 1 태스크
-                        const impact = (kpi as any).priority || '-'; // priority를 영향도로 사용
-                        const team = kpi.team || '-';
-                        const assignee = kpi.assignee || '-';
-                        const startDate = kpi.start_date || kpi.registration_date || kpi.registrationDate || '-';
-                        const completedDate = (kpi as any).due_date || kpi.completed_date || kpi.completedDate || '-';
-
-                        return (
-                          <TableRow
-                            key={kpi.id}
-                            hover
-                            sx={{
-                              '&:hover': { backgroundColor: 'action.hover' }
-                            }}
-                          >
-                            <TableCell padding="checkbox" sx={{ width: 50, px: 0.5 }}>
-                              <Radio
-                                size="small"
-                                checked={selectedKpiData?.id === kpi.id}
-                                onChange={() => setSelectedKpiData(kpi)}
-                                sx={{
-                                  padding: '0px',
-                                  transform: 'scale(0.75)',
-                                  '& .MuiSvgIcon-root': { fontSize: 14 }
-                                }}
-                              />
+                        <TableHead>
+                          <TableRow sx={{ backgroundColor: 'grey.50' }}>
+                            <TableCell
+                              padding="checkbox"
+                              sx={{ width: 50, fontSize: '12px', fontWeight: 600, px: 0.5, whiteSpace: 'nowrap', textAlign: 'center' }}
+                            >
+                              선택
                             </TableCell>
-                            <TableCell sx={{ textAlign: 'center' }}>
-                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                                {startIndex + index + 1}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                                {overview}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                                {main}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                                {sub}
-                              </Typography>
-                            </TableCell>
-                            <TableCell sx={{ width: 60 }}>
-                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                                {impact}
-                              </Typography>
-                            </TableCell>
-                            <TableCell sx={{ width: 100 }}>
-                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                                {team}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                                {assignee}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                                {startDate}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                                {completedDate}
-                              </Typography>
-                            </TableCell>
+                            <TableCell sx={{ fontWeight: 600, width: 60, textAlign: 'center', fontSize: '12px' }}>NO</TableCell>
+                            <TableCell sx={{ fontWeight: 600, minWidth: 150, fontSize: '12px' }}>개요</TableCell>
+                            <TableCell sx={{ fontWeight: 600, minWidth: 120, fontSize: '12px' }}>Main</TableCell>
+                            <TableCell sx={{ fontWeight: 600, minWidth: 150, fontSize: '12px' }}>Sub</TableCell>
+                            <TableCell sx={{ fontWeight: 600, width: 60, fontSize: '12px' }}>영향도</TableCell>
+                            <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>팀</TableCell>
+                            <TableCell sx={{ fontWeight: 600, width: 80, fontSize: '12px' }}>담당자</TableCell>
+                            <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>시작일</TableCell>
+                            <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>완료일</TableCell>
                           </TableRow>
-                        );
-                      })}
-                    </TableBody>
+                        </TableHead>
+                        <TableBody>
+                          {paginatedData.map((kpi, index) => {
+                            // main_kpi_task 필드 매핑 (계층 구조)
+                            const overview = (kpi as any).kpi_work_content || '-'; // KPI의 work_content (주요과제)
+                            const main = (kpi as any).level === 0 ? (kpi as any).text : (kpi as any).parent_task_text || '-'; // 레벨 0 또는 부모 태스크
+                            const sub = (kpi as any).level === 1 ? (kpi as any).text : '-'; // 레벨 1 태스크
+                            const impact = (kpi as any).priority || '-'; // priority를 영향도로 사용
+                            const team = kpi.team || '-';
+                            const assignee = kpi.assignee || '-';
+                            const startDate = kpi.start_date || kpi.registration_date || kpi.registrationDate || '-';
+                            const completedDate = (kpi as any).due_date || kpi.completed_date || kpi.completedDate || '-';
+
+                            return (
+                              <TableRow
+                                key={kpi.id}
+                                hover
+                                sx={{
+                                  '&:hover': { backgroundColor: 'action.hover' }
+                                }}
+                              >
+                                <TableCell padding="checkbox" sx={{ width: 50, px: 0.5 }}>
+                                  <Radio
+                                    size="small"
+                                    checked={selectedKpiData?.id === kpi.id}
+                                    onChange={() => setSelectedKpiData(kpi)}
+                                    sx={{
+                                      padding: '0px',
+                                      transform: 'scale(0.75)',
+                                      '& .MuiSvgIcon-root': { fontSize: 14 }
+                                    }}
+                                  />
+                                </TableCell>
+                                <TableCell sx={{ textAlign: 'center' }}>
+                                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                                    {startIndex + index + 1}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell>
+                                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                                    {overview}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell>
+                                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                                    {main}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell>
+                                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                                    {sub}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell sx={{ width: 60 }}>
+                                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                                    {impact}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell sx={{ width: 100 }}>
+                                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                                    {team}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell>
+                                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                                    {assignee}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell>
+                                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                                    {startDate}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell>
+                                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                                    {completedDate}
+                                  </Typography>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
                       </Table>
                     </TableContainer>
                   </Box>
 
                   {/* 페이지네이션 - 하단 고정 */}
                   {totalPages > 1 && (
-                    <Box sx={{
-                      flexShrink: 0,
-                      display: 'flex',
-                      justifyContent: 'center',
-                      p: 2,
-                      borderTop: '1px solid',
-                      borderColor: 'divider',
-                      backgroundColor: 'background.paper'
-                    }}>
+                    <Box
+                      sx={{
+                        flexShrink: 0,
+                        display: 'flex',
+                        justifyContent: 'center',
+                        p: 2,
+                        borderTop: '1px solid',
+                        borderColor: 'divider',
+                        backgroundColor: 'background.paper'
+                      }}
+                    >
                       <Pagination
                         count={totalPages}
                         page={kpiPage}
@@ -4121,7 +4143,6 @@ const TaskEditDialog = memo(
             })()}
           </DialogContent>
         </Dialog>
-
       </>
     );
   }

@@ -48,10 +48,7 @@ export const useSupabaseKpi = () => {
       setLoading(true);
       setError(null);
 
-      const { data, error: fetchError } = await supabase
-        .from('main_kpi_data')
-        .select('*')
-        .order('id', { ascending: false });
+      const { data, error: fetchError } = await supabase.from('main_kpi_data').select('*').order('id', { ascending: false });
 
       if (fetchError) {
         throw fetchError;
@@ -74,11 +71,7 @@ export const useSupabaseKpi = () => {
     try {
       console.log('📝 KPI 추가 데이터:', kpiData);
 
-      const { data, error: insertError } = await supabase
-        .from('main_kpi_data')
-        .insert([kpiData])
-        .select()
-        .single();
+      const { data, error: insertError } = await supabase.from('main_kpi_data').insert([kpiData]).select().single();
 
       if (insertError) {
         console.error('❌ Supabase Insert 오류:', insertError);
@@ -104,12 +97,7 @@ export const useSupabaseKpi = () => {
   // KPI 수정
   const updateKpi = useCallback(async (id: number, updates: Partial<KpiData>) => {
     try {
-      const { data, error: updateError } = await supabase
-        .from('main_kpi_data')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+      const { data, error: updateError } = await supabase.from('main_kpi_data').update(updates).eq('id', id).select().single();
 
       if (updateError) {
         throw updateError;
@@ -159,23 +147,20 @@ export const useSupabaseKpi = () => {
   }, []);
 
   // 코드로 KPI 조회
-  const getKpiByCode = useCallback(
-    async (code: string) => {
-      try {
-        const { data, error: fetchError } = await supabase.from('main_kpi_data').select('*').eq('code', code).single();
+  const getKpiByCode = useCallback(async (code: string) => {
+    try {
+      const { data, error: fetchError } = await supabase.from('main_kpi_data').select('*').eq('code', code).single();
 
-        if (fetchError) {
-          throw fetchError;
-        }
-
-        return data;
-      } catch (err: any) {
-        console.error('KPI 조회 오류:', err);
-        return null;
+      if (fetchError) {
+        throw fetchError;
       }
-    },
-    []
-  );
+
+      return data;
+    } catch (err: any) {
+      console.error('KPI 조회 오류:', err);
+      return null;
+    }
+  }, []);
 
   // 초기 데이터 로드 (캐시 우선 전략)
   useEffect(() => {

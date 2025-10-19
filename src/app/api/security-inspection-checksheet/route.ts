@@ -28,11 +28,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    let query = supabase
-      .from('security_inspection_checksheet')
-      .select('*')
-      .eq('inspection_id', inspectionId)
-      .eq('is_active', true);
+    let query = supabase.from('security_inspection_checksheet').select('*').eq('inspection_id', inspectionId).eq('is_active', true);
 
     // checklist_id가 제공되면 해당 체크리스트 항목만 조회
     if (checklistId) {

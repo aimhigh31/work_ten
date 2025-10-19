@@ -1,9 +1,11 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { useSupabaseUserManagement, UserProfile } from 'hooks/useSupabaseUserManagement';
+import { useSupabaseUsers } from 'hooks/useSupabaseUsers';
+import { UserProfile } from 'hooks/useSupabaseUserManagement';
 import { useSupabaseDepartmentManagement, Department } from 'hooks/useSupabaseDepartmentManagement';
 import { useSupabaseMasterCode3, MasterCodeFlat } from 'hooks/useSupabaseMasterCode3';
+import { cleanupExpiredCache } from 'utils/cacheUtils';
 
 // 🏪 공용 데이터 타입 정의
 interface CommonData {
@@ -35,10 +37,22 @@ interface CommonDataProviderProps {
  * - 모든 페이지에서 즉시 사용 가능 ⚡
  */
 export function CommonDataProvider({ children }: CommonDataProviderProps) {
-  // Investment 패턴 hooks
-  const { getUsers } = useSupabaseUserManagement();
+  // Auto-loading 패턴으로 변경
+  const { users: usersFromHook } = useSupabaseUsers();
   const { getDepartments } = useSupabaseDepartmentManagement();
   const { getAllMasterCodes, processAllData } = useSupabaseMasterCode3();
+
+  // 🔍 디버깅: useSupabaseUsers에서 받은 데이터 확인
+  React.useEffect(() => {
+    console.log('🔍 [CommonDataContext] useSupabaseUsers에서 받은 users:', usersFromHook.length);
+    if (usersFromHook.length > 0) {
+      console.log('🔍 [CommonDataContext] 첫 번째 user 샘플:', {
+        user_name: usersFromHook[0].user_name,
+        avatar_url: usersFromHook[0].avatar_url,
+        profile_image_url: usersFromHook[0].profile_image_url
+      });
+    }
+  }, [usersFromHook]);
 
   // 공용 데이터 상태
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -59,12 +73,11 @@ export function CommonDataProvider({ children }: CommonDataProviderProps) {
       setIsLoading(true);
       setError(null);
 
-      // 🍽️ 3명의 요리사가 동시에 공용 재료 준비!
+      // 🍽️ 2명의 요리사가 동시에 공용 재료 준비! (users는 hook에서 자동 로딩)
       const t1 = performance.now();
-      const [usersData, deptsData, codesData] = await Promise.all([
-        getUsers(),           // 요리사 A: 사용자 데이터
-        getDepartments(),     // 요리사 B: 부서 데이터
-        getAllMasterCodes()   // 요리사 C: 마스터코드 데이터
+      const [deptsData, codesData] = await Promise.all([
+        getDepartments(), // 요리사 A: 부서 데이터
+        getAllMasterCodes() // 요리사 B: 마스터코드 데이터
       ]);
       const t2 = performance.now();
 
@@ -72,7 +85,7 @@ export function CommonDataProvider({ children }: CommonDataProviderProps) {
 
       // 공용 창고에 저장
       const t3 = performance.now();
-      setUsers(usersData);
+      setUsers(usersFromHook); // hook에서 자동 로딩된 users 사용
       setDepartments(deptsData);
       setMasterCodes(codesData);
       processAllData(codesData); // MasterCode3 내부 상태도 업데이트
@@ -84,7 +97,7 @@ export function CommonDataProvider({ children }: CommonDataProviderProps) {
       const totalTime = endTime - startTime;
 
       console.log('✅ 공용 창고 준비 완료!', {
-        users: usersData.length,
+        users: usersFromHook.length,
         departments: deptsData.length,
         masterCodes: codesData.length,
         총_소요시간: `${totalTime.toFixed(2)}ms`,
@@ -92,17 +105,20 @@ export function CommonDataProvider({ children }: CommonDataProviderProps) {
         상태업데이트: `${(t4 - t3).toFixed(2)}ms`
       });
       console.log('🏪 ========================================');
-
     } catch (err) {
       console.error('❌ 공용 데이터 로딩 실패:', err);
       setError(err instanceof Error ? err.message : '공용 데이터 로딩 실패');
     } finally {
       setIsLoading(false);
     }
-  }, [getUsers, getDepartments, getAllMasterCodes, processAllData]);
+  }, [usersFromHook, getDepartments, getAllMasterCodes, processAllData]);
 
   // 🍽️ 레스토랑 오픈 시 한 번만 실행 (앱 시작 시)
   useEffect(() => {
+    // 🧹 만료된 캐시 정리 (앱 시작 시)
+    cleanupExpiredCache();
+
+    // 🏪 공용 데이터 로드
     loadCommonData();
   }, [loadCommonData]);
 

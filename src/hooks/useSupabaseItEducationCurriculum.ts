@@ -7,10 +7,7 @@ console.log('Supabase 환경변수 확인:', {
   keyExists: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 });
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
 // IT교육 커리큘럼 데이터 타입 정의
 export interface ItEducationCurriculumData {
@@ -107,103 +104,107 @@ export function useSupabaseItEducationCurriculum() {
   }, []);
 
   // IT교육 커리큘럼 데이터 저장 (교육 ID별 일괄 저장)
-  const saveCurriculumByEducationId = useCallback(async (educationId: number, curriculumItems: Partial<ItEducationCurriculumData>[]): Promise<boolean> => {
-    setLoading(true);
-    setError(null);
+  const saveCurriculumByEducationId = useCallback(
+    async (educationId: number, curriculumItems: Partial<ItEducationCurriculumData>[]): Promise<boolean> => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      console.log('💾 커리큘럼 데이터 저장 시작:', { educationId, itemCount: curriculumItems.length });
+      try {
+        console.log('💾 커리큘럼 데이터 저장 시작:', { educationId, itemCount: curriculumItems.length });
 
-      // 1. 기존 활성 커리큘럼 데이터 삭제 (소프트 삭제)
-      const { error: deleteError } = await supabase
-        .from('it_education_curriculum')
-        .update({ is_active: false, updated_at: new Date().toISOString() })
-        .eq('education_id', educationId)
-        .eq('is_active', true);
-
-      if (deleteError) {
-        console.error('❌ 기존 커리큘럼 삭제 실패:', deleteError);
-        throw deleteError;
-      }
-
-      // 2. 새 커리큘럼 데이터 저장
-      if (curriculumItems.length > 0) {
-        const curriculumDataToSave = curriculumItems.map((item, index) => ({
-          education_id: educationId,
-          session_order: item.session_order || (index + 1),
-          session_title: item.session_title || `세션 ${index + 1}`,
-          session_description: item.session_description || '',
-          duration_minutes: item.duration_minutes || 0,
-          instructor: item.instructor || '',
-          session_type: item.session_type || '강의',
-          materials: item.materials || '',
-          objectives: item.objectives || '',
-          is_active: true,
-          created_by: 'user',
-          updated_by: 'user'
-        }));
-
-        const { error: insertError } = await supabase
+        // 1. 기존 활성 커리큘럼 데이터 삭제 (소프트 삭제)
+        const { error: deleteError } = await supabase
           .from('it_education_curriculum')
-          .insert(curriculumDataToSave);
+          .update({ is_active: false, updated_at: new Date().toISOString() })
+          .eq('education_id', educationId)
+          .eq('is_active', true);
 
-        if (insertError) {
-          console.error('❌ 새 커리큘럼 저장 실패:', insertError);
-          throw insertError;
+        if (deleteError) {
+          console.error('❌ 기존 커리큘럼 삭제 실패:', deleteError);
+          throw deleteError;
         }
+
+        // 2. 새 커리큘럼 데이터 저장
+        if (curriculumItems.length > 0) {
+          const curriculumDataToSave = curriculumItems.map((item, index) => ({
+            education_id: educationId,
+            session_order: item.session_order || index + 1,
+            session_title: item.session_title || `세션 ${index + 1}`,
+            session_description: item.session_description || '',
+            duration_minutes: item.duration_minutes || 0,
+            instructor: item.instructor || '',
+            session_type: item.session_type || '강의',
+            materials: item.materials || '',
+            objectives: item.objectives || '',
+            is_active: true,
+            created_by: 'user',
+            updated_by: 'user'
+          }));
+
+          const { error: insertError } = await supabase.from('it_education_curriculum').insert(curriculumDataToSave);
+
+          if (insertError) {
+            console.error('❌ 새 커리큘럼 저장 실패:', insertError);
+            throw insertError;
+          }
+        }
+
+        console.log('✅ 커리큘럼 데이터 저장 성공:', { educationId, itemCount: curriculumItems.length });
+        return true;
+      } catch (err) {
+        console.error('❌ 커리큘럼 저장 오류 상세:', {
+          educationId,
+          error: err,
+          message: err instanceof Error ? err.message : '알 수 없는 오류',
+          stack: err instanceof Error ? err.stack : undefined,
+          type: typeof err,
+          stringified: JSON.stringify(err)
+        });
+
+        const errorMessage = err instanceof Error ? err.message : 'IT교육 커리큘럼 저장 중 오류가 발생했습니다.';
+        setError(errorMessage);
+        return false;
+      } finally {
+        setLoading(false);
       }
-
-      console.log('✅ 커리큘럼 데이터 저장 성공:', { educationId, itemCount: curriculumItems.length });
-      return true;
-    } catch (err) {
-      console.error('❌ 커리큘럼 저장 오류 상세:', {
-        educationId,
-        error: err,
-        message: err instanceof Error ? err.message : '알 수 없는 오류',
-        stack: err instanceof Error ? err.stack : undefined,
-        type: typeof err,
-        stringified: JSON.stringify(err)
-      });
-
-      const errorMessage = err instanceof Error ? err.message : 'IT교육 커리큘럼 저장 중 오류가 발생했습니다.';
-      setError(errorMessage);
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   // 특정 커리큘럼 항목 수정
-  const updateCurriculumItem = useCallback(async (id: number, updates: Partial<ItEducationCurriculumData>): Promise<ItEducationCurriculumData | null> => {
-    setLoading(true);
-    setError(null);
+  const updateCurriculumItem = useCallback(
+    async (id: number, updates: Partial<ItEducationCurriculumData>): Promise<ItEducationCurriculumData | null> => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      const { data, error } = await supabase
-        .from('it_education_curriculum')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
-        .select()
-        .single();
+      try {
+        const { data, error } = await supabase
+          .from('it_education_curriculum')
+          .update({
+            ...updates,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id)
+          .select()
+          .single();
 
-      if (error) {
-        console.error('❌ 커리큘럼 항목 수정 실패:', error);
-        throw error;
+        if (error) {
+          console.error('❌ 커리큘럼 항목 수정 실패:', error);
+          throw error;
+        }
+
+        return data;
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'IT교육 커리큘럼 수정 중 오류가 발생했습니다.';
+        setError(errorMessage);
+        console.error('❌ 커리큘럼 항목 수정 오류:', err);
+        return null;
+      } finally {
+        setLoading(false);
       }
-
-      return data;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'IT교육 커리큘럼 수정 중 오류가 발생했습니다.';
-      setError(errorMessage);
-      console.error('❌ 커리큘럼 항목 수정 오류:', err);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   // 커리큘럼 항목 삭제 (소프트 삭제)
   const deleteCurriculumItem = useCallback(async (id: number): Promise<boolean> => {

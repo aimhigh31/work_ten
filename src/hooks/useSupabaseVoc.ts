@@ -69,7 +69,6 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
       saveToCache(CACHE_KEY, data || []);
 
       return data || [];
-
     } catch (error) {
       console.log('❌ getVocs 실패:', error);
       setError(error instanceof Error ? error.message : 'VOC 데이터 조회 실패');
@@ -86,12 +85,7 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
       setLoading(true);
       setError(null);
 
-      const { data, error: supabaseError } = await supabase
-        .from('it_voc_data')
-        .select('*')
-        .eq('id', id)
-        .eq('is_active', true)
-        .single();
+      const { data, error: supabaseError } = await supabase.from('it_voc_data').select('*').eq('id', id).eq('is_active', true).single();
 
       if (supabaseError) {
         console.log('❌ Supabase 조회 오류:', supabaseError);
@@ -100,7 +94,6 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
 
       console.log('✅ getVocById 성공:', data);
       return data;
-
     } catch (error) {
       console.log('❌ getVocById 실패:', error);
       setError(error instanceof Error ? error.message : 'VOC 데이터 조회 실패');
@@ -111,9 +104,7 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
   }, []);
 
   // 새 VOC 생성
-  const createVoc = useCallback(async (
-    voc: Omit<DbVocData, 'id' | 'created_at' | 'updated_at'>
-  ): Promise<DbVocData | null> => {
+  const createVoc = useCallback(async (voc: Omit<DbVocData, 'id' | 'created_at' | 'updated_at'>): Promise<DbVocData | null> => {
     try {
       console.log('🚀 createVoc 시작');
       console.log('📝 생성할 VOC 데이터:', voc);
@@ -144,11 +135,7 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
 
       console.log('💾 최종 삽입 데이터:', insertData);
 
-      const { data, error: supabaseError } = await supabase
-        .from('it_voc_data')
-        .insert([insertData])
-        .select()
-        .single();
+      const { data, error: supabaseError } = await supabase.from('it_voc_data').insert([insertData]).select().single();
 
       if (supabaseError) {
         console.log('❌ Supabase 생성 오류:', supabaseError);
@@ -164,7 +151,6 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
       sessionStorage.removeItem(CACHE_KEY);
 
       return data;
-
     } catch (error) {
       console.log('❌ createVoc 실패:', error);
       setError(error instanceof Error ? error.message : 'VOC 생성 실패');
@@ -175,10 +161,7 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
   }, []);
 
   // VOC 업데이트
-  const updateVoc = useCallback(async (
-    id: number,
-    voc: Partial<DbVocData>
-  ): Promise<boolean> => {
+  const updateVoc = useCallback(async (id: number, voc: Partial<DbVocData>): Promise<boolean> => {
     try {
       console.log('📞 updateVoc 호출:', id);
       setLoading(true);
@@ -189,11 +172,7 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
         updated_at: new Date().toISOString()
       };
 
-      const { error: supabaseError } = await supabase
-        .from('it_voc_data')
-        .update(updateData)
-        .eq('id', id)
-        .eq('is_active', true);
+      const { error: supabaseError } = await supabase.from('it_voc_data').update(updateData).eq('id', id).eq('is_active', true);
 
       if (supabaseError) {
         console.log('❌ Supabase 업데이트 오류:', supabaseError);
@@ -207,7 +186,6 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
       sessionStorage.removeItem(CACHE_KEY);
 
       return true;
-
     } catch (error) {
       console.log('❌ updateVoc 실패:', error);
       setError(error instanceof Error ? error.message : 'VOC 업데이트 실패');
@@ -244,7 +222,6 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
       sessionStorage.removeItem(CACHE_KEY);
 
       return true;
-
     } catch (error) {
       console.log('❌ deleteVoc 실패:', error);
       setError(error instanceof Error ? error.message : 'VOC 삭제 실패');
@@ -279,9 +256,7 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
   }, []);
 
   // 프론트엔드 데이터를 DB 형식으로 변환
-  const convertToDbVocData = useCallback((
-    frontendData: VocData
-  ): Omit<DbVocData, 'id' | 'created_at' | 'updated_at'> => {
+  const convertToDbVocData = useCallback((frontendData: VocData): Omit<DbVocData, 'id' | 'created_at' | 'updated_at'> => {
     return {
       no: frontendData.no || 0, // createVoc에서 자동으로 설정됨
       registration_date: frontendData.registrationDate || new Date().toISOString().split('T')[0],

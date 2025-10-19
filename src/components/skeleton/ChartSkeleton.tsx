@@ -14,9 +14,7 @@ export default function ChartSkeleton({ height = 300, showTitle = true }: ChartS
   return (
     <Card>
       <CardContent>
-        {showTitle && (
-          <Skeleton variant="text" width="40%" height={28} animation="wave" sx={{ mb: 2 }} />
-        )}
+        {showTitle && <Skeleton variant="text" width="40%" height={28} animation="wave" sx={{ mb: 2 }} />}
         <Skeleton variant="rectangular" width="100%" height={height} animation="wave" />
       </CardContent>
     </Card>

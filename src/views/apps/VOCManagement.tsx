@@ -115,7 +115,16 @@ interface KanbanViewProps {
   assigneeList?: any[];
 }
 
-function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssignee, vocs, setVOCs, addChangeLog, assigneeList }: KanbanViewProps) {
+function KanbanView({
+  selectedYear,
+  selectedTeam,
+  selectedStatus,
+  selectedAssignee,
+  vocs,
+  setVOCs,
+  addChangeLog,
+  assigneeList
+}: KanbanViewProps) {
   // 상태 관리
   const [activeVOC, setActiveVOC] = useState<VOCTableData | null>(null);
   const [isDraggingState, setIsDraggingState] = useState(false);
@@ -351,6 +360,13 @@ function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssign
         }
       : { cursor: 'pointer' };
 
+    // 사용자 프로필 이미지 가져오기 (최적화: find 한 번만 호출)
+    const assigneeUser = React.useMemo(() => {
+      return assigneeList?.find((user) => user.user_name === voc.assignee);
+    }, [voc.assignee]);
+
+    const assigneeAvatar = assigneeUser?.profile_image_url || assigneeUser?.avatar_url || '/assets/images/users/avatar-1.png';
+
     return (
       <article
         ref={setNodeRef}
@@ -402,13 +418,13 @@ function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssign
         <div className="card-footer">
           <div className="assignee-info">
             <img
-              src={
-                assigneeList?.find((user) => user.user_name === voc.assignee)?.profile_image_url ||
-                assigneeList?.find((user) => user.user_name === voc.assignee)?.avatar_url ||
-                '/assets/images/users/avatar-1.png'
-              }
+              src={assigneeAvatar}
               alt={voc.assignee || '담당자'}
               className="assignee-avatar"
+              onError={(e) => {
+                // 이미지 로드 실패 시 기본 이미지로 대체
+                e.currentTarget.src = '/assets/images/users/avatar-1.png';
+              }}
             />
             <span className="assignee-name">{voc.assignee || '미할당'}</span>
           </div>

@@ -25,7 +25,8 @@ export const investmentData: InvestmentData[] = [
     code: 'PLAN-INV-25-001',
     investmentType: '펀드',
     investmentName: 'AI 벤처 펀드 투자',
-    description: 'AI 기술을 활용한 스타트업들을 대상으로 한 벤처 펀드 투자입니다. 딥러닝, 자연어처리, 컴퓨터 비전 등 다양한 AI 분야의 유망한 기업들에 분산 투자하여 높은 수익률을 기대하고 있습니다.',
+    description:
+      'AI 기술을 활용한 스타트업들을 대상으로 한 벤처 펀드 투자입니다. 딥러닝, 자연어처리, 컴퓨터 비전 등 다양한 AI 분야의 유망한 기업들에 분산 투자하여 높은 수익률을 기대하고 있습니다.',
     amount: 5000000000,
     team: '투자팀',
     assignee: '김투자',

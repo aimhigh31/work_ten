@@ -75,7 +75,7 @@ export default function AccountProfile({ tab }: Props) {
 
   useEffect(() => {
     if (session?.user?.email && users.length > 0) {
-      const user = users.find(u => u.email === session.user.email);
+      const user = users.find((u) => u.email === session.user.email);
       if (user) {
         // 모든 필드를 확실하게 정의된 값으로 설정
         const normalizedUser = {
@@ -383,12 +383,7 @@ export default function AccountProfile({ tab }: Props) {
                     프로필 사진
                   </Typography>
                   {(previewImageUrl || currentUser.profile_image_url) && (
-                    <Button
-                      variant="outlined"
-                      color="error"
-                      size="small"
-                      onClick={handleRemoveProfileImage}
-                    >
+                    <Button variant="outlined" color="error" size="small" onClick={handleRemoveProfileImage}>
                       사진 제거
                     </Button>
                   )}
@@ -410,7 +405,10 @@ export default function AccountProfile({ tab }: Props) {
                     '&:hover': {
                       borderColor: '#1976d2'
                     },
-                    backgroundImage: previewImageUrl || currentUser.profile_image_url ? `url(${previewImageUrl || currentUser.profile_image_url})` : 'none',
+                    backgroundImage:
+                      previewImageUrl || currentUser.profile_image_url
+                        ? `url(${previewImageUrl || currentUser.profile_image_url})`
+                        : 'none',
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     position: 'relative'
@@ -428,11 +426,11 @@ export default function AccountProfile({ tab }: Props) {
                 >
                   {!previewImageUrl && !currentUser.profile_image_url && (
                     <>
-                      <Avatar sx={{ width: 60, height: 60, mb: 1, bgcolor: '#f5f5f5', color: '#999' }}>
-                        📷
-                      </Avatar>
+                      <Avatar sx={{ width: 60, height: 60, mb: 1, bgcolor: '#f5f5f5', color: '#999' }}>📷</Avatar>
                       <Typography variant="body2" color="textSecondary" textAlign="center">
-                        클릭하여<br />사진 업로드
+                        클릭하여
+                        <br />
+                        사진 업로드
                       </Typography>
                     </>
                   )}
@@ -513,24 +511,12 @@ export default function AccountProfile({ tab }: Props) {
                 </Box>
 
                 {/* 비밀번호 변경 버튼 */}
-                <Button
-                  variant="outlined"
-                  color="primary"
-                  fullWidth
-                  sx={{ mt: 2 }}
-                  onClick={handlePasswordChangeOpen}
-                >
+                <Button variant="outlined" color="primary" fullWidth sx={{ mt: 2 }} onClick={handlePasswordChangeOpen}>
                   비밀번호 변경
                 </Button>
 
                 {/* 비밀번호 초기화 버튼 */}
-                <Button
-                  variant="outlined"
-                  color="warning"
-                  fullWidth
-                  sx={{ mt: 1 }}
-                  onClick={handlePasswordReset}
-                >
+                <Button variant="outlined" color="warning" fullWidth sx={{ mt: 1 }} onClick={handlePasswordReset}>
                   비밀번호 초기화
                 </Button>
               </Stack>
@@ -708,12 +694,7 @@ export default function AccountProfile({ tab }: Props) {
       </Box>
 
       {/* 비밀번호 변경 다이얼로그 */}
-      <Dialog
-        open={passwordDialogOpen}
-        onClose={handlePasswordChangeClose}
-        maxWidth="xs"
-        fullWidth
-      >
+      <Dialog open={passwordDialogOpen} onClose={handlePasswordChangeClose} maxWidth="xs" fullWidth>
         <DialogTitle>비밀번호 변경</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ pt: 2 }}>
@@ -734,11 +715,7 @@ export default function AccountProfile({ tab }: Props) {
               onChange={(e) => setConfirmPasswordInput(e.target.value)}
               placeholder="새 비밀번호를 다시 입력하세요"
               error={confirmPasswordInput !== '' && newPasswordInput !== confirmPasswordInput}
-              helperText={
-                confirmPasswordInput !== '' && newPasswordInput !== confirmPasswordInput
-                  ? '비밀번호가 일치하지 않습니다'
-                  : ''
-              }
+              helperText={confirmPasswordInput !== '' && newPasswordInput !== confirmPasswordInput ? '비밀번호가 일치하지 않습니다' : ''}
             />
           </Stack>
         </DialogContent>

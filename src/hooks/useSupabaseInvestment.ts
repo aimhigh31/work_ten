@@ -69,7 +69,6 @@ export const useSupabaseInvestment = (): UseSupabaseInvestmentReturn => {
       saveToCache(CACHE_KEY, data || []);
 
       return data || [];
-
     } catch (error) {
       console.log('❌ getInvestments 실패:', error);
       setError(error instanceof Error ? error.message : '투자 데이터 조회 실패');
@@ -100,7 +99,6 @@ export const useSupabaseInvestment = (): UseSupabaseInvestmentReturn => {
 
       console.log('✅ getInvestmentById 성공:', data);
       return data;
-
     } catch (error) {
       console.log('❌ getInvestmentById 실패:', error);
       setError(error instanceof Error ? error.message : '투자 데이터 조회 실패');
@@ -111,61 +109,54 @@ export const useSupabaseInvestment = (): UseSupabaseInvestmentReturn => {
   }, []);
 
   // 새 투자 생성
-  const createInvestment = useCallback(async (
-    investment: Omit<DbInvestmentData, 'id' | 'created_at' | 'updated_at'>
-  ): Promise<DbInvestmentData | null> => {
-    try {
-      console.log('🚀 createInvestment 시작');
-      console.log('📝 생성할 투자 데이터:', investment);
-      setLoading(true);
-      setError(null);
+  const createInvestment = useCallback(
+    async (investment: Omit<DbInvestmentData, 'id' | 'created_at' | 'updated_at'>): Promise<DbInvestmentData | null> => {
+      try {
+        console.log('🚀 createInvestment 시작');
+        console.log('📝 생성할 투자 데이터:', investment);
+        setLoading(true);
+        setError(null);
 
-      const insertData = {
-        ...investment,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
+        const insertData = {
+          ...investment,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
 
-      console.log('💾 최종 삽입 데이터:', insertData);
+        console.log('💾 최종 삽입 데이터:', insertData);
 
-      const { data, error: supabaseError } = await supabase
-        .from('plan_investment_data')
-        .insert([insertData])
-        .select()
-        .single();
+        const { data, error: supabaseError } = await supabase.from('plan_investment_data').insert([insertData]).select().single();
 
-      if (supabaseError) {
-        console.log('❌ Supabase 생성 오류:', supabaseError);
-        console.log('❌ 오류 메시지:', supabaseError.message);
-        console.log('❌ 오류 코드:', supabaseError.code);
-        console.log('❌ 상세 오류:', supabaseError.details);
-        console.log('❌ 힌트:', supabaseError.hint);
-        console.log('❌ 전체 오류 객체:', JSON.stringify(supabaseError, null, 2));
-        setError(`투자 생성 오류: ${supabaseError.message || '알 수 없는 오류'}`);
+        if (supabaseError) {
+          console.log('❌ Supabase 생성 오류:', supabaseError);
+          console.log('❌ 오류 메시지:', supabaseError.message);
+          console.log('❌ 오류 코드:', supabaseError.code);
+          console.log('❌ 상세 오류:', supabaseError.details);
+          console.log('❌ 힌트:', supabaseError.hint);
+          console.log('❌ 전체 오류 객체:', JSON.stringify(supabaseError, null, 2));
+          setError(`투자 생성 오류: ${supabaseError.message || '알 수 없는 오류'}`);
+          return null;
+        }
+
+        console.log('✅ createInvestment 성공:', data);
+
+        // 캐시 무효화 (최신 데이터 보장)
+        sessionStorage.removeItem(CACHE_KEY);
+
+        return data;
+      } catch (error) {
+        console.log('❌ createInvestment 실패:', error);
+        setError(error instanceof Error ? error.message : '투자 생성 실패');
         return null;
+      } finally {
+        setLoading(false);
       }
-
-      console.log('✅ createInvestment 성공:', data);
-
-      // 캐시 무효화 (최신 데이터 보장)
-      sessionStorage.removeItem(CACHE_KEY);
-
-      return data;
-
-    } catch (error) {
-      console.log('❌ createInvestment 실패:', error);
-      setError(error instanceof Error ? error.message : '투자 생성 실패');
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   // 투자 업데이트
-  const updateInvestment = useCallback(async (
-    id: number,
-    investment: Partial<DbInvestmentData>
-  ): Promise<boolean> => {
+  const updateInvestment = useCallback(async (id: number, investment: Partial<DbInvestmentData>): Promise<boolean> => {
     try {
       console.log('📞 updateInvestment 호출:', id);
       console.log('📦 업데이트할 데이터:', investment);
@@ -204,7 +195,6 @@ export const useSupabaseInvestment = (): UseSupabaseInvestmentReturn => {
       sessionStorage.removeItem(CACHE_KEY);
 
       return true;
-
     } catch (error) {
       console.log('❌ updateInvestment 실패:', error);
       setError(error instanceof Error ? error.message : '투자 업데이트 실패');
@@ -241,7 +231,6 @@ export const useSupabaseInvestment = (): UseSupabaseInvestmentReturn => {
       sessionStorage.removeItem(CACHE_KEY);
 
       return true;
-
     } catch (error) {
       console.log('❌ deleteInvestment 실패:', error);
       setError(error instanceof Error ? error.message : '투자 삭제 실패');
@@ -291,39 +280,40 @@ export const useSupabaseInvestment = (): UseSupabaseInvestmentReturn => {
   }, []);
 
   // 프론트엔드 데이터를 DB 형식으로 변환
-  const convertToDbInvestmentData = useCallback((
-    frontendData: InvestmentData
-  ): Omit<DbInvestmentData, 'id' | 'created_at' | 'updated_at'> => {
-    // description과 files를 attachments 객체로 결합
-    const attachmentsData = {
-      description: frontendData.description || '',
-      files: frontendData.attachments || []
-    };
+  const convertToDbInvestmentData = useCallback(
+    (frontendData: InvestmentData): Omit<DbInvestmentData, 'id' | 'created_at' | 'updated_at'> => {
+      // description과 files를 attachments 객체로 결합
+      const attachmentsData = {
+        description: frontendData.description || '',
+        files: frontendData.attachments || []
+      };
 
-    const dbData = {
-      no: 0, // DB에는 0으로 저장 (프론트엔드에서 역순정렬로 관리)
-      registration_date: frontendData.registrationDate || new Date().toISOString().split('T')[0],
-      code: frontendData.code || '',
-      investment_type: frontendData.investmentType || '',
-      investment_name: frontendData.investmentName || '',
-      amount: frontendData.amount || 0,
-      team: frontendData.team || '',
-      assignee: frontendData.assignee || null,
-      status: frontendData.status || '대기',
-      start_date: frontendData.startDate || frontendData.registrationDate || null,
-      completed_date: frontendData.completedDate || null,
-      expected_return: frontendData.expectedReturn || 0,
-      actual_return: frontendData.actualReturn || null,
-      risk_level: frontendData.riskLevel || '보통',
-      attachments: attachmentsData as any,
-      created_by: 'system',
-      updated_by: 'system',
-      is_active: true
-    };
+      const dbData = {
+        no: 0, // DB에는 0으로 저장 (프론트엔드에서 역순정렬로 관리)
+        registration_date: frontendData.registrationDate || new Date().toISOString().split('T')[0],
+        code: frontendData.code || '',
+        investment_type: frontendData.investmentType || '',
+        investment_name: frontendData.investmentName || '',
+        amount: frontendData.amount || 0,
+        team: frontendData.team || '',
+        assignee: frontendData.assignee || null,
+        status: frontendData.status || '대기',
+        start_date: frontendData.startDate || frontendData.registrationDate || null,
+        completed_date: frontendData.completedDate || null,
+        expected_return: frontendData.expectedReturn || 0,
+        actual_return: frontendData.actualReturn || null,
+        risk_level: frontendData.riskLevel || '보통',
+        attachments: attachmentsData as any,
+        created_by: 'system',
+        updated_by: 'system',
+        is_active: true
+      };
 
-    console.log('🔄 convertToDbInvestmentData 결과:', dbData);
-    return dbData;
-  }, []);
+      console.log('🔄 convertToDbInvestmentData 결과:', dbData);
+      return dbData;
+    },
+    []
+  );
 
   return {
     getInvestments,

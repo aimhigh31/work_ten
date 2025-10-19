@@ -96,7 +96,6 @@ export function useSupabaseCostFinance() {
       saveToCache(cacheKey, result);
 
       return result;
-
     } catch (err) {
       console.error('❌ getFinanceItems 실패:', err);
       setError(err instanceof Error ? err.message : '금액 항목 조회 실패');
@@ -107,20 +106,14 @@ export function useSupabaseCostFinance() {
   }, []);
 
   // 금액 항목 일괄 저장 (기존 삭제 후 재저장 - data_relation.md 패턴)
-  const saveFinanceItems = useCallback(async (
-    costId: number,
-    items: CostFinanceItem[]
-  ): Promise<boolean> => {
+  const saveFinanceItems = useCallback(async (costId: number, items: CostFinanceItem[]): Promise<boolean> => {
     try {
       console.log('💾 saveFinanceItems 호출:', costId, items.length, '개');
       setLoading(true);
       setError(null);
 
       // 1단계: 기존 데이터 삭제 (물리적 삭제)
-      const { error: deleteError } = await supabase
-        .from('main_cost_finance')
-        .delete()
-        .eq('cost_id', costId);
+      const { error: deleteError } = await supabase.from('main_cost_finance').delete().eq('cost_id', costId);
 
       if (deleteError) {
         console.error('❌ 기존 데이터 삭제 오류:', deleteError);
@@ -145,9 +138,7 @@ export function useSupabaseCostFinance() {
           updated_by: 'user'
         }));
 
-        const { error: insertError } = await supabase
-          .from('main_cost_finance')
-          .insert(insertData);
+        const { error: insertError } = await supabase.from('main_cost_finance').insert(insertData);
 
         if (insertError) {
           console.error('❌ 데이터 저장 오류:', insertError);
@@ -159,7 +150,6 @@ export function useSupabaseCostFinance() {
 
       console.log('✅ saveFinanceItems 성공');
       return true;
-
     } catch (err) {
       console.error('❌ saveFinanceItems 실패:', err);
       setError(err instanceof Error ? err.message : '금액 항목 저장 실패');
@@ -176,10 +166,7 @@ export function useSupabaseCostFinance() {
       setLoading(true);
       setError(null);
 
-      const { error: deleteError } = await supabase
-        .from('main_cost_finance')
-        .delete()
-        .eq('id', id);
+      const { error: deleteError } = await supabase.from('main_cost_finance').delete().eq('id', id);
 
       if (deleteError) {
         console.error('❌ 삭제 오류:', deleteError);
@@ -188,7 +175,6 @@ export function useSupabaseCostFinance() {
 
       console.log('✅ deleteFinanceItem 성공');
       return true;
-
     } catch (err) {
       console.error('❌ deleteFinanceItem 실패:', err);
       setError(err instanceof Error ? err.message : '금액 항목 삭제 실패');

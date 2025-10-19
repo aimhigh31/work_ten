@@ -81,37 +81,13 @@ export type EducationStatus = '대기' | '진행' | '완료' | '홀딩';
 export type EducationRequestType = string;
 
 // Education 타입 옵션
-export const Education_TYPES = [
-  "문의",
-  "불만",
-  "개선요청",
-  "칭찬",
-  "제안",
-  "기타"
-];
+export const Education_TYPES = ['문의', '불만', '개선요청', '칭찬', '제안', '기타'];
 
 // 채널 옵션
-export const Education_CHANNELS = [
-  "전화",
-  "이메일",
-  "채팅",
-  "방문",
-  "SNS",
-  "홈페이지"
-];
+export const Education_CHANNELS = ['전화', '이메일', '채팅', '방문', 'SNS', '홈페이지'];
 
 // 상태 옵션
-export const Education_STATUS = [
-  "대기",
-  "진행",
-  "완료",
-  "홀딩"
-];
+export const Education_STATUS = ['대기', '진행', '완료', '홀딩'];
 
 // 우선순위 옵션
-export const Education_PRIORITIES = [
-  "긴급",
-  "높음",
-  "보통",
-  "낮음"
-];
+export const Education_PRIORITIES = ['긴급', '높음', '보통', '낮음'];

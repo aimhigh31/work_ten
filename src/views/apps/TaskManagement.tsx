@@ -132,7 +132,16 @@ interface KanbanViewProps {
   assigneeList?: any[];
 }
 
-function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssignee, tasks, onUpdateTask, addChangeLog, assigneeList }: KanbanViewProps) {
+function KanbanView({
+  selectedYear,
+  selectedTeam,
+  selectedStatus,
+  selectedAssignee,
+  tasks,
+  onUpdateTask,
+  addChangeLog,
+  assigneeList
+}: KanbanViewProps) {
   const theme = useTheme();
 
   // 상태 관리
@@ -307,16 +316,7 @@ function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssign
       const workContent = currentTask.workContent || '업무내용 없음';
       const description = `업무관리 ${workContent}(${taskCode}) 정보의 칸반탭 상태가 ${oldStatus} → ${newStatus} 로 수정 되었습니다.`;
 
-      await addChangeLog(
-        '수정',
-        taskCode,
-        description,
-        currentTask.team || '시스템',
-        oldStatus,
-        newStatus,
-        '상태',
-        workContent
-      );
+      await addChangeLog('수정', taskCode, description, currentTask.team || '시스템', oldStatus, newStatus, '상태', workContent);
     }
   };
 
@@ -423,6 +423,13 @@ function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssign
       return '사고 탐지';
     })();
 
+    // 사용자 프로필 이미지 가져오기 (최적화: find 한 번만 호출)
+    const assigneeUser = React.useMemo(() => {
+      return assigneeList?.find((user) => user.user_name === task.assignee);
+    }, [task.assignee]);
+
+    const assigneeAvatar = assigneeUser?.profile_image_url || assigneeUser?.avatar_url || '/assets/images/users/avatar-1.png';
+
     return (
       <article
         ref={setNodeRef}
@@ -483,12 +490,12 @@ function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssign
           <div className="assignee-info">
             <img
               className="assignee-avatar"
-              src={
-                assigneeList?.find((user) => user.user_name === task.assignee)?.profile_image_url ||
-                assigneeList?.find((user) => user.user_name === task.assignee)?.avatar_url ||
-                '/assets/images/users/avatar-1.png'
-              }
+              src={assigneeAvatar}
               alt={task.assignee || '미할당'}
+              onError={(e) => {
+                // 이미지 로드 실패 시 기본 이미지로 대체
+                e.currentTarget.src = '/assets/images/users/avatar-1.png';
+              }}
             />
             <span className="assignee-name">{task.assignee || '미할당'}</span>
           </div>
@@ -1476,10 +1483,18 @@ function ChangeLogView({
                 }
               }}
             >
-              <MenuItem key="rows-5" value={5}>5</MenuItem>
-              <MenuItem key="rows-10" value={10}>10</MenuItem>
-              <MenuItem key="rows-25" value={25}>25</MenuItem>
-              <MenuItem key="rows-50" value={50}>50</MenuItem>
+              <MenuItem key="rows-5" value={5}>
+                5
+              </MenuItem>
+              <MenuItem key="rows-10" value={10}>
+                10
+              </MenuItem>
+              <MenuItem key="rows-25" value={25}>
+                25
+              </MenuItem>
+              <MenuItem key="rows-50" value={50}>
+                50
+              </MenuItem>
             </Select>
           </FormControl>
 
@@ -2455,7 +2470,14 @@ export default function TaskManagement() {
   const { users, departments, isLoading: commonDataLoading } = useCommonData();
 
   // ⭐ Investment 패턴: 페이지별 데이터만 로딩
-  const { getTasks, updateTask, addTask: addTaskToDb, deleteTask: deleteTaskFromDb, loading: taskLoading, error: taskError } = useSupabaseTaskManagement();
+  const {
+    getTasks,
+    updateTask,
+    addTask: addTaskToDb,
+    deleteTask: deleteTaskFromDb,
+    loading: taskLoading,
+    error: taskError
+  } = useSupabaseTaskManagement();
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
   const { tasks: kpiTasks, fetchAllTasksByUser } = useSupabaseKpiTask();
 
@@ -2616,7 +2638,7 @@ export default function TaskManagement() {
 
     return dbChangeLogs.map((log: ChangeLogData) => {
       // record_id로 해당 업무 찾기 (record_id는 코드로 저장되어 있음)
-      const taskItem = tasks.find(t => t.code === log.record_id);
+      const taskItem = tasks.find((t) => t.code === log.record_id);
 
       const date = new Date(log.created_at);
       const year = date.getFullYear();

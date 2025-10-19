@@ -262,7 +262,10 @@ const OverviewTab = memo(
     }, [taskState.workContent, workContentInput.inputValue, workContentInput.debouncedValue]); // reset 제거
 
     useEffect(() => {
-      if (taskState.selectionBackground !== selectionBackgroundInput.inputValue && taskState.selectionBackground !== selectionBackgroundInput.debouncedValue) {
+      if (
+        taskState.selectionBackground !== selectionBackgroundInput.inputValue &&
+        taskState.selectionBackground !== selectionBackgroundInput.debouncedValue
+      ) {
         isUpdatingRef.current = true;
         selectionBackgroundInput.reset(taskState.selectionBackground);
         setTimeout(() => {
@@ -282,7 +285,10 @@ const OverviewTab = memo(
     }, [taskState.impact, impactInput.inputValue, impactInput.debouncedValue]); // reset 제거
 
     useEffect(() => {
-      if (taskState.evaluationCriteria.S !== evaluationCriteriaSInput.inputValue && taskState.evaluationCriteria.S !== evaluationCriteriaSInput.debouncedValue) {
+      if (
+        taskState.evaluationCriteria.S !== evaluationCriteriaSInput.inputValue &&
+        taskState.evaluationCriteria.S !== evaluationCriteriaSInput.debouncedValue
+      ) {
         isUpdatingRef.current = true;
         evaluationCriteriaSInput.reset(taskState.evaluationCriteria.S);
         setTimeout(() => {
@@ -292,7 +298,10 @@ const OverviewTab = memo(
     }, [taskState.evaluationCriteria.S, evaluationCriteriaSInput.inputValue, evaluationCriteriaSInput.debouncedValue]);
 
     useEffect(() => {
-      if (taskState.evaluationCriteria.A !== evaluationCriteriaAInput.inputValue && taskState.evaluationCriteria.A !== evaluationCriteriaAInput.debouncedValue) {
+      if (
+        taskState.evaluationCriteria.A !== evaluationCriteriaAInput.inputValue &&
+        taskState.evaluationCriteria.A !== evaluationCriteriaAInput.debouncedValue
+      ) {
         isUpdatingRef.current = true;
         evaluationCriteriaAInput.reset(taskState.evaluationCriteria.A);
         setTimeout(() => {
@@ -302,7 +311,10 @@ const OverviewTab = memo(
     }, [taskState.evaluationCriteria.A, evaluationCriteriaAInput.inputValue, evaluationCriteriaAInput.debouncedValue]);
 
     useEffect(() => {
-      if (taskState.evaluationCriteria.B !== evaluationCriteriaBInput.inputValue && taskState.evaluationCriteria.B !== evaluationCriteriaBInput.debouncedValue) {
+      if (
+        taskState.evaluationCriteria.B !== evaluationCriteriaBInput.inputValue &&
+        taskState.evaluationCriteria.B !== evaluationCriteriaBInput.debouncedValue
+      ) {
         isUpdatingRef.current = true;
         evaluationCriteriaBInput.reset(taskState.evaluationCriteria.B);
         setTimeout(() => {
@@ -312,7 +324,10 @@ const OverviewTab = memo(
     }, [taskState.evaluationCriteria.B, evaluationCriteriaBInput.inputValue, evaluationCriteriaBInput.debouncedValue]);
 
     useEffect(() => {
-      if (taskState.evaluationCriteria.C !== evaluationCriteriaCInput.inputValue && taskState.evaluationCriteria.C !== evaluationCriteriaCInput.debouncedValue) {
+      if (
+        taskState.evaluationCriteria.C !== evaluationCriteriaCInput.inputValue &&
+        taskState.evaluationCriteria.C !== evaluationCriteriaCInput.debouncedValue
+      ) {
         isUpdatingRef.current = true;
         evaluationCriteriaCInput.reset(taskState.evaluationCriteria.C);
         setTimeout(() => {
@@ -322,7 +337,10 @@ const OverviewTab = memo(
     }, [taskState.evaluationCriteria.C, evaluationCriteriaCInput.inputValue, evaluationCriteriaCInput.debouncedValue]);
 
     useEffect(() => {
-      if (taskState.evaluationCriteria.D !== evaluationCriteriaDInput.inputValue && taskState.evaluationCriteria.D !== evaluationCriteriaDInput.debouncedValue) {
+      if (
+        taskState.evaluationCriteria.D !== evaluationCriteriaDInput.inputValue &&
+        taskState.evaluationCriteria.D !== evaluationCriteriaDInput.debouncedValue
+      ) {
         isUpdatingRef.current = true;
         evaluationCriteriaDInput.reset(taskState.evaluationCriteria.D);
         setTimeout(() => {
@@ -1062,9 +1080,7 @@ const RecordTab = memo(
           }}
         >
           <Typography variant="body2" color="text.secondary">
-            {comments.length > 0
-              ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}`
-              : '0-0 of 0'}
+            {comments.length > 0 ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}` : '0-0 of 0'}
           </Typography>
           {comments.length > 0 && (
             <Pagination
@@ -1324,7 +1340,8 @@ const PerformanceTab = memo(
     const renderEditableCell = (item: PerformanceItem, field: string, value: any) => {
       const isEditing = editingCell?.id === item.id && editingCell?.field === field;
       const isOverallProgress = field === 'overallProgress';
-      const isMultilineField = field === 'planPerformance' || field === 'achievementReflection' || field === 'targetKpi' || field === 'actualKpi';
+      const isMultilineField =
+        field === 'planPerformance' || field === 'achievementReflection' || field === 'targetKpi' || field === 'actualKpi';
 
       return (
         <Box
@@ -1518,7 +1535,6 @@ const PerformanceTab = memo(
       );
     };
 
-
     return (
       <Box sx={{ height: '650px', display: 'flex', flexDirection: 'column', pt: 2, px: 3, pb: 0, overflow: 'hidden' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
@@ -1671,7 +1687,16 @@ const PerformanceTab = memo(
                       maxHeight: cellHeight
                     }}
                   >
-                    <Box sx={{ height: cellHeight, maxHeight: cellHeight, display: 'flex', alignItems: 'center', padding: '8px 12px', overflow: 'hidden' }}>
+                    <Box
+                      sx={{
+                        height: cellHeight,
+                        maxHeight: cellHeight,
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: '8px 12px',
+                        overflow: 'hidden'
+                      }}
+                    >
                       {startIndex + index + 1}
                     </Box>
                   </TableCell>
@@ -1685,8 +1710,20 @@ const PerformanceTab = memo(
                       maxHeight: cellHeight
                     }}
                   >
-                    <Box sx={{ height: cellHeight, maxHeight: cellHeight, display: 'flex', alignItems: 'center', padding: '8px 12px', overflow: 'hidden' }}>
-                      <Typography variant="body2" sx={{ fontSize: '0.875rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <Box
+                      sx={{
+                        height: cellHeight,
+                        maxHeight: cellHeight,
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: '8px 12px',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{ fontSize: '0.875rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                      >
                         {item.month}
                       </Typography>
                     </Box>
@@ -2268,7 +2305,7 @@ const PlanTab = memo(
                   onChange={() => {
                     onToggle(originalIndex);
                     // 체크박스 상태에 따라 상태를 완료 또는 대기로 변경
-                    const newStatus = (item.checked || item.status === '완료') ? '대기' : '완료';
+                    const newStatus = item.checked || item.status === '완료' ? '대기' : '완료';
                     onStatusChange(item.id, newStatus);
                   }}
                   color={item.status === '취소' ? 'error' : 'success'}
@@ -3947,26 +3984,28 @@ const TaskEditDialog = memo(
     const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
     const [editingCommentText, setEditingCommentText] = useState('');
     // 임시 저장된 기록들 (저장 버튼 클릭 시 DB에 저장)
-    const [pendingComments, setPendingComments] = useState<Array<{
-      id: string;
-      content: string;
-      timestamp: string;
-      author: string;
-      avatar?: string;
-      department?: string;
-      position?: string;
-      role?: string;
-      isNew: boolean;
-    }>>([]);
+    const [pendingComments, setPendingComments] = useState<
+      Array<{
+        id: string;
+        content: string;
+        timestamp: string;
+        author: string;
+        avatar?: string;
+        department?: string;
+        position?: string;
+        role?: string;
+        isNew: boolean;
+      }>
+    >([]);
     // 수정된 기록들 추적
-    const [modifiedComments, setModifiedComments] = useState<{[key: string]: string}>({});
+    const [modifiedComments, setModifiedComments] = useState<{ [key: string]: string }>({});
     // 삭제된 기록 ID들
     const [deletedCommentIds, setDeletedCommentIds] = useState<string[]>([]);
 
     // Supabase feedbacks를 RecordTab 형식으로 변환
     const comments = useMemo(() => {
       const existingComments = feedbacks
-        .filter(feedback => !deletedCommentIds.includes(String(feedback.id)))
+        .filter((feedback) => !deletedCommentIds.includes(String(feedback.id)))
         .map((feedback) => {
           const feedbackUser = users.find((u) => u.user_name === feedback.user_name);
           const feedbackIdStr = String(feedback.id);
@@ -3984,7 +4023,7 @@ const TaskEditDialog = memo(
           };
         });
 
-      const newComments = pendingComments.map(comment => ({
+      const newComments = pendingComments.map((comment) => ({
         ...comment,
         isNew: true
       }));
@@ -4235,7 +4274,19 @@ const TaskEditDialog = memo(
 
         onClose();
       }, 50); // 50ms 지연
-    }, [task, taskState, onSave, onClose, dispatch, deletedCommentIds, modifiedComments, pendingComments, deleteFeedback, updateFeedback, addFeedback]);
+    }, [
+      task,
+      taskState,
+      onSave,
+      onClose,
+      dispatch,
+      deletedCommentIds,
+      modifiedComments,
+      pendingComments,
+      deleteFeedback,
+      updateFeedback,
+      addFeedback
+    ]);
 
     const handleClose = useCallback(() => {
       setEditTab(0);
@@ -4303,24 +4354,27 @@ const TaskEditDialog = memo(
       setEditingChecklistText('');
     }, []);
 
-    const handleDeleteChecklistItem = useCallback(async (id: number) => {
-      try {
-        // 삭제할 항목과 그 하위 항목들을 모두 찾기
-        const findAllChildren = (parentId: number): number[] => {
-          const children = checklistItems.filter((item) => item.parentId === parentId).map((item) => item.id);
-          const allChildren = [...children];
-          children.forEach((childId) => {
-            allChildren.push(...findAllChildren(childId));
-          });
-          return allChildren;
-        };
+    const handleDeleteChecklistItem = useCallback(
+      async (id: number) => {
+        try {
+          // 삭제할 항목과 그 하위 항목들을 모두 찾기
+          const findAllChildren = (parentId: number): number[] => {
+            const children = checklistItems.filter((item) => item.parentId === parentId).map((item) => item.id);
+            const allChildren = [...children];
+            children.forEach((childId) => {
+              allChildren.push(...findAllChildren(childId));
+            });
+            return allChildren;
+          };
 
-        const toDelete = [id, ...findAllChildren(id)];
-        await deleteTasks(toDelete);
-      } catch (error) {
-        console.error('❌ Task 삭제 실패:', error);
-      }
-    }, [checklistItems, deleteTasks]);
+          const toDelete = [id, ...findAllChildren(id)];
+          await deleteTasks(toDelete);
+        } catch (error) {
+          console.error('❌ Task 삭제 실패:', error);
+        }
+      },
+      [checklistItems, deleteTasks]
+    );
 
     // 드래그 앤 드롭 핸들러들
     const handleDragStart = useCallback((e: React.DragEvent, itemId: number) => {
@@ -4338,56 +4392,62 @@ const TaskEditDialog = memo(
       setDraggedItemId(null);
     }, []);
 
-    const handleDrop = useCallback(async (e: React.DragEvent, targetId: number) => {
-      e.preventDefault();
-      const draggedId = parseInt(e.dataTransfer.getData('text/plain'));
+    const handleDrop = useCallback(
+      async (e: React.DragEvent, targetId: number) => {
+        e.preventDefault();
+        const draggedId = parseInt(e.dataTransfer.getData('text/plain'));
 
-      if (draggedId === targetId) return; // 자기 자신에게는 드롭 불가
+        if (draggedId === targetId) return; // 자기 자신에게는 드롭 불가
 
-      // 순환 참조 방지: 드래그된 항목이 타겟의 상위인지 확인
-      const isParentOf = (parentId: number, childId: number): boolean => {
-        const child = checklistItems.find((item) => item.id === childId);
-        if (!child || !child.parentId) return false;
-        if (child.parentId === parentId) return true;
-        return isParentOf(parentId, child.parentId);
-      };
+        // 순환 참조 방지: 드래그된 항목이 타겟의 상위인지 확인
+        const isParentOf = (parentId: number, childId: number): boolean => {
+          const child = checklistItems.find((item) => item.id === childId);
+          if (!child || !child.parentId) return false;
+          if (child.parentId === parentId) return true;
+          return isParentOf(parentId, child.parentId);
+        };
 
-      if (isParentOf(draggedId, targetId)) return; // 순환 참조 방지
+        if (isParentOf(draggedId, targetId)) return; // 순환 참조 방지
 
-      const target = checklistItems.find((item) => item.id === targetId);
-      if (!target) return;
+        const target = checklistItems.find((item) => item.id === targetId);
+        if (!target) return;
 
-      // 레벨 1까지만 허용: 타겟이 레벨 0일 때만 드롭 가능
-      if (target.level !== 0) return;
+        // 레벨 1까지만 허용: 타겟이 레벨 0일 때만 드롭 가능
+        if (target.level !== 0) return;
 
-      try {
-        // 드래그된 항목의 parentId와 level 업데이트
-        await updateTask(draggedId, {
-          parent_id: targetId,
-          level: target.level + 1
-        });
+        try {
+          // 드래그된 항목의 parentId와 level 업데이트
+          await updateTask(draggedId, {
+            parent_id: targetId,
+            level: target.level + 1
+          });
 
-        // 타겟 항목을 자동으로 펼치기
-        await updateTask(targetId, { expanded: true });
+          // 타겟 항목을 자동으로 펼치기
+          await updateTask(targetId, { expanded: true });
 
-        // 드래그 완료 후 상태 초기화
-        setDraggedItemId(null);
-      } catch (error) {
-        console.error('❌ Task 드롭 실패:', error);
-      }
-    }, [checklistItems, updateTask]);
+          // 드래그 완료 후 상태 초기화
+          setDraggedItemId(null);
+        } catch (error) {
+          console.error('❌ Task 드롭 실패:', error);
+        }
+      },
+      [checklistItems, updateTask]
+    );
 
     // 접기/펼치기 핸들러
-    const handleToggleExpanded = useCallback(async (id: number) => {
-      const item = checklistItems.find((item) => item.id === id);
-      if (!item) return;
+    const handleToggleExpanded = useCallback(
+      async (id: number) => {
+        const item = checklistItems.find((item) => item.id === id);
+        if (!item) return;
 
-      try {
-        await updateTask(id, { expanded: !item.expanded });
-      } catch (error) {
-        console.error('❌ Task 펼침/접힘 상태 변경 실패:', error);
-      }
-    }, [checklistItems, updateTask]);
+        try {
+          await updateTask(id, { expanded: !item.expanded });
+        } catch (error) {
+          console.error('❌ Task 펼침/접힘 상태 변경 실패:', error);
+        }
+      },
+      [checklistItems, updateTask]
+    );
 
     // 부모 항목(레벨 0)의 값 자동 계산
     const calculateParentValues = useCallback((items: any[]) => {
@@ -4463,16 +4523,19 @@ const TaskEditDialog = memo(
       return updatedItems;
     }, []);
 
-    const handleToggleChecklistItem = useCallback(async (index: number) => {
-      const item = checklistItems[index];
-      if (!item) return;
+    const handleToggleChecklistItem = useCallback(
+      async (index: number) => {
+        const item = checklistItems[index];
+        if (!item) return;
 
-      try {
-        await updateTask(item.id, { checked: !item.checked });
-      } catch (error) {
-        console.error('❌ Task 체크 상태 변경 실패:', error);
-      }
-    }, [checklistItems, updateTask]);
+        try {
+          await updateTask(item.id, { checked: !item.checked });
+        } catch (error) {
+          console.error('❌ Task 체크 상태 변경 실패:', error);
+        }
+      },
+      [checklistItems, updateTask]
+    );
 
     // 체크리스트 상태 변경 핸들러
     const handleChecklistStatusChange = useCallback(
@@ -4640,7 +4703,7 @@ const TaskEditDialog = memo(
         isNew: true
       };
 
-      setPendingComments(prev => [tempComment, ...prev]);
+      setPendingComments((prev) => [tempComment, ...prev]);
       setNewComment('');
     }, [newComment, users, currentUser]);
 
@@ -4655,16 +4718,12 @@ const TaskEditDialog = memo(
       // 임시 저장된 기록인지 확인 (ID가 temp_로 시작)
       if (editingCommentId.startsWith('temp_')) {
         // pendingComments에서 직접 수정
-        setPendingComments(prev =>
-          prev.map(comment =>
-            comment.id === editingCommentId
-              ? { ...comment, content: editingCommentText }
-              : comment
-          )
+        setPendingComments((prev) =>
+          prev.map((comment) => (comment.id === editingCommentId ? { ...comment, content: editingCommentText } : comment))
         );
       } else {
         // 기존 DB 데이터는 수정 목록에 추가 (저장 시 DB 업데이트)
-        setModifiedComments(prev => ({
+        setModifiedComments((prev) => ({
           ...prev,
           [editingCommentId]: editingCommentText
         }));
@@ -4683,10 +4742,10 @@ const TaskEditDialog = memo(
       // 임시 저장된 기록인지 확인 (ID가 temp_로 시작)
       if (commentId.startsWith('temp_')) {
         // pendingComments에서 직접 삭제
-        setPendingComments(prev => prev.filter(comment => comment.id !== commentId));
+        setPendingComments((prev) => prev.filter((comment) => comment.id !== commentId));
       } else {
         // 기존 DB 데이터는 삭제 목록에 추가 (저장 시 DB에서 삭제)
-        setDeletedCommentIds(prev => [...prev, commentId]);
+        setDeletedCommentIds((prev) => [...prev, commentId]);
       }
     }, []);
 
@@ -4737,7 +4796,17 @@ const TaskEditDialog = memo(
         departmentOptions,
         users
       }),
-      [taskState, handleFieldChange, assignees, assigneeAvatars, statusOptions, statusColors, managementCategoryOptions, departmentOptions, users]
+      [
+        taskState,
+        handleFieldChange,
+        assignees,
+        assigneeAvatars,
+        statusOptions,
+        statusColors,
+        managementCategoryOptions,
+        departmentOptions,
+        users
+      ]
     );
 
     const planTabProps = useMemo(
@@ -4808,47 +4877,44 @@ const TaskEditDialog = memo(
       ]
     );
 
-    const recordTabProps = useMemo(
-      () => {
-        // 현재 사용자 정보 가져오기
-        const feedbackUser = users.find((u) => u.user_name === currentUser?.user_name);
-        const currentUserName = feedbackUser?.user_name || currentUser?.user_name || '현재 사용자';
-        const currentUserAvatar = feedbackUser?.profile_image_url || currentUser?.profile_image_url || '';
-        const currentUserRole = feedbackUser?.role || currentUser?.role || '';
-        const currentUserDepartment = feedbackUser?.department || currentUser?.department || '';
+    const recordTabProps = useMemo(() => {
+      // 현재 사용자 정보 가져오기
+      const feedbackUser = users.find((u) => u.user_name === currentUser?.user_name);
+      const currentUserName = feedbackUser?.user_name || currentUser?.user_name || '현재 사용자';
+      const currentUserAvatar = feedbackUser?.profile_image_url || currentUser?.profile_image_url || '';
+      const currentUserRole = feedbackUser?.role || currentUser?.role || '';
+      const currentUserDepartment = feedbackUser?.department || currentUser?.department || '';
 
-        return {
-          comments,
-          newComment,
-          onNewCommentChange: setNewComment,
-          onAddComment: handleAddComment,
-          editingCommentId,
-          editingCommentText,
-          onEditComment: handleEditComment,
-          onSaveEditComment: handleSaveEditComment,
-          onCancelEditComment: handleCancelEditComment,
-          onDeleteComment: handleDeleteComment,
-          onEditCommentTextChange: setEditingCommentText,
-          currentUserName,
-          currentUserAvatar,
-          currentUserRole,
-          currentUserDepartment
-        };
-      },
-      [
+      return {
         comments,
         newComment,
+        onNewCommentChange: setNewComment,
+        onAddComment: handleAddComment,
         editingCommentId,
         editingCommentText,
-        handleAddComment,
-        handleEditComment,
-        handleSaveEditComment,
-        handleCancelEditComment,
-        handleDeleteComment,
-        users,
-        currentUser
-      ]
-    );
+        onEditComment: handleEditComment,
+        onSaveEditComment: handleSaveEditComment,
+        onCancelEditComment: handleCancelEditComment,
+        onDeleteComment: handleDeleteComment,
+        onEditCommentTextChange: setEditingCommentText,
+        currentUserName,
+        currentUserAvatar,
+        currentUserRole,
+        currentUserDepartment
+      };
+    }, [
+      comments,
+      newComment,
+      editingCommentId,
+      editingCommentText,
+      handleAddComment,
+      handleEditComment,
+      handleSaveEditComment,
+      handleCancelEditComment,
+      handleDeleteComment,
+      users,
+      currentUser
+    ]);
 
     const performanceTabProps = useMemo(
       () => ({

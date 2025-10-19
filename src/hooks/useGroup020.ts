@@ -59,7 +59,6 @@ export const useGroup020 = () => {
 
         console.log('✅ GROUP020 데이터 조회 성공:', data.length + '개');
         setUserStatuses(data);
-
       } catch (err: any) {
         console.error('❌ GROUP020 데이터 조회 중 오류:', err);
         setError('사용상태 목록을 불러오는데 실패했습니다.');
@@ -79,18 +78,18 @@ export const useGroup020 = () => {
 
   // 서브코드를 서브코드명으로 변환하는 유틸리티 함수
   const getStatusName = (subcode: string): string => {
-    const status = userStatuses.find(s => s.subcode === subcode);
+    const status = userStatuses.find((s) => s.subcode === subcode);
     return status ? status.subcode_name : subcode;
   };
 
   // 서브코드명을 서브코드로 변환하는 유틸리티 함수
   const getStatusCode = (subcodeName: string): string => {
-    const status = userStatuses.find(s => s.subcode_name === subcodeName);
+    const status = userStatuses.find((s) => s.subcode_name === subcodeName);
     return status ? status.subcode : subcodeName;
   };
 
   // Select 옵션용 배열 생성
-  const statusOptions = userStatuses.map(status => ({
+  const statusOptions = userStatuses.map((status) => ({
     value: status.subcode,
     label: status.subcode_name
   }));

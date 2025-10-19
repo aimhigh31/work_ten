@@ -109,7 +109,9 @@ export function useSupabaseImprovements() {
 
         // 연결 테스트
         console.log('🔗 Supabase 연결 테스트 중...');
-        const { count, error: testError } = await supabase.from('security_accident_improvement').select('*', { count: 'exact', head: true });
+        const { count, error: testError } = await supabase
+          .from('security_accident_improvement')
+          .select('*', { count: 'exact', head: true });
         console.log('🔗 연결 테스트 결과:', { count, error: testError });
 
         const { data, error } = await supabase.from('security_accident_improvement').insert(improvementData).select().single();

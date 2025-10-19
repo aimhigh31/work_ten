@@ -19,24 +19,24 @@ export interface HardwareData {
   work_content?: string;
   status?: string;
   assignee?: string;
-  registrant?: string;                  // 등록자
+  registrant?: string; // 등록자
   start_date?: string;
   completed_date?: string;
   attachments?: string[];
 
   // 하드웨어 특화 필드
-  asset_category?: string;          // 자산 분류
-  asset_name?: string;              // 자산명
-  model?: string;                   // 모델명
-  manufacturer?: string;            // 제조사
-  vendor?: string;                  // 공급업체
-  detail_spec?: string;             // 상세 스펙
-  purchase_date?: string;           // 구매일
-  warranty_end_date?: string;       // 보증 종료일
-  serial_number?: string;           // 시리얼 번호
-  assigned_user?: string;           // 할당된 사용자
-  location?: string;                // 위치/장소
-  images?: string[];                // 이미지 파일 배열
+  asset_category?: string; // 자산 분류
+  asset_name?: string; // 자산명
+  model?: string; // 모델명
+  manufacturer?: string; // 제조사
+  vendor?: string; // 공급업체
+  detail_spec?: string; // 상세 스펙
+  purchase_date?: string; // 구매일
+  warranty_end_date?: string; // 보증 종료일
+  serial_number?: string; // 시리얼 번호
+  assigned_user?: string; // 할당된 사용자
+  location?: string; // 위치/장소
+  images?: string[]; // 이미지 파일 배열
 
   is_active?: boolean;
   created_at?: string;
@@ -79,7 +79,6 @@ export const useSupabaseHardware = () => {
       saveToCache(CACHE_KEY, data || []);
 
       return data || [];
-
     } catch (err: any) {
       console.log('❌ getHardware 실패:', err);
       setError(err.message || '하드웨어 데이터 조회 실패');
@@ -103,11 +102,7 @@ export const useSupabaseHardware = () => {
       setLoading(true);
       setError(null);
 
-      const { data, error } = await supabase
-        .from('it_hardware_data')
-        .insert([insertData])
-        .select()
-        .single();
+      const { data, error } = await supabase.from('it_hardware_data').insert([insertData]).select().single();
 
       if (error) {
         console.log('❌ Supabase 생성 오류:', error);
@@ -120,7 +115,6 @@ export const useSupabaseHardware = () => {
       sessionStorage.removeItem(CACHE_KEY);
 
       return data;
-
     } catch (err: any) {
       console.log('❌ createHardware 실패:', err);
       setError(err.message || '하드웨어 생성 실패');
@@ -139,9 +133,7 @@ export const useSupabaseHardware = () => {
       setError(null);
 
       // null 값들을 제거하여 실제 업데이트할 데이터만 전송
-      const cleanData = Object.fromEntries(
-        Object.entries(hardwareData).filter(([_, value]) => value !== null && value !== undefined)
-      );
+      const cleanData = Object.fromEntries(Object.entries(hardwareData).filter(([_, value]) => value !== null && value !== undefined));
 
       console.log('📝 정제된 업데이트 데이터:', cleanData);
       console.log('📝 정제된 데이터 키들:', Object.keys(cleanData));
@@ -152,12 +144,7 @@ export const useSupabaseHardware = () => {
       console.log('🔍 Supabase 업데이트 쿼리 실행:', { table: 'it_hardware_data', id, cleanData });
       console.log('🔍 실제 전송되는 데이터:', JSON.stringify(cleanData, null, 2));
 
-      const { data, error } = await supabase
-        .from('it_hardware_data')
-        .update(cleanData)
-        .eq('id', id)
-        .select()
-        .single();
+      const { data, error } = await supabase.from('it_hardware_data').update(cleanData).eq('id', id).select().single();
 
       console.log('🔍 Supabase 업데이트 응답:', { data: !!data, error: !!error });
 
@@ -185,7 +172,6 @@ export const useSupabaseHardware = () => {
       sessionStorage.removeItem(CACHE_KEY);
 
       return data;
-
     } catch (err: any) {
       console.log('❌ updateHardware 실패:', err);
       setError(err.message || '하드웨어 수정 실패');
@@ -203,12 +189,7 @@ export const useSupabaseHardware = () => {
       setLoading(true);
       setError(null);
 
-      const { data, error } = await supabase
-        .from('it_hardware_data')
-        .update({ is_active: false })
-        .eq('id', id)
-        .select()
-        .single();
+      const { data, error } = await supabase.from('it_hardware_data').update({ is_active: false }).eq('id', id).select().single();
 
       if (error) {
         console.log('❌ Supabase 삭제 오류:', error);
@@ -221,7 +202,6 @@ export const useSupabaseHardware = () => {
       sessionStorage.removeItem(CACHE_KEY);
 
       return data;
-
     } catch (err: any) {
       console.log('❌ deleteHardware 실패:', err);
       setError(err.message || '하드웨어 삭제 실패');
@@ -264,7 +244,6 @@ export const useSupabaseHardware = () => {
       sessionStorage.removeItem(CACHE_KEY);
 
       return data;
-
     } catch (err: any) {
       console.log('❌ deleteMultipleHardware 실패:', err);
       setError(err.message || '여러 하드웨어 삭제 실패');

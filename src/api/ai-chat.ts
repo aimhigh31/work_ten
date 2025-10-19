@@ -62,7 +62,9 @@ export async function sendMessageToAI(messages: AIMessage[]): Promise<string> {
 
       // 모델이 로드되지 않은 경우 친화적인 에러 메시지
       if (errorText.includes('No models loaded') || errorText.includes('model_not_found')) {
-        throw new Error('AI 서버에 모델이 로드되지 않았습니다.\n\nLM Studio를 실행하고 모델을 로드한 후 서버를 시작해주세요.\n(Server 탭 → Start Server)');
+        throw new Error(
+          'AI 서버에 모델이 로드되지 않았습니다.\n\nLM Studio를 실행하고 모델을 로드한 후 서버를 시작해주세요.\n(Server 탭 → Start Server)'
+        );
       }
 
       throw new Error(`AI 서버 오류 (${response.status}): ${errorText}`);

@@ -155,21 +155,21 @@ const OverviewTab = memo(
     const { users } = useSupabaseUserManagement();
 
     // GROUP023의 서브코드 목록 가져오기 (VOC 유형)
-    const vocTypeOptions = getSubCodesByGroup('GROUP023').map(subCode => ({
+    const vocTypeOptions = getSubCodesByGroup('GROUP023').map((subCode) => ({
       value: subCode.subcode_name,
       label: subCode.subcode_name,
       description: subCode.subcode_description
     }));
 
     // GROUP024의 서브코드 목록 가져오기 (우선순위)
-    const priorityOptions = getSubCodesByGroup('GROUP024').map(subCode => ({
+    const priorityOptions = getSubCodesByGroup('GROUP024').map((subCode) => ({
       value: subCode.subcode_name,
       label: subCode.subcode_name,
       description: subCode.subcode_description
     }));
 
     // GROUP002의 서브코드 목록 가져오기 (상태)
-    const statusOptionsFromMaster = getSubCodesByGroup('GROUP002').map(subCode => ({
+    const statusOptionsFromMaster = getSubCodesByGroup('GROUP002').map((subCode) => ({
       value: subCode.subcode_name,
       label: subCode.subcode_name,
       description: subCode.subcode_description
@@ -177,8 +177,8 @@ const OverviewTab = memo(
 
     // 사용자 목록 옵션 생성 (등록자)
     const userOptions = users
-      .filter(user => user.is_active && user.status === 'active')
-      .map(user => ({
+      .filter((user) => user.is_active && user.status === 'active')
+      .map((user) => ({
         value: user.user_name,
         label: user.user_name,
         department: user.department || '',
@@ -217,7 +217,10 @@ const OverviewTab = memo(
     }, [vocState.content, contentInput.inputValue, contentInput.debouncedValue]); // reset 제거
 
     useEffect(() => {
-      if (vocState.responseContent !== responseContentInput.inputValue && vocState.responseContent !== responseContentInput.debouncedValue) {
+      if (
+        vocState.responseContent !== responseContentInput.inputValue &&
+        vocState.responseContent !== responseContentInput.debouncedValue
+      ) {
         isUpdatingRef.current = true;
         responseContentInput.reset(vocState.responseContent);
         setTimeout(() => {
@@ -292,20 +295,18 @@ const OverviewTab = memo(
               </InputLabel>
               <Select value={vocState.vocType} label="VOC유형 *" onChange={handleFieldChange('vocType')} displayEmpty>
                 <MenuItem value="">선택</MenuItem>
-                {vocTypeOptions.length > 0 ? (
-                  vocTypeOptions.map((option) => (
-                    <MenuItem key={option.value} value={option.value} title={option.description}>
-                      {option.label}
-                    </MenuItem>
-                  ))
-                ) : (
-                  // 백업용: 마스터코드 로딩 중이거나 데이터가 없을 때
-                  VOC_TYPES.map((type) => (
-                    <MenuItem key={type} value={type}>
-                      {type}
-                    </MenuItem>
-                  ))
-                )}
+                {vocTypeOptions.length > 0
+                  ? vocTypeOptions.map((option) => (
+                      <MenuItem key={option.value} value={option.value} title={option.description}>
+                        {option.label}
+                      </MenuItem>
+                    ))
+                  : // 백업용: 마스터코드 로딩 중이거나 데이터가 없을 때
+                    VOC_TYPES.map((type) => (
+                      <MenuItem key={type} value={type}>
+                        {type}
+                      </MenuItem>
+                    ))}
               </Select>
             </FormControl>
 
@@ -523,15 +524,11 @@ const OverviewTab = memo(
                   }
                 }}
                 renderValue={(value) => {
-                  const user = userOptions.find(u => u.value === value);
+                  const user = userOptions.find((u) => u.value === value);
                   if (!user) return value;
                   return (
                     <Stack direction="row" spacing={1.5} alignItems="center">
-                      <Avatar
-                        src={user.avatar}
-                        alt={user.label}
-                        sx={{ width: 20, height: 20 }}
-                      >
+                      <Avatar src={user.avatar} alt={user.label} sx={{ width: 20, height: 20 }}>
                         {user.label?.charAt(0)}
                       </Avatar>
                       <Typography variant="body1" sx={{ color: '#666666' }}>
@@ -545,10 +542,7 @@ const OverviewTab = memo(
                   userOptions.map((user) => (
                     <MenuItem key={user.value} value={user.value} title={user.department}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Avatar
-                          src={user.avatar}
-                          sx={{ width: 20, height: 20, fontSize: '12px' }}
-                        >
+                        <Avatar src={user.avatar} sx={{ width: 20, height: 20, fontSize: '12px' }}>
                           {user.label.charAt(0)}
                         </Avatar>
                         <Typography variant="body2">{user.label}</Typography>
@@ -588,8 +582,11 @@ const OverviewTab = memo(
             <TextField
               fullWidth
               label="코드"
-              value={voc ? `IT-VOC-${new Date(voc.registrationDate).getFullYear().toString().slice(-2)}-${String(voc.no).padStart(3, '0')}` :
-                     `IT-VOC-${new Date().getFullYear().toString().slice(-2)}-XXX`}
+              value={
+                voc
+                  ? `IT-VOC-${new Date(voc.registrationDate).getFullYear().toString().slice(-2)}-${String(voc.no).padStart(3, '0')}`
+                  : `IT-VOC-${new Date().getFullYear().toString().slice(-2)}-XXX`
+              }
               InputLabelProps={{ shrink: true }}
               variant="outlined"
               InputProps={{
@@ -602,7 +599,6 @@ const OverviewTab = memo(
               }}
             />
           </Stack>
-
         </Stack>
       </Box>
     );
@@ -921,9 +917,7 @@ const RecordTab = memo(
           }}
         >
           <Typography variant="body2" color="text.secondary">
-            {comments.length > 0
-              ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}`
-              : '0-0 of 0'}
+            {comments.length > 0 ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}` : '0-0 of 0'}
           </Typography>
           {comments.length > 0 && (
             <Pagination
@@ -1524,22 +1518,19 @@ const VOCEditDialog = memo(
 
       if (voc?.id) {
         // 추가된 기록 (temp- ID)
-        const addedFeedbacks = pendingFeedbacks.filter(fb =>
-          fb.id.toString().startsWith('temp-') &&
-          !initialFeedbacks.find(initial => initial.id === fb.id)
+        const addedFeedbacks = pendingFeedbacks.filter(
+          (fb) => fb.id.toString().startsWith('temp-') && !initialFeedbacks.find((initial) => initial.id === fb.id)
         );
 
         // 수정된 기록
-        const updatedFeedbacks = pendingFeedbacks.filter(fb => {
+        const updatedFeedbacks = pendingFeedbacks.filter((fb) => {
           if (fb.id.toString().startsWith('temp-')) return false;
-          const initial = initialFeedbacks.find(initial => initial.id === fb.id);
+          const initial = initialFeedbacks.find((initial) => initial.id === fb.id);
           return initial && initial.description !== fb.description;
         });
 
         // 삭제된 기록
-        const deletedFeedbacks = initialFeedbacks.filter(initial =>
-          !pendingFeedbacks.find(pending => pending.id === initial.id)
-        );
+        const deletedFeedbacks = initialFeedbacks.filter((initial) => !pendingFeedbacks.find((pending) => pending.id === initial.id));
 
         // 추가 (역순으로 저장)
         const reversedAddedFeedbacks = [...addedFeedbacks].reverse();
@@ -1557,7 +1548,7 @@ const VOCEditDialog = memo(
 
         // 삭제 - feedbacks 배열에 존재하는 항목만 삭제
         for (const feedback of deletedFeedbacks) {
-          const existsInFeedbacks = feedbacks.some(fb => String(fb.id) === String(feedback.id));
+          const existsInFeedbacks = feedbacks.some((fb) => String(fb.id) === String(feedback.id));
           if (existsInFeedbacks) {
             await deleteFeedback(String(feedback.id));
           } else {
@@ -1616,7 +1607,19 @@ const VOCEditDialog = memo(
         }
         onClose();
       }, 50); // 50ms 지연
-    }, [voc, vocState, onSave, onClose, dispatch, pendingFeedbacks, initialFeedbacks, feedbacks, addFeedback, updateFeedback, deleteFeedback]);
+    }, [
+      voc,
+      vocState,
+      onSave,
+      onClose,
+      dispatch,
+      pendingFeedbacks,
+      initialFeedbacks,
+      feedbacks,
+      addFeedback,
+      updateFeedback,
+      deleteFeedback
+    ]);
 
     const handleClose = useCallback(() => {
       setEditTab(0);
@@ -1659,7 +1662,7 @@ const VOCEditDialog = memo(
       };
 
       // 로컬 state에만 추가 (즉시 반응)
-      setPendingFeedbacks(prev => [newFeedback, ...prev]);
+      setPendingFeedbacks((prev) => [newFeedback, ...prev]);
       setNewComment('');
     }, [newComment, voc?.id, currentUser]);
 
@@ -1672,13 +1675,7 @@ const VOCEditDialog = memo(
       if (!editingCommentText.trim() || !editingCommentId) return;
 
       // 로컬 state만 업데이트 (즉시 반응)
-      setPendingFeedbacks(prev =>
-        prev.map(fb =>
-          fb.id === editingCommentId
-            ? { ...fb, description: editingCommentText }
-            : fb
-        )
-      );
+      setPendingFeedbacks((prev) => prev.map((fb) => (fb.id === editingCommentId ? { ...fb, description: editingCommentText } : fb)));
 
       setEditingCommentId(null);
       setEditingCommentText('');
@@ -1691,7 +1688,7 @@ const VOCEditDialog = memo(
 
     const handleDeleteComment = useCallback((commentId: string) => {
       // 로컬 state에서만 제거 (즉시 반응)
-      setPendingFeedbacks(prev => prev.filter(fb => fb.id !== commentId));
+      setPendingFeedbacks((prev) => prev.filter((fb) => fb.id !== commentId));
     }, []);
 
     // 메모이제이션된 탭 컴포넌트 props

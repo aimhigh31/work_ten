@@ -40,10 +40,7 @@ export default function DashboardCalendar() {
         <Typography variant="h5">일정관리</Typography>
       </Box>
       <LocalizationProvider dateAdapter={AdapterDayjs}>
-        <DateCalendar
-          value={selectedDate}
-          onChange={(newValue) => setSelectedDate(newValue || dayjs())}
-        />
+        <DateCalendar value={selectedDate} onChange={(newValue) => setSelectedDate(newValue || dayjs())} />
       </LocalizationProvider>
 
       {/* 선택된 날짜의 일정 목록 */}

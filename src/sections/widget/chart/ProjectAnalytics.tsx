@@ -220,7 +220,12 @@ export default function ProjectAnalytics() {
     >
       <Box sx={{ width: '100%' }}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs value={value} onChange={handleChange} aria-label="basic tabs example" sx={{ px: 3, pt: 0.5, '& .MuiTab-root': { mb: 0.5 } }}>
+          <Tabs
+            value={value}
+            onChange={handleChange}
+            aria-label="basic tabs example"
+            sx={{ px: 3, pt: 0.5, '& .MuiTab-root': { mb: 0.5 } }}
+          >
             <Tab label="Overview" {...a11yProps(0)} />
             <Tab label="Marketing" {...a11yProps(1)} />
             <Tab label="Project" {...a11yProps(2)} />

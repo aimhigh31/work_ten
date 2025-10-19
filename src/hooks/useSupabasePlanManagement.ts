@@ -6,10 +6,10 @@ import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } f
 export interface PlanItem {
   id: number;
   task_id: string;
-  item_id: number;  // BIGINT (JavaScript에서는 number로 처리)
+  item_id: number; // BIGINT (JavaScript에서는 number로 처리)
   text: string;
   checked: boolean;
-  parent_id: number | null;  // BIGINT (JavaScript에서는 number로 처리)
+  parent_id: number | null; // BIGINT (JavaScript에서는 number로 처리)
   level: number;
   expanded: boolean;
   status: string;
@@ -26,10 +26,10 @@ export interface PlanItem {
 // 계획 항목 입력 타입
 export interface PlanItemInput {
   task_id: string;
-  item_id: number;  // BIGINT (JavaScript에서는 number로 처리)
+  item_id: number; // BIGINT (JavaScript에서는 number로 처리)
   text: string;
   checked?: boolean;
-  parent_id?: number | null;  // BIGINT (JavaScript에서는 number로 처리)
+  parent_id?: number | null; // BIGINT (JavaScript에서는 number로 처리)
   level?: number;
   expanded?: boolean;
   status?: string;
@@ -98,10 +98,7 @@ export const useSupabasePlanManagement = () => {
       setError(null);
 
       // 1. 기존 데이터 삭제
-      const { error: deleteError } = await supabase
-        .from('main_task_management')
-        .delete()
-        .eq('task_id', taskId);
+      const { error: deleteError } = await supabase.from('main_task_management').delete().eq('task_id', taskId);
 
       if (deleteError) {
         console.error('❌ 기존 계획 항목 삭제 실패:', deleteError);
@@ -114,7 +111,7 @@ export const useSupabasePlanManagement = () => {
 
       // 2. 새 데이터 저장 (데이터가 있을 경우에만)
       if (items.length > 0) {
-        const insertData = items.map(item => ({
+        const insertData = items.map((item) => ({
           task_id: taskId,
           item_id: item.item_id,
           text: item.text,
@@ -132,10 +129,7 @@ export const useSupabasePlanManagement = () => {
 
         console.log('📝 INSERT 데이터:', JSON.stringify(insertData, null, 2));
 
-        const { error: insertError, data: insertedData } = await supabase
-          .from('main_task_management')
-          .insert(insertData)
-          .select();
+        const { error: insertError, data: insertedData } = await supabase.from('main_task_management').insert(insertData).select();
 
         if (insertError) {
           console.error('❌ 계획 항목 저장 실패:', insertError);

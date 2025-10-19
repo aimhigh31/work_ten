@@ -45,10 +45,7 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 // Project imports
 import InvestmentDataTable from 'views/apps/InvestmentDataTable';
 import InvestmentEditDialog from 'components/InvestmentEditDialog';
-import {
-  investmentStatusColors,
-  investmentAssigneeAvatars
-} from 'data/investment';
+import { investmentStatusColors, investmentAssigneeAvatars } from 'data/investment';
 import { InvestmentTableData, InvestmentStatus, InvestmentData } from 'types/investment';
 import { ThemeMode } from 'config';
 
@@ -2126,7 +2123,16 @@ export default function InvestmentManagement() {
   const { users, departments } = useCommonData();
 
   // Supabase 투자관리 연동
-  const { getInvestments, createInvestment, updateInvestment, deleteInvestment, convertToInvestmentData, convertToDbInvestmentData, loading, error } = useSupabaseInvestment();
+  const {
+    getInvestments,
+    createInvestment,
+    updateInvestment,
+    deleteInvestment,
+    convertToInvestmentData,
+    convertToDbInvestmentData,
+    loading,
+    error
+  } = useSupabaseInvestment();
   const { saveFinanceItems } = useSupabaseInvestmentFinance();
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
@@ -2267,16 +2273,14 @@ export default function InvestmentManagement() {
   useEffect(() => {
     const loadMasterCodes = async () => {
       const investmentTypes = await getSubCodesByGroup('GROUP025');
-      setInvestmentTypeOptions(investmentTypes.map(item => item.subCodeName));
+      setInvestmentTypeOptions(investmentTypes.map((item) => item.subCodeName));
     };
     loadMasterCodes();
   }, [getSubCodesByGroup]);
 
   // NO 할당 헬퍼 함수
   const assignNoToInvestments = (investments: InvestmentData[]) => {
-    const sortedByDate = investments.sort((a, b) =>
-      new Date(b.registrationDate).getTime() - new Date(a.registrationDate).getTime()
-    );
+    const sortedByDate = investments.sort((a, b) => new Date(b.registrationDate).getTime() - new Date(a.registrationDate).getTime());
 
     return sortedByDate.map((investment, index) => ({
       ...investment,
@@ -2515,7 +2519,7 @@ export default function InvestmentManagement() {
         // 코드 자동 생성 (DB의 id 기반)
         const currentYear = new Date().getFullYear().toString().slice(-2);
         const dbInvestments = await getInvestments();
-        const maxId = Math.max(...dbInvestments.map(inv => inv.id || 0), 0);
+        const maxId = Math.max(...dbInvestments.map((inv) => inv.id || 0), 0);
         const newCode = `PLAN-INV-${currentYear}-${String(maxId + 1).padStart(3, '0')}`;
 
         const newInvestmentData = {
@@ -2957,7 +2961,7 @@ export default function InvestmentManagement() {
                   console.log('editDialogOpen을 true로 설정함');
                 }}
                 onDeleteInvestments={(investmentsToDelete) => {
-                  investmentsToDelete.forEach(investment => {
+                  investmentsToDelete.forEach((investment) => {
                     handleDeleteInvestment(investment);
                   });
                 }}

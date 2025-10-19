@@ -120,7 +120,16 @@ interface KanbanViewProps {
   assigneeList?: any[];
 }
 
-function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssignee, tasks, setTasks, addChangeLog, assigneeList }: KanbanViewProps) {
+function KanbanView({
+  selectedYear,
+  selectedTeam,
+  selectedStatus,
+  selectedAssignee,
+  tasks,
+  setTasks,
+  addChangeLog,
+  assigneeList
+}: KanbanViewProps) {
   const theme = useTheme();
 
   // 상태 관리
@@ -295,6 +304,13 @@ function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssign
 
     const statusTagColor = getStatusTagColor(task.status);
 
+    // 사용자 프로필 이미지 가져오기 (최적화: find 한 번만 호출)
+    const assigneeUser = React.useMemo(() => {
+      return assigneeList?.find((user) => user.user_name === task.assignee);
+    }, [task.assignee]);
+
+    const assigneeAvatar = assigneeUser?.profile_image_url || assigneeUser?.avatar_url || '/assets/images/users/avatar-1.png';
+
     return (
       <article
         ref={setNodeRef}
@@ -346,12 +362,12 @@ function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssign
           <div className="assignee-info">
             <img
               className="assignee-avatar"
-              src={
-                assigneeList?.find((user) => user.user_name === task.assignee)?.profile_image_url ||
-                assigneeList?.find((user) => user.user_name === task.assignee)?.avatar_url ||
-                '/assets/images/users/avatar-1.png'
-              }
+              src={assigneeAvatar}
               alt={task.assignee || '미할당'}
+              onError={(e) => {
+                // 이미지 로드 실패 시 기본 이미지로 대체
+                e.currentTarget.src = '/assets/images/users/avatar-1.png';
+              }}
             />
             <span className="assignee-name">{task.assignee || '미할당'}</span>
           </div>
@@ -1017,7 +1033,6 @@ function MonthlyScheduleView({
     </Box>
   );
 }
-
 
 // 대시보드 뷰 컴포넌트
 interface DashboardViewProps {
@@ -1908,6 +1923,18 @@ export default function ITEducationManagement() {
   const { users, departments } = useCommonData(); // 🏪 공용 창고에서 가져오기
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
+  // 🔍 디버깅: CommonData에서 받은 users 확인
+  React.useEffect(() => {
+    console.log('🔍 [ITEducationManagement] CommonData users:', users.length);
+    if (users.length > 0) {
+      console.log('🔍 [ITEducationManagement] 첫 번째 user 샘플:', {
+        user_name: users[0].user_name,
+        avatar_url: users[0].avatar_url,
+        profile_image_url: users[0].profile_image_url
+      });
+    }
+  }, [users]);
+
   // 마스터코드에서 상태 옵션 가져오기
   const statusTypes = React.useMemo(() => {
     return getSubCodesByGroup('GROUP002');
@@ -1948,7 +1975,7 @@ export default function ITEducationManagement() {
   const changeLogs = React.useMemo(() => {
     return dbChangeLogs.map((log: ChangeLogData) => {
       // record_id로 해당 IT교육 찾기 (record_id는 코드로 저장되어 있음)
-      const education = tasks.find(t => t.code === log.record_id);
+      const education = tasks.find((t) => t.code === log.record_id);
 
       const date = new Date(log.created_at);
       const year = date.getFullYear();
@@ -2512,6 +2539,7 @@ export default function ITEducationManagement() {
                   tasks={tasks}
                   setTasks={setTasks}
                   addChangeLog={addChangeLog}
+                  users={users}
                 />
               </Box>
             </TabPanel>
@@ -2882,10 +2910,18 @@ export default function ITEducationManagement() {
                             }
                           }}
                         >
-                          <MenuItem key="rows-5" value={5}>5</MenuItem>
-                          <MenuItem key="rows-10" value={10}>10</MenuItem>
-                          <MenuItem key="rows-25" value={25}>25</MenuItem>
-                          <MenuItem key="rows-50" value={50}>50</MenuItem>
+                          <MenuItem key="rows-5" value={5}>
+                            5
+                          </MenuItem>
+                          <MenuItem key="rows-10" value={10}>
+                            10
+                          </MenuItem>
+                          <MenuItem key="rows-25" value={25}>
+                            25
+                          </MenuItem>
+                          <MenuItem key="rows-50" value={50}>
+                            50
+                          </MenuItem>
                         </Select>
                       </FormControl>
 
@@ -2919,7 +2955,11 @@ export default function ITEducationManagement() {
                             }
                           }}
                         />
-                        <Button size="small" onClick={handleChangeLogGoToPage} sx={{ minWidth: 'auto', px: 1.5, py: 0.5, fontSize: '0.875rem' }}>
+                        <Button
+                          size="small"
+                          onClick={handleChangeLogGoToPage}
+                          sx={{ minWidth: 'auto', px: 1.5, py: 0.5, fontSize: '0.875rem' }}
+                        >
                           Go
                         </Button>
                       </Box>

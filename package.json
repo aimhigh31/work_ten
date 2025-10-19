@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "cross-env NODE_OPTIONS=--max-old-space-size=16384 next dev -p 3200",
     "build": "cross-env NODE_OPTIONS=--max-old-space-size=16384 next build",
-    "start": "next start",
+    "start": "next start -p 4200",
     "lint": "eslint \"src/**/*.{js,jsx,ts,tsx}\"",
     "lint:fix": "eslint --fix \"src/**/*.{js,jsx,ts,tsx}\"",
     "prettier": "prettier --write \"src/**/*.{js,jsx,ts,tsx}\"",

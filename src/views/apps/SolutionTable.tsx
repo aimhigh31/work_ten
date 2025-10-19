@@ -39,7 +39,7 @@ import SolutionEditDialog from 'components/SolutionEditDialog';
 import { solutionData, teams, assignees, solutionStatusOptions, solutionStatusColors, assigneeAvatars } from 'data/solution';
 import { SolutionTableData, SolutionStatus } from 'types/solution';
 import { useSupabaseSolution } from '../../hooks/useSupabaseSolution';
-import { useSupabaseUserManagement } from '../../hooks/useSupabaseUserManagement';
+import { useSupabaseUsers } from '../../hooks/useSupabaseUsers';
 
 // Icons
 import { Add, Trash, Edit, DocumentDownload } from '@wandersonalwes/iconsax-react';
@@ -68,7 +68,16 @@ interface SolutionTableProps {
   selectedAssignee?: string;
   solutions?: SolutionTableData[];
   setSolutions?: React.Dispatch<React.SetStateAction<SolutionTableData[]>>;
-  addChangeLog?: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string, title?: string) => void;
+  addChangeLog?: (
+    action: string,
+    target: string,
+    description: string,
+    team?: string,
+    beforeValue?: string,
+    afterValue?: string,
+    changedField?: string,
+    title?: string
+  ) => void;
 }
 
 export default function SolutionTable({
@@ -83,22 +92,15 @@ export default function SolutionTable({
   const theme = useTheme();
 
   // Supabase 연동 훅
-  const {
-    createSolution,
-    updateSolution,
-    deleteSolution,
-    convertToDbSolutionData,
-    convertToSolutionData,
-    getSolutions
-  } = useSupabaseSolution();
+  const { createSolution, updateSolution, deleteSolution, convertToDbSolutionData, convertToSolutionData, getSolutions } =
+    useSupabaseSolution();
 
   // 사용자관리 훅 - 담당자 프로필 사진 연동
-  const { users } = useSupabaseUserManagement();
+  const { users } = useSupabaseUsers();
 
-  // 담당자별 프로필 사진 가져오는 함수
-  const getUserProfileImage = (assigneeName: string) => {
-    const user = users.find(u => u.user_name === assigneeName);
-    return user?.profile_image_url || user?.avatar_url || null;
+  // 사용자 이름으로 사용자 데이터 찾기
+  const findUserByName = (userName: string) => {
+    return users.find((user) => user.user_name === userName);
   };
 
   const [data, setData] = useState<SolutionTableData[]>(solutions ? solutions : solutionData.map((solution) => ({ ...solution })));
@@ -304,149 +306,151 @@ export default function SolutionTable({
         // 변경로그 추가 - 필드별 상세 추적 (개요탭 전체 필드) - DB 저장 전에 실행
         if (addChangeLog) {
           const originalSolution = data[existingIndex];
-          const solutionCode = updatedSolution.code || `IT-SOL-${new Date().getFullYear().toString().slice(-2)}-${String(updatedSolution.id).padStart(3, '0')}`;
+          const solutionCode =
+            updatedSolution.code ||
+            `IT-SOL-${new Date().getFullYear().toString().slice(-2)}-${String(updatedSolution.id).padStart(3, '0')}`;
           const solutionName = updatedSolution.title || '솔루션';
 
-        // 1. 솔루션유형 변경
-        if (originalSolution.solutionType !== updatedSolution.solutionType) {
-          addChangeLog(
-            '수정',
-            solutionCode,
-            `솔루션관리 ${solutionName}(${solutionCode}) 정보의 개요탭 솔루션유형이 ${originalSolution.solutionType || ''} → ${updatedSolution.solutionType || ''} 로 수정 되었습니다.`,
-            updatedSolution.team || '미분류',
-            originalSolution.solutionType || '',
-            updatedSolution.solutionType || '',
-            '솔루션유형',
-            solutionName
-          );
-        }
+          // 1. 솔루션유형 변경
+          if (originalSolution.solutionType !== updatedSolution.solutionType) {
+            addChangeLog(
+              '수정',
+              solutionCode,
+              `솔루션관리 ${solutionName}(${solutionCode}) 정보의 개요탭 솔루션유형이 ${originalSolution.solutionType || ''} → ${updatedSolution.solutionType || ''} 로 수정 되었습니다.`,
+              updatedSolution.team || '미분류',
+              originalSolution.solutionType || '',
+              updatedSolution.solutionType || '',
+              '솔루션유형',
+              solutionName
+            );
+          }
 
-        // 2. 개발유형 변경
-        if (originalSolution.developmentType !== updatedSolution.developmentType) {
-          addChangeLog(
-            '수정',
-            solutionCode,
-            `솔루션관리 ${solutionName}(${solutionCode}) 정보의 개요탭 개발유형이 ${originalSolution.developmentType || ''} → ${updatedSolution.developmentType || ''} 로 수정 되었습니다.`,
-            updatedSolution.team || '미분류',
-            originalSolution.developmentType || '',
-            updatedSolution.developmentType || '',
-            '개발유형',
-            solutionName
-          );
-        }
+          // 2. 개발유형 변경
+          if (originalSolution.developmentType !== updatedSolution.developmentType) {
+            addChangeLog(
+              '수정',
+              solutionCode,
+              `솔루션관리 ${solutionName}(${solutionCode}) 정보의 개요탭 개발유형이 ${originalSolution.developmentType || ''} → ${updatedSolution.developmentType || ''} 로 수정 되었습니다.`,
+              updatedSolution.team || '미분류',
+              originalSolution.developmentType || '',
+              updatedSolution.developmentType || '',
+              '개발유형',
+              solutionName
+            );
+          }
 
-        // 3. 제목 변경
-        if (originalSolution.title !== updatedSolution.title) {
-          addChangeLog(
-            '수정',
-            solutionCode,
-            `솔루션관리 ${originalSolution.title || ''}(${solutionCode}) 정보의 개요탭 제목이 ${originalSolution.title || ''} → ${updatedSolution.title || ''} 로 수정 되었습니다.`,
-            updatedSolution.team || '미분류',
-            originalSolution.title || '',
-            updatedSolution.title || '',
-            '제목',
-            solutionName
-          );
-        }
+          // 3. 제목 변경
+          if (originalSolution.title !== updatedSolution.title) {
+            addChangeLog(
+              '수정',
+              solutionCode,
+              `솔루션관리 ${originalSolution.title || ''}(${solutionCode}) 정보의 개요탭 제목이 ${originalSolution.title || ''} → ${updatedSolution.title || ''} 로 수정 되었습니다.`,
+              updatedSolution.team || '미분류',
+              originalSolution.title || '',
+              updatedSolution.title || '',
+              '제목',
+              solutionName
+            );
+          }
 
-        // 4. 세부내용 변경
-        if (originalSolution.detailContent !== updatedSolution.detailContent) {
-          addChangeLog(
-            '수정',
-            solutionCode,
-            `솔루션관리 ${solutionName}(${solutionCode}) 정보의 개요탭 세부내용이 ${originalSolution.detailContent || ''} → ${updatedSolution.detailContent || ''} 로 수정 되었습니다.`,
-            updatedSolution.team || '미분류',
-            originalSolution.detailContent || '',
-            updatedSolution.detailContent || '',
-            '세부내용',
-            solutionName
-          );
-        }
+          // 4. 세부내용 변경
+          if (originalSolution.detailContent !== updatedSolution.detailContent) {
+            addChangeLog(
+              '수정',
+              solutionCode,
+              `솔루션관리 ${solutionName}(${solutionCode}) 정보의 개요탭 세부내용이 ${originalSolution.detailContent || ''} → ${updatedSolution.detailContent || ''} 로 수정 되었습니다.`,
+              updatedSolution.team || '미분류',
+              originalSolution.detailContent || '',
+              updatedSolution.detailContent || '',
+              '세부내용',
+              solutionName
+            );
+          }
 
-        // 5. 팀 변경
-        if (originalSolution.team !== updatedSolution.team) {
-          addChangeLog(
-            '수정',
-            solutionCode,
-            `솔루션관리 ${solutionName}(${solutionCode}) 정보의 개요탭 팀이 ${originalSolution.team || ''} → ${updatedSolution.team || ''} 로 수정 되었습니다.`,
-            updatedSolution.team || '미분류',
-            originalSolution.team || '',
-            updatedSolution.team || '',
-            '팀',
-            solutionName
-          );
-        }
+          // 5. 팀 변경
+          if (originalSolution.team !== updatedSolution.team) {
+            addChangeLog(
+              '수정',
+              solutionCode,
+              `솔루션관리 ${solutionName}(${solutionCode}) 정보의 개요탭 팀이 ${originalSolution.team || ''} → ${updatedSolution.team || ''} 로 수정 되었습니다.`,
+              updatedSolution.team || '미분류',
+              originalSolution.team || '',
+              updatedSolution.team || '',
+              '팀',
+              solutionName
+            );
+          }
 
-        // 6. 담당자 변경
-        if (originalSolution.assignee !== updatedSolution.assignee) {
-          addChangeLog(
-            '수정',
-            solutionCode,
-            `솔루션관리 ${solutionName}(${solutionCode}) 정보의 개요탭 담당자가 ${originalSolution.assignee || ''} → ${updatedSolution.assignee || ''} 로 수정 되었습니다.`,
-            updatedSolution.team || '미분류',
-            originalSolution.assignee || '',
-            updatedSolution.assignee || '',
-            '담당자',
-            solutionName
-          );
-        }
+          // 6. 담당자 변경
+          if (originalSolution.assignee !== updatedSolution.assignee) {
+            addChangeLog(
+              '수정',
+              solutionCode,
+              `솔루션관리 ${solutionName}(${solutionCode}) 정보의 개요탭 담당자가 ${originalSolution.assignee || ''} → ${updatedSolution.assignee || ''} 로 수정 되었습니다.`,
+              updatedSolution.team || '미분류',
+              originalSolution.assignee || '',
+              updatedSolution.assignee || '',
+              '담당자',
+              solutionName
+            );
+          }
 
-        // 7. 상태 변경
-        if (originalSolution.status !== updatedSolution.status) {
-          addChangeLog(
-            '수정',
-            solutionCode,
-            `솔루션관리 ${solutionName}(${solutionCode}) 정보의 개요탭 상태가 ${originalSolution.status} → ${updatedSolution.status} 로 수정 되었습니다.`,
-            updatedSolution.team || '미분류',
-            originalSolution.status,
-            updatedSolution.status,
-            '상태',
-            solutionName
-          );
-        }
+          // 7. 상태 변경
+          if (originalSolution.status !== updatedSolution.status) {
+            addChangeLog(
+              '수정',
+              solutionCode,
+              `솔루션관리 ${solutionName}(${solutionCode}) 정보의 개요탭 상태가 ${originalSolution.status} → ${updatedSolution.status} 로 수정 되었습니다.`,
+              updatedSolution.team || '미분류',
+              originalSolution.status,
+              updatedSolution.status,
+              '상태',
+              solutionName
+            );
+          }
 
-        // 8. 진행율 변경
-        if ((originalSolution.progress || 0) !== (updatedSolution.progress || 0)) {
-          addChangeLog(
-            '수정',
-            solutionCode,
-            `솔루션관리 ${solutionName}(${solutionCode}) 정보의 개요탭 진행율이 ${originalSolution.progress || 0}% → ${updatedSolution.progress || 0}% 로 수정 되었습니다.`,
-            updatedSolution.team || '미분류',
-            String(originalSolution.progress || 0),
-            String(updatedSolution.progress || 0),
-            '진행율',
-            solutionName
-          );
-        }
+          // 8. 진행율 변경
+          if ((originalSolution.progress || 0) !== (updatedSolution.progress || 0)) {
+            addChangeLog(
+              '수정',
+              solutionCode,
+              `솔루션관리 ${solutionName}(${solutionCode}) 정보의 개요탭 진행율이 ${originalSolution.progress || 0}% → ${updatedSolution.progress || 0}% 로 수정 되었습니다.`,
+              updatedSolution.team || '미분류',
+              String(originalSolution.progress || 0),
+              String(updatedSolution.progress || 0),
+              '진행율',
+              solutionName
+            );
+          }
 
-        // 9. 시작일 변경
-        if (originalSolution.startDate !== updatedSolution.startDate) {
-          addChangeLog(
-            '수정',
-            solutionCode,
-            `솔루션관리 ${solutionName}(${solutionCode}) 정보의 개요탭 시작일이 ${originalSolution.startDate || ''} → ${updatedSolution.startDate || ''} 로 수정 되었습니다.`,
-            updatedSolution.team || '미분류',
-            originalSolution.startDate || '',
-            updatedSolution.startDate || '',
-            '시작일',
-            solutionName
-          );
-        }
+          // 9. 시작일 변경
+          if (originalSolution.startDate !== updatedSolution.startDate) {
+            addChangeLog(
+              '수정',
+              solutionCode,
+              `솔루션관리 ${solutionName}(${solutionCode}) 정보의 개요탭 시작일이 ${originalSolution.startDate || ''} → ${updatedSolution.startDate || ''} 로 수정 되었습니다.`,
+              updatedSolution.team || '미분류',
+              originalSolution.startDate || '',
+              updatedSolution.startDate || '',
+              '시작일',
+              solutionName
+            );
+          }
 
-        // 10. 완료일 변경
-        if (originalSolution.completedDate !== updatedSolution.completedDate) {
-          addChangeLog(
-            '수정',
-            solutionCode,
-            `솔루션관리 ${solutionName}(${solutionCode}) 정보의 개요탭 완료일이 ${originalSolution.completedDate || ''} → ${updatedSolution.completedDate || ''} 로 수정 되었습니다.`,
-            updatedSolution.team || '미분류',
-            originalSolution.completedDate || '',
-            updatedSolution.completedDate || '',
-            '완료일',
-            solutionName
-          );
+          // 10. 완료일 변경
+          if (originalSolution.completedDate !== updatedSolution.completedDate) {
+            addChangeLog(
+              '수정',
+              solutionCode,
+              `솔루션관리 ${solutionName}(${solutionCode}) 정보의 개요탭 완료일이 ${originalSolution.completedDate || ''} → ${updatedSolution.completedDate || ''} 로 수정 되었습니다.`,
+              updatedSolution.team || '미분류',
+              originalSolution.completedDate || '',
+              updatedSolution.completedDate || '',
+              '완료일',
+              solutionName
+            );
+          }
         }
-      }
 
         // 이제 DB 저장 작업 수행
         const dbData = convertToDbSolutionData(updatedSolution);
@@ -782,7 +786,7 @@ export default function SolutionTable({
                   <TableCell>
                     <Stack direction="row" spacing={1} alignItems="center">
                       <Avatar
-                        src={getUserProfileImage(solution.assignee)}
+                        src={findUserByName(solution.assignee)?.avatar_url || findUserByName(solution.assignee)?.profile_image_url}
                         alt={solution.assignee}
                         sx={{ width: 24, height: 24 }}
                       >

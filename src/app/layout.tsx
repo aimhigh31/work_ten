@@ -10,6 +10,8 @@ export const metadata: Metadata = {
   description: 'Next.js와 Material-UI로 구축된 현대적이고 강력한 관리자 대시보드 시스템입니다.'
 };
 
+export const dynamic = 'force-dynamic';
+
 export default function RootLayout({ children }: { children: React.ReactElement }) {
   return (
     <html lang="en" style={{ height: '100%', overflow: 'hidden' }}>

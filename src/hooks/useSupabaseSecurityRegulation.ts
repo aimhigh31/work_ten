@@ -246,7 +246,10 @@ export function useSupabaseSecurityRegulation() {
     });
 
     console.log('🌳 루트 아이템 개수:', roots.length);
-    console.log('🌳 루트 아이템 상세:', roots.map(r => ({ name: r.name, children: r.children?.length || 0 })));
+    console.log(
+      '🌳 루트 아이템 상세:',
+      roots.map((r) => ({ name: r.name, children: r.children?.length || 0 }))
+    );
 
     // 정렬
     const sortItems = (items: SecurityRegulationItem[]) => {

@@ -79,7 +79,7 @@ export function endPageLoad(pageName: string) {
   let cumulativeTime = 0;
   log.events.forEach((event, index) => {
     cumulativeTime += event.duration || 0;
-    const percentage = ((event.duration || 0) / totalTime * 100).toFixed(1);
+    const percentage = (((event.duration || 0) / totalTime) * 100).toFixed(1);
     console.log(`   ${index + 1}. ${event.name}: ${event.duration?.toFixed(2)}ms (${percentage}%) - 누적: ${cumulativeTime.toFixed(2)}ms`);
   });
 
@@ -90,9 +90,7 @@ export function endPageLoad(pageName: string) {
     console.warn(`⚠️ 성능 경고: ${pageName} 로딩이 1초 이상 소요됨 (${(totalTime / 1000).toFixed(2)}s)`);
 
     // 가장 느린 단계 찾기
-    const slowestEvent = log.events.reduce((max, event) =>
-      (event.duration || 0) > (max.duration || 0) ? event : max
-    , log.events[0]);
+    const slowestEvent = log.events.reduce((max, event) => ((event.duration || 0) > (max.duration || 0) ? event : max), log.events[0]);
 
     if (slowestEvent) {
       console.warn(`   🐢 가장 느린 단계: ${slowestEvent.name} (${slowestEvent.duration?.toFixed(2)}ms)`);
@@ -109,10 +107,10 @@ export function printAllPageLogs() {
   console.log(`📊 ========================================`);
 
   const logs = Array.from(performanceLogs.values())
-    .filter(log => log.endTime)
-    .sort((a, b) => (b.endTime! - b.startTime) - (a.endTime! - a.startTime));
+    .filter((log) => log.endTime)
+    .sort((a, b) => b.endTime! - b.startTime - (a.endTime! - a.startTime));
 
-  logs.forEach(log => {
+  logs.forEach((log) => {
     const totalTime = log.endTime! - log.startTime;
     console.log(`   ${log.pageName}: ${totalTime.toFixed(2)}ms (${(totalTime / 1000).toFixed(2)}s)`);
   });

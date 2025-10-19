@@ -188,7 +188,10 @@ const OverviewTab = memo(
     }, [solutionState.title, titleInput.inputValue, titleInput.debouncedValue]); // reset 제거
 
     useEffect(() => {
-      if (solutionState.detailContent !== detailContentInput.inputValue && solutionState.detailContent !== detailContentInput.debouncedValue) {
+      if (
+        solutionState.detailContent !== detailContentInput.inputValue &&
+        solutionState.detailContent !== detailContentInput.debouncedValue
+      ) {
         isUpdatingRef.current = true;
         detailContentInput.reset(solutionState.detailContent);
         setTimeout(() => {
@@ -289,7 +292,6 @@ const OverviewTab = memo(
 
           {/* 진행율, 상태 - 2등분 배치 */}
           <Stack direction="row" spacing={2}>
-
             <TextField
               fullWidth
               label="진행율 (%)"
@@ -459,7 +461,7 @@ const OverviewTab = memo(
                 }}
               >
                 {departments
-                  .filter(dept => dept.is_active) // 활성 부서만 표시
+                  .filter((dept) => dept.is_active) // 활성 부서만 표시
                   .map((dept) => (
                     <MenuItem key={dept.id} value={dept.department_name}>
                       {dept.department_name}
@@ -500,15 +502,11 @@ const OverviewTab = memo(
                   }
                 }}
                 renderValue={(value) => {
-                  const user = users.find(u => u.user_name === value);
+                  const user = users.find((u) => u.user_name === value);
                   if (!user) return value;
                   return (
                     <Stack direction="row" spacing={1.5} alignItems="center">
-                      <Avatar
-                        src={user.profile_image_url || user.avatar_url}
-                        alt={user.user_name}
-                        sx={{ width: 20, height: 20 }}
-                      >
+                      <Avatar src={user.profile_image_url || user.avatar_url} alt={user.user_name} sx={{ width: 20, height: 20 }}>
                         {user.user_name?.charAt(0)}
                       </Avatar>
                       <Typography variant="body1" sx={{ color: '#666666' }}>
@@ -519,7 +517,7 @@ const OverviewTab = memo(
                 }}
               >
                 {users
-                  .filter(user => user.is_active && user.status === 'active') // 활성 사용자만 표시
+                  .filter((user) => user.is_active && user.status === 'active') // 활성 사용자만 표시
                   .map((user) => (
                     <MenuItem key={user.id} value={user.user_name}>
                       <Stack direction="row" spacing={1.5} alignItems="center">
@@ -911,9 +909,7 @@ const RecordTab = memo(
           }}
         >
           <Typography variant="body2" color="text.secondary">
-            {comments.length > 0
-              ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}`
-              : '0-0 of 0'}
+            {comments.length > 0 ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}` : '0-0 of 0'}
           </Typography>
           {comments.length > 0 && (
             <Pagination
@@ -1327,11 +1323,7 @@ const SolutionEditDialog = memo(
     }, [session, users]);
 
     // DB 연동 훅
-    const {
-      getSolutionById,
-      convertToSolutionData,
-      convertToDbSolutionData
-    } = useSupabaseSolution();
+    const { getSolutionById, convertToSolutionData, convertToDbSolutionData } = useSupabaseSolution();
 
     // 피드백 훅
     const {
@@ -1538,22 +1530,19 @@ const SolutionEditDialog = memo(
 
       if (solution?.id) {
         // 추가된 기록 (temp- ID)
-        const addedFeedbacks = pendingFeedbacks.filter(fb =>
-          fb.id.toString().startsWith('temp-') &&
-          !initialFeedbacks.find(initial => initial.id === fb.id)
+        const addedFeedbacks = pendingFeedbacks.filter(
+          (fb) => fb.id.toString().startsWith('temp-') && !initialFeedbacks.find((initial) => initial.id === fb.id)
         );
 
         // 수정된 기록
-        const updatedFeedbacks = pendingFeedbacks.filter(fb => {
+        const updatedFeedbacks = pendingFeedbacks.filter((fb) => {
           if (fb.id.toString().startsWith('temp-')) return false;
-          const initial = initialFeedbacks.find(initial => initial.id === fb.id);
+          const initial = initialFeedbacks.find((initial) => initial.id === fb.id);
           return initial && initial.description !== fb.description;
         });
 
         // 삭제된 기록
-        const deletedFeedbacks = initialFeedbacks.filter(initial =>
-          !pendingFeedbacks.find(pending => pending.id === initial.id)
-        );
+        const deletedFeedbacks = initialFeedbacks.filter((initial) => !pendingFeedbacks.find((pending) => pending.id === initial.id));
 
         // 추가 (역순으로 저장)
         const reversedAddedFeedbacks = [...addedFeedbacks].reverse();
@@ -1571,7 +1560,7 @@ const SolutionEditDialog = memo(
 
         // 삭제 - feedbacks 배열에 존재하는 항목만 삭제
         for (const feedback of deletedFeedbacks) {
-          const existsInFeedbacks = feedbacks.some(fb => String(fb.id) === String(feedback.id));
+          const existsInFeedbacks = feedbacks.some((fb) => String(fb.id) === String(feedback.id));
           if (existsInFeedbacks) {
             await deleteFeedback(String(feedback.id));
           } else {
@@ -1630,7 +1619,19 @@ const SolutionEditDialog = memo(
         }
         onClose();
       }, 50); // 50ms 지연
-    }, [solution, solutionState, onSave, onClose, dispatch, pendingFeedbacks, initialFeedbacks, feedbacks, addFeedback, updateFeedback, deleteFeedback]);
+    }, [
+      solution,
+      solutionState,
+      onSave,
+      onClose,
+      dispatch,
+      pendingFeedbacks,
+      initialFeedbacks,
+      feedbacks,
+      addFeedback,
+      updateFeedback,
+      deleteFeedback
+    ]);
 
     const handleClose = useCallback(() => {
       setEditTab(0);
@@ -1820,7 +1821,7 @@ const SolutionEditDialog = memo(
       };
 
       // 로컬 state에만 추가 (즉시 반응)
-      setPendingFeedbacks(prev => [newFeedback, ...prev]);
+      setPendingFeedbacks((prev) => [newFeedback, ...prev]);
       setNewComment('');
     }, [newComment, solution?.id, currentUser]);
 
@@ -1833,13 +1834,7 @@ const SolutionEditDialog = memo(
       if (!editingCommentText.trim() || !editingCommentId) return;
 
       // 로컬 state만 업데이트 (즉시 반응)
-      setPendingFeedbacks(prev =>
-        prev.map(fb =>
-          fb.id === editingCommentId
-            ? { ...fb, description: editingCommentText }
-            : fb
-        )
-      );
+      setPendingFeedbacks((prev) => prev.map((fb) => (fb.id === editingCommentId ? { ...fb, description: editingCommentText } : fb)));
 
       setEditingCommentId(null);
       setEditingCommentText('');
@@ -1852,7 +1847,7 @@ const SolutionEditDialog = memo(
 
     const handleDeleteComment = useCallback((commentId: string) => {
       // 로컬 state에서만 제거 (즉시 반응)
-      setPendingFeedbacks(prev => prev.filter(fb => fb.id !== commentId));
+      setPendingFeedbacks((prev) => prev.filter((fb) => fb.id !== commentId));
     }, []);
 
     // 메모이제이션된 탭 컴포넌트 props

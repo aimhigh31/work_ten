@@ -136,7 +136,9 @@ export default function ChangeLogPage() {
         // 필요한 필드만 선택하여 쿼리 최적화
         const { data, error } = await supabase
           .from('common_log_data')
-          .select('id, created_at, page, title, description, record_id, action_type, changed_field, before_value, after_value, team, user_name')
+          .select(
+            'id, created_at, page, title, description, record_id, action_type, changed_field, before_value, after_value, team, user_name'
+          )
           .order('created_at', { ascending: false })
           .limit(50); // 100개에서 50개로 줄임
 
@@ -302,7 +304,16 @@ export default function ChangeLogPage() {
   };
 
   return (
-    <Box sx={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: 'background.paper' }}>
+    <Box
+      sx={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        backgroundColor: 'background.paper'
+      }}
+    >
       {/* 타이틀 및 브레드크럼 */}
       <Box sx={{ mb: 2, px: 2.5, pt: 2.5, flexShrink: 0, backgroundColor: 'background.paper' }}>
         <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 2 }}>
@@ -316,8 +327,22 @@ export default function ChangeLogPage() {
       </Box>
 
       {/* 탭 영역 */}
-      <MainCard border={false} content={false} sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: 'none' }}>
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2.5, pt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <MainCard
+        border={false}
+        content={false}
+        sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: 'none' }}
+      >
+        <Box
+          sx={{
+            borderBottom: 1,
+            borderColor: 'divider',
+            px: 2.5,
+            pt: 2,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}
+        >
           <Tabs
             value={value}
             onChange={handleChange}
@@ -439,286 +464,286 @@ export default function ChangeLogPage() {
               </Typography>
             </Box>
 
-        {/* 변경로그 테이블 */}
-        <TableContainer
-          sx={{
-            flex: 1,
-            border: 'none',
-            borderRadius: 0,
-            overflowX: 'auto',
-            overflowY: 'auto',
-            boxShadow: 'none',
-            minHeight: 0,
-            // 스크롤바 스타일
-            '&::-webkit-scrollbar': {
-              width: '10px',
-              height: '10px'
-            },
-            '&::-webkit-scrollbar-track': {
-              backgroundColor: '#f8f9fa',
-              borderRadius: '4px'
-            },
-            '&::-webkit-scrollbar-thumb': {
-              backgroundColor: '#e9ecef',
-              borderRadius: '4px',
-              border: '2px solid #f8f9fa'
-            },
-            '&::-webkit-scrollbar-thumb:hover': {
-              backgroundColor: '#dee2e6'
-            },
-            '&::-webkit-scrollbar-corner': {
-              backgroundColor: '#f8f9fa'
-            }
-          }}
-        >
-          <Table size="small">
-            <TableHead>
-              <TableRow sx={{ backgroundColor: 'grey.50' }}>
-                <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
-                <TableCell sx={{ fontWeight: 600, width: 150 }}>변경시간</TableCell>
-                <TableCell sx={{ fontWeight: 600, width: 120 }}>페이지</TableCell>
-                <TableCell sx={{ fontWeight: 600, width: 150 }}>제목</TableCell>
-                <TableCell sx={{ fontWeight: 600, width: 150 }}>코드</TableCell>
-                <TableCell sx={{ fontWeight: 600, width: 70 }}>변경분류</TableCell>
-                <TableCell sx={{ fontWeight: 600, width: 70 }}>변경필드</TableCell>
-                <TableCell sx={{ fontWeight: 600, width: 120 }}>변경전</TableCell>
-                <TableCell sx={{ fontWeight: 600, width: 120 }}>변경후</TableCell>
-                <TableCell sx={{ fontWeight: 600, width: 330 }}>변경세부내용</TableCell>
-                <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-                <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {paginatedLogs.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={12} sx={{ textAlign: 'center', py: 4 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      {loading ? '데이터를 불러오는 중...' : '표시할 데이터가 없습니다.'}
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                paginatedLogs.map((log, index) => (
-                  <TableRow
-                    key={log.id}
-                    hover
+            {/* 변경로그 테이블 */}
+            <TableContainer
+              sx={{
+                flex: 1,
+                border: 'none',
+                borderRadius: 0,
+                overflowX: 'auto',
+                overflowY: 'auto',
+                boxShadow: 'none',
+                minHeight: 0,
+                // 스크롤바 스타일
+                '&::-webkit-scrollbar': {
+                  width: '10px',
+                  height: '10px'
+                },
+                '&::-webkit-scrollbar-track': {
+                  backgroundColor: '#f8f9fa',
+                  borderRadius: '4px'
+                },
+                '&::-webkit-scrollbar-thumb': {
+                  backgroundColor: '#e9ecef',
+                  borderRadius: '4px',
+                  border: '2px solid #f8f9fa'
+                },
+                '&::-webkit-scrollbar-thumb:hover': {
+                  backgroundColor: '#dee2e6'
+                },
+                '&::-webkit-scrollbar-corner': {
+                  backgroundColor: '#f8f9fa'
+                }
+              }}
+            >
+              <Table size="small">
+                <TableHead>
+                  <TableRow sx={{ backgroundColor: 'grey.50' }}>
+                    <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 150 }}>변경시간</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 120 }}>페이지</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 150 }}>제목</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 150 }}>코드</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 70 }}>변경분류</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 70 }}>변경필드</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 120 }}>변경전</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 120 }}>변경후</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 330 }}>변경세부내용</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {paginatedLogs.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={12} sx={{ textAlign: 'center', py: 4 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          {loading ? '데이터를 불러오는 중...' : '표시할 데이터가 없습니다.'}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paginatedLogs.map((log, index) => (
+                      <TableRow
+                        key={log.id}
+                        hover
+                        sx={{
+                          '&:hover': { backgroundColor: 'action.hover' }
+                        }}
+                      >
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                            {changeLogs.length - (page * rowsPerPage + index)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                            {log.dateTime}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                            {log.page}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                            {log.title}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                            {log.code}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                            {log.action}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                            {log.changedField}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                            {log.beforeValue}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                            {log.afterValue}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontSize: '12px',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'normal',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              lineHeight: 1.4
+                            }}
+                            title={log.description}
+                          >
+                            {log.description}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                            {log.team}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                            {log.user}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            {/* 페이지네이션 */}
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                mt: 0.5,
+                px: 1,
+                py: 0.5,
+                borderTop: '1px solid',
+                borderColor: 'divider',
+                flexShrink: 0
+              }}
+            >
+              {/* 왼쪽: Row per page */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  Row per page
+                </Typography>
+                <FormControl size="small" sx={{ minWidth: 60 }}>
+                  <Select
+                    value={rowsPerPage}
+                    onChange={(e) => {
+                      setRowsPerPage(Number(e.target.value));
+                      setPage(0);
+                    }}
                     sx={{
-                      '&:hover': { backgroundColor: 'action.hover' }
+                      '& .MuiSelect-select': {
+                        py: 0.5,
+                        px: 1,
+                        fontSize: '0.875rem'
+                      },
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        border: '1px solid #e0e0e0'
+                      }
                     }}
                   >
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                      {changeLogs.length - (page * rowsPerPage + index)}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                      {log.dateTime}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                      {log.page}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                      {log.title}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                      {log.code}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                      {log.action}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                      {log.changedField}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                      {log.beforeValue}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                      {log.afterValue}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        fontSize: '12px',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'normal',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        lineHeight: 1.4
-                      }}
-                      title={log.description}
-                    >
-                      {log.description}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                      {log.team}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                      {log.user}
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                    <MenuItem value={5}>5</MenuItem>
+                    <MenuItem value={10}>10</MenuItem>
+                    <MenuItem value={25}>25</MenuItem>
+                    <MenuItem value={50}>50</MenuItem>
+                  </Select>
+                </FormControl>
 
-        {/* 페이지네이션 */}
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            mt: 0.5,
-            px: 1,
-            py: 0.5,
-            borderTop: '1px solid',
-            borderColor: 'divider',
-            flexShrink: 0
-          }}
-        >
-          {/* 왼쪽: Row per page */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Row per page
-            </Typography>
-            <FormControl size="small" sx={{ minWidth: 60 }}>
-              <Select
-                value={rowsPerPage}
-                onChange={(e) => {
-                  setRowsPerPage(Number(e.target.value));
-                  setPage(0);
-                }}
-                sx={{
-                  '& .MuiSelect-select': {
-                    py: 0.5,
-                    px: 1,
-                    fontSize: '0.875rem'
-                  },
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    border: '1px solid #e0e0e0'
-                  }
-                }}
-              >
-                <MenuItem value={5}>5</MenuItem>
-                <MenuItem value={10}>10</MenuItem>
-                <MenuItem value={25}>25</MenuItem>
-                <MenuItem value={50}>50</MenuItem>
-              </Select>
-            </FormControl>
-
-            {/* Go to */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                Go to
-              </Typography>
-              <TextField
-                size="small"
-                value={goToPage}
-                onChange={(e) => setGoToPage(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    handleGoToPage();
-                  }
-                }}
-                placeholder="1"
-                sx={{
-                  width: 60,
-                  '& .MuiOutlinedInput-root': {
-                    '& input': {
+                {/* Go to */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    Go to
+                  </Typography>
+                  <TextField
+                    size="small"
+                    value={goToPage}
+                    onChange={(e) => setGoToPage(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        handleGoToPage();
+                      }
+                    }}
+                    placeholder="1"
+                    sx={{
+                      width: 60,
+                      '& .MuiOutlinedInput-root': {
+                        '& input': {
+                          py: 0.5,
+                          px: 1,
+                          textAlign: 'center',
+                          fontSize: '0.875rem'
+                        },
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          border: '1px solid #e0e0e0'
+                        }
+                      }
+                    }}
+                  />
+                  <Button
+                    size="small"
+                    onClick={handleGoToPage}
+                    sx={{
+                      minWidth: 'auto',
+                      px: 1.5,
                       py: 0.5,
-                      px: 1,
-                      textAlign: 'center',
                       fontSize: '0.875rem'
-                    },
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      border: '1px solid #e0e0e0'
-                    }
-                  }
-                }}
-              />
-              <Button
-                size="small"
-                onClick={handleGoToPage}
-                sx={{
-                  minWidth: 'auto',
-                  px: 1.5,
-                  py: 0.5,
-                  fontSize: '0.875rem'
-                }}
-              >
-                Go
-              </Button>
-            </Box>
-          </Box>
+                    }}
+                  >
+                    Go
+                  </Button>
+                </Box>
+              </Box>
 
-          {/* 오른쪽: 페이지 네비게이션 */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              {changeLogs.length > 0
-                ? `${page * rowsPerPage + 1}-${Math.min((page + 1) * rowsPerPage, changeLogs.length)} of ${changeLogs.length}`
-                : '0-0 of 0'}
-            </Typography>
-            {totalPages > 0 && (
-              <Pagination
-                count={totalPages}
-                page={page + 1}
-                onChange={handleChangePage}
-                color="primary"
-                size="small"
-                showFirstButton
-                showLastButton
-                sx={{
-                  '& .MuiPaginationItem-root': {
-                    fontSize: '0.875rem',
-                    minWidth: '32px',
-                    height: '32px',
-                    borderRadius: '4px'
-                  },
-                  '& .MuiPaginationItem-page.Mui-selected': {
-                    backgroundColor: 'primary.main',
-                    color: 'white !important',
-                    borderRadius: '4px',
-                    fontWeight: 500,
-                    '&:hover': {
-                      backgroundColor: 'primary.dark',
-                      color: 'white !important'
-                    }
-                  },
-                  '& .MuiPaginationItem-page': {
-                    borderRadius: '4px',
-                    '&:hover': {
-                      backgroundColor: 'grey.100'
-                    }
-                  }
-                }}
-              />
-            )}
-          </Box>
-        </Box>
+              {/* 오른쪽: 페이지 네비게이션 */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  {changeLogs.length > 0
+                    ? `${page * rowsPerPage + 1}-${Math.min((page + 1) * rowsPerPage, changeLogs.length)} of ${changeLogs.length}`
+                    : '0-0 of 0'}
+                </Typography>
+                {totalPages > 0 && (
+                  <Pagination
+                    count={totalPages}
+                    page={page + 1}
+                    onChange={handleChangePage}
+                    color="primary"
+                    size="small"
+                    showFirstButton
+                    showLastButton
+                    sx={{
+                      '& .MuiPaginationItem-root': {
+                        fontSize: '0.875rem',
+                        minWidth: '32px',
+                        height: '32px',
+                        borderRadius: '4px'
+                      },
+                      '& .MuiPaginationItem-page.Mui-selected': {
+                        backgroundColor: 'primary.main',
+                        color: 'white !important',
+                        borderRadius: '4px',
+                        fontWeight: 500,
+                        '&:hover': {
+                          backgroundColor: 'primary.dark',
+                          color: 'white !important'
+                        }
+                      },
+                      '& .MuiPaginationItem-page': {
+                        borderRadius: '4px',
+                        '&:hover': {
+                          backgroundColor: 'grey.100'
+                        }
+                      }
+                    }}
+                  />
+                )}
+              </Box>
+            </Box>
           </Box>
         </TabPanel>
       </MainCard>

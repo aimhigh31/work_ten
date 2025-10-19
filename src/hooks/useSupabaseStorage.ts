@@ -23,12 +23,7 @@ export const useSupabaseStorage = () => {
    * @param quality - 압축 품질 (0~1, 기본값: 0.8)
    * @returns 압축된 이미지 File 객체
    */
-  const compressImage = async (
-    file: File,
-    maxWidth: number = 800,
-    maxHeight: number = 800,
-    quality: number = 0.8
-  ): Promise<File> => {
+  const compressImage = async (file: File, maxWidth: number = 800, maxHeight: number = 800, quality: number = 0.8): Promise<File> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
@@ -77,7 +72,9 @@ export const useSupabaseStorage = () => {
                 lastModified: Date.now()
               });
 
-              console.log(`📦 이미지 압축 완료: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+              console.log(
+                `📦 이미지 압축 완료: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`
+              );
               resolve(compressedFile);
             },
             file.type,

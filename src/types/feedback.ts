@@ -61,4 +61,4 @@ export const PAGE_IDENTIFIERS = {
   SECURITY_REGULATION: 'security_regulation'
 } as const;
 
-export type PageIdentifier = typeof PAGE_IDENTIFIERS[keyof typeof PAGE_IDENTIFIERS];
+export type PageIdentifier = (typeof PAGE_IDENTIFIERS)[keyof typeof PAGE_IDENTIFIERS];

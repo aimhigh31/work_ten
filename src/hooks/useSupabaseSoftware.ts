@@ -28,7 +28,7 @@ export interface SoftwareData {
   description?: string;
   software_category?: string;
   spec?: string;
-  current_users?: string;          // current_user → current_users로 변경
+  current_users?: string; // current_user → current_users로 변경
   solution_provider?: string;
   user_count?: number;
   license_type?: string;
@@ -75,7 +75,6 @@ export const useSupabaseSoftware = () => {
       saveToCache(CACHE_KEY, data || []);
 
       return data || [];
-
     } catch (err: any) {
       console.log('❌ getSoftware 실패:', err);
       setError(err.message || '소프트웨어 데이터 조회 실패');
@@ -95,11 +94,13 @@ export const useSupabaseSoftware = () => {
 
       const { data, error } = await supabase
         .from('it_software_data')
-        .insert([{
-          ...softwareData,
-          is_active: true,
-          registration_date: new Date().toISOString().split('T')[0]
-        }])
+        .insert([
+          {
+            ...softwareData,
+            is_active: true,
+            registration_date: new Date().toISOString().split('T')[0]
+          }
+        ])
         .select()
         .single();
 
@@ -114,7 +115,6 @@ export const useSupabaseSoftware = () => {
       sessionStorage.removeItem(CACHE_KEY);
 
       return data;
-
     } catch (err: any) {
       console.log('❌ createSoftware 실패:', err);
       setError(err.message || '소프트웨어 생성 실패');
@@ -132,16 +132,9 @@ export const useSupabaseSoftware = () => {
       setLoading(true);
       setError(null);
 
-      const cleanData = Object.fromEntries(
-        Object.entries(softwareData).filter(([_, value]) => value !== null && value !== undefined)
-      );
+      const cleanData = Object.fromEntries(Object.entries(softwareData).filter(([_, value]) => value !== null && value !== undefined));
 
-      const { data, error } = await supabase
-        .from('it_software_data')
-        .update(cleanData)
-        .eq('id', id)
-        .select()
-        .single();
+      const { data, error } = await supabase.from('it_software_data').update(cleanData).eq('id', id).select().single();
 
       if (error) {
         console.log('❌ Supabase 수정 오류:', error);
@@ -158,7 +151,6 @@ export const useSupabaseSoftware = () => {
       sessionStorage.removeItem(CACHE_KEY);
 
       return data;
-
     } catch (err: any) {
       console.log('❌ updateSoftware 실패:', err);
       setError(err.message || '소프트웨어 수정 실패');
@@ -176,12 +168,7 @@ export const useSupabaseSoftware = () => {
       setLoading(true);
       setError(null);
 
-      const { data, error } = await supabase
-        .from('it_software_data')
-        .update({ is_active: false })
-        .eq('id', id)
-        .select()
-        .single();
+      const { data, error } = await supabase.from('it_software_data').update({ is_active: false }).eq('id', id).select().single();
 
       if (error) {
         console.log('❌ Supabase 삭제 오류:', error);
@@ -194,7 +181,6 @@ export const useSupabaseSoftware = () => {
       sessionStorage.removeItem(CACHE_KEY);
 
       return data;
-
     } catch (err: any) {
       console.log('❌ deleteSoftware 실패:', err);
       setError(err.message || '소프트웨어 삭제 실패');
@@ -237,7 +223,6 @@ export const useSupabaseSoftware = () => {
       sessionStorage.removeItem(CACHE_KEY);
 
       return data;
-
     } catch (err: any) {
       console.log('❌ deleteMultipleSoftware 실패:', err);
       setError(err.message || '여러 소프트웨어 삭제 실패');

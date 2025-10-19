@@ -7,11 +7,7 @@ import { CHANGE_LOG_ACTIONS, ChangeLogMetadata, getFieldNameKR } from '../types/
  * @param userName 사용자명
  * @returns 자연어 설명
  */
-export const generateChangeDescription = (
-  action: string,
-  metadata: ChangeLogMetadata,
-  userName: string
-): string => {
+export const generateChangeDescription = (action: string, metadata: ChangeLogMetadata, userName: string): string => {
   const name = userName || '사용자';
 
   switch (action) {
@@ -123,10 +119,7 @@ export const generateChangeDescription = (
  * @param after 변경 후 객체
  * @returns 변경된 필드 배열
  */
-export const detectChanges = (
-  before: any,
-  after: any
-): Array<{ field: string; before: any; after: any }> => {
+export const detectChanges = (before: any, after: any): Array<{ field: string; before: any; after: any }> => {
   const changes = [];
   const allKeys = new Set([...Object.keys(before || {}), ...Object.keys(after || {})]);
 

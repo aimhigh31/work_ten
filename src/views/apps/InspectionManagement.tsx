@@ -116,7 +116,16 @@ interface KanbanViewProps {
   selectedAssignee: string;
   inspections: InspectionTableData[];
   setInspections: React.Dispatch<React.SetStateAction<InspectionTableData[]>>;
-  addChangeLog: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string, title?: string) => void;
+  addChangeLog: (
+    action: string,
+    target: string,
+    description: string,
+    team?: string,
+    beforeValue?: string,
+    afterValue?: string,
+    changedField?: string,
+    title?: string
+  ) => void;
   generateInspectionCode?: () => Promise<string>;
   assigneeList?: any[];
 }
@@ -268,7 +277,16 @@ function KanbanView({
       const inspectionContent = currentInspection.inspectionContent || inspectionTitle;
       const description = `${inspectionTitle} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
 
-      addChangeLog('점검 상태 변경', inspectionCode, description, currentInspection.team || '미분류', oldStatus, newStatus, '상태', inspectionContent);
+      addChangeLog(
+        '점검 상태 변경',
+        inspectionCode,
+        description,
+        currentInspection.team || '미분류',
+        oldStatus,
+        newStatus,
+        '상태',
+        inspectionContent
+      );
     }
   };
 
@@ -368,6 +386,13 @@ function KanbanView({
     const statusTagColor = getStatusTagColor(inspection.status);
     const progress = getProgressFromStatus(inspection.status);
 
+    // 사용자 프로필 이미지 가져오기 (최적화: find 한 번만 호출)
+    const assigneeUser = React.useMemo(() => {
+      return assigneeList?.find((user) => user.user_name === inspection.assignee);
+    }, [inspection.assignee]);
+
+    const assigneeAvatar = assigneeUser?.profile_image_url || assigneeUser?.avatar_url || '/assets/images/users/avatar-1.png';
+
     return (
       <article
         ref={setNodeRef}
@@ -415,12 +440,12 @@ function KanbanView({
           <div className="assignee-info">
             <img
               className="assignee-avatar"
-              src={
-                assigneeList?.find((user) => user.user_name === inspection.assignee)?.profile_image_url ||
-                assigneeList?.find((user) => user.user_name === inspection.assignee)?.avatar_url ||
-                '/assets/images/users/avatar-1.png'
-              }
+              src={assigneeAvatar}
               alt={inspection.assignee || '미할당'}
+              onError={(e) => {
+                // 이미지 로드 실패 시 기본 이미지로 대체
+                e.currentTarget.src = '/assets/images/users/avatar-1.png';
+              }}
             />
             <span className="assignee-name">{inspection.assignee || '미할당'}</span>
           </div>
@@ -891,68 +916,70 @@ function MonthlyScheduleView({
                     boxSizing: 'border-box'
                   }}
                 >
-                  {items.filter(item => item && item.status).map((item, itemIndex) => {
-                    const date = new Date(item.inspectionDate);
-                    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-                    const day = date.getDate().toString().padStart(2, '0');
+                  {items
+                    .filter((item) => item && item.status)
+                    .map((item, itemIndex) => {
+                      const date = new Date(item.inspectionDate);
+                      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                      const day = date.getDate().toString().padStart(2, '0');
 
-                    return (
-                      <Box
-                        key={item.id}
-                        onClick={() => onCardClick(item)}
-                        sx={{
-                          mb: itemIndex < items.length - 1 ? 0.8 : 0,
-                          p: 0.6,
-                          borderRadius: 1,
-                          backgroundColor: getStatusColor(item.status),
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          '&:hover': {
-                            transform: 'translateY(-1px)',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                          }
-                        }}
-                      >
-                        {/* 첫 번째 줄: 날짜, 점검대상, 상태 */}
+                      return (
                         <Box
+                          key={item.id}
+                          onClick={() => onCardClick(item)}
                           sx={{
-                            fontSize: '13px',
-                            color: getStatusTextColor(item.status),
-                            fontWeight: 500,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 0.5,
-                            mb: 0.15
+                            mb: itemIndex < items.length - 1 ? 0.8 : 0,
+                            p: 0.6,
+                            borderRadius: 1,
+                            backgroundColor: getStatusColor(item.status),
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              transform: 'translateY(-1px)',
+                              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                            }
                           }}
                         >
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <span>{`${month}-${day}`}</span>
-                            <span>{item.inspectionTarget}</span>
+                          {/* 첫 번째 줄: 날짜, 점검대상, 상태 */}
+                          <Box
+                            sx={{
+                              fontSize: '13px',
+                              color: getStatusTextColor(item.status),
+                              fontWeight: 500,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 0.5,
+                              mb: 0.15
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <span>{`${month}-${day}`}</span>
+                              <span>{item.inspectionTarget}</span>
+                            </Box>
+                            <span>{item.status}</span>
                           </Box>
-                          <span>{item.status}</span>
-                        </Box>
 
-                        {/* 두 번째 줄: 점검내용 */}
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontSize: '13px',
-                            color: theme.palette.text.secondary,
-                            mt: 0.15,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap'
-                          }}
-                          title={item.inspectionContent || '점검내용 없음'}
-                        >
-                          {item.inspectionContent || '점검내용 없음'}
-                        </Typography>
-                      </Box>
-                    );
-                  })}
+                          {/* 두 번째 줄: 점검내용 */}
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontSize: '13px',
+                              color: theme.palette.text.secondary,
+                              mt: 0.15,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}
+                            title={item.inspectionContent || '점검내용 없음'}
+                          >
+                            {item.inspectionContent || '점검내용 없음'}
+                          </Typography>
+                        </Box>
+                      );
+                    })}
                 </Box>
               );
             })}
@@ -1008,68 +1035,70 @@ function MonthlyScheduleView({
                     boxSizing: 'border-box'
                   }}
                 >
-                  {items.filter(item => item && item.status).map((item, itemIndex) => {
-                    const date = new Date(item.inspectionDate);
-                    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-                    const day = date.getDate().toString().padStart(2, '0');
+                  {items
+                    .filter((item) => item && item.status)
+                    .map((item, itemIndex) => {
+                      const date = new Date(item.inspectionDate);
+                      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                      const day = date.getDate().toString().padStart(2, '0');
 
-                    return (
-                      <Box
-                        key={item.id}
-                        onClick={() => onCardClick(item)}
-                        sx={{
-                          mb: itemIndex < items.length - 1 ? 0.8 : 0,
-                          p: 0.6,
-                          borderRadius: 1,
-                          backgroundColor: getStatusColor(item.status),
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          '&:hover': {
-                            transform: 'translateY(-1px)',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                          }
-                        }}
-                      >
-                        {/* 첫 번째 줄: 날짜, 점검대상, 상태 */}
+                      return (
                         <Box
+                          key={item.id}
+                          onClick={() => onCardClick(item)}
                           sx={{
-                            fontSize: '13px',
-                            color: getStatusTextColor(item.status),
-                            fontWeight: 500,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 0.5,
-                            mb: 0.15
+                            mb: itemIndex < items.length - 1 ? 0.8 : 0,
+                            p: 0.6,
+                            borderRadius: 1,
+                            backgroundColor: getStatusColor(item.status),
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              transform: 'translateY(-1px)',
+                              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                            }
                           }}
                         >
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <span>{`${month}-${day}`}</span>
-                            <span>{item.inspectionTarget}</span>
+                          {/* 첫 번째 줄: 날짜, 점검대상, 상태 */}
+                          <Box
+                            sx={{
+                              fontSize: '13px',
+                              color: getStatusTextColor(item.status),
+                              fontWeight: 500,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 0.5,
+                              mb: 0.15
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <span>{`${month}-${day}`}</span>
+                              <span>{item.inspectionTarget}</span>
+                            </Box>
+                            <span>{item.status}</span>
                           </Box>
-                          <span>{item.status}</span>
-                        </Box>
 
-                        {/* 두 번째 줄: 점검내용 */}
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontSize: '13px',
-                            color: theme.palette.text.secondary,
-                            mt: 0.15,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap'
-                          }}
-                          title={item.inspectionContent || '점검내용 없음'}
-                        >
-                          {item.inspectionContent || '점검내용 없음'}
-                        </Typography>
-                      </Box>
-                    );
-                  })}
+                          {/* 두 번째 줄: 점검내용 */}
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontSize: '13px',
+                              color: theme.palette.text.secondary,
+                              mt: 0.15,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}
+                            title={item.inspectionContent || '점검내용 없음'}
+                          >
+                            {item.inspectionContent || '점검내용 없음'}
+                          </Typography>
+                        </Box>
+                      );
+                    })}
                 </Box>
               );
             })}
@@ -2039,7 +2068,7 @@ export default function InspectionManagement() {
   const changeLogs = React.useMemo(() => {
     return dbChangeLogs.map((log: ChangeLogData) => {
       // record_id로 해당 보안점검 찾기 (record_id는 코드로 저장되어 있음)
-      const inspection = inspections.find(i => i.code === log.record_id);
+      const inspection = inspections.find((i) => i.code === log.record_id);
 
       const date = new Date(log.created_at);
       const year = date.getFullYear();
@@ -2350,7 +2379,16 @@ export default function InspectionManagement() {
       // 변경로그 추가
       const deletedInspections = inspections.filter((inspection) => ids.includes(inspection.id));
       deletedInspections.forEach((inspection) => {
-        addChangeLog('점검 삭제', inspection.code, `${inspection.inspectionContent} 삭제`, inspection.team, undefined, undefined, undefined, inspection.inspectionContent);
+        addChangeLog(
+          '점검 삭제',
+          inspection.code,
+          `${inspection.inspectionContent} 삭제`,
+          inspection.team,
+          undefined,
+          undefined,
+          undefined,
+          inspection.inspectionContent
+        );
       });
 
       console.log('✅ 보안점검 데이터 삭제 완료');
@@ -2857,7 +2895,7 @@ export default function InspectionManagement() {
                   }
                 }}
               >
-{/* 변경로그 탭 */}
+                {/* 변경로그 탭 */}
                 <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                   {/* 상단 정보 */}
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, mt: 4.5, flexShrink: 0 }}>
@@ -3073,10 +3111,18 @@ export default function InspectionManagement() {
                             }
                           }}
                         >
-                          <MenuItem key="rows-5" value={5}>5</MenuItem>
-                          <MenuItem key="rows-10" value={10}>10</MenuItem>
-                          <MenuItem key="rows-25" value={25}>25</MenuItem>
-                          <MenuItem key="rows-50" value={50}>50</MenuItem>
+                          <MenuItem key="rows-5" value={5}>
+                            5
+                          </MenuItem>
+                          <MenuItem key="rows-10" value={10}>
+                            10
+                          </MenuItem>
+                          <MenuItem key="rows-25" value={25}>
+                            25
+                          </MenuItem>
+                          <MenuItem key="rows-50" value={50}>
+                            50
+                          </MenuItem>
                         </Select>
                       </FormControl>
 
@@ -3110,7 +3156,11 @@ export default function InspectionManagement() {
                             }
                           }}
                         />
-                        <Button size="small" onClick={handleChangeLogGoToPage} sx={{ minWidth: 'auto', px: 1.5, py: 0.5, fontSize: '0.875rem' }}>
+                        <Button
+                          size="small"
+                          onClick={handleChangeLogGoToPage}
+                          sx={{ minWidth: 'auto', px: 1.5, py: 0.5, fontSize: '0.875rem' }}
+                        >
                           Go
                         </Button>
                       </Box>

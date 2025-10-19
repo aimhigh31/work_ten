@@ -2609,7 +2609,7 @@ export default function SalesManagement() {
               // 코드 자동 생성 (DB의 id 기반)
               const currentYear = new Date().getFullYear().toString().slice(-2);
               const dbSales = await getSales();
-              const maxId = Math.max(...dbSales.map(s => s.id || 0), 0);
+              const maxId = Math.max(...dbSales.map((s) => s.id || 0), 0);
               const newCode = `SALES-${currentYear}-${String(maxId + 1).padStart(3, '0')}`;
 
               console.log('🆕 자동 생성된 코드:', newCode);
@@ -2838,7 +2838,7 @@ function SalesKanbanView({
         // 코드 자동 생성 (DB의 id 기반)
         const currentYear = new Date().getFullYear().toString().slice(-2);
         const dbSales = await getSales();
-        const maxId = Math.max(...dbSales.map(s => s.id || 0), 0);
+        const maxId = Math.max(...dbSales.map((s) => s.id || 0), 0);
         const newCode = `SALES-${currentYear}-${String(maxId + 1).padStart(3, '0')}`;
 
         console.log('🆕 자동 생성된 코드:', newCode);

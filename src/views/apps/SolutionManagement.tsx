@@ -359,6 +359,13 @@ function KanbanView({
         }
       : { cursor: 'pointer' };
 
+    // 사용자 프로필 이미지 가져오기 (최적화: find 한 번만 호출)
+    const assigneeUser = React.useMemo(() => {
+      return assigneeList?.find((user) => user.user_name === solution.assignee);
+    }, [solution.assignee]);
+
+    const assigneeAvatar = assigneeUser?.profile_image_url || assigneeUser?.avatar_url || '/assets/images/users/avatar-1.png';
+
     return (
       <article
         ref={setNodeRef}
@@ -408,13 +415,13 @@ function KanbanView({
         <div className="card-footer">
           <div className="assignee-info">
             <img
-              src={
-                assigneeList?.find((user) => user.user_name === solution.assignee)?.profile_image_url ||
-                assigneeList?.find((user) => user.user_name === solution.assignee)?.avatar_url ||
-                '/assets/images/users/avatar-1.png'
-              }
+              src={assigneeAvatar}
               alt={solution.assignee || '담당자'}
               className="assignee-avatar"
+              onError={(e) => {
+                // 이미지 로드 실패 시 기본 이미지로 대체
+                e.currentTarget.src = '/assets/images/users/avatar-1.png';
+              }}
             />
             <span className="assignee-name">{solution.assignee || '미할당'}</span>
           </div>
@@ -2326,14 +2333,8 @@ export default function SolutionManagement() {
 
   // 공유 Solutions 상태
   // DB 연동 훅
-  const {
-    getSolutions,
-    convertToSolutionData,
-    createSolution,
-    updateSolution,
-    deleteSolution,
-    convertToDbSolutionData
-  } = useSupabaseSolution();
+  const { getSolutions, convertToSolutionData, createSolution, updateSolution, deleteSolution, convertToDbSolutionData } =
+    useSupabaseSolution();
   const { users, departments } = useCommonData(); // 🏪 공용 창고에서 가져오기
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
@@ -2359,14 +2360,20 @@ export default function SolutionManagement() {
 
     return changeLogData.map((log) => ({
       id: String(log.id),
-      dateTime: log.created_at ? new Date(log.created_at).toLocaleString('ko-KR', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      }).replace(/\. /g, '-').replace('.', '').replace(',', '') : '',
+      dateTime: log.created_at
+        ? new Date(log.created_at)
+            .toLocaleString('ko-KR', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false
+            })
+            .replace(/\. /g, '-')
+            .replace('.', '')
+            .replace(',', '')
+        : '',
       title: log.title || '',
       code: log.record_id || '',
       target: log.record_id || '',
@@ -3131,83 +3138,85 @@ export default function SolutionManagement() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {changeLogs.slice(changeLogPage * changeLogRowsPerPage, (changeLogPage + 1) * changeLogRowsPerPage).map((log, index) => (
-                        <TableRow key={log.id} hover sx={{ '&:hover': { backgroundColor: 'action.hover' } }}>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {changeLogs.length - (changeLogPage * changeLogRowsPerPage + index)}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.dateTime}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.title}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.code}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.action}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.location}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.changedField || '-'}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.beforeValue || '-'}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.afterValue || '-'}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography
-                              variant="body2"
-                              sx={{
-                                fontSize: '13px',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'normal',
-                                display: '-webkit-box',
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: 'vertical',
-                                lineHeight: 1.4
-                              }}
-                              title={log.description}
-                            >
-                              {log.description}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.team}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.user}
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {changeLogs
+                        .slice(changeLogPage * changeLogRowsPerPage, (changeLogPage + 1) * changeLogRowsPerPage)
+                        .map((log, index) => (
+                          <TableRow key={log.id} hover sx={{ '&:hover': { backgroundColor: 'action.hover' } }}>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {changeLogs.length - (changeLogPage * changeLogRowsPerPage + index)}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.dateTime}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.title}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.code}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.action}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.location}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.changedField || '-'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.beforeValue || '-'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.afterValue || '-'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontSize: '13px',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'normal',
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  lineHeight: 1.4
+                                }}
+                                title={log.description}
+                              >
+                                {log.description}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.team}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.user}
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        ))}
                     </TableBody>
                   </Table>
                 </TableContainer>

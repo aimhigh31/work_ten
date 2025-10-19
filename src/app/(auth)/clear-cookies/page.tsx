@@ -8,10 +8,8 @@ export default function ClearCookiesPage() {
 
   useEffect(() => {
     // 모든 쿠키 삭제
-    document.cookie.split(";").forEach((c) => {
-      document.cookie = c
-        .replace(/^ +/, "")
-        .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    document.cookie.split(';').forEach((c) => {
+      document.cookie = c.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/');
     });
 
     // localStorage 삭제
@@ -29,13 +27,15 @@ export default function ClearCookiesPage() {
   }, [router]);
 
   return (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      height: '100vh',
-      fontSize: '24px'
-    }}>
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        fontSize: '24px'
+      }}
+    >
       쿠키 삭제 중...
     </div>
   );

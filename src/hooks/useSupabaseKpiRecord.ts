@@ -28,59 +28,57 @@ export const useSupabaseKpiRecord = (kpiId?: number) => {
   const [error, setError] = useState<string | null>(null);
 
   // 특정 KPI의 실적 목록 조회
-  const fetchRecords = useCallback(async (targetKpiId?: number) => {
-    const fetchKpiId = targetKpiId || kpiId;
-    if (!fetchKpiId) {
-      console.warn('KPI ID가 제공되지 않았습니다.');
-      return;
-    }
-
-    // 1. 동적 캐시 키 생성
-    const cacheKey = createCacheKey('kpi_record', `kpi_${fetchKpiId}`);
-    const cachedData = loadFromCache<KpiRecordData[]>(cacheKey, DEFAULT_CACHE_EXPIRY_MS);
-    if (cachedData) {
-      console.log('⚡ [KpiRecord] 캐시 데이터 반환');
-      setRecords(cachedData);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const { data, error: fetchError } = await supabase
-        .from('main_kpi_record')
-        .select('*')
-        .eq('kpi_id', fetchKpiId)
-        .order('month', { ascending: true });
-
-      if (fetchError) {
-        throw fetchError;
+  const fetchRecords = useCallback(
+    async (targetKpiId?: number) => {
+      const fetchKpiId = targetKpiId || kpiId;
+      if (!fetchKpiId) {
+        console.warn('KPI ID가 제공되지 않았습니다.');
+        return;
       }
 
-      setRecords(data || []);
+      // 1. 동적 캐시 키 생성
+      const cacheKey = createCacheKey('kpi_record', `kpi_${fetchKpiId}`);
+      const cachedData = loadFromCache<KpiRecordData[]>(cacheKey, DEFAULT_CACHE_EXPIRY_MS);
+      if (cachedData) {
+        console.log('⚡ [KpiRecord] 캐시 데이터 반환');
+        setRecords(cachedData);
+        return;
+      }
 
-      // 2. 캐시에 저장
-      saveToCache(cacheKey, data || []);
+      try {
+        setLoading(true);
+        setError(null);
 
-    } catch (err: any) {
-      console.error('KPI Record 조회 오류:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [kpiId]);
+        const { data, error: fetchError } = await supabase
+          .from('main_kpi_record')
+          .select('*')
+          .eq('kpi_id', fetchKpiId)
+          .order('month', { ascending: true });
+
+        if (fetchError) {
+          throw fetchError;
+        }
+
+        setRecords(data || []);
+
+        // 2. 캐시에 저장
+        saveToCache(cacheKey, data || []);
+      } catch (err: any) {
+        console.error('KPI Record 조회 오류:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [kpiId]
+  );
 
   // 실적 추가
   const addRecord = useCallback(async (recordData: Omit<KpiRecordData, 'id' | 'created_at' | 'updated_at'>) => {
     try {
       console.log('📝 KPI Record 추가 데이터:', recordData);
 
-      const { data, error: insertError } = await supabase
-        .from('main_kpi_record')
-        .insert([recordData])
-        .select()
-        .single();
+      const { data, error: insertError } = await supabase.from('main_kpi_record').insert([recordData]).select().single();
 
       if (insertError) {
         console.error('❌ Supabase Insert 오류:', insertError);
@@ -100,12 +98,7 @@ export const useSupabaseKpiRecord = (kpiId?: number) => {
   // 실적 수정
   const updateRecord = useCallback(async (id: number, updates: Partial<KpiRecordData>) => {
     try {
-      const { data, error: updateError } = await supabase
-        .from('main_kpi_record')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+      const { data, error: updateError } = await supabase.from('main_kpi_record').update(updates).eq('id', id).select().single();
 
       if (updateError) {
         throw updateError;
@@ -155,23 +148,26 @@ export const useSupabaseKpiRecord = (kpiId?: number) => {
   }, []);
 
   // 특정 KPI의 모든 실적 삭제
-  const deleteAllRecordsByKpiId = useCallback(async (targetKpiId: number) => {
-    try {
-      const { error: deleteError } = await supabase.from('main_kpi_record').delete().eq('kpi_id', targetKpiId);
+  const deleteAllRecordsByKpiId = useCallback(
+    async (targetKpiId: number) => {
+      try {
+        const { error: deleteError } = await supabase.from('main_kpi_record').delete().eq('kpi_id', targetKpiId);
 
-      if (deleteError) {
-        throw deleteError;
-      }
+        if (deleteError) {
+          throw deleteError;
+        }
 
-      if (targetKpiId === kpiId) {
-        setRecords([]);
+        if (targetKpiId === kpiId) {
+          setRecords([]);
+        }
+      } catch (err: any) {
+        console.error('KPI Record 전체 삭제 오류:', err);
+        setError(err.message);
+        throw err;
       }
-    } catch (err: any) {
-      console.error('KPI Record 전체 삭제 오류:', err);
-      setError(err.message);
-      throw err;
-    }
-  }, [kpiId]);
+    },
+    [kpiId]
+  );
 
   // 초기 데이터 로드
   useEffect(() => {

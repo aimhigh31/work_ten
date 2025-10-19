@@ -411,15 +411,16 @@ const OverviewTab = memo(
                 shrink: true
               }}
               InputProps={{
-                startAdornment: taskState.assignee && assigneeAvatars[taskState.assignee as keyof typeof assigneeAvatars] ? (
-                  <Avatar
-                    src={assigneeAvatars[taskState.assignee as keyof typeof assigneeAvatars]}
-                    alt={taskState.assignee}
-                    sx={{ width: 24, height: 24, mr: 0.25 }}
-                  >
-                    {taskState.assignee?.charAt(0)}
-                  </Avatar>
-                ) : null
+                startAdornment:
+                  taskState.assignee && assigneeAvatars[taskState.assignee as keyof typeof assigneeAvatars] ? (
+                    <Avatar
+                      src={assigneeAvatars[taskState.assignee as keyof typeof assigneeAvatars]}
+                      alt={taskState.assignee}
+                      sx={{ width: 24, height: 24, mr: 0.25 }}
+                    >
+                      {taskState.assignee?.charAt(0)}
+                    </Avatar>
+                  ) : null
               }}
               sx={{
                 '& .MuiInputBase-root.Mui-disabled': {

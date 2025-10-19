@@ -126,7 +126,16 @@ interface KanbanViewProps {
   selectedAssignee: string;
   tasks: SecurityIncidentRecord[];
   setTasks: React.Dispatch<React.SetStateAction<SecurityIncidentRecord[]>>;
-  addChangeLog: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string, title?: string) => void;
+  addChangeLog: (
+    action: string,
+    target: string,
+    description: string,
+    team?: string,
+    beforeValue?: string,
+    afterValue?: string,
+    changedField?: string,
+    title?: string
+  ) => void;
   onCardClick?: (task: SecurityIncidentRecord) => void;
   assigneeList?: any[];
 }
@@ -321,6 +330,13 @@ function KanbanView({
         }
       : { cursor: 'pointer' };
 
+    // 사용자 프로필 이미지 가져오기 (최적화: find 한 번만 호출)
+    const assigneeUser = React.useMemo(() => {
+      return assigneeList?.find((user) => user.user_name === task.assignee);
+    }, [task.assignee]);
+
+    const assigneeAvatar = assigneeUser?.profile_image_url || assigneeUser?.avatar_url || '/assets/images/users/avatar-1.png';
+
     return (
       <article
         ref={setNodeRef}
@@ -436,12 +452,12 @@ function KanbanView({
           <div className="assignee-info">
             <img
               className="assignee-avatar"
-              src={
-                assigneeList?.find((user) => user.user_name === task.assignee)?.profile_image_url ||
-                assigneeList?.find((user) => user.user_name === task.assignee)?.avatar_url ||
-                '/assets/images/users/avatar-1.png'
-              }
+              src={assigneeAvatar}
               alt={task.assignee || '김철수'}
+              onError={(e) => {
+                // 이미지 로드 실패 시 기본 이미지로 대체
+                e.currentTarget.src = '/assets/images/users/avatar-1.png';
+              }}
             />
             <span className="assignee-name">{task.assignee || '김철수'}</span>
           </div>
@@ -2139,7 +2155,7 @@ export default function SecurityIncidentManagement() {
   const changeLogs = React.useMemo(() => {
     return dbChangeLogs.map((log: ChangeLogData) => {
       // record_id로 해당 보안사고 찾기 (record_id는 코드로 저장되어 있음)
-      const incident = tasks.find(t => t.code === log.record_id);
+      const incident = tasks.find((t) => t.code === log.record_id);
 
       const date = new Date(log.created_at);
       const year = date.getFullYear();
@@ -2292,7 +2308,16 @@ export default function SecurityIncidentManagement() {
       }
 
       if (changes.length > 0) {
-        addChangeLog('업무 수정', updatedTask.code, changes.join(', '), updatedTask.team, undefined, undefined, undefined, updatedTask.mainContent);
+        addChangeLog(
+          '업무 수정',
+          updatedTask.code,
+          changes.join(', '),
+          updatedTask.team,
+          undefined,
+          undefined,
+          undefined,
+          updatedTask.mainContent
+        );
       }
     } else {
       // 새로 생성
@@ -2302,7 +2327,16 @@ export default function SecurityIncidentManagement() {
         console.log('✨ 생성 후 tasks:', newTasks);
         return newTasks;
       });
-      addChangeLog('사고 생성', updatedTask.code, `새로운 보안사고가 생성되었습니다: ${updatedTask.mainContent}`, updatedTask.team, undefined, undefined, undefined, updatedTask.mainContent);
+      addChangeLog(
+        '사고 생성',
+        updatedTask.code,
+        `새로운 보안사고가 생성되었습니다: ${updatedTask.mainContent}`,
+        updatedTask.team,
+        undefined,
+        undefined,
+        undefined,
+        updatedTask.mainContent
+      );
     }
 
     handleEditDialogClose();
@@ -2497,7 +2531,9 @@ export default function SecurityIncidentManagement() {
                     }
                   }}
                 >
-                  <MenuItem key="year-all" value="전체">전체</MenuItem>
+                  <MenuItem key="year-all" value="전체">
+                    전체
+                  </MenuItem>
                   {yearOptions.map((year) => (
                     <MenuItem key={`year-${year}`} value={year}>
                       {year}년
@@ -2520,7 +2556,9 @@ export default function SecurityIncidentManagement() {
                     }
                   }}
                 >
-                  <MenuItem key="team-all" value="전체">전체</MenuItem>
+                  <MenuItem key="team-all" value="전체">
+                    전체
+                  </MenuItem>
                   {departments
                     .filter((dept) => dept.is_active)
                     .map((dept) => (
@@ -2545,7 +2583,9 @@ export default function SecurityIncidentManagement() {
                     }
                   }}
                 >
-                  <MenuItem key="assignee-all" value="전체">전체</MenuItem>
+                  <MenuItem key="assignee-all" value="전체">
+                    전체
+                  </MenuItem>
                   {users
                     .filter((user) => user.is_active)
                     .map((user) => (
@@ -2570,7 +2610,9 @@ export default function SecurityIncidentManagement() {
                     }
                   }}
                 >
-                  <MenuItem key="status-all" value="전체">전체</MenuItem>
+                  <MenuItem key="status-all" value="전체">
+                    전체
+                  </MenuItem>
                   {statusTypes.map((statusItem) => (
                     <MenuItem key={statusItem.id} value={statusItem.subcode_name}>
                       {statusItem.subcode_name}
@@ -2985,10 +3027,18 @@ export default function SecurityIncidentManagement() {
                           }
                         }}
                       >
-                        <MenuItem key="rows-5" value={5}>5</MenuItem>
-                        <MenuItem key="rows-10" value={10}>10</MenuItem>
-                        <MenuItem key="rows-25" value={25}>25</MenuItem>
-                        <MenuItem key="rows-50" value={50}>50</MenuItem>
+                        <MenuItem key="rows-5" value={5}>
+                          5
+                        </MenuItem>
+                        <MenuItem key="rows-10" value={10}>
+                          10
+                        </MenuItem>
+                        <MenuItem key="rows-25" value={25}>
+                          25
+                        </MenuItem>
+                        <MenuItem key="rows-50" value={50}>
+                          50
+                        </MenuItem>
                       </Select>
                     </FormControl>
 
@@ -3022,7 +3072,11 @@ export default function SecurityIncidentManagement() {
                           }
                         }}
                       />
-                      <Button size="small" onClick={handleChangeLogGoToPage} sx={{ minWidth: 'auto', px: 1.5, py: 0.5, fontSize: '0.875rem' }}>
+                      <Button
+                        size="small"
+                        onClick={handleChangeLogGoToPage}
+                        sx={{ minWidth: 'auto', px: 1.5, py: 0.5, fontSize: '0.875rem' }}
+                      >
                         Go
                       </Button>
                     </Box>

@@ -211,33 +211,13 @@ export default function Toolbar({
             onChange={(event, newValue) => {
               onAttendeesFilterChange?.(newValue);
             }}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="참석자"
-                placeholder="검색"
-              />
-            )}
+            renderInput={(params) => <TextField {...params} label="참석자" placeholder="검색" />}
             renderTags={(value: readonly string[], getTagProps) => {
               if (value.length === 0) return null;
               if (value.length === 1) {
-                return (
-                  <Chip
-                    size="small"
-                    label={value[0]}
-                    {...getTagProps({ index: 0 })}
-                    key={value[0]}
-                  />
-                );
+                return <Chip size="small" label={value[0]} {...getTagProps({ index: 0 })} key={value[0]} />;
               }
-              return (
-                <Chip
-                  size="small"
-                  label={`${value[0]} 외 ${value.length - 1}명`}
-                  {...getTagProps({ index: 0 })}
-                  key={value[0]}
-                />
-              );
+              return <Chip size="small" label={`${value[0]} 외 ${value.length - 1}명`} {...getTagProps({ index: 0 })} key={value[0]} />;
             }}
             sx={{ minWidth: 150 }}
           />

@@ -11,9 +11,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('NEXT_PUBLIC_SUPABASE_ANON_KEY:', supabaseAnonKey ? '설정됨' : '없음');
 }
 
-const supabase = supabaseUrl && supabaseAnonKey
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : null;
+const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
 interface UploadResult {
   url: string;
@@ -62,12 +60,10 @@ export function useSupabaseImageUpload() {
       console.log('📁 저장 경로:', fileName);
 
       // Supabase Storage에 업로드
-      const { data, error: uploadError } = await supabase.storage
-        .from('hardware-images')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
+      const { data, error: uploadError } = await supabase.storage.from('hardware-images').upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
 
       if (uploadError) {
         console.error('❌ 업로드 실패:', uploadError);
@@ -77,16 +73,13 @@ export function useSupabaseImageUpload() {
       console.log('✅ 업로드 성공:', data);
 
       // 공개 URL 생성
-      const { data: urlData } = supabase.storage
-        .from('hardware-images')
-        .getPublicUrl(fileName);
+      const { data: urlData } = supabase.storage.from('hardware-images').getPublicUrl(fileName);
 
       const publicUrl = urlData.publicUrl;
       console.log('🔗 공개 URL:', publicUrl);
 
       setUploading(false);
       return publicUrl;
-
     } catch (err: any) {
       console.error('❌ 이미지 업로드 에러:', err);
       setError(err.message || '이미지 업로드 중 오류가 발생했습니다.');
@@ -101,35 +94,34 @@ export function useSupabaseImageUpload() {
    * @param folder - 저장할 폴더
    * @returns 업로드된 이미지 URL 배열
    */
-  const uploadMultipleImages = useCallback(async (
-    files: (File | null)[],
-    folder: string = 'hardware'
-  ): Promise<(string | null)[]> => {
-    try {
-      setUploading(true);
-      setError(null);
+  const uploadMultipleImages = useCallback(
+    async (files: (File | null)[], folder: string = 'hardware'): Promise<(string | null)[]> => {
+      try {
+        setUploading(true);
+        setError(null);
 
-      console.log('📤 다중 이미지 업로드 시작:', files.length, '개');
+        console.log('📤 다중 이미지 업로드 시작:', files.length, '개');
 
-      const uploadPromises = files.map(file => {
-        if (!file) return Promise.resolve(null);
-        return uploadImage(file, folder);
-      });
+        const uploadPromises = files.map((file) => {
+          if (!file) return Promise.resolve(null);
+          return uploadImage(file, folder);
+        });
 
-      const results = await Promise.all(uploadPromises);
+        const results = await Promise.all(uploadPromises);
 
-      console.log('✅ 다중 업로드 완료:', results);
+        console.log('✅ 다중 업로드 완료:', results);
 
-      setUploading(false);
-      return results;
-
-    } catch (err: any) {
-      console.error('❌ 다중 이미지 업로드 에러:', err);
-      setError(err.message || '이미지 업로드 중 오류가 발생했습니다.');
-      setUploading(false);
-      return [];
-    }
-  }, [uploadImage]);
+        setUploading(false);
+        return results;
+      } catch (err: any) {
+        console.error('❌ 다중 이미지 업로드 에러:', err);
+        setError(err.message || '이미지 업로드 중 오류가 발생했습니다.');
+        setUploading(false);
+        return [];
+      }
+    },
+    [uploadImage]
+  );
 
   /**
    * Storage에서 이미지 삭제
@@ -153,9 +145,7 @@ export function useSupabaseImageUpload() {
       const filePath = urlParts[1];
       console.log('📁 삭제할 파일 경로:', filePath);
 
-      const { error: deleteError } = await supabase.storage
-        .from('hardware-images')
-        .remove([filePath]);
+      const { error: deleteError } = await supabase.storage.from('hardware-images').remove([filePath]);
 
       if (deleteError) {
         console.error('❌ 삭제 실패:', deleteError);
@@ -164,7 +154,6 @@ export function useSupabaseImageUpload() {
 
       console.log('✅ 이미지 삭제 성공');
       return true;
-
     } catch (err: any) {
       console.error('❌ 이미지 삭제 에러:', err);
       setError(err.message || '이미지 삭제 중 오류가 발생했습니다.');

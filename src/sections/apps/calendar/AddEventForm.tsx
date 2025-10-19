@@ -79,7 +79,10 @@ function getInitialValues(event: FormikValues | null, range: DateRange | null, c
     team: currentUserTeam || '',
     assignee: currentUserName || '',
     attendees: '',
-    color: currentUserTeam && teamColors[currentUserTeam as keyof typeof teamColors] ? teamColors[currentUserTeam as keyof typeof teamColors] : '#DC2626',
+    color:
+      currentUserTeam && teamColors[currentUserTeam as keyof typeof teamColors]
+        ? teamColors[currentUserTeam as keyof typeof teamColors]
+        : '#DC2626',
     textColor: '#000000',
     allDay: false,
     start: range ? new Date(range.start) : defaultStart,
@@ -110,7 +113,15 @@ interface AddEventFormProps {
   deleteEvent?: (event_id: string) => Promise<void>;
 }
 
-export default function AddEventFrom({ event, range, onCancel, modalCallback, createEvent: createEventProp, updateEvent: updateEventProp, deleteEvent: deleteEventProp }: AddEventFormProps) {
+export default function AddEventFrom({
+  event,
+  range,
+  onCancel,
+  modalCallback,
+  createEvent: createEventProp,
+  updateEvent: updateEventProp,
+  deleteEvent: deleteEventProp
+}: AddEventFormProps) {
   const theme = useTheme();
   const isCreating = !event;
   const { data: session } = useSession();
@@ -439,18 +450,20 @@ export default function AddEventFrom({ event, range, onCancel, modalCallback, cr
                   freeSolo
                   id="cal-attendees"
                   options={[]}
-                  value={values.attendees ? values.attendees.split(',').map((name: string) => name.trim()).filter((name: string) => name) : []}
+                  value={
+                    values.attendees
+                      ? values.attendees
+                          .split(',')
+                          .map((name: string) => name.trim())
+                          .filter((name: string) => name)
+                      : []
+                  }
                   onChange={(event, newValue) => {
                     setFieldValue('attendees', newValue.join(','));
                   }}
                   renderTags={(value: readonly string[], getTagProps) =>
                     value.map((option: string, index: number) => (
-                      <Chip
-                        variant="outlined"
-                        label={option}
-                        {...getTagProps({ index })}
-                        key={option}
-                      />
+                      <Chip variant="outlined" label={option} {...getTagProps({ index })} key={option} />
                     ))
                   }
                   renderInput={(params) => (
@@ -569,9 +582,7 @@ export default function AddEventFrom({ event, range, onCancel, modalCallback, cr
                   fullWidth
                   label="등록일"
                   value={
-                    event?.created_at
-                      ? new Date(event.created_at).toISOString().split('T')[0]
-                      : new Date().toISOString().split('T')[0]
+                    event?.created_at ? new Date(event.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
                   }
                   InputProps={{
                     readOnly: true
@@ -609,7 +620,11 @@ export default function AddEventFrom({ event, range, onCancel, modalCallback, cr
                   <InputLabel shrink sx={{ backgroundColor: 'white', px: 0.5 }}>
                     배경색상
                   </InputLabel>
-                  <Stack direction="row" spacing={2} sx={{ alignItems: 'center', py: 1, px: 2, border: '1px solid #e0e0e0', borderRadius: 1, mt: 2 }}>
+                  <Stack
+                    direction="row"
+                    spacing={2}
+                    sx={{ alignItems: 'center', py: 1, px: 2, border: '1px solid #e0e0e0', borderRadius: 1, mt: 2 }}
+                  >
                     <div
                       style={{
                         width: '40px',
@@ -634,9 +649,7 @@ export default function AddEventFrom({ event, range, onCancel, modalCallback, cr
           {/* 에러 메시지 표시 */}
           {validationError && (
             <Box sx={{ px: 3, pb: 2, pt: 0 }}>
-              <Alert severity="error">
-                {validationError}
-              </Alert>
+              <Alert severity="error">{validationError}</Alert>
             </Box>
           )}
         </Form>

@@ -229,11 +229,7 @@ function KanbanView({
     } else {
       try {
         // DB에서 최신 데이터 가져오기
-        const { data: latestData, error } = await supabase
-          .from('security_education_data')
-          .select('*')
-          .eq('id', task.id)
-          .single();
+        const { data: latestData, error } = await supabase.from('security_education_data').select('*').eq('id', task.id).single();
 
         if (error) {
           console.error('❌ DB 조회 실패:', error);
@@ -291,7 +287,16 @@ function KanbanView({
       const educationName = currentTask.educationName || '교육명 없음';
       const description = `${educationName} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
 
-      addChangeLog('교육 상태 변경', taskCode, description, currentTask.educationType || '미분류', oldStatus, newStatus, '상태', educationName);
+      addChangeLog(
+        '교육 상태 변경',
+        taskCode,
+        description,
+        currentTask.educationType || '미분류',
+        oldStatus,
+        newStatus,
+        '상태',
+        educationName
+      );
     }
   };
 
@@ -369,6 +374,13 @@ function KanbanView({
         }
       : { cursor: 'pointer' };
 
+    // 사용자 프로필 이미지 가져오기 (최적화: find 한 번만 호출)
+    const assigneeUser = React.useMemo(() => {
+      return assigneeList?.find((user) => user.user_name === task.assignee);
+    }, [task.assignee]);
+
+    const assigneeAvatar = assigneeUser?.profile_image_url || assigneeUser?.avatar_url || '/assets/images/users/avatar-1.png';
+
     return (
       <article
         ref={setNodeRef}
@@ -432,12 +444,12 @@ function KanbanView({
           <div className="assignee-info">
             <img
               className="assignee-avatar"
-              src={
-                assigneeList?.find((user) => user.user_name === task.assignee)?.profile_image_url ||
-                assigneeList?.find((user) => user.user_name === task.assignee)?.avatar_url ||
-                '/assets/images/users/avatar-1.png'
-              }
+              src={assigneeAvatar}
               alt={task.assignee || '담당자'}
+              onError={(e) => {
+                // 이미지 로드 실패 시 기본 이미지로 대체
+                e.currentTarget.src = '/assets/images/users/avatar-1.png';
+              }}
             />
             <span className="assignee-name">{task.assignee || '미할당'}</span>
           </div>
@@ -1455,10 +1467,18 @@ function ChangeLogView({
                 }
               }}
             >
-              <MenuItem key="rows-5" value={5}>5</MenuItem>
-              <MenuItem key="rows-10" value={10}>10</MenuItem>
-              <MenuItem key="rows-25" value={25}>25</MenuItem>
-              <MenuItem key="rows-50" value={50}>50</MenuItem>
+              <MenuItem key="rows-5" value={5}>
+                5
+              </MenuItem>
+              <MenuItem key="rows-10" value={10}>
+                10
+              </MenuItem>
+              <MenuItem key="rows-25" value={25}>
+                25
+              </MenuItem>
+              <MenuItem key="rows-50" value={50}>
+                50
+              </MenuItem>
             </Select>
           </FormControl>
 
@@ -2617,7 +2637,7 @@ export default function SecurityEducationManagement() {
   const changeLogs = React.useMemo(() => {
     return dbChangeLogs.map((log: ChangeLogData) => {
       // record_id로 해당 교육 찾기 (record_id는 코드로 저장되어 있음)
-      const education = tasks.find(t => t.code === log.record_id);
+      const education = tasks.find((t) => t.code === log.record_id);
 
       const date = new Date(log.created_at);
       const year = date.getFullYear();
@@ -2736,12 +2756,30 @@ export default function SecurityEducationManagement() {
       }
 
       if (changes.length > 0) {
-        addChangeLog('업무 수정', updatedTask.code, changes.join(', '), updatedTask.team, undefined, undefined, undefined, updatedTask.educationName || updatedTask.workContent);
+        addChangeLog(
+          '업무 수정',
+          updatedTask.code,
+          changes.join(', '),
+          updatedTask.team,
+          undefined,
+          undefined,
+          undefined,
+          updatedTask.educationName || updatedTask.workContent
+        );
       }
     } else {
       // 새로 생성
       setTasks((prevTasks) => [...prevTasks, updatedTask]);
-      addChangeLog('업무 생성', updatedTask.code, `새로운 업무가 생성되었습니다: ${updatedTask.workContent}`, updatedTask.team, undefined, undefined, undefined, updatedTask.educationName || updatedTask.workContent);
+      addChangeLog(
+        '업무 생성',
+        updatedTask.code,
+        `새로운 업무가 생성되었습니다: ${updatedTask.workContent}`,
+        updatedTask.team,
+        undefined,
+        undefined,
+        undefined,
+        updatedTask.educationName || updatedTask.workContent
+      );
     }
 
     handleEditDialogClose();
@@ -2936,7 +2974,9 @@ export default function SecurityEducationManagement() {
                     }
                   }}
                 >
-                  <MenuItem key="year-all" value="전체">전체</MenuItem>
+                  <MenuItem key="year-all" value="전체">
+                    전체
+                  </MenuItem>
                   {yearOptions.map((year) => (
                     <MenuItem key={`year-${year}`} value={year}>
                       {year}년
@@ -2959,7 +2999,9 @@ export default function SecurityEducationManagement() {
                     }
                   }}
                 >
-                  <MenuItem key="team-all" value="전체">전체</MenuItem>
+                  <MenuItem key="team-all" value="전체">
+                    전체
+                  </MenuItem>
                   {departments
                     .filter((dept) => dept.is_active)
                     .map((dept) => (
@@ -2984,7 +3026,9 @@ export default function SecurityEducationManagement() {
                     }
                   }}
                 >
-                  <MenuItem key="assignee-all" value="전체">전체</MenuItem>
+                  <MenuItem key="assignee-all" value="전체">
+                    전체
+                  </MenuItem>
                   {users
                     .filter((user) => user.status === 'active')
                     .map((user, index) => (
@@ -3009,7 +3053,9 @@ export default function SecurityEducationManagement() {
                     }
                   }}
                 >
-                  <MenuItem key="status-all" value="전체">전체</MenuItem>
+                  <MenuItem key="status-all" value="전체">
+                    전체
+                  </MenuItem>
                   {statusTypes.map((statusItem) => (
                     <MenuItem key={statusItem.id} value={statusItem.subcode_name}>
                       {statusItem.subcode_name}

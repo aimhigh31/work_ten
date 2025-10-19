@@ -157,16 +157,7 @@ export default function UserManagementTable({
   const { users: supabaseUsers, departments: supabaseDepartments } = useCommonData();
 
   // Supabase 훅 사용 (데이터 수정 함수만)
-  const {
-    loading,
-    error,
-    clearError,
-    fetchUsers,
-    createUser,
-    updateUser,
-    toggleUserStatus,
-    deleteUser
-  } = useSupabaseUserManagement();
+  const { loading, error, clearError, fetchUsers, createUser, updateUser, toggleUserStatus, deleteUser } = useSupabaseUserManagement();
 
   // 마스터코드3 Supabase 훅 사용 (플랫 구조)
   const { subCodes: allSubCodes } = useSupabaseMasterCode3();
@@ -321,12 +312,12 @@ export default function UserManagementTable({
       hasEmail: !!session?.user?.email,
       email: session?.user?.email,
       dataLength: data.length,
-      allEmails: data.map(u => u.email)
+      allEmails: data.map((u) => u.email)
     });
 
     if (openProfile === 'true' && session?.user?.email && data.length > 0) {
       // 현재 로그인한 사용자 찾기
-      const currentUser = data.find(user => user.email === session.user.email);
+      const currentUser = data.find((user) => user.email === session.user.email);
 
       console.log('🎯 Found current user:', currentUser);
 
@@ -475,7 +466,9 @@ export default function UserManagementTable({
 
           // 이메일 중복 오류인 경우 특별 처리
           if (result.error && result.error.includes('already been registered')) {
-            alert(`이메일 중복 오류: 이미 사용 중인 이메일입니다.\n이메일: ${baseEmail}\n\n다른 이메일 주소를 입력하거나, 이메일을 비워두면 자동으로 생성됩니다.`);
+            alert(
+              `이메일 중복 오류: 이미 사용 중인 이메일입니다.\n이메일: ${baseEmail}\n\n다른 이메일 주소를 입력하거나, 이메일을 비워두면 자동으로 생성됩니다.`
+            );
           } else {
             alert(`사용자 생성 실패: ${result.error}`);
           }

@@ -144,9 +144,7 @@ function TabPanel(props: TabPanelProps) {
   const { children, value, index, ...other } = props;
 
   // QR출력 탭(index 3)은 인쇄 시 표시, 나머지는 숨김
-  const printStyle = index === 3
-    ? { '@media print': { display: 'block !important' } }
-    : { '@media print': { display: 'none !important' } };
+  const printStyle = index === 3 ? { '@media print': { display: 'block !important' } } : { '@media print': { display: 'none !important' } };
 
   return (
     <Box
@@ -330,7 +328,12 @@ const OverviewTab = memo(
               <InputLabel shrink>
                 자산분류 <span style={{ color: 'red' }}>*</span>
               </InputLabel>
-              <Select value={hardwareState.assetCategory} onChange={(e) => onFieldChange('assetCategory', e.target.value)} label="자산분류" displayEmpty>
+              <Select
+                value={hardwareState.assetCategory}
+                onChange={(e) => onFieldChange('assetCategory', e.target.value)}
+                label="자산분류"
+                displayEmpty
+              >
                 <MenuItem value="">선택</MenuItem>
                 {assetCategories.map((category) => (
                   <MenuItem key={category} value={category}>
@@ -655,935 +658,1002 @@ interface MaintenanceHistoryTabRef {
   clearMaintenanceTempData: () => void;
 }
 
-const UserHistoryTab = memo(React.forwardRef<UserHistoryTabRef, UserHistoryTabProps>(({ mode, hardwareId, userHistories: initialUserHistories, onUserHistoriesChange }, ref) => {
-  const { getUserHistories, convertToUserHistory } = useSupabaseHardwareUser();
+const UserHistoryTab = memo(
+  React.forwardRef<UserHistoryTabRef, UserHistoryTabProps>(
+    ({ mode, hardwareId, userHistories: initialUserHistories, onUserHistoriesChange }, ref) => {
+      const { getUserHistories, convertToUserHistory } = useSupabaseHardwareUser();
 
-  // 사용자 액션 추적을 위한 ref들을 컴포넌트 최상단에 선언
-  const userActionRef = useRef(false);
-  const loadedRef = useRef(false);
-  const initializedRef = useRef(false);
-  const prevUserHistoriesRef = useRef<UserHistory[]>([]);
-  const prevTempDataRef = useRef<string>('');
+      // 사용자 액션 추적을 위한 ref들을 컴포넌트 최상단에 선언
+      const userActionRef = useRef(false);
+      const loadedRef = useRef(false);
+      const initializedRef = useRef(false);
+      const prevUserHistoriesRef = useRef<UserHistory[]>([]);
+      const prevTempDataRef = useRef<string>('');
 
-  // 임시저장 키 생성
-  const tempStorageKey = useMemo(() => {
-    return `hardware_user_history_${mode}_${hardwareId || 'new'}`;
-  }, [mode, hardwareId]);
+      // 임시저장 키 생성
+      const tempStorageKey = useMemo(() => {
+        return `hardware_user_history_${mode}_${hardwareId || 'new'}`;
+      }, [mode, hardwareId]);
 
-  // 로컬 사용자이력 상태 - DB 연동을 위해 초기값으로 props 사용
-  const [userHistories, setUserHistories] = useState<UserHistory[]>(initialUserHistories);
+      // 로컬 사용자이력 상태 - DB 연동을 위해 초기값으로 props 사용
+      const [userHistories, setUserHistories] = useState<UserHistory[]>(initialUserHistories);
 
-  // 하드웨어 ID가 변경되면 모든 상태 초기화
-  useEffect(() => {
-    console.log('🔄 하드웨어 ID 변경됨, 모든 상태 초기화:', hardwareId);
-    loadedRef.current = false;
-    initializedRef.current = false;
-    userActionRef.current = false;
-    // 편집 모드에서는 UI 초기화
-    if (mode === 'edit') {
-      setUserHistories([]);
-    }
-  }, [hardwareId, mode]);
+      // 하드웨어 ID가 변경되면 모든 상태 초기화
+      useEffect(() => {
+        console.log('🔄 하드웨어 ID 변경됨, 모든 상태 초기화:', hardwareId);
+        loadedRef.current = false;
+        initializedRef.current = false;
+        userActionRef.current = false;
+        // 편집 모드에서는 UI 초기화
+        if (mode === 'edit') {
+          setUserHistories([]);
+        }
+      }, [hardwareId, mode]);
 
-  // DB에서 사용자이력 로드 (편집 모드인 경우)
-  useEffect(() => {
-    let isMounted = true;
-    let timeoutId: NodeJS.Timeout;
+      // DB에서 사용자이력 로드 (편집 모드인 경우)
+      useEffect(() => {
+        let isMounted = true;
+        let timeoutId: NodeJS.Timeout;
 
-    const loadUserHistories = async () => {
-      // 사용자 액션 중인 경우 건너뛰기
-      if (userActionRef.current) {
-        console.log('⏸️ 사용자 액션 중이므로 DB 로드 건너뛰기');
-        return;
-      }
-
-      if (mode === 'edit' && hardwareId && !loadedRef.current && isMounted) {
-        console.log('🔍 하드웨어 사용자 이력 조회 시작:', hardwareId);
-        loadedRef.current = true; // 로드 시작 표시
-
-        try {
-          const hardwareIdNum = parseInt(hardwareId);
-          console.log('📞 getUserHistories 호출 전');
-          const userData = await getUserHistories(hardwareIdNum);
-          console.log('📞 getUserHistories 응답:', userData?.length || 0, '개');
-
-          if (isMounted && !userActionRef.current) {
-            const convertedData = userData.map(convertToUserHistory);
-            console.log('🔄 DB에서 로드한 사용자이력:', convertedData.length, '개');
-            console.log('📋 변환된 데이터 상세:', convertedData);
-
-            // 상태 업데이트
-            setUserHistories(convertedData);
-            console.log('✅ setUserHistories 호출 완료');
-
-            // 부모에게 알림
-            onUserHistoriesChange(convertedData);
-            console.log('✅ onUserHistoriesChange 호출 완료');
+        const loadUserHistories = async () => {
+          // 사용자 액션 중인 경우 건너뛰기
+          if (userActionRef.current) {
+            console.log('⏸️ 사용자 액션 중이므로 DB 로드 건너뛰기');
+            return;
           }
-        } catch (error) {
-          if (isMounted) {
-            console.warn('⚠️ 사용자이력 로드 중 오류:', error);
-            setUserHistories([]);
-          }
-        }
-      } else if (mode === 'add' && isMounted && !loadedRef.current) {
-        loadedRef.current = true;
-        // add 모드에서는 임시저장 데이터 복원 시도
-        try {
-          const tempData = localStorage.getItem(tempStorageKey);
-          if (tempData) {
-            const parsedData = JSON.parse(tempData);
-            console.log('📋 사용자이력 임시저장 데이터 복원:', parsedData);
-            setUserHistories(parsedData);
-          }
-        } catch (error) {
-          console.warn('사용자이력 임시저장 데이터 복원 실패:', error);
-        }
-      }
-    };
 
-    // 약간의 지연을 주어 컴포넌트가 완전히 마운트된 후 실행
-    timeoutId = setTimeout(() => {
-      loadUserHistories();
-    }, 100);
+          if (mode === 'edit' && hardwareId && !loadedRef.current && isMounted) {
+            console.log('🔍 하드웨어 사용자 이력 조회 시작:', hardwareId);
+            loadedRef.current = true; // 로드 시작 표시
 
-    return () => {
-      isMounted = false;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-    };
-  }, [mode, hardwareId]); // 하드웨어 ID 변경 시 다시 로드
+            try {
+              const hardwareIdNum = parseInt(hardwareId);
+              console.log('📞 getUserHistories 호출 전');
+              const userData = await getUserHistories(hardwareIdNum);
+              console.log('📞 getUserHistories 응답:', userData?.length || 0, '개');
 
-  // 이력 변경 시 부모 컴포넌트에 알림 - 사용자 액션에서만
-  useEffect(() => {
-    // 사용자 액션으로 인한 변경이고, 실제로 데이터가 변경된 경우에만 부모에게 알림
-    if (userActionRef.current &&
-        JSON.stringify(userHistories) !== JSON.stringify(prevUserHistoriesRef.current)) {
-      console.log('📤 부모 컴포넌트에 사용자이력 변경 알림');
-      onUserHistoriesChange(userHistories);
-      userActionRef.current = false;
-      prevUserHistoriesRef.current = [...userHistories];
-    }
-  }, [userHistories]); // onUserHistoriesChange 제거하여 순환 의존성 방지
+              if (isMounted && !userActionRef.current) {
+                const convertedData = userData.map(convertToUserHistory);
+                console.log('🔄 DB에서 로드한 사용자이력:', convertedData.length, '개');
+                console.log('📋 변환된 데이터 상세:', convertedData);
 
-  const [selectedRows, setSelectedRows] = useState<string[]>([]);
-  const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
-  const [statusWarning, setStatusWarning] = useState<string>('');
+                // 상태 업데이트
+                setUserHistories(convertedData);
+                console.log('✅ setUserHistories 호출 완료');
 
-  // 페이지네이션 상태
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(7);
-
-  // 페이지네이션 계산
-  const totalPages = Math.ceil(userHistories.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentItems = userHistories.slice(startIndex, endIndex);
-
-  // 사용자이력 임시저장 - 사용자 액션이 있을 때만 저장
-  useEffect(() => {
-    // 사용자 액션이 있거나 add 모드일 때만 임시저장
-    if (mode === 'add' || userActionRef.current) {
-      const dataString = JSON.stringify(userHistories);
-      if (dataString !== prevTempDataRef.current) {
-        try {
-          localStorage.setItem(tempStorageKey, dataString);
-          prevTempDataRef.current = dataString;
-          console.log('💾 사용자이력 임시저장 완료:', userHistories.length + '개');
-        } catch (error) {
-          console.warn('사용자이력 임시저장 실패:', error);
-        }
-      }
-    }
-  }, [userHistories, tempStorageKey, mode]);
-
-  // ref를 통해 임시저장 삭제 함수 노출
-  React.useImperativeHandle(ref, () => ({
-    clearTempData: () => {
-      try {
-        localStorage.removeItem(tempStorageKey);
-        console.log('💾 사용자이력 임시저장 데이터 삭제 완료');
-      } catch (error) {
-        console.warn('사용자이력 임시저장 데이터 삭제 실패:', error);
-      }
-    }
-  }), [tempStorageKey]);
-
-  // 페이지 변경 핸들러 (MUI Pagination 형식에 맞게 수정)
-  const handlePageChange = (event: React.ChangeEvent<unknown>, page: number) => {
-    setCurrentPage(page);
-  };
-
-  const handleCellClick = (id: string, field: string) => {
-    setEditingCell({ id, field });
-  };
-
-  const handleCellBlur = () => {
-    setEditingCell(null);
-  };
-
-  const handleAddHistory = useCallback(() => {
-    const newHistory: UserHistory = {
-      id: Date.now().toString(),
-      registrationDate: new Date().toISOString().split('T')[0],
-      userId: '',
-      userName: '',
-      department: '',
-      startDate: new Date().toISOString().split('T')[0],
-      endDate: '',
-      reason: '',
-      status: 'active'
-    };
-    setUserHistories(prev => {
-      const newList = [newHistory, ...prev];
-      console.log('📝 행 추가:', newHistory.id, '총 개수:', newList.length);
-      userActionRef.current = true; // 사용자 액션 플래그 설정
-      return newList;
-    });
-  }, []);
-
-  const handleDeleteSelected = useCallback(() => {
-    setUserHistories(prev => {
-      const filtered = prev.filter((h) => !selectedRows.includes(h.id));
-      console.log('🗑️ 행 삭제:', selectedRows.length, '개, 남은 개수:', filtered.length);
-      userActionRef.current = true; // 사용자 액션 플래그 설정
-      return filtered;
-    });
-    setSelectedRows([]);
-  }, [selectedRows]);
-
-  const handleEditHistory = useCallback((id: string, field: keyof UserHistory, value: string) => {
-    setUserHistories(prev => {
-      // 상태를 '사용중'으로 변경하려는 경우 검증
-      if (field === 'status' && value === 'active') {
-        const hasActiveUser = prev.some((h) => h.id !== id && h.status === 'active');
-        if (hasActiveUser) {
-          setStatusWarning('이미 다른 사용자가 사용중입니다. 사용중인 항목은 하나만 선택 가능합니다.');
-          setTimeout(() => setStatusWarning(''), 3000);
-          return prev; // 상태 변경하지 않고 기존 상태 반환
-        }
-      }
-
-      setStatusWarning('');
-      const updated = prev.map((h) => (h.id === id ? { ...h, [field]: value } : h));
-      console.log('✏️ 행 편집:', id, field, value);
-      userActionRef.current = true; // 사용자 액션 플래그 설정
-      return updated;
-    });
-  }, []);
-
-  const handleSelectRow = (id: string) => {
-    if (selectedRows.includes(id)) {
-      setSelectedRows(selectedRows.filter((rowId) => rowId !== id));
-    } else {
-      setSelectedRows([...selectedRows, id]);
-    }
-  };
-
-  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.checked) {
-      setSelectedRows(userHistories.map((h) => h.id));
-    } else {
-      setSelectedRows([]);
-    }
-  };
-
-  const statusOptions = ['사용중', '종료'];
-  const statusColors: Record<string, string> = {
-    사용중: 'success',
-    종료: 'default'
-  };
-
-  // 컬럼 너비 및 높이 정의 (편집/읽기 모드 공통)
-  const columnWidths = {
-    checkbox: 50,
-    no: 60,
-    registrationDate: 100,
-    team: 100,
-    userName: 120,
-    reason: 150,
-    status: 100,
-    startDate: 100,
-    endDate: 100
-  };
-
-  const cellHeight = 56; // 고정 셀 높이
-
-  // 편집 가능한 셀 렌더링
-  const renderEditableCell = (history: UserHistory, field: string, value: string, options?: string[]) => {
-    const isEditing = editingCell?.id === history.id && editingCell?.field === field;
-    const fieldWidth = columnWidths[field as keyof typeof columnWidths] || 100;
-
-    if (isEditing) {
-      if (options) {
-        return (
-          <Select
-            value={value}
-            onChange={(e) => {
-              const newValue = e.target.value;
-              if (field === 'status') {
-                const newStatus = newValue === '사용중' ? 'active' : 'inactive';
-                handleEditHistory(history.id, 'status', newStatus);
-              } else {
-                handleEditHistory(history.id, field as keyof UserHistory, newValue);
+                // 부모에게 알림
+                onUserHistoriesChange(convertedData);
+                console.log('✅ onUserHistoriesChange 호출 완료');
               }
-            }}
-            onBlur={handleCellBlur}
-            size="small"
-            autoFocus
+            } catch (error) {
+              if (isMounted) {
+                console.warn('⚠️ 사용자이력 로드 중 오류:', error);
+                setUserHistories([]);
+              }
+            }
+          } else if (mode === 'add' && isMounted && !loadedRef.current) {
+            loadedRef.current = true;
+            // add 모드에서는 임시저장 데이터 복원 시도
+            try {
+              const tempData = localStorage.getItem(tempStorageKey);
+              if (tempData) {
+                const parsedData = JSON.parse(tempData);
+                console.log('📋 사용자이력 임시저장 데이터 복원:', parsedData);
+                setUserHistories(parsedData);
+              }
+            } catch (error) {
+              console.warn('사용자이력 임시저장 데이터 복원 실패:', error);
+            }
+          }
+        };
+
+        // 약간의 지연을 주어 컴포넌트가 완전히 마운트된 후 실행
+        timeoutId = setTimeout(() => {
+          loadUserHistories();
+        }, 100);
+
+        return () => {
+          isMounted = false;
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+        };
+      }, [mode, hardwareId]); // 하드웨어 ID 변경 시 다시 로드
+
+      // 이력 변경 시 부모 컴포넌트에 알림 - 사용자 액션에서만
+      useEffect(() => {
+        // 사용자 액션으로 인한 변경이고, 실제로 데이터가 변경된 경우에만 부모에게 알림
+        if (userActionRef.current && JSON.stringify(userHistories) !== JSON.stringify(prevUserHistoriesRef.current)) {
+          console.log('📤 부모 컴포넌트에 사용자이력 변경 알림');
+          onUserHistoriesChange(userHistories);
+          userActionRef.current = false;
+          prevUserHistoriesRef.current = [...userHistories];
+        }
+      }, [userHistories]); // onUserHistoriesChange 제거하여 순환 의존성 방지
+
+      const [selectedRows, setSelectedRows] = useState<string[]>([]);
+      const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
+      const [statusWarning, setStatusWarning] = useState<string>('');
+
+      // 페이지네이션 상태
+      const [currentPage, setCurrentPage] = useState(1);
+      const [itemsPerPage] = useState(7);
+
+      // 페이지네이션 계산
+      const totalPages = Math.ceil(userHistories.length / itemsPerPage);
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const currentItems = userHistories.slice(startIndex, endIndex);
+
+      // 사용자이력 임시저장 - 사용자 액션이 있을 때만 저장
+      useEffect(() => {
+        // 사용자 액션이 있거나 add 모드일 때만 임시저장
+        if (mode === 'add' || userActionRef.current) {
+          const dataString = JSON.stringify(userHistories);
+          if (dataString !== prevTempDataRef.current) {
+            try {
+              localStorage.setItem(tempStorageKey, dataString);
+              prevTempDataRef.current = dataString;
+              console.log('💾 사용자이력 임시저장 완료:', userHistories.length + '개');
+            } catch (error) {
+              console.warn('사용자이력 임시저장 실패:', error);
+            }
+          }
+        }
+      }, [userHistories, tempStorageKey, mode]);
+
+      // ref를 통해 임시저장 삭제 함수 노출
+      React.useImperativeHandle(
+        ref,
+        () => ({
+          clearTempData: () => {
+            try {
+              localStorage.removeItem(tempStorageKey);
+              console.log('💾 사용자이력 임시저장 데이터 삭제 완료');
+            } catch (error) {
+              console.warn('사용자이력 임시저장 데이터 삭제 실패:', error);
+            }
+          }
+        }),
+        [tempStorageKey]
+      );
+
+      // 페이지 변경 핸들러 (MUI Pagination 형식에 맞게 수정)
+      const handlePageChange = (event: React.ChangeEvent<unknown>, page: number) => {
+        setCurrentPage(page);
+      };
+
+      const handleCellClick = (id: string, field: string) => {
+        setEditingCell({ id, field });
+      };
+
+      const handleCellBlur = () => {
+        setEditingCell(null);
+      };
+
+      const handleAddHistory = useCallback(() => {
+        const newHistory: UserHistory = {
+          id: Date.now().toString(),
+          registrationDate: new Date().toISOString().split('T')[0],
+          userId: '',
+          userName: '',
+          department: '',
+          startDate: new Date().toISOString().split('T')[0],
+          endDate: '',
+          reason: '',
+          status: 'active'
+        };
+        setUserHistories((prev) => {
+          const newList = [newHistory, ...prev];
+          console.log('📝 행 추가:', newHistory.id, '총 개수:', newList.length);
+          userActionRef.current = true; // 사용자 액션 플래그 설정
+          return newList;
+        });
+      }, []);
+
+      const handleDeleteSelected = useCallback(() => {
+        setUserHistories((prev) => {
+          const filtered = prev.filter((h) => !selectedRows.includes(h.id));
+          console.log('🗑️ 행 삭제:', selectedRows.length, '개, 남은 개수:', filtered.length);
+          userActionRef.current = true; // 사용자 액션 플래그 설정
+          return filtered;
+        });
+        setSelectedRows([]);
+      }, [selectedRows]);
+
+      const handleEditHistory = useCallback((id: string, field: keyof UserHistory, value: string) => {
+        setUserHistories((prev) => {
+          // 상태를 '사용중'으로 변경하려는 경우 검증
+          if (field === 'status' && value === 'active') {
+            const hasActiveUser = prev.some((h) => h.id !== id && h.status === 'active');
+            if (hasActiveUser) {
+              setStatusWarning('이미 다른 사용자가 사용중입니다. 사용중인 항목은 하나만 선택 가능합니다.');
+              setTimeout(() => setStatusWarning(''), 3000);
+              return prev; // 상태 변경하지 않고 기존 상태 반환
+            }
+          }
+
+          setStatusWarning('');
+          const updated = prev.map((h) => (h.id === id ? { ...h, [field]: value } : h));
+          console.log('✏️ 행 편집:', id, field, value);
+          userActionRef.current = true; // 사용자 액션 플래그 설정
+          return updated;
+        });
+      }, []);
+
+      const handleSelectRow = (id: string) => {
+        if (selectedRows.includes(id)) {
+          setSelectedRows(selectedRows.filter((rowId) => rowId !== id));
+        } else {
+          setSelectedRows([...selectedRows, id]);
+        }
+      };
+
+      const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+        if (event.target.checked) {
+          setSelectedRows(userHistories.map((h) => h.id));
+        } else {
+          setSelectedRows([]);
+        }
+      };
+
+      const statusOptions = ['사용중', '종료'];
+      const statusColors: Record<string, string> = {
+        사용중: 'success',
+        종료: 'default'
+      };
+
+      // 컬럼 너비 및 높이 정의 (편집/읽기 모드 공통)
+      const columnWidths = {
+        checkbox: 50,
+        no: 60,
+        registrationDate: 100,
+        team: 100,
+        userName: 120,
+        reason: 150,
+        status: 100,
+        startDate: 100,
+        endDate: 100
+      };
+
+      const cellHeight = 56; // 고정 셀 높이
+
+      // 편집 가능한 셀 렌더링
+      const renderEditableCell = (history: UserHistory, field: string, value: string, options?: string[]) => {
+        const isEditing = editingCell?.id === history.id && editingCell?.field === field;
+        const fieldWidth = columnWidths[field as keyof typeof columnWidths] || 100;
+
+        if (isEditing) {
+          if (options) {
+            return (
+              <Select
+                value={value}
+                onChange={(e) => {
+                  const newValue = e.target.value;
+                  if (field === 'status') {
+                    const newStatus = newValue === '사용중' ? 'active' : 'inactive';
+                    handleEditHistory(history.id, 'status', newStatus);
+                  } else {
+                    handleEditHistory(history.id, field as keyof UserHistory, newValue);
+                  }
+                }}
+                onBlur={handleCellBlur}
+                size="small"
+                autoFocus
+                sx={{
+                  width: fieldWidth - 16,
+                  minWidth: fieldWidth - 16,
+                  height: 40, // 고정 높이
+                  '& .MuiSelect-select': {
+                    padding: '8px 14px',
+                    fontSize: '12px',
+                    lineHeight: '1.4'
+                  }
+                }}
+              >
+                {options.map((option) => (
+                  <MenuItem key={option} value={option}>
+                    {field === 'status' ? <Chip label={option} color={statusColors[option] as any} size="small" /> : option}
+                  </MenuItem>
+                ))}
+              </Select>
+            );
+          }
+
+          if (field === 'startDate' || field === 'endDate') {
+            return (
+              <TextField
+                type="date"
+                value={value || ''}
+                onChange={(e) => handleEditHistory(history.id, field as keyof UserHistory, e.target.value)}
+                onBlur={handleCellBlur}
+                size="small"
+                autoFocus
+                InputLabelProps={{
+                  shrink: true
+                }}
+                sx={{
+                  width: fieldWidth - 16,
+                  height: 40, // 고정 높이
+                  '& .MuiInputBase-root': {
+                    height: 40
+                  },
+                  '& .MuiInputBase-input': {
+                    fontSize: '12px',
+                    padding: '8px 14px'
+                  }
+                }}
+              />
+            );
+          }
+
+          return (
+            <TextField
+              value={value}
+              onChange={(e) => handleEditHistory(history.id, field as keyof UserHistory, e.target.value)}
+              onBlur={handleCellBlur}
+              size="small"
+              autoFocus
+              InputLabelProps={{ shrink: true }}
+              sx={{
+                width: fieldWidth - 16,
+                height: 40, // 고정 높이
+                '& .MuiInputBase-root': {
+                  height: 40
+                },
+                '& .MuiInputBase-input': {
+                  fontSize: '12px',
+                  padding: '8px 14px'
+                }
+              }}
+            />
+          );
+        }
+
+        // 읽기 모드
+        if (field === 'status') {
+          return (
+            <Box
+              sx={{
+                height: 40, // 고정 높이
+                display: 'flex',
+                alignItems: 'center',
+                cursor: 'pointer'
+              }}
+            >
+              <Chip
+                label={value}
+                color={statusColors[value] as any}
+                size="small"
+                sx={{
+                  '&:hover': { opacity: 0.8 },
+                  fontSize: '12px'
+                }}
+              />
+            </Box>
+          );
+        }
+
+        return (
+          <Box
             sx={{
-              width: fieldWidth - 16,
-              minWidth: fieldWidth - 16,
               height: 40, // 고정 높이
-              '& .MuiSelect-select': {
-                padding: '8px 14px',
-                fontSize: '12px',
-                lineHeight: '1.4'
+              display: 'flex',
+              alignItems: 'center',
+              cursor: 'pointer',
+              '&:hover': { bgcolor: 'grey.50' },
+              p: 0.5,
+              borderRadius: 1
+            }}
+          >
+            <Typography
+              variant="body2"
+              sx={{
+                fontSize: '12px'
+              }}
+            >
+              {value || '-'}
+            </Typography>
+          </Box>
+        );
+      };
+
+      return (
+        <Box sx={{ height: '650px', display: 'flex', flexDirection: 'column', p: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Typography variant="h6" sx={{ fontSize: '16px', fontWeight: 600 }}>
+              사용자 이력 관리
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button variant="outlined" color="error" onClick={handleDeleteSelected} disabled={selectedRows.length === 0} size="small">
+                삭제({selectedRows.length})
+              </Button>
+              <Button variant="contained" onClick={handleAddHistory} size="small" sx={{ fontSize: '12px' }}>
+                추가
+              </Button>
+            </Box>
+          </Box>
+
+          <TableContainer
+            sx={{
+              flex: 1,
+              overflowY: 'auto',
+              overflowX: 'auto',
+              '& .MuiTable-root': {
+                minWidth: 800
               }
             }}
           >
-            {options.map((option) => (
-              <MenuItem key={option} value={option}>
-                {field === 'status' ? <Chip label={option} color={statusColors[option] as any} size="small" /> : option}
-              </MenuItem>
-            ))}
-          </Select>
-        );
-      }
-
-      if (field === 'startDate' || field === 'endDate') {
-        return (
-          <TextField
-            type="date"
-            value={value || ''}
-            onChange={(e) => handleEditHistory(history.id, field as keyof UserHistory, e.target.value)}
-            onBlur={handleCellBlur}
-            size="small"
-            autoFocus
-            InputLabelProps={{
-              shrink: true
-            }}
-            sx={{
-              width: fieldWidth - 16,
-              height: 40, // 고정 높이
-              '& .MuiInputBase-root': {
-                height: 40
-              },
-              '& .MuiInputBase-input': {
-                fontSize: '12px',
-                padding: '8px 14px'
-              }
-            }}
-          />
-        );
-      }
-
-      return (
-        <TextField
-          value={value}
-          onChange={(e) => handleEditHistory(history.id, field as keyof UserHistory, e.target.value)}
-          onBlur={handleCellBlur}
-          size="small"
-          autoFocus
-          InputLabelProps={{ shrink: true }}
-          sx={{
-            width: fieldWidth - 16,
-            height: 40, // 고정 높이
-            '& .MuiInputBase-root': {
-              height: 40
-            },
-            '& .MuiInputBase-input': {
-              fontSize: '12px',
-              padding: '8px 14px'
-            }
-          }}
-        />
-      );
-    }
-
-    // 읽기 모드
-    if (field === 'status') {
-      return (
-        <Box
-          sx={{
-            height: 40, // 고정 높이
-            display: 'flex',
-            alignItems: 'center',
-            cursor: 'pointer'
-          }}
-        >
-          <Chip
-            label={value}
-            color={statusColors[value] as any}
-            size="small"
-            sx={{
-              '&:hover': { opacity: 0.8 },
-              fontSize: '12px'
-            }}
-          />
-        </Box>
-      );
-    }
-
-    return (
-      <Box
-        sx={{
-          height: 40, // 고정 높이
-          display: 'flex',
-          alignItems: 'center',
-          cursor: 'pointer',
-          '&:hover': { bgcolor: 'grey.50' },
-          p: 0.5,
-          borderRadius: 1
-        }}
-      >
-        <Typography
-          variant="body2"
-          sx={{
-            fontSize: '12px'
-          }}
-        >
-          {value || '-'}
-        </Typography>
-      </Box>
-    );
-  };
-
-  return (
-    <Box sx={{ height: '650px', display: 'flex', flexDirection: 'column', p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h6" sx={{ fontSize: '16px', fontWeight: 600 }}>
-          사용자 이력 관리
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button variant="outlined" color="error" onClick={handleDeleteSelected} disabled={selectedRows.length === 0} size="small">
-            삭제({selectedRows.length})
-          </Button>
-          <Button variant="contained" onClick={handleAddHistory} size="small" sx={{ fontSize: '12px' }}>
-            추가
-          </Button>
-        </Box>
-      </Box>
-
-      <TableContainer
-        sx={{
-          flex: 1,
-          overflowY: 'auto',
-          overflowX: 'auto',
-          '& .MuiTable-root': {
-            minWidth: 800
-          }
-        }}
-      >
-        <Table size="small">
-          <TableHead>
-            <TableRow sx={{ backgroundColor: 'grey.50' }}>
-              <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
-                <Checkbox
-                  checked={selectedRows.length === userHistories.length && userHistories.length > 0}
-                  onChange={handleSelectAll}
-                  color="primary"
-                  size="small"
-                  sx={{
-                    transform: 'scale(0.7)',
-                    '&.Mui-checked': {
-                      color: '#1976d2'
-                    }
-                  }}
-                />
-              </TableCell>
-              <TableCell sx={{ width: columnWidths.no, fontWeight: 600 }}>NO</TableCell>
-              <TableCell sx={{ width: columnWidths.registrationDate, fontWeight: 600 }}>등록일</TableCell>
-              <TableCell sx={{ width: columnWidths.team, fontWeight: 600 }}>팀</TableCell>
-              <TableCell sx={{ width: columnWidths.userName, fontWeight: 600 }}>사용자</TableCell>
-              <TableCell sx={{ width: columnWidths.reason, fontWeight: 600 }}>사유</TableCell>
-              <TableCell sx={{ width: columnWidths.status, fontWeight: 600 }}>사용상태</TableCell>
-              <TableCell sx={{ width: columnWidths.startDate, fontWeight: 600 }}>시작일</TableCell>
-              <TableCell sx={{ width: columnWidths.endDate, fontWeight: 600 }}>종료일</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {currentItems.map((history, index) => (
-              <TableRow
-                key={history.id}
-                hover
-                sx={{
-                  height: cellHeight,
-                  '&:hover': { backgroundColor: 'action.hover' }
-                }}
-              >
-                <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
-                  <Checkbox
-                    checked={selectedRows.includes(history.id)}
-                    onChange={() => handleSelectRow(history.id)}
-                    color="primary"
-                    size="small"
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ backgroundColor: 'grey.50' }}>
+                  <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
+                    <Checkbox
+                      checked={selectedRows.length === userHistories.length && userHistories.length > 0}
+                      onChange={handleSelectAll}
+                      color="primary"
+                      size="small"
+                      sx={{
+                        transform: 'scale(0.7)',
+                        '&.Mui-checked': {
+                          color: '#1976d2'
+                        }
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell sx={{ width: columnWidths.no, fontWeight: 600 }}>NO</TableCell>
+                  <TableCell sx={{ width: columnWidths.registrationDate, fontWeight: 600 }}>등록일</TableCell>
+                  <TableCell sx={{ width: columnWidths.team, fontWeight: 600 }}>팀</TableCell>
+                  <TableCell sx={{ width: columnWidths.userName, fontWeight: 600 }}>사용자</TableCell>
+                  <TableCell sx={{ width: columnWidths.reason, fontWeight: 600 }}>사유</TableCell>
+                  <TableCell sx={{ width: columnWidths.status, fontWeight: 600 }}>사용상태</TableCell>
+                  <TableCell sx={{ width: columnWidths.startDate, fontWeight: 600 }}>시작일</TableCell>
+                  <TableCell sx={{ width: columnWidths.endDate, fontWeight: 600 }}>종료일</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {currentItems.map((history, index) => (
+                  <TableRow
+                    key={history.id}
+                    hover
                     sx={{
-                      transform: 'scale(0.7)',
-                      '&.Mui-checked': {
-                        color: '#1976d2'
-                      }
+                      height: cellHeight,
+                      '&:hover': { backgroundColor: 'action.hover' }
                     }}
-                  />
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.no }}>{userHistories.length - startIndex - index}</TableCell>
-                <TableCell sx={{ width: columnWidths.registrationDate }} onClick={() => handleCellClick(history.id, 'registrationDate')}>
-                  {renderEditableCell(history, 'registrationDate', history.registrationDate)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.team }} onClick={() => handleCellClick(history.id, 'department')}>
-                  {renderEditableCell(history, 'department', history.department)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.userName }} onClick={() => handleCellClick(history.id, 'userName')}>
-                  {renderEditableCell(history, 'userName', history.userName)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.reason }} onClick={() => handleCellClick(history.id, 'reason')}>
-                  {renderEditableCell(history, 'reason', history.reason)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.status }} onClick={() => handleCellClick(history.id, 'status')}>
-                  {renderEditableCell(history, 'status', history.status === 'active' ? '사용중' : '종료', statusOptions)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.startDate }} onClick={() => handleCellClick(history.id, 'startDate')}>
-                  {renderEditableCell(history, 'startDate', history.startDate)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.endDate }} onClick={() => handleCellClick(history.id, 'endDate')}>
-                  {renderEditableCell(history, 'endDate', history.endDate)}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+                  >
+                    <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
+                      <Checkbox
+                        checked={selectedRows.includes(history.id)}
+                        onChange={() => handleSelectRow(history.id)}
+                        color="primary"
+                        size="small"
+                        sx={{
+                          transform: 'scale(0.7)',
+                          '&.Mui-checked': {
+                            color: '#1976d2'
+                          }
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ width: columnWidths.no }}>{userHistories.length - startIndex - index}</TableCell>
+                    <TableCell
+                      sx={{ width: columnWidths.registrationDate }}
+                      onClick={() => handleCellClick(history.id, 'registrationDate')}
+                    >
+                      {renderEditableCell(history, 'registrationDate', history.registrationDate)}
+                    </TableCell>
+                    <TableCell sx={{ width: columnWidths.team }} onClick={() => handleCellClick(history.id, 'department')}>
+                      {renderEditableCell(history, 'department', history.department)}
+                    </TableCell>
+                    <TableCell sx={{ width: columnWidths.userName }} onClick={() => handleCellClick(history.id, 'userName')}>
+                      {renderEditableCell(history, 'userName', history.userName)}
+                    </TableCell>
+                    <TableCell sx={{ width: columnWidths.reason }} onClick={() => handleCellClick(history.id, 'reason')}>
+                      {renderEditableCell(history, 'reason', history.reason)}
+                    </TableCell>
+                    <TableCell sx={{ width: columnWidths.status }} onClick={() => handleCellClick(history.id, 'status')}>
+                      {renderEditableCell(history, 'status', history.status === 'active' ? '사용중' : '종료', statusOptions)}
+                    </TableCell>
+                    <TableCell sx={{ width: columnWidths.startDate }} onClick={() => handleCellClick(history.id, 'startDate')}>
+                      {renderEditableCell(history, 'startDate', history.startDate)}
+                    </TableCell>
+                    <TableCell sx={{ width: columnWidths.endDate }} onClick={() => handleCellClick(history.id, 'endDate')}>
+                      {renderEditableCell(history, 'endDate', history.endDate)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
 
-      {/* 페이지네이션 - 하단 고정 */}
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          mt: 'auto',
-          pt: 2,
-          px: 2,
-          borderTop: '1px solid',
-          borderColor: 'divider',
-          backgroundColor: 'background.paper',
-          position: 'sticky',
-          bottom: 0
-        }}
-      >
-        <Typography variant="body2" color="text.secondary">
-          {userHistories.length > 0
-            ? `${startIndex + 1}-${Math.min(endIndex, userHistories.length)} of ${userHistories.length}`
-            : '0-0 of 0'}
-        </Typography>
-        {totalPages > 1 && (
-          <Pagination
-            count={totalPages}
-            page={currentPage}
-            onChange={handlePageChange}
-            color="primary"
-            size="small"
-            showFirstButton
-            showLastButton
+          {/* 페이지네이션 - 하단 고정 */}
+          <Box
             sx={{
-              '& .MuiPaginationItem-root': {
-                fontSize: '0.875rem',
-                minWidth: '32px',
-                height: '32px',
-                borderRadius: '4px'
-              },
-              '& .MuiPaginationItem-page.Mui-selected': {
-                backgroundColor: 'primary.main',
-                color: 'white !important',
-                borderRadius: '4px',
-                fontWeight: 500,
-                '&:hover': {
-                  backgroundColor: 'primary.dark',
-                  color: 'white !important'
-                }
-              },
-              '& .MuiPaginationItem-page': {
-                borderRadius: '4px',
-                '&:hover': {
-                  backgroundColor: 'grey.100'
-                }
-              }
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              mt: 'auto',
+              pt: 2,
+              px: 2,
+              borderTop: '1px solid',
+              borderColor: 'divider',
+              backgroundColor: 'background.paper',
+              position: 'sticky',
+              bottom: 0
             }}
-          />
-        )}
-      </Box>
+          >
+            <Typography variant="body2" color="text.secondary">
+              {userHistories.length > 0
+                ? `${startIndex + 1}-${Math.min(endIndex, userHistories.length)} of ${userHistories.length}`
+                : '0-0 of 0'}
+            </Typography>
+            {totalPages > 1 && (
+              <Pagination
+                count={totalPages}
+                page={currentPage}
+                onChange={handlePageChange}
+                color="primary"
+                size="small"
+                showFirstButton
+                showLastButton
+                sx={{
+                  '& .MuiPaginationItem-root': {
+                    fontSize: '0.875rem',
+                    minWidth: '32px',
+                    height: '32px',
+                    borderRadius: '4px'
+                  },
+                  '& .MuiPaginationItem-page.Mui-selected': {
+                    backgroundColor: 'primary.main',
+                    color: 'white !important',
+                    borderRadius: '4px',
+                    fontWeight: 500,
+                    '&:hover': {
+                      backgroundColor: 'primary.dark',
+                      color: 'white !important'
+                    }
+                  },
+                  '& .MuiPaginationItem-page': {
+                    borderRadius: '4px',
+                    '&:hover': {
+                      backgroundColor: 'grey.100'
+                    }
+                  }
+                }}
+              />
+            )}
+          </Box>
 
-      {/* 경고 메시지 */}
-      {statusWarning && (
-        <Alert
-          severity="warning"
-          sx={{
-            mt: 2,
-            mx: 3,
-            mb: 2,
-            animation: 'fadeIn 0.3s ease-in'
-          }}
-        >
-          {statusWarning}
-        </Alert>
-      )}
-    </Box>
-  );
-}));
+          {/* 경고 메시지 */}
+          {statusWarning && (
+            <Alert
+              severity="warning"
+              sx={{
+                mt: 2,
+                mx: 3,
+                mb: 2,
+                animation: 'fadeIn 0.3s ease-in'
+              }}
+            >
+              {statusWarning}
+            </Alert>
+          )}
+        </Box>
+      );
+    }
+  )
+);
 
 // useImperativeHandle을 사용하여 ref 함수 노출
 UserHistoryTab.displayName = 'UserHistoryTab';
 
 // 구매/수리 이력 탭 컴포넌트
-const MaintenanceHistoryTab = memo(React.forwardRef<MaintenanceHistoryTabRef, {
-  hardwareId: number;
-  mode: 'add' | 'edit';
-  maintenanceHistories: MaintenanceHistory[];
-  onMaintenanceHistoriesChange: (histories: MaintenanceHistory[]) => void;
-}>(({
-  hardwareId,
-  mode,
-  maintenanceHistories: initialHistories,
-  onMaintenanceHistoriesChange
-}, ref) => {
-  const { getMaintenanceHistories, convertToMaintenanceHistory } = useSupabaseHardwareHistory();
-
-  // 사용자 액션 추적을 위한 ref들을 컴포넌트 최상단에 선언
-  const userActionRef = useRef(false);
-  const loadedRef = useRef(false);
-  const initializedRef = useRef(false);
-  const prevMaintenanceHistoriesRef = useRef<MaintenanceHistory[]>([]);
-  const prevTempDataRef = useRef<string>('');
-
-  // 임시저장 키 생성
-  const tempMaintenanceKey = useMemo(() => {
-    return `hardware_maintenance_history_${mode}_${hardwareId || 'new'}`;
-  }, [mode, hardwareId]);
-
-  // 로컬 구매/수리이력 상태 - DB 연동을 위해 초기값으로 props 사용
-  const [maintenanceHistories, setMaintenanceHistories] = useState<MaintenanceHistory[]>(initialHistories);
-
-  // 하드웨어 ID가 변경되면 모든 상태 초기화
-  useEffect(() => {
-    console.log('🔄 하드웨어 ID 변경됨, 모든 상태 초기화:', hardwareId);
-    loadedRef.current = false;
-    initializedRef.current = false;
-    userActionRef.current = false;
-    // 편집 모드에서는 UI 초기화
-    if (mode === 'edit') {
-      setMaintenanceHistories([]);
+const MaintenanceHistoryTab = memo(
+  React.forwardRef<
+    MaintenanceHistoryTabRef,
+    {
+      hardwareId: number;
+      mode: 'add' | 'edit';
+      maintenanceHistories: MaintenanceHistory[];
+      onMaintenanceHistoriesChange: (histories: MaintenanceHistory[]) => void;
     }
-  }, [hardwareId, mode]);
+  >(({ hardwareId, mode, maintenanceHistories: initialHistories, onMaintenanceHistoriesChange }, ref) => {
+    const { getMaintenanceHistories, convertToMaintenanceHistory } = useSupabaseHardwareHistory();
 
-  // DB에서 구매/수리이력 로드 (편집 모드인 경우)
-  useEffect(() => {
-    let isMounted = true;
-    let timeoutId: NodeJS.Timeout;
+    // 사용자 액션 추적을 위한 ref들을 컴포넌트 최상단에 선언
+    const userActionRef = useRef(false);
+    const loadedRef = useRef(false);
+    const initializedRef = useRef(false);
+    const prevMaintenanceHistoriesRef = useRef<MaintenanceHistory[]>([]);
+    const prevTempDataRef = useRef<string>('');
 
-    const loadMaintenanceHistories = async () => {
-      // 사용자 액션 중인 경우 건너뛰기
-      if (userActionRef.current) {
-        console.log('⏸️ 사용자 액션 중이므로 DB 로드 건너뛰기');
-        return;
-      }
+    // 임시저장 키 생성
+    const tempMaintenanceKey = useMemo(() => {
+      return `hardware_maintenance_history_${mode}_${hardwareId || 'new'}`;
+    }, [mode, hardwareId]);
 
-      if (mode === 'edit' && hardwareId && !loadedRef.current && isMounted) {
-        console.log('🔍 하드웨어 구매/수리 이력 조회 시작:', hardwareId);
-        loadedRef.current = true; // 로드 시작 표시
+    // 로컬 구매/수리이력 상태 - DB 연동을 위해 초기값으로 props 사용
+    const [maintenanceHistories, setMaintenanceHistories] = useState<MaintenanceHistory[]>(initialHistories);
 
-        try {
-          console.log('📞 getMaintenanceHistories 호출 전');
-          const historyData = await getMaintenanceHistories(hardwareId);
-          console.log('📞 getMaintenanceHistories 응답:', historyData?.length || 0, '개');
-
-          if (isMounted && !userActionRef.current) {
-            const convertedData = historyData.map(convertToMaintenanceHistory);
-            console.log('🔄 DB에서 로드한 구매/수리이력:', convertedData.length, '개');
-            console.log('📋 변환된 데이터 상세:', convertedData);
-
-            // 상태 업데이트
-            setMaintenanceHistories(convertedData);
-            console.log('✅ setMaintenanceHistories 호출 완료');
-
-            // 부모에게 알림
-            onMaintenanceHistoriesChange(convertedData);
-            console.log('✅ onMaintenanceHistoriesChange 호출 완료');
-          }
-        } catch (error) {
-          if (isMounted) {
-            console.warn('⚠️ 구매/수리이력 로드 중 오류:', error);
-            setMaintenanceHistories([]);
-          }
-        }
-      } else if (mode === 'add' && isMounted && !loadedRef.current) {
-        loadedRef.current = true;
-        // add 모드에서는 임시저장 데이터 복원 시도
-        try {
-          const tempData = localStorage.getItem(tempStorageKey);
-          if (tempData) {
-            const parsedData = JSON.parse(tempData);
-            console.log('📋 구매/수리이력 임시저장 데이터 복원:', parsedData);
-            setMaintenanceHistories(parsedData);
-          }
-        } catch (error) {
-          console.warn('구매/수리이력 임시저장 데이터 복원 실패:', error);
-        }
-      }
-    };
-
-    // 약간의 지연을 주어 컴포넌트가 완전히 마운트된 후 실행
-    timeoutId = setTimeout(() => {
-      loadMaintenanceHistories();
-    }, 100);
-
-    return () => {
-      isMounted = false;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-    };
-  }, [mode, hardwareId]); // 하드웨어 ID 변경 시 다시 로드
-
-  // 이력 변경 시 부모 컴포넌트에 알림 - 사용자 액션에서만
-  useEffect(() => {
-    // 사용자 액션으로 인한 변경이고, 실제로 데이터가 변경된 경우에만 부모에게 알림
-    if (userActionRef.current &&
-        JSON.stringify(maintenanceHistories) !== JSON.stringify(prevMaintenanceHistoriesRef.current)) {
-      console.log('📤 부모 컴포넌트에 구매/수리이력 변경 알림');
-      onMaintenanceHistoriesChange(maintenanceHistories);
+    // 하드웨어 ID가 변경되면 모든 상태 초기화
+    useEffect(() => {
+      console.log('🔄 하드웨어 ID 변경됨, 모든 상태 초기화:', hardwareId);
+      loadedRef.current = false;
+      initializedRef.current = false;
       userActionRef.current = false;
-      prevMaintenanceHistoriesRef.current = [...maintenanceHistories];
-    }
-  }, [maintenanceHistories]); // onMaintenanceHistoriesChange 제거하여 순환 의존성 방지
+      // 편집 모드에서는 UI 초기화
+      if (mode === 'edit') {
+        setMaintenanceHistories([]);
+      }
+    }, [hardwareId, mode]);
 
-  // 구매/수리이력 임시저장 - 사용자 액션이 있을 때만 저장
-  useEffect(() => {
-    // 사용자 액션이 있거나 add 모드일 때만 임시저장
-    if (userActionRef.current || mode === 'add') {
-      try {
-        if (maintenanceHistories.length > 0) {
-          localStorage.setItem(tempMaintenanceKey, JSON.stringify(maintenanceHistories));
-          console.log('💾 구매/수리이력 임시저장 완료:', maintenanceHistories.length + '개');
+    // DB에서 구매/수리이력 로드 (편집 모드인 경우)
+    useEffect(() => {
+      let isMounted = true;
+      let timeoutId: NodeJS.Timeout;
+
+      const loadMaintenanceHistories = async () => {
+        // 사용자 액션 중인 경우 건너뛰기
+        if (userActionRef.current) {
+          console.log('⏸️ 사용자 액션 중이므로 DB 로드 건너뛰기');
+          return;
         }
-      } catch (error) {
-        console.warn('구매/수리이력 임시저장 실패:', error);
+
+        if (mode === 'edit' && hardwareId && !loadedRef.current && isMounted) {
+          console.log('🔍 하드웨어 구매/수리 이력 조회 시작:', hardwareId);
+          loadedRef.current = true; // 로드 시작 표시
+
+          try {
+            console.log('📞 getMaintenanceHistories 호출 전');
+            const historyData = await getMaintenanceHistories(hardwareId);
+            console.log('📞 getMaintenanceHistories 응답:', historyData?.length || 0, '개');
+
+            if (isMounted && !userActionRef.current) {
+              const convertedData = historyData.map(convertToMaintenanceHistory);
+              console.log('🔄 DB에서 로드한 구매/수리이력:', convertedData.length, '개');
+              console.log('📋 변환된 데이터 상세:', convertedData);
+
+              // 상태 업데이트
+              setMaintenanceHistories(convertedData);
+              console.log('✅ setMaintenanceHistories 호출 완료');
+
+              // 부모에게 알림
+              onMaintenanceHistoriesChange(convertedData);
+              console.log('✅ onMaintenanceHistoriesChange 호출 완료');
+            }
+          } catch (error) {
+            if (isMounted) {
+              console.warn('⚠️ 구매/수리이력 로드 중 오류:', error);
+              setMaintenanceHistories([]);
+            }
+          }
+        } else if (mode === 'add' && isMounted && !loadedRef.current) {
+          loadedRef.current = true;
+          // add 모드에서는 임시저장 데이터 복원 시도
+          try {
+            const tempData = localStorage.getItem(tempStorageKey);
+            if (tempData) {
+              const parsedData = JSON.parse(tempData);
+              console.log('📋 구매/수리이력 임시저장 데이터 복원:', parsedData);
+              setMaintenanceHistories(parsedData);
+            }
+          } catch (error) {
+            console.warn('구매/수리이력 임시저장 데이터 복원 실패:', error);
+          }
+        }
+      };
+
+      // 약간의 지연을 주어 컴포넌트가 완전히 마운트된 후 실행
+      timeoutId = setTimeout(() => {
+        loadMaintenanceHistories();
+      }, 100);
+
+      return () => {
+        isMounted = false;
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+      };
+    }, [mode, hardwareId]); // 하드웨어 ID 변경 시 다시 로드
+
+    // 이력 변경 시 부모 컴포넌트에 알림 - 사용자 액션에서만
+    useEffect(() => {
+      // 사용자 액션으로 인한 변경이고, 실제로 데이터가 변경된 경우에만 부모에게 알림
+      if (userActionRef.current && JSON.stringify(maintenanceHistories) !== JSON.stringify(prevMaintenanceHistoriesRef.current)) {
+        console.log('📤 부모 컴포넌트에 구매/수리이력 변경 알림');
+        onMaintenanceHistoriesChange(maintenanceHistories);
+        userActionRef.current = false;
+        prevMaintenanceHistoriesRef.current = [...maintenanceHistories];
       }
-    }
-  }, [maintenanceHistories, tempMaintenanceKey, mode]);
+    }, [maintenanceHistories]); // onMaintenanceHistoriesChange 제거하여 순환 의존성 방지
 
-  // ref를 통해 임시저장 삭제 함수 노출
-  useImperativeHandle(ref, () => ({
-    ...((ref as any)?.current || {}),
-    clearMaintenanceTempData: () => {
-      try {
-        localStorage.removeItem(tempMaintenanceKey);
-        console.log('💾 구매/수리이력 임시저장 데이터 삭제 완료');
-      } catch (error) {
-        console.warn('구매/수리이력 임시저장 데이터 삭제 실패:', error);
+    // 구매/수리이력 임시저장 - 사용자 액션이 있을 때만 저장
+    useEffect(() => {
+      // 사용자 액션이 있거나 add 모드일 때만 임시저장
+      if (userActionRef.current || mode === 'add') {
+        try {
+          if (maintenanceHistories.length > 0) {
+            localStorage.setItem(tempMaintenanceKey, JSON.stringify(maintenanceHistories));
+            console.log('💾 구매/수리이력 임시저장 완료:', maintenanceHistories.length + '개');
+          }
+        } catch (error) {
+          console.warn('구매/수리이력 임시저장 실패:', error);
+        }
       }
-    }
-  }), [tempMaintenanceKey]);
+    }, [maintenanceHistories, tempMaintenanceKey, mode]);
 
-  const [selectedRows, setSelectedRows] = useState<string[]>([]);
-  const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
+    // ref를 통해 임시저장 삭제 함수 노출
+    useImperativeHandle(
+      ref,
+      () => ({
+        ...((ref as any)?.current || {}),
+        clearMaintenanceTempData: () => {
+          try {
+            localStorage.removeItem(tempMaintenanceKey);
+            console.log('💾 구매/수리이력 임시저장 데이터 삭제 완료');
+          } catch (error) {
+            console.warn('구매/수리이력 임시저장 데이터 삭제 실패:', error);
+          }
+        }
+      }),
+      [tempMaintenanceKey]
+    );
 
-  // 페이지네이션 상태
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(7);
+    const [selectedRows, setSelectedRows] = useState<string[]>([]);
+    const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
 
-  // 페이지네이션 계산
-  const totalPages = Math.ceil(maintenanceHistories.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentItems = maintenanceHistories.slice(startIndex, endIndex);
+    // 페이지네이션 상태
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(7);
 
-  // 페이지 변경 핸들러 (MUI Pagination 형식에 맞게 수정)
-  const handlePageChange = (event: React.ChangeEvent<unknown>, page: number) => {
-    setCurrentPage(page);
-  };
+    // 페이지네이션 계산
+    const totalPages = Math.ceil(maintenanceHistories.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const currentItems = maintenanceHistories.slice(startIndex, endIndex);
 
-  const handleCellClick = (id: string, field: string) => {
-    setEditingCell({ id, field });
-  };
-
-  const handleCellBlur = () => {
-    setEditingCell(null);
-  };
-
-  const handleAddHistory = () => {
-    const newHistory: MaintenanceHistory = {
-      id: Date.now().toString(),
-      registrationDate: new Date().toISOString().split('T')[0],
-      type: 'purchase',
-      content: '',
-      vendor: '',
-      amount: 0,
-      registrant: '',
-      status: '진행중',
-      startDate: new Date().toISOString().split('T')[0],
-      completionDate: ''
+    // 페이지 변경 핸들러 (MUI Pagination 형식에 맞게 수정)
+    const handlePageChange = (event: React.ChangeEvent<unknown>, page: number) => {
+      setCurrentPage(page);
     };
-    setMaintenanceHistories(prev => {
-      const newList = [newHistory, ...prev];
-      userActionRef.current = true; // 사용자 액션 플래그 설정
-      return newList;
-    });
-  };
 
-  const handleDeleteSelected = () => {
-    setMaintenanceHistories(prev => {
-      const newList = prev.filter((h) => !selectedRows.includes(h.id));
-      userActionRef.current = true; // 사용자 액션 플래그 설정
-      return newList;
-    });
-    setSelectedRows([]);
-  };
+    const handleCellClick = (id: string, field: string) => {
+      setEditingCell({ id, field });
+    };
 
-  const handleEditHistory = (id: string, field: keyof MaintenanceHistory, value: string | number) => {
-    setMaintenanceHistories(prev => {
-      const newList = prev.map((h) => (h.id === id ? { ...h, [field]: value } : h));
-      userActionRef.current = true; // 사용자 액션 플래그 설정
-      return newList;
-    });
-  };
+    const handleCellBlur = () => {
+      setEditingCell(null);
+    };
 
-  const handleSelectRow = (id: string) => {
-    if (selectedRows.includes(id)) {
-      setSelectedRows(selectedRows.filter((rowId) => rowId !== id));
-    } else {
-      setSelectedRows([...selectedRows, id]);
-    }
-  };
+    const handleAddHistory = () => {
+      const newHistory: MaintenanceHistory = {
+        id: Date.now().toString(),
+        registrationDate: new Date().toISOString().split('T')[0],
+        type: 'purchase',
+        content: '',
+        vendor: '',
+        amount: 0,
+        registrant: '',
+        status: '진행중',
+        startDate: new Date().toISOString().split('T')[0],
+        completionDate: ''
+      };
+      setMaintenanceHistories((prev) => {
+        const newList = [newHistory, ...prev];
+        userActionRef.current = true; // 사용자 액션 플래그 설정
+        return newList;
+      });
+    };
 
-  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.checked) {
-      setSelectedRows(maintenanceHistories.map((h) => h.id));
-    } else {
+    const handleDeleteSelected = () => {
+      setMaintenanceHistories((prev) => {
+        const newList = prev.filter((h) => !selectedRows.includes(h.id));
+        userActionRef.current = true; // 사용자 액션 플래그 설정
+        return newList;
+      });
       setSelectedRows([]);
-    }
-  };
+    };
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'purchase':
-        return { backgroundColor: '#E3F2FD', color: '#000000' }; // 파스텔 블루
-      case 'repair':
-        return { backgroundColor: '#FFEBEE', color: '#000000' }; // 파스텔 레드
-      case 'other':
-        return { backgroundColor: '#F3E5F5', color: '#000000' }; // 파스텔 퍼플
-      default:
-        return { backgroundColor: '#F5F5F5', color: '#000000' }; // 연한 그레이
-    }
-  };
+    const handleEditHistory = (id: string, field: keyof MaintenanceHistory, value: string | number) => {
+      setMaintenanceHistories((prev) => {
+        const newList = prev.map((h) => (h.id === id ? { ...h, [field]: value } : h));
+        userActionRef.current = true; // 사용자 액션 플래그 설정
+        return newList;
+      });
+    };
 
-  const getTypeLabel = (type: string) => {
-    switch (type) {
-      case 'purchase':
-        return '구매';
-      case 'repair':
-        return '수리';
-      case 'other':
-        return '기타';
-      default:
-        return type;
-    }
-  };
-
-  const typeOptions = ['구매', '수리', '기타'];
-  const statusOptions = ['대기', '진행', '완료', '취소'];
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case '대기':
-        return { backgroundColor: '#FFF8E1', color: '#000000' }; // 파스텔 옐로우
-      case '진행':
-      case '진행중':
-        return { backgroundColor: '#E0F2F1', color: '#000000' }; // 파스텔 틸
-      case '완료':
-        return { backgroundColor: '#E8F5E8', color: '#000000' }; // 파스텔 그린
-      case '취소':
-        return { backgroundColor: '#FFEBEE', color: '#000000' }; // 파스텔 레드
-      default:
-        return { backgroundColor: '#F5F5F5', color: '#000000' }; // 연한 그레이
-    }
-  };
-
-  // 컬럼 너비 및 높이 정의 (편집/읽기 모드 공통)
-  const columnWidths = {
-    checkbox: 50,
-    no: 60,
-    registrationDate: 100,
-    type: 100,
-    content: 180,
-    vendor: 120,
-    amount: 120,
-    registrant: 100,
-    status: 80,
-    startDate: 100,
-    completionDate: 100
-  };
-
-  const cellHeight = 56; // 고정 셀 높이
-
-  // 편집 가능한 셀 렌더링
-  const renderEditableCell = (history: MaintenanceHistory, field: string, value: string | number, options?: string[]) => {
-    const isEditing = editingCell?.id === history.id && editingCell?.field === field;
-    const fieldWidth = columnWidths[field as keyof typeof columnWidths] || 100;
-
-    if (isEditing) {
-      if (options) {
-        return (
-          <Select
-            value={field === 'type' ? getTypeLabel(history.type) : value}
-            onChange={(e) => {
-              const newValue = e.target.value;
-              if (field === 'type') {
-                const newType = newValue === '구매' ? 'purchase' : 'repair';
-                handleEditHistory(history.id, 'type', newType);
-              } else {
-                handleEditHistory(history.id, field as keyof MaintenanceHistory, newValue);
-              }
-            }}
-            onBlur={handleCellBlur}
-            size="small"
-            autoFocus
-            sx={{
-              width: fieldWidth - 16,
-              minWidth: fieldWidth - 16,
-              height: 40, // 고정 높이
-              '& .MuiSelect-select': {
-                padding: '8px 14px',
-                fontSize: '12px',
-                lineHeight: '1.4'
-              }
-            }}
-          >
-            {options.map((option) => (
-              <MenuItem key={option} value={option}>
-                {field === 'type' ? (
-                  <Chip label={option} color={getTypeColor(option === '구매' ? 'purchase' : 'repair') as any} size="small" />
-                ) : field === 'status' ? (
-                  <Chip label={option} color={statusColors[option] as any} size="small" />
-                ) : (
-                  option
-                )}
-              </MenuItem>
-            ))}
-          </Select>
-        );
+    const handleSelectRow = (id: string) => {
+      if (selectedRows.includes(id)) {
+        setSelectedRows(selectedRows.filter((rowId) => rowId !== id));
+      } else {
+        setSelectedRows([...selectedRows, id]);
       }
+    };
 
-      if (field === 'date') {
+    const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+      if (event.target.checked) {
+        setSelectedRows(maintenanceHistories.map((h) => h.id));
+      } else {
+        setSelectedRows([]);
+      }
+    };
+
+    const getTypeColor = (type: string) => {
+      switch (type) {
+        case 'purchase':
+          return { backgroundColor: '#E3F2FD', color: '#000000' }; // 파스텔 블루
+        case 'repair':
+          return { backgroundColor: '#FFEBEE', color: '#000000' }; // 파스텔 레드
+        case 'other':
+          return { backgroundColor: '#F3E5F5', color: '#000000' }; // 파스텔 퍼플
+        default:
+          return { backgroundColor: '#F5F5F5', color: '#000000' }; // 연한 그레이
+      }
+    };
+
+    const getTypeLabel = (type: string) => {
+      switch (type) {
+        case 'purchase':
+          return '구매';
+        case 'repair':
+          return '수리';
+        case 'other':
+          return '기타';
+        default:
+          return type;
+      }
+    };
+
+    const typeOptions = ['구매', '수리', '기타'];
+    const statusOptions = ['대기', '진행', '완료', '취소'];
+    const getStatusColor = (status: string) => {
+      switch (status) {
+        case '대기':
+          return { backgroundColor: '#FFF8E1', color: '#000000' }; // 파스텔 옐로우
+        case '진행':
+        case '진행중':
+          return { backgroundColor: '#E0F2F1', color: '#000000' }; // 파스텔 틸
+        case '완료':
+          return { backgroundColor: '#E8F5E8', color: '#000000' }; // 파스텔 그린
+        case '취소':
+          return { backgroundColor: '#FFEBEE', color: '#000000' }; // 파스텔 레드
+        default:
+          return { backgroundColor: '#F5F5F5', color: '#000000' }; // 연한 그레이
+      }
+    };
+
+    // 컬럼 너비 및 높이 정의 (편집/읽기 모드 공통)
+    const columnWidths = {
+      checkbox: 50,
+      no: 60,
+      registrationDate: 100,
+      type: 100,
+      content: 180,
+      vendor: 120,
+      amount: 120,
+      registrant: 100,
+      status: 80,
+      startDate: 100,
+      completionDate: 100
+    };
+
+    const cellHeight = 56; // 고정 셀 높이
+
+    // 편집 가능한 셀 렌더링
+    const renderEditableCell = (history: MaintenanceHistory, field: string, value: string | number, options?: string[]) => {
+      const isEditing = editingCell?.id === history.id && editingCell?.field === field;
+      const fieldWidth = columnWidths[field as keyof typeof columnWidths] || 100;
+
+      if (isEditing) {
+        if (options) {
+          return (
+            <Select
+              value={field === 'type' ? getTypeLabel(history.type) : value}
+              onChange={(e) => {
+                const newValue = e.target.value;
+                if (field === 'type') {
+                  const newType = newValue === '구매' ? 'purchase' : 'repair';
+                  handleEditHistory(history.id, 'type', newType);
+                } else {
+                  handleEditHistory(history.id, field as keyof MaintenanceHistory, newValue);
+                }
+              }}
+              onBlur={handleCellBlur}
+              size="small"
+              autoFocus
+              sx={{
+                width: fieldWidth - 16,
+                minWidth: fieldWidth - 16,
+                height: 40, // 고정 높이
+                '& .MuiSelect-select': {
+                  padding: '8px 14px',
+                  fontSize: '12px',
+                  lineHeight: '1.4'
+                }
+              }}
+            >
+              {options.map((option) => (
+                <MenuItem key={option} value={option}>
+                  {field === 'type' ? (
+                    <Chip label={option} color={getTypeColor(option === '구매' ? 'purchase' : 'repair') as any} size="small" />
+                  ) : field === 'status' ? (
+                    <Chip label={option} color={statusColors[option] as any} size="small" />
+                  ) : (
+                    option
+                  )}
+                </MenuItem>
+              ))}
+            </Select>
+          );
+        }
+
+        if (field === 'date') {
+          return (
+            <TextField
+              type="date"
+              value={(value as string) || ''}
+              onChange={(e) => handleEditHistory(history.id, field as keyof MaintenanceHistory, e.target.value)}
+              onBlur={handleCellBlur}
+              size="small"
+              autoFocus
+              InputLabelProps={{
+                shrink: true
+              }}
+              sx={{
+                width: fieldWidth - 16,
+                height: 40, // 고정 높이
+                '& .MuiInputBase-root': {
+                  height: 40
+                },
+                '& .MuiInputBase-input': {
+                  fontSize: '12px',
+                  padding: '8px 14px'
+                }
+              }}
+            />
+          );
+        }
+
+        if (field === 'amount' || field === 'cost') {
+          return (
+            <TextField
+              type="number"
+              value={value as number}
+              onChange={(e) => handleEditHistory(history.id, field as keyof MaintenanceHistory, Number(e.target.value))}
+              onBlur={handleCellBlur}
+              size="small"
+              autoFocus
+              InputLabelProps={{ shrink: true }}
+              InputProps={{
+                endAdornment: (
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.secondary' }}>
+                    원
+                  </Typography>
+                )
+              }}
+              sx={{
+                width: fieldWidth - 16,
+                height: 40, // 고정 높이
+                '& .MuiInputBase-root': {
+                  height: 40
+                },
+                '& .MuiInputBase-input': {
+                  fontSize: '12px',
+                  padding: '8px 14px'
+                }
+              }}
+            />
+          );
+        }
+
         return (
           <TextField
-            type="date"
-            value={(value as string) || ''}
+            value={value as string}
             onChange={(e) => handleEditHistory(history.id, field as keyof MaintenanceHistory, e.target.value)}
             onBlur={handleCellBlur}
             size="small"
             autoFocus
-            InputLabelProps={{
-              shrink: true
-            }}
+            InputLabelProps={{ shrink: true }}
             sx={{
               width: fieldWidth - 16,
               height: 40, // 고정 높이
@@ -1596,114 +1666,83 @@ const MaintenanceHistoryTab = memo(React.forwardRef<MaintenanceHistoryTabRef, {
               }
             }}
           />
+        );
+      }
+
+      // 읽기 모드
+      if (field === 'type') {
+        return (
+          <Box
+            sx={{
+              height: 40, // 고정 높이
+              display: 'flex',
+              alignItems: 'center',
+              cursor: 'pointer'
+            }}
+          >
+            <Chip
+              label={getTypeLabel(history.type)}
+              size="small"
+              sx={{
+                ...getTypeColor(history.type),
+                '&:hover': { opacity: 0.8 },
+                fontSize: '12px',
+                fontWeight: 500
+              }}
+            />
+          </Box>
+        );
+      }
+
+      if (field === 'status') {
+        return (
+          <Box
+            sx={{
+              height: 40, // 고정 높이
+              display: 'flex',
+              alignItems: 'center',
+              cursor: 'pointer'
+            }}
+          >
+            <Chip
+              label={value as string}
+              size="small"
+              sx={{
+                ...getStatusColor(value as string),
+                '&:hover': { opacity: 0.8 },
+                fontSize: '12px',
+                fontWeight: 500
+              }}
+            />
+          </Box>
         );
       }
 
       if (field === 'amount' || field === 'cost') {
         return (
-          <TextField
-            type="number"
-            value={value as number}
-            onChange={(e) => handleEditHistory(history.id, field as keyof MaintenanceHistory, Number(e.target.value))}
-            onBlur={handleCellBlur}
-            size="small"
-            autoFocus
-            InputLabelProps={{ shrink: true }}
-            InputProps={{
-              endAdornment: (
-                <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.secondary' }}>
-                  원
-                </Typography>
-              )
-            }}
+          <Box
             sx={{
-              width: fieldWidth - 16,
               height: 40, // 고정 높이
-              '& .MuiInputBase-root': {
-                height: 40
-              },
-              '& .MuiInputBase-input': {
-                fontSize: '12px',
-                padding: '8px 14px'
-              }
+              display: 'flex',
+              alignItems: 'center',
+              cursor: 'pointer',
+              '&:hover': { bgcolor: 'grey.50' },
+              p: 0.5,
+              borderRadius: 1
             }}
-          />
+          >
+            <Typography
+              variant="body2"
+              sx={{
+                fontSize: '12px'
+              }}
+            >
+              {(value as number).toLocaleString()}원
+            </Typography>
+          </Box>
         );
       }
 
-      return (
-        <TextField
-          value={value as string}
-          onChange={(e) => handleEditHistory(history.id, field as keyof MaintenanceHistory, e.target.value)}
-          onBlur={handleCellBlur}
-          size="small"
-          autoFocus
-          InputLabelProps={{ shrink: true }}
-          sx={{
-            width: fieldWidth - 16,
-            height: 40, // 고정 높이
-            '& .MuiInputBase-root': {
-              height: 40
-            },
-            '& .MuiInputBase-input': {
-              fontSize: '12px',
-              padding: '8px 14px'
-            }
-          }}
-        />
-      );
-    }
-
-    // 읽기 모드
-    if (field === 'type') {
-      return (
-        <Box
-          sx={{
-            height: 40, // 고정 높이
-            display: 'flex',
-            alignItems: 'center',
-            cursor: 'pointer'
-          }}
-        >
-          <Chip
-            label={getTypeLabel(history.type)}
-            size="small"
-            sx={{
-              ...getTypeColor(history.type),
-              '&:hover': { opacity: 0.8 },
-              fontSize: '12px',
-              fontWeight: 500
-            }}
-          />
-        </Box>
-      );
-    }
-
-    if (field === 'status') {
-      return (
-        <Box
-          sx={{
-            height: 40, // 고정 높이
-            display: 'flex',
-            alignItems: 'center',
-            cursor: 'pointer'
-          }}
-        >
-          <Chip
-            label={value as string}
-            size="small"
-            sx={{
-              ...getStatusColor(value as string),
-              '&:hover': { opacity: 0.8 },
-              fontSize: '12px',
-              fontWeight: 500
-            }}
-          />
-        </Box>
-      );
-    }
-
-    if (field === 'amount' || field === 'cost') {
       return (
         <Box
           sx={{
@@ -1722,105 +1761,45 @@ const MaintenanceHistoryTab = memo(React.forwardRef<MaintenanceHistoryTabRef, {
               fontSize: '12px'
             }}
           >
-            {(value as number).toLocaleString()}원
+            {value || '-'}
           </Typography>
         </Box>
       );
-    }
+    };
 
     return (
-      <Box
-        sx={{
-          height: 40, // 고정 높이
-          display: 'flex',
-          alignItems: 'center',
-          cursor: 'pointer',
-          '&:hover': { bgcolor: 'grey.50' },
-          p: 0.5,
-          borderRadius: 1
-        }}
-      >
-        <Typography
-          variant="body2"
+      <Box sx={{ height: '650px', display: 'flex', flexDirection: 'column', p: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Typography variant="h6" sx={{ fontSize: '16px', fontWeight: 600 }}>
+            구매/수리 이력
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button variant="outlined" color="error" onClick={handleDeleteSelected} disabled={selectedRows.length === 0} size="small">
+              취소({selectedRows.length})
+            </Button>
+            <Button variant="contained" onClick={handleAddHistory} size="small" sx={{ fontSize: '12px' }}>
+              추가
+            </Button>
+          </Box>
+        </Box>
+
+        <TableContainer
           sx={{
-            fontSize: '12px'
+            flex: 1,
+            overflowY: 'auto',
+            overflowX: 'auto',
+            '& .MuiTable-root': {
+              minWidth: 1000
+            }
           }}
         >
-          {value || '-'}
-        </Typography>
-      </Box>
-    );
-  };
-
-  return (
-    <Box sx={{ height: '650px', display: 'flex', flexDirection: 'column', p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h6" sx={{ fontSize: '16px', fontWeight: 600 }}>
-          구매/수리 이력
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button variant="outlined" color="error" onClick={handleDeleteSelected} disabled={selectedRows.length === 0} size="small">
-            취소({selectedRows.length})
-          </Button>
-          <Button variant="contained" onClick={handleAddHistory} size="small" sx={{ fontSize: '12px' }}>
-            추가
-          </Button>
-        </Box>
-      </Box>
-
-      <TableContainer
-        sx={{
-          flex: 1,
-          overflowY: 'auto',
-          overflowX: 'auto',
-          '& .MuiTable-root': {
-            minWidth: 1000
-          }
-        }}
-      >
-        <Table size="small">
-          <TableHead>
-            <TableRow sx={{ backgroundColor: 'grey.50' }}>
-              <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
-                <Checkbox
-                  checked={selectedRows.length === maintenanceHistories.length && maintenanceHistories.length > 0}
-                  onChange={handleSelectAll}
-                  color="primary"
-                  size="small"
-                  sx={{
-                    transform: 'scale(0.7)',
-                    '&.Mui-checked': {
-                      color: '#1976d2'
-                    }
-                  }}
-                />
-              </TableCell>
-              <TableCell sx={{ width: columnWidths.no, fontWeight: 600 }}>NO</TableCell>
-              <TableCell sx={{ width: columnWidths.registrationDate, fontWeight: 600 }}>등록일</TableCell>
-              <TableCell sx={{ width: columnWidths.type, fontWeight: 600 }}>구매/수리</TableCell>
-              <TableCell sx={{ width: columnWidths.content, fontWeight: 600 }}>내용</TableCell>
-              <TableCell sx={{ width: columnWidths.vendor, fontWeight: 600 }}>업체</TableCell>
-              <TableCell sx={{ width: columnWidths.amount, fontWeight: 600 }}>금액</TableCell>
-              <TableCell sx={{ width: columnWidths.registrant, fontWeight: 600 }}>등록자</TableCell>
-              <TableCell sx={{ width: columnWidths.status, fontWeight: 600 }}>상태</TableCell>
-              <TableCell sx={{ width: columnWidths.startDate, fontWeight: 600 }}>시작일</TableCell>
-              <TableCell sx={{ width: columnWidths.completionDate, fontWeight: 600 }}>완료일</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {currentItems.map((history, index) => (
-              <TableRow
-                key={history.id}
-                hover
-                sx={{
-                  height: cellHeight,
-                  '&:hover': { backgroundColor: 'action.hover' }
-                }}
-              >
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ backgroundColor: 'grey.50' }}>
                 <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
                   <Checkbox
-                    checked={selectedRows.includes(history.id)}
-                    onChange={() => handleSelectRow(history.id)}
+                    checked={selectedRows.length === maintenanceHistories.length && maintenanceHistories.length > 0}
+                    onChange={handleSelectAll}
                     color="primary"
                     size="small"
                     sx={{
@@ -1831,100 +1810,137 @@ const MaintenanceHistoryTab = memo(React.forwardRef<MaintenanceHistoryTabRef, {
                     }}
                   />
                 </TableCell>
-                <TableCell sx={{ width: columnWidths.no }}>{maintenanceHistories.length - startIndex - index}</TableCell>
-                <TableCell sx={{ width: columnWidths.registrationDate }} onClick={() => handleCellClick(history.id, 'registrationDate')}>
-                  {renderEditableCell(history, 'registrationDate', history.registrationDate)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.type }} onClick={() => handleCellClick(history.id, 'type')}>
-                  {renderEditableCell(history, 'type', getTypeLabel(history.type), typeOptions)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.content }} onClick={() => handleCellClick(history.id, 'content')}>
-                  {renderEditableCell(history, 'content', history.content)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.vendor }} onClick={() => handleCellClick(history.id, 'vendor')}>
-                  {renderEditableCell(history, 'vendor', history.vendor)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.amount }} onClick={() => handleCellClick(history.id, 'amount')}>
-                  {renderEditableCell(history, 'amount', history.amount)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.registrant }} onClick={() => handleCellClick(history.id, 'registrant')}>
-                  {renderEditableCell(history, 'registrant', history.registrant)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.status }} onClick={() => handleCellClick(history.id, 'status')}>
-                  {renderEditableCell(history, 'status', history.status, statusOptions)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.startDate }} onClick={() => handleCellClick(history.id, 'startDate')}>
-                  {renderEditableCell(history, 'startDate', history.startDate)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.completionDate }} onClick={() => handleCellClick(history.id, 'completionDate')}>
-                  {renderEditableCell(history, 'completionDate', history.completionDate)}
-                </TableCell>
+                <TableCell sx={{ width: columnWidths.no, fontWeight: 600 }}>NO</TableCell>
+                <TableCell sx={{ width: columnWidths.registrationDate, fontWeight: 600 }}>등록일</TableCell>
+                <TableCell sx={{ width: columnWidths.type, fontWeight: 600 }}>구매/수리</TableCell>
+                <TableCell sx={{ width: columnWidths.content, fontWeight: 600 }}>내용</TableCell>
+                <TableCell sx={{ width: columnWidths.vendor, fontWeight: 600 }}>업체</TableCell>
+                <TableCell sx={{ width: columnWidths.amount, fontWeight: 600 }}>금액</TableCell>
+                <TableCell sx={{ width: columnWidths.registrant, fontWeight: 600 }}>등록자</TableCell>
+                <TableCell sx={{ width: columnWidths.status, fontWeight: 600 }}>상태</TableCell>
+                <TableCell sx={{ width: columnWidths.startDate, fontWeight: 600 }}>시작일</TableCell>
+                <TableCell sx={{ width: columnWidths.completionDate, fontWeight: 600 }}>완료일</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            </TableHead>
+            <TableBody>
+              {currentItems.map((history, index) => (
+                <TableRow
+                  key={history.id}
+                  hover
+                  sx={{
+                    height: cellHeight,
+                    '&:hover': { backgroundColor: 'action.hover' }
+                  }}
+                >
+                  <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
+                    <Checkbox
+                      checked={selectedRows.includes(history.id)}
+                      onChange={() => handleSelectRow(history.id)}
+                      color="primary"
+                      size="small"
+                      sx={{
+                        transform: 'scale(0.7)',
+                        '&.Mui-checked': {
+                          color: '#1976d2'
+                        }
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell sx={{ width: columnWidths.no }}>{maintenanceHistories.length - startIndex - index}</TableCell>
+                  <TableCell sx={{ width: columnWidths.registrationDate }} onClick={() => handleCellClick(history.id, 'registrationDate')}>
+                    {renderEditableCell(history, 'registrationDate', history.registrationDate)}
+                  </TableCell>
+                  <TableCell sx={{ width: columnWidths.type }} onClick={() => handleCellClick(history.id, 'type')}>
+                    {renderEditableCell(history, 'type', getTypeLabel(history.type), typeOptions)}
+                  </TableCell>
+                  <TableCell sx={{ width: columnWidths.content }} onClick={() => handleCellClick(history.id, 'content')}>
+                    {renderEditableCell(history, 'content', history.content)}
+                  </TableCell>
+                  <TableCell sx={{ width: columnWidths.vendor }} onClick={() => handleCellClick(history.id, 'vendor')}>
+                    {renderEditableCell(history, 'vendor', history.vendor)}
+                  </TableCell>
+                  <TableCell sx={{ width: columnWidths.amount }} onClick={() => handleCellClick(history.id, 'amount')}>
+                    {renderEditableCell(history, 'amount', history.amount)}
+                  </TableCell>
+                  <TableCell sx={{ width: columnWidths.registrant }} onClick={() => handleCellClick(history.id, 'registrant')}>
+                    {renderEditableCell(history, 'registrant', history.registrant)}
+                  </TableCell>
+                  <TableCell sx={{ width: columnWidths.status }} onClick={() => handleCellClick(history.id, 'status')}>
+                    {renderEditableCell(history, 'status', history.status, statusOptions)}
+                  </TableCell>
+                  <TableCell sx={{ width: columnWidths.startDate }} onClick={() => handleCellClick(history.id, 'startDate')}>
+                    {renderEditableCell(history, 'startDate', history.startDate)}
+                  </TableCell>
+                  <TableCell sx={{ width: columnWidths.completionDate }} onClick={() => handleCellClick(history.id, 'completionDate')}>
+                    {renderEditableCell(history, 'completionDate', history.completionDate)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
 
-      {/* 페이지네이션 - 하단 고정 */}
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          mt: 'auto',
-          pt: 2,
-          px: 2,
-          borderTop: '1px solid',
-          borderColor: 'divider',
-          backgroundColor: 'background.paper',
-          position: 'sticky',
-          bottom: 0
-        }}
-      >
-        <Typography variant="body2" color="text.secondary">
-          {maintenanceHistories.length > 0
-            ? `${startIndex + 1}-${Math.min(endIndex, maintenanceHistories.length)} of ${maintenanceHistories.length}`
-            : '0-0 of 0'}
-        </Typography>
-        {totalPages > 1 && (
-          <Pagination
-            count={totalPages}
-            page={currentPage}
-            onChange={handlePageChange}
-            color="primary"
-            size="small"
-            showFirstButton
-            showLastButton
-            sx={{
-              '& .MuiPaginationItem-root': {
-                fontSize: '0.875rem',
-                minWidth: '32px',
-                height: '32px',
-                borderRadius: '4px'
-              },
-              '& .MuiPaginationItem-page.Mui-selected': {
-                backgroundColor: 'primary.main',
-                color: 'white !important',
-                borderRadius: '4px',
-                fontWeight: 500,
-                '&:hover': {
-                  backgroundColor: 'primary.dark',
-                  color: 'white !important'
+        {/* 페이지네이션 - 하단 고정 */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            mt: 'auto',
+            pt: 2,
+            px: 2,
+            borderTop: '1px solid',
+            borderColor: 'divider',
+            backgroundColor: 'background.paper',
+            position: 'sticky',
+            bottom: 0
+          }}
+        >
+          <Typography variant="body2" color="text.secondary">
+            {maintenanceHistories.length > 0
+              ? `${startIndex + 1}-${Math.min(endIndex, maintenanceHistories.length)} of ${maintenanceHistories.length}`
+              : '0-0 of 0'}
+          </Typography>
+          {totalPages > 1 && (
+            <Pagination
+              count={totalPages}
+              page={currentPage}
+              onChange={handlePageChange}
+              color="primary"
+              size="small"
+              showFirstButton
+              showLastButton
+              sx={{
+                '& .MuiPaginationItem-root': {
+                  fontSize: '0.875rem',
+                  minWidth: '32px',
+                  height: '32px',
+                  borderRadius: '4px'
+                },
+                '& .MuiPaginationItem-page.Mui-selected': {
+                  backgroundColor: 'primary.main',
+                  color: 'white !important',
+                  borderRadius: '4px',
+                  fontWeight: 500,
+                  '&:hover': {
+                    backgroundColor: 'primary.dark',
+                    color: 'white !important'
+                  }
+                },
+                '& .MuiPaginationItem-page': {
+                  borderRadius: '4px',
+                  '&:hover': {
+                    backgroundColor: 'grey.100'
+                  }
                 }
-              },
-              '& .MuiPaginationItem-page': {
-                borderRadius: '4px',
-                '&:hover': {
-                  backgroundColor: 'grey.100'
-                }
-              }
-            }}
-          />
-        )}
+              }}
+            />
+          )}
+        </Box>
       </Box>
-    </Box>
-  );
-}));
+    );
+  })
+);
 
 // displayName 설정
 MaintenanceHistoryTab.displayName = 'MaintenanceHistoryTab';
@@ -2092,165 +2108,165 @@ const QROutputTab = memo(({ hardwareState }: { hardwareState: HardwareEditState 
                   }
                 }}
               >
-            <Box
-              sx={{
-                border: '2px solid #333',
-                borderRadius: '2px',
-                padding: '3px',
-                backgroundColor: 'white',
-                width: baseLayoutWidth,
-                height: baseLayoutHeight,
-                display: 'flex',
-                flexDirection: 'column',
-                '@media print': {
-                  margin: 0,
-                  padding: `${Math.round(20 * layoutScale)}px`,
-                  border: `${Math.round(2 * layoutScale)}px solid #000`
-                }
-              }}
-            >
-              <Stack direction="row" spacing={4} alignItems="flex-start" sx={{ flex: 1 }}>
-                {/* QR 코드 영역 */}
                 <Box
                   sx={{
-                    flex: '0 0 auto',
+                    border: '2px solid #333',
+                    borderRadius: '2px',
+                    padding: '3px',
+                    backgroundColor: 'white',
+                    width: baseLayoutWidth,
+                    height: baseLayoutHeight,
                     display: 'flex',
                     flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 1,
-                    height: '100%',
-                    justifyContent: 'center'
+                    '@media print': {
+                      margin: 0,
+                      padding: `${Math.round(20 * layoutScale)}px`,
+                      border: `${Math.round(2 * layoutScale)}px solid #000`
+                    }
                   }}
                 >
-                  <Box
-                    sx={{
-                      width: baseQRSize,
-                      height: baseQRSize,
-                      padding: '2px',
-                      backgroundColor: 'white',
-                      borderRadius: '1px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <QRCode
-                      value={qrData}
-                      size={baseQRSize - 16}
-                      level="M"
-                      style={{
-                        height: 'auto',
-                        maxWidth: '100%',
-                        width: '100%'
+                  <Stack direction="row" spacing={4} alignItems="flex-start" sx={{ flex: 1 }}>
+                    {/* QR 코드 영역 */}
+                    <Box
+                      sx={{
+                        flex: '0 0 auto',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: 1,
+                        height: '100%',
+                        justifyContent: 'center'
                       }}
-                    />
-                  </Box>
-                  {/* QR 코드 아래 자산코드 표시 */}
+                    >
+                      <Box
+                        sx={{
+                          width: baseQRSize,
+                          height: baseQRSize,
+                          padding: '2px',
+                          backgroundColor: 'white',
+                          borderRadius: '1px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <QRCode
+                          value={qrData}
+                          size={baseQRSize - 16}
+                          level="M"
+                          style={{
+                            height: 'auto',
+                            maxWidth: '100%',
+                            width: '100%'
+                          }}
+                        />
+                      </Box>
+                      {/* QR 코드 아래 자산코드 표시 */}
+                      <Typography
+                        sx={{
+                          fontSize: '12px',
+                          fontFamily: 'monospace',
+                          color: '#333',
+                          textAlign: 'center',
+                          mt: 1
+                        }}
+                      >
+                        {hardwareState.code || ''}
+                      </Typography>
+                    </Box>
+
+                    {/* 하드웨어 정보 영역 */}
+                    <Box
+                      sx={{
+                        flex: 1,
+                        pl: 2,
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <Stack spacing={0.8}>
+                        <Typography
+                          variant="h6"
+                          sx={{
+                            fontWeight: 600,
+                            fontSize: '24px',
+                            lineHeight: 1.1,
+                            mb: 1,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}
+                        >
+                          {hardwareState.assetName || '자산명'}
+                        </Typography>
+                        <Typography
+                          variant="body1"
+                          sx={{
+                            fontSize: '16px',
+                            lineHeight: 1.3,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}
+                        >
+                          자산분류 : {hardwareState.assetCategory || '-'}
+                        </Typography>
+                        <Typography
+                          variant="body1"
+                          sx={{
+                            fontSize: '16px',
+                            lineHeight: 1.3,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}
+                        >
+                          자산코드 : {hardwareState.code || '-'}
+                        </Typography>
+                        <Typography
+                          variant="body1"
+                          sx={{
+                            fontSize: '16px',
+                            lineHeight: 1.3,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}
+                        >
+                          시리얼넘버 : {hardwareState.serialNumber || '-'}
+                        </Typography>
+                        <Typography
+                          variant="body1"
+                          sx={{
+                            fontSize: '16px',
+                            lineHeight: 1.3,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}
+                        >
+                          구매일 : {hardwareState.purchaseDate || '-'}
+                        </Typography>
+                      </Stack>
+                    </Box>
+                  </Stack>
+
+                  {/* 하드웨어 자산라벨 - 네모박스 하단 중앙 */}
                   <Typography
                     sx={{
-                      fontSize: '12px',
-                      fontFamily: 'monospace',
-                      color: '#333',
+                      fontSize: '11px',
+                      color: '#666',
                       textAlign: 'center',
-                      mt: 1
+                      mt: 0.5,
+                      pt: 0.8
                     }}
                   >
-                    {hardwareState.code || ''}
+                    {labelText}
                   </Typography>
                 </Box>
-
-                {/* 하드웨어 정보 영역 */}
-                <Box
-                  sx={{
-                    flex: 1,
-                    pl: 2,
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <Stack spacing={0.8}>
-                    <Typography
-                      variant="h6"
-                      sx={{
-                        fontWeight: 600,
-                        fontSize: '24px',
-                        lineHeight: 1.1,
-                        mb: 1,
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis'
-                      }}
-                    >
-                      {hardwareState.assetName || '자산명'}
-                    </Typography>
-                    <Typography
-                      variant="body1"
-                      sx={{
-                        fontSize: '16px',
-                        lineHeight: 1.3,
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis'
-                      }}
-                    >
-                      자산분류 : {hardwareState.assetCategory || '-'}
-                    </Typography>
-                    <Typography
-                      variant="body1"
-                      sx={{
-                        fontSize: '16px',
-                        lineHeight: 1.3,
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis'
-                      }}
-                    >
-                      자산코드 : {hardwareState.code || '-'}
-                    </Typography>
-                    <Typography
-                      variant="body1"
-                      sx={{
-                        fontSize: '16px',
-                        lineHeight: 1.3,
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis'
-                      }}
-                    >
-                      시리얼넘버 : {hardwareState.serialNumber || '-'}
-                    </Typography>
-                    <Typography
-                      variant="body1"
-                      sx={{
-                        fontSize: '16px',
-                        lineHeight: 1.3,
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis'
-                      }}
-                    >
-                      구매일 : {hardwareState.purchaseDate || '-'}
-                    </Typography>
-                  </Stack>
-                </Box>
-              </Stack>
-
-              {/* 하드웨어 자산라벨 - 네모박스 하단 중앙 */}
-              <Typography
-                sx={{
-                  fontSize: '11px',
-                  color: '#666',
-                  textAlign: 'center',
-                  mt: 0.5,
-                  pt: 0.8
-                }}
-              >
-                {labelText}
-              </Typography>
-            </Box>
-          </Box>
+              </Box>
             </CardContent>
           </Card>
         </Grid>
@@ -2552,9 +2568,7 @@ const RecordTab = memo(
           }}
         >
           <Typography variant="body2" color="text.secondary">
-            {comments.length > 0
-              ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}`
-              : '0-0 of 0'}
+            {comments.length > 0 ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}` : '0-0 of 0'}
           </Typography>
           {comments.length > 0 && (
             <Pagination
@@ -2929,7 +2943,15 @@ interface HardwareDialogProps {
   statusColors?: Record<string, any>;
 }
 
-export default function HardwareDialog({ open, onClose, onSave, data, mode, statusOptions: propStatusOptions, statusColors: propStatusColors }: HardwareDialogProps) {
+export default function HardwareDialog({
+  open,
+  onClose,
+  onSave,
+  data,
+  mode,
+  statusOptions: propStatusOptions,
+  statusColors: propStatusColors
+}: HardwareDialogProps) {
   const [value, setValue] = useState(0);
   const [validationError, setValidationError] = useState('');
 
@@ -3189,7 +3211,7 @@ export default function HardwareDialog({ open, onClose, onSave, data, mode, stat
     };
 
     // 로컬 state에만 추가 (즉시 반응)
-    setPendingFeedbacks(prev => [newFeedback, ...prev]);
+    setPendingFeedbacks((prev) => [newFeedback, ...prev]);
     setNewComment('');
   }, [newComment, data?.id, currentUser]);
 
@@ -3202,13 +3224,7 @@ export default function HardwareDialog({ open, onClose, onSave, data, mode, stat
     if (!editingCommentText.trim() || !editingCommentId) return;
 
     // 로컬 state만 업데이트 (즉시 반응)
-    setPendingFeedbacks(prev =>
-      prev.map(fb =>
-        fb.id === editingCommentId
-          ? { ...fb, description: editingCommentText }
-          : fb
-      )
-    );
+    setPendingFeedbacks((prev) => prev.map((fb) => (fb.id === editingCommentId ? { ...fb, description: editingCommentText } : fb)));
 
     setEditingCommentId(null);
     setEditingCommentText('');
@@ -3221,7 +3237,7 @@ export default function HardwareDialog({ open, onClose, onSave, data, mode, stat
 
   const handleDeleteComment = useCallback((commentId: string) => {
     // 로컬 state에서만 제거 (즉시 반응)
-    setPendingFeedbacks(prev => prev.filter(fb => fb.id !== commentId));
+    setPendingFeedbacks((prev) => prev.filter((fb) => fb.id !== commentId));
   }, []);
 
   // 저장 핸들러
@@ -3259,13 +3275,13 @@ export default function HardwareDialog({ open, onClose, onSave, data, mode, stat
         const hardwareId = parseInt(data.id);
 
         // UserHistory를 HardwareUserHistory 형식으로 변환
-        const convertedHistories: HardwareUserHistory[] = userHistories.map(history => ({
+        const convertedHistories: HardwareUserHistory[] = userHistories.map((history) => ({
           id: parseInt(history.id) || 0,
           hardware_id: hardwareId,
           user_name: history.userName?.trim() || '',
           department: history.department?.trim() || '',
           start_date: history.startDate?.trim() || new Date().toISOString().split('T')[0],
-          end_date: (history.endDate?.trim() && history.endDate.trim() !== '') ? history.endDate.trim() : null,
+          end_date: history.endDate?.trim() && history.endDate.trim() !== '' ? history.endDate.trim() : null,
           reason: history.reason?.trim() || '',
           status: history.status as 'active' | 'inactive',
           registration_date: history.registrationDate?.trim() || new Date().toISOString().split('T')[0],
@@ -3304,22 +3320,19 @@ export default function HardwareDialog({ open, onClose, onSave, data, mode, stat
 
       if (data?.id) {
         // 추가된 기록 (temp- ID)
-        const addedFeedbacks = pendingFeedbacks.filter(fb =>
-          fb.id.toString().startsWith('temp-') &&
-          !initialFeedbacks.find(initial => initial.id === fb.id)
+        const addedFeedbacks = pendingFeedbacks.filter(
+          (fb) => fb.id.toString().startsWith('temp-') && !initialFeedbacks.find((initial) => initial.id === fb.id)
         );
 
         // 수정된 기록
-        const updatedFeedbacks = pendingFeedbacks.filter(fb => {
+        const updatedFeedbacks = pendingFeedbacks.filter((fb) => {
           if (fb.id.toString().startsWith('temp-')) return false;
-          const initial = initialFeedbacks.find(initial => initial.id === fb.id);
+          const initial = initialFeedbacks.find((initial) => initial.id === fb.id);
           return initial && initial.description !== fb.description;
         });
 
         // 삭제된 기록
-        const deletedFeedbacks = initialFeedbacks.filter(initial =>
-          !pendingFeedbacks.find(pending => pending.id === initial.id)
-        );
+        const deletedFeedbacks = initialFeedbacks.filter((initial) => !pendingFeedbacks.find((pending) => pending.id === initial.id));
 
         // 추가 (역순으로 저장)
         const reversedAddedFeedbacks = [...addedFeedbacks].reverse();
@@ -3337,7 +3350,7 @@ export default function HardwareDialog({ open, onClose, onSave, data, mode, stat
 
         // 삭제 - feedbacks 배열에 존재하는 항목만 삭제
         for (const feedback of deletedFeedbacks) {
-          const existsInFeedbacks = feedbacks.some(fb => String(fb.id) === String(feedback.id));
+          const existsInFeedbacks = feedbacks.some((fb) => String(fb.id) === String(feedback.id));
           if (existsInFeedbacks) {
             await deleteFeedback(String(feedback.id));
           } else {

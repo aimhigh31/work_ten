@@ -38,7 +38,7 @@ import HardwareEditDialog from 'components/HardwareEditDialog';
 // data and types
 import { hardwareData, teams, assignees, hardwareStatusOptions, hardwareStatusColors, assigneeAvatars } from 'data/hardware';
 import { HardwareTableData, HardwareStatus } from 'types/hardware';
-import { useUserManagement } from 'hooks/useUserManagement';
+import { useSupabaseUsers } from 'hooks/useSupabaseUsers';
 
 // Icons
 import { Add, Trash, Edit, DocumentDownload } from '@wandersonalwes/iconsax-react';
@@ -66,7 +66,16 @@ interface HardwareTableProps {
   selectedAssignee?: string;
   tasks?: HardwareTableData[];
   setTasks?: React.Dispatch<React.SetStateAction<HardwareTableData[]>>;
-  addChangeLog?: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string, title?: string) => void;
+  addChangeLog?: (
+    action: string,
+    target: string,
+    description: string,
+    team?: string,
+    beforeValue?: string,
+    afterValue?: string,
+    changedField?: string,
+    title?: string
+  ) => void;
   deleteMultipleHardware?: (ids: number[]) => Promise<any>;
   onHardwareSave?: (hardware: HardwareTableData) => Promise<void>;
   statusTypes?: any[];
@@ -91,8 +100,13 @@ export default function HardwareTable({
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [goToPage, setGoToPage] = useState('');
 
-  // 사용자 관리 훅
-  const { users, findUserByName } = useUserManagement();
+  // 사용자 데이터 훅
+  const { users } = useSupabaseUsers();
+
+  // 사용자 이름으로 사용자 데이터 찾기
+  const findUserByName = (userName: string) => {
+    return users.find((user) => user.user_name === userName);
+  };
 
   // Edit 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);
@@ -236,7 +250,16 @@ export default function HardwareTable({
           const deletedTasks = data.filter((task) => selected.includes(task.id));
           deletedTasks.forEach((task) => {
             const assetName = task.assetName || task.workContent || '하드웨어';
-            addChangeLog('하드웨어 삭제', task.code || `HW-${task.id}`, `${assetName} 삭제`, task.team || '미분류', undefined, undefined, undefined, assetName);
+            addChangeLog(
+              '하드웨어 삭제',
+              task.code || `HW-${task.id}`,
+              `${assetName} 삭제`,
+              task.team || '미분류',
+              undefined,
+              undefined,
+              undefined,
+              assetName
+            );
           });
         }
       }
@@ -279,13 +302,7 @@ export default function HardwareTable({
         console.log(`✅ [OPL방식] ${fieldName} 즉시 저장 완료`);
 
         // 로컬 상태도 즉시 업데이트
-        setData(prevData =>
-          prevData.map(item =>
-            item.id === editingHardware.id
-              ? { ...item, [fieldName]: value }
-              : item
-          )
-        );
+        setData((prevData) => prevData.map((item) => (item.id === editingHardware.id ? { ...item, [fieldName]: value } : item)));
       }
     } catch (error) {
       console.error(`❌ [OPL방식] ${fieldName} 즉시 저장 실패:`, error);
@@ -803,9 +820,24 @@ export default function HardwareTable({
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" noWrap sx={{ maxWidth: 80, fontSize: '13px' }}>
-                      {task.assignee || '-'}
-                    </Typography>
+                    {task.assignee ? (
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Avatar
+                          src={findUserByName(task.assignee)?.avatar_url || findUserByName(task.assignee)?.profile_image_url}
+                          alt={task.assignee}
+                          sx={{ width: 24, height: 24 }}
+                        >
+                          {task.assignee?.charAt(0)}
+                        </Avatar>
+                        <Typography variant="body2" noWrap sx={{ maxWidth: 80, fontSize: '13px' }}>
+                          {task.assignee}
+                        </Typography>
+                      </Stack>
+                    ) : (
+                      <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.secondary' }}>
+                        미할당
+                      </Typography>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Chip

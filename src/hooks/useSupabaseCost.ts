@@ -96,11 +96,7 @@ export function useSupabaseCost() {
   // 코드 존재 여부 확인 (is_active 무관)
   const checkCodeExists = useCallback(async (code: string): Promise<boolean> => {
     try {
-      const { data, error: supabaseError } = await supabase
-        .from('main_cost_data')
-        .select('id')
-        .eq('code', code)
-        .limit(1);
+      const { data, error: supabaseError } = await supabase.from('main_cost_data').select('id').eq('code', code).limit(1);
 
       if (supabaseError) {
         console.error('❌ 코드 확인 오류:', supabaseError);
@@ -146,7 +142,6 @@ export function useSupabaseCost() {
       saveToCache(CACHE_KEY, result);
 
       return result;
-
     } catch (err) {
       console.error('❌ getCosts 실패:', err);
       setError(err instanceof Error ? err.message : '비용 데이터 조회 실패');
@@ -174,11 +169,7 @@ export function useSupabaseCost() {
       };
       console.log('📤 삽입할 데이터:', insertData);
 
-      const { data, error: supabaseError } = await supabase
-        .from('main_cost_data')
-        .insert([insertData])
-        .select()
-        .single();
+      const { data, error: supabaseError } = await supabase.from('main_cost_data').insert([insertData]).select().single();
 
       if (supabaseError) {
         console.error('❌ Supabase 생성 오류 상세:', {
@@ -203,7 +194,6 @@ export function useSupabaseCost() {
       sessionStorage.removeItem(CACHE_KEY);
 
       return convertToFrontendData(data, true);
-
     } catch (err) {
       console.error('❌ createCost 실패 상세:', {
         error: err,
@@ -249,7 +239,6 @@ export function useSupabaseCost() {
       sessionStorage.removeItem(CACHE_KEY);
 
       return convertToFrontendData(data);
-
     } catch (err) {
       console.error('❌ updateCost 실패:', err);
       setError(err instanceof Error ? err.message : '비용 데이터 수정 실패');
@@ -286,7 +275,6 @@ export function useSupabaseCost() {
       sessionStorage.removeItem(CACHE_KEY);
 
       return true;
-
     } catch (err) {
       console.error('❌ deleteCost 실패:', err);
       setError(err instanceof Error ? err.message : '비용 데이터 삭제 실패');

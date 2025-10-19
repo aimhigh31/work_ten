@@ -72,7 +72,16 @@ interface SoftwareTableProps {
   selectedAssignee?: string;
   tasks?: TaskTableData[];
   setTasks?: React.Dispatch<React.SetStateAction<TaskTableData[]>>;
-  addChangeLog?: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string, title?: string) => void;
+  addChangeLog?: (
+    action: string,
+    target: string,
+    description: string,
+    team?: string,
+    beforeValue?: string,
+    afterValue?: string,
+    changedField?: string,
+    title?: string
+  ) => void;
   deleteMultipleSoftware?: (ids: number[]) => Promise<any>;
 }
 
@@ -101,7 +110,7 @@ export default function SoftwareTable({
 
   // 사용자 이름으로 사용자 데이터 찾기
   const findUserByName = (userName: string) => {
-    return users.find(user => user.user_name === userName);
+    return users.find((user) => user.user_name === userName);
   };
 
   // tasks props 변경시 data 상태 업데이트
@@ -249,7 +258,16 @@ export default function SoftwareTable({
         const deletedTasks = data.filter((task) => selected.includes(task.id));
         deletedTasks.forEach((task) => {
           const softwareName = task.softwareName || task.workContent || '소프트웨어';
-          addChangeLog('소프트웨어 삭제', task.code || `SW-${task.id}`, `${task.workContent || '소프트웨어'} 삭제`, task.team || '미분류', undefined, undefined, undefined, softwareName);
+          addChangeLog(
+            '소프트웨어 삭제',
+            task.code || `SW-${task.id}`,
+            `${task.workContent || '소프트웨어'} 삭제`,
+            task.team || '미분류',
+            undefined,
+            undefined,
+            undefined,
+            softwareName
+          );
         });
       }
 

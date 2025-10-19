@@ -56,7 +56,6 @@ export function useSupabaseInvestmentFinance() {
       saveToCache(cacheKey, data || []);
 
       return data || [];
-
     } catch (err) {
       console.error('❌ getFinanceItems 실패:', err);
       setError(err instanceof Error ? err.message : '금액 항목 조회 실패');
@@ -67,65 +66,62 @@ export function useSupabaseInvestmentFinance() {
   }, []);
 
   // 금액 항목 일괄 저장 (기존 삭제 후 재저장)
-  const saveFinanceItems = useCallback(async (
-    investmentId: number,
-    items: Omit<InvestmentFinanceItem, 'id' | 'created_at' | 'updated_at'>[]
-  ): Promise<boolean> => {
-    try {
-      console.log('💾 saveFinanceItems 호출:', investmentId, items.length, '개');
-      setLoading(true);
-      setError(null);
+  const saveFinanceItems = useCallback(
+    async (investmentId: number, items: Omit<InvestmentFinanceItem, 'id' | 'created_at' | 'updated_at'>[]): Promise<boolean> => {
+      try {
+        console.log('💾 saveFinanceItems 호출:', investmentId, items.length, '개');
+        setLoading(true);
+        setError(null);
 
-      // 1단계: 기존 활성 데이터를 is_active = false로 변경
-      const { error: updateError } = await supabase
-        .from('plan_investment_finance')
-        .update({ is_active: false, updated_at: new Date().toISOString() })
-        .eq('investment_id', investmentId)
-        .eq('is_active', true);
-
-      if (updateError) {
-        console.error('❌ 기존 데이터 비활성화 오류:', updateError);
-        throw updateError;
-      }
-
-      console.log('✅ 기존 데이터 비활성화 완료');
-
-      // 2단계: 새 데이터 저장
-      if (items.length > 0) {
-        const insertData = items.map((item, index) => ({
-          investment_id: investmentId,
-          item_order: item.item_order || index + 1,
-          investment_category: item.investment_category,
-          item_name: item.item_name,
-          budget_amount: item.budget_amount || 0,
-          execution_amount: item.execution_amount || 0,
-          remarks: item.remarks || '',
-          is_active: true,
-          created_by: 'user',
-          updated_by: 'user'
-        }));
-
-        const { error: insertError } = await supabase
+        // 1단계: 기존 활성 데이터를 is_active = false로 변경
+        const { error: updateError } = await supabase
           .from('plan_investment_finance')
-          .insert(insertData);
+          .update({ is_active: false, updated_at: new Date().toISOString() })
+          .eq('investment_id', investmentId)
+          .eq('is_active', true);
 
-        if (insertError) {
-          console.error('❌ 데이터 저장 오류:', insertError);
-          throw insertError;
+        if (updateError) {
+          console.error('❌ 기존 데이터 비활성화 오류:', updateError);
+          throw updateError;
         }
+
+        console.log('✅ 기존 데이터 비활성화 완료');
+
+        // 2단계: 새 데이터 저장
+        if (items.length > 0) {
+          const insertData = items.map((item, index) => ({
+            investment_id: investmentId,
+            item_order: item.item_order || index + 1,
+            investment_category: item.investment_category,
+            item_name: item.item_name,
+            budget_amount: item.budget_amount || 0,
+            execution_amount: item.execution_amount || 0,
+            remarks: item.remarks || '',
+            is_active: true,
+            created_by: 'user',
+            updated_by: 'user'
+          }));
+
+          const { error: insertError } = await supabase.from('plan_investment_finance').insert(insertData);
+
+          if (insertError) {
+            console.error('❌ 데이터 저장 오류:', insertError);
+            throw insertError;
+          }
+        }
+
+        console.log('✅ saveFinanceItems 성공');
+        return true;
+      } catch (err) {
+        console.error('❌ saveFinanceItems 실패:', err);
+        setError(err instanceof Error ? err.message : '금액 항목 저장 실패');
+        return false;
+      } finally {
+        setLoading(false);
       }
-
-      console.log('✅ saveFinanceItems 성공');
-      return true;
-
-    } catch (err) {
-      console.error('❌ saveFinanceItems 실패:', err);
-      setError(err instanceof Error ? err.message : '금액 항목 저장 실패');
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   // 금액 항목 삭제
   const deleteFinanceItem = useCallback(async (id: number): Promise<boolean> => {
@@ -146,7 +142,6 @@ export function useSupabaseInvestmentFinance() {
 
       console.log('✅ deleteFinanceItem 성공');
       return true;
-
     } catch (err) {
       console.error('❌ deleteFinanceItem 실패:', err);
       setError(err instanceof Error ? err.message : '금액 항목 삭제 실패');

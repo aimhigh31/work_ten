@@ -91,7 +91,6 @@ export const useSupabaseTaskManagement = () => {
       saveToCache(CACHE_KEY, data || []);
 
       return data || [];
-
     } catch (err: any) {
       console.log('❌ getTasks 실패:', err);
       setError(err.message || '업무 데이터 조회 실패');
@@ -123,11 +122,7 @@ export const useSupabaseTaskManagement = () => {
         status: task.status || '대기'
       };
 
-      const { data, error } = await supabase
-        .from('main_task_data')
-        .insert([insertData])
-        .select()
-        .single();
+      const { data, error } = await supabase.from('main_task_data').insert([insertData]).select().single();
 
       if (error) {
         console.log('❌ Supabase 생성 오류:', error);
@@ -199,12 +194,7 @@ export const useSupabaseTaskManagement = () => {
       setLoading(true);
       setError(null);
 
-      const { data, error } = await supabase
-        .from('main_task_data')
-        .update({ is_active: false })
-        .eq('id', id)
-        .select()
-        .single();
+      const { data, error } = await supabase.from('main_task_data').update({ is_active: false }).eq('id', id).select().single();
 
       if (error) {
         console.log('❌ Supabase 삭제 오류:', error);
@@ -229,11 +219,7 @@ export const useSupabaseTaskManagement = () => {
   // 코드 중복 확인
   const checkCodeExists = useCallback(async (code: string): Promise<boolean> => {
     try {
-      const { data, error: checkError } = await supabase
-        .from('main_task_data')
-        .select('id')
-        .eq('code', code)
-        .eq('is_active', true);
+      const { data, error: checkError } = await supabase.from('main_task_data').select('id').eq('code', code).eq('is_active', true);
 
       if (checkError) {
         console.error('코드 확인 실패:', checkError);

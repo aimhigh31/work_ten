@@ -44,12 +44,11 @@ export const useGroup018 = () => {
       setGroup018Data(subcodes);
 
       // 서브코드명 배열 추출 (자산분류 목록)
-      const categoryNames = subcodes.map(item => item.subcode_name);
+      const categoryNames = subcodes.map((item) => item.subcode_name);
       setAssetCategories(categoryNames);
 
       console.log('📋 자산분류 목록:', categoryNames);
       setError(null);
-
     } catch (err: any) {
       console.error('❌ fetchGroup018Data 오류:', err);
       setError(err.message || 'GROUP018 데이터 조회 중 오류가 발생했습니다.');
@@ -62,13 +61,13 @@ export const useGroup018 = () => {
 
   // 서브코드명으로 서브코드 찾기
   const findSubcodeByName = (name: string): string => {
-    const found = group018Data.find(item => item.subcode_name === name);
+    const found = group018Data.find((item) => item.subcode_name === name);
     return found?.subcode || '';
   };
 
   // 서브코드로 서브코드명 찾기
   const findNameBySubcode = (subcode: string): string => {
-    const found = group018Data.find(item => item.subcode === subcode);
+    const found = group018Data.find((item) => item.subcode === subcode);
     return found?.subcode_name || '';
   };
 
@@ -78,12 +77,12 @@ export const useGroup018 = () => {
   }, []);
 
   return {
-    assetCategories,         // string[] - 서브코드명 배열 (자산분류 목록)
-    group018Data,           // Group018Subcode[] - 전체 데이터
+    assetCategories, // string[] - 서브코드명 배열 (자산분류 목록)
+    group018Data, // Group018Subcode[] - 전체 데이터
     loading,
     error,
     fetchGroup018Data,
-    findSubcodeByName,      // 서브코드명 → 서브코드
-    findNameBySubcode       // 서브코드 → 서브코드명
+    findSubcodeByName, // 서브코드명 → 서브코드
+    findNameBySubcode // 서브코드 → 서브코드명
   };
 };

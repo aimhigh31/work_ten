@@ -59,10 +59,10 @@ export default function DashboardDefault() {
 
         // 🍽️ 4명의 요리사가 동시에 작업 시작!
         const [tasksData, educationsData, eventsData, costsData] = await Promise.all([
-          getTasks(),       // 요리사 A: 업무 데이터
-          getEducations(),  // 요리사 B: 교육 데이터
-          getEvents(),      // 요리사 C: 일정 데이터
-          getCosts()        // 요리사 D: 비용 데이터
+          getTasks(), // 요리사 A: 업무 데이터
+          getEducations(), // 요리사 B: 교육 데이터
+          getEvents(), // 요리사 C: 일정 데이터
+          getCosts() // 요리사 D: 비용 데이터
         ]);
 
         console.timeEnd('⚡ Dashboard - 병렬 로딩');
@@ -181,168 +181,168 @@ export default function DashboardDefault() {
   return (
     <Box sx={{ height: '100%', overflow: 'auto', p: 3 }}>
       <Grid container spacing={GRID_COMMON_SPACING}>
-      <Grid size={12}>
-        <WelcomeBanner />
-      </Grid>
-      {/* row 1 - 개인 업무 통계 카드 */}
-      <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-        <EcommerceDataCard
-          title="업무관리"
-          count={`총 ${dashboardStats.task.total}건`}
-          iconPrimary={<Task />}
-          percentage={
-            <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap', fontSize: '0.875rem' }}>
-              <Typography component="span" sx={{ color: 'text.secondary' }}>
-                대기
-              </Typography>
-              <Typography component="span" color="primary" sx={{ fontWeight: 600 }}>
-                {dashboardStats.task.waiting}
-              </Typography>
-              <Typography component="span" sx={{ color: 'text.secondary' }}>
-                진행
-              </Typography>
-              <Typography component="span" color="primary" sx={{ fontWeight: 600 }}>
-                {dashboardStats.task.progress}
-              </Typography>
-              <Typography component="span" sx={{ color: 'text.secondary' }}>
-                완료
-              </Typography>
-              <Typography component="span" color="primary" sx={{ fontWeight: 600 }}>
-                {dashboardStats.task.completed}
-              </Typography>
-              <Typography component="span" sx={{ color: 'text.secondary' }}>
-                홀딩
-              </Typography>
-              <Typography component="span" color="primary" sx={{ fontWeight: 600 }}>
-                {dashboardStats.task.holding}
-              </Typography>
-            </Stack>
-          }
-        />
-      </Grid>
-      <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-        <EcommerceDataCard
-          title="개인교육관리"
-          count={`총 ${dashboardStats.education.total}건`}
-          color="warning"
-          iconPrimary={<Book />}
-          percentage={
-            <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap', fontSize: '0.875rem' }}>
-              <Typography component="span" sx={{ color: 'text.secondary' }}>
-                대기
-              </Typography>
-              <Typography component="span" sx={{ color: 'warning.dark', fontWeight: 600 }}>
-                {dashboardStats.education.waiting}
-              </Typography>
-              <Typography component="span" sx={{ color: 'text.secondary' }}>
-                진행
-              </Typography>
-              <Typography component="span" sx={{ color: 'warning.dark', fontWeight: 600 }}>
-                {dashboardStats.education.progress}
-              </Typography>
-              <Typography component="span" sx={{ color: 'text.secondary' }}>
-                완료
-              </Typography>
-              <Typography component="span" sx={{ color: 'warning.dark', fontWeight: 600 }}>
-                {dashboardStats.education.completed}
-              </Typography>
-              <Typography component="span" sx={{ color: 'text.secondary' }}>
-                홀딩
-              </Typography>
-              <Typography component="span" sx={{ color: 'warning.dark', fontWeight: 600 }}>
-                {dashboardStats.education.holding}
-              </Typography>
-            </Stack>
-          }
-        />
-      </Grid>
-      <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-        <EcommerceDataCard
-          title="일정관리"
-          count={`총 ${dashboardStats.calendar.total}건`}
-          color="success"
-          iconPrimary={<Calendar />}
-          percentage={
-            <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap', fontSize: '0.875rem' }}>
-              <Typography component="span" sx={{ color: 'text.secondary' }}>
-                오늘
-              </Typography>
-              <Typography component="span" sx={{ color: 'success.darker', fontWeight: 600 }}>
-                {dashboardStats.calendar.today}
-              </Typography>
-              <Typography component="span" sx={{ color: 'text.secondary' }}>
-                이번주
-              </Typography>
-              <Typography component="span" sx={{ color: 'success.darker', fontWeight: 600 }}>
-                {dashboardStats.calendar.thisWeek}
-              </Typography>
-              <Typography component="span" sx={{ color: 'text.secondary' }}>
-                당월
-              </Typography>
-              <Typography component="span" sx={{ color: 'success.darker', fontWeight: 600 }}>
-                {dashboardStats.calendar.thisMonth}
-              </Typography>
-            </Stack>
-          }
-        />
-      </Grid>
-      <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-        <EcommerceDataCard
-          title="비용관리"
-          count={`총 ${dashboardStats.cost.total}건`}
-          color="error"
-          iconPrimary={<DollarCircle />}
-          percentage={
-            <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap', fontSize: '0.875rem' }}>
-              <Typography component="span" sx={{ color: 'text.secondary' }}>
-                대기
-              </Typography>
-              <Typography component="span" sx={{ color: 'error.dark', fontWeight: 600 }}>
-                {dashboardStats.cost.waiting}
-              </Typography>
-              <Typography component="span" sx={{ color: 'text.secondary' }}>
-                진행
-              </Typography>
-              <Typography component="span" sx={{ color: 'error.dark', fontWeight: 600 }}>
-                {dashboardStats.cost.progress}
-              </Typography>
-              <Typography component="span" sx={{ color: 'text.secondary' }}>
-                완료
-              </Typography>
-              <Typography component="span" sx={{ color: 'error.dark', fontWeight: 600 }}>
-                {dashboardStats.cost.completed}
-              </Typography>
-              <Typography component="span" sx={{ color: 'text.secondary' }}>
-                홀딩
-              </Typography>
-              <Typography component="span" sx={{ color: 'error.dark', fontWeight: 600 }}>
-                {dashboardStats.cost.holding}
-              </Typography>
-            </Stack>
-          }
-        />
-      </Grid>
-      {/* row 2 - 업무관리 & 달력 */}
-      <Grid size={{ xs: 12, md: 8, lg: 9 }}>
-        <Transactions />
-      </Grid>
-      <Grid size={{ xs: 12, md: 4, lg: 3 }}>
-        <DashboardCalendar />
-      </Grid>
-      {/* row 3 - KPI관리, 개인교육관리, 변경로그 */}
-      <Grid size={{ xs: 12, md: 4 }}>
-        <KpiWidget />
-      </Grid>
-      <Grid size={{ xs: 12, md: 4 }}>
-        <EducationWidget />
-      </Grid>
-      <Grid size={{ xs: 12, md: 4 }}>
-        <ProjectRelease />
-      </Grid>
-      {/* row 4 - Project Analytics */}
-      <Grid size={12}>
-        <ProjectAnalytics />
-      </Grid>
+        <Grid size={12}>
+          <WelcomeBanner />
+        </Grid>
+        {/* row 1 - 개인 업무 통계 카드 */}
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <EcommerceDataCard
+            title="업무관리"
+            count={`총 ${dashboardStats.task.total}건`}
+            iconPrimary={<Task />}
+            percentage={
+              <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap', fontSize: '0.875rem' }}>
+                <Typography component="span" sx={{ color: 'text.secondary' }}>
+                  대기
+                </Typography>
+                <Typography component="span" color="primary" sx={{ fontWeight: 600 }}>
+                  {dashboardStats.task.waiting}
+                </Typography>
+                <Typography component="span" sx={{ color: 'text.secondary' }}>
+                  진행
+                </Typography>
+                <Typography component="span" color="primary" sx={{ fontWeight: 600 }}>
+                  {dashboardStats.task.progress}
+                </Typography>
+                <Typography component="span" sx={{ color: 'text.secondary' }}>
+                  완료
+                </Typography>
+                <Typography component="span" color="primary" sx={{ fontWeight: 600 }}>
+                  {dashboardStats.task.completed}
+                </Typography>
+                <Typography component="span" sx={{ color: 'text.secondary' }}>
+                  홀딩
+                </Typography>
+                <Typography component="span" color="primary" sx={{ fontWeight: 600 }}>
+                  {dashboardStats.task.holding}
+                </Typography>
+              </Stack>
+            }
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <EcommerceDataCard
+            title="개인교육관리"
+            count={`총 ${dashboardStats.education.total}건`}
+            color="warning"
+            iconPrimary={<Book />}
+            percentage={
+              <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap', fontSize: '0.875rem' }}>
+                <Typography component="span" sx={{ color: 'text.secondary' }}>
+                  대기
+                </Typography>
+                <Typography component="span" sx={{ color: 'warning.dark', fontWeight: 600 }}>
+                  {dashboardStats.education.waiting}
+                </Typography>
+                <Typography component="span" sx={{ color: 'text.secondary' }}>
+                  진행
+                </Typography>
+                <Typography component="span" sx={{ color: 'warning.dark', fontWeight: 600 }}>
+                  {dashboardStats.education.progress}
+                </Typography>
+                <Typography component="span" sx={{ color: 'text.secondary' }}>
+                  완료
+                </Typography>
+                <Typography component="span" sx={{ color: 'warning.dark', fontWeight: 600 }}>
+                  {dashboardStats.education.completed}
+                </Typography>
+                <Typography component="span" sx={{ color: 'text.secondary' }}>
+                  홀딩
+                </Typography>
+                <Typography component="span" sx={{ color: 'warning.dark', fontWeight: 600 }}>
+                  {dashboardStats.education.holding}
+                </Typography>
+              </Stack>
+            }
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <EcommerceDataCard
+            title="일정관리"
+            count={`총 ${dashboardStats.calendar.total}건`}
+            color="success"
+            iconPrimary={<Calendar />}
+            percentage={
+              <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap', fontSize: '0.875rem' }}>
+                <Typography component="span" sx={{ color: 'text.secondary' }}>
+                  오늘
+                </Typography>
+                <Typography component="span" sx={{ color: 'success.darker', fontWeight: 600 }}>
+                  {dashboardStats.calendar.today}
+                </Typography>
+                <Typography component="span" sx={{ color: 'text.secondary' }}>
+                  이번주
+                </Typography>
+                <Typography component="span" sx={{ color: 'success.darker', fontWeight: 600 }}>
+                  {dashboardStats.calendar.thisWeek}
+                </Typography>
+                <Typography component="span" sx={{ color: 'text.secondary' }}>
+                  당월
+                </Typography>
+                <Typography component="span" sx={{ color: 'success.darker', fontWeight: 600 }}>
+                  {dashboardStats.calendar.thisMonth}
+                </Typography>
+              </Stack>
+            }
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <EcommerceDataCard
+            title="비용관리"
+            count={`총 ${dashboardStats.cost.total}건`}
+            color="error"
+            iconPrimary={<DollarCircle />}
+            percentage={
+              <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap', fontSize: '0.875rem' }}>
+                <Typography component="span" sx={{ color: 'text.secondary' }}>
+                  대기
+                </Typography>
+                <Typography component="span" sx={{ color: 'error.dark', fontWeight: 600 }}>
+                  {dashboardStats.cost.waiting}
+                </Typography>
+                <Typography component="span" sx={{ color: 'text.secondary' }}>
+                  진행
+                </Typography>
+                <Typography component="span" sx={{ color: 'error.dark', fontWeight: 600 }}>
+                  {dashboardStats.cost.progress}
+                </Typography>
+                <Typography component="span" sx={{ color: 'text.secondary' }}>
+                  완료
+                </Typography>
+                <Typography component="span" sx={{ color: 'error.dark', fontWeight: 600 }}>
+                  {dashboardStats.cost.completed}
+                </Typography>
+                <Typography component="span" sx={{ color: 'text.secondary' }}>
+                  홀딩
+                </Typography>
+                <Typography component="span" sx={{ color: 'error.dark', fontWeight: 600 }}>
+                  {dashboardStats.cost.holding}
+                </Typography>
+              </Stack>
+            }
+          />
+        </Grid>
+        {/* row 2 - 업무관리 & 달력 */}
+        <Grid size={{ xs: 12, md: 8, lg: 9 }}>
+          <Transactions />
+        </Grid>
+        <Grid size={{ xs: 12, md: 4, lg: 3 }}>
+          <DashboardCalendar />
+        </Grid>
+        {/* row 3 - KPI관리, 개인교육관리, 변경로그 */}
+        <Grid size={{ xs: 12, md: 4 }}>
+          <KpiWidget />
+        </Grid>
+        <Grid size={{ xs: 12, md: 4 }}>
+          <EducationWidget />
+        </Grid>
+        <Grid size={{ xs: 12, md: 4 }}>
+          <ProjectRelease />
+        </Grid>
+        {/* row 4 - Project Analytics */}
+        <Grid size={12}>
+          <ProjectAnalytics />
+        </Grid>
       </Grid>
     </Box>
   );

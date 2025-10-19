@@ -81,12 +81,7 @@ export default function ProviderWrapper({ children }: { children: ReactElement }
       }
 
       // 빈 객체 {} 필터링
-      if (
-        typeof reason === 'object' &&
-        reason !== null &&
-        Object.keys(reason).length === 0 &&
-        reason.constructor === Object
-      ) {
+      if (typeof reason === 'object' && reason !== null && Object.keys(reason).length === 0 && reason.constructor === Object) {
         if (process.env.NODE_ENV === 'development') {
           console.debug('🔇 빈 객체 오류 무시됨');
         }
@@ -151,7 +146,13 @@ export default function ProviderWrapper({ children }: { children: ReactElement }
     const originalConsoleError = console.error;
     console.error = (...args: any[]) => {
       // 빈 객체 {} 필터링
-      if (args.length === 1 && typeof args[0] === 'object' && args[0] !== null && Object.keys(args[0]).length === 0 && args[0].constructor === Object) {
+      if (
+        args.length === 1 &&
+        typeof args[0] === 'object' &&
+        args[0] !== null &&
+        Object.keys(args[0]).length === 0 &&
+        args[0].constructor === Object
+      ) {
         if (process.env.NODE_ENV === 'development') {
           console.debug('🔇 빈 객체 콘솔 오류 무시됨');
         }

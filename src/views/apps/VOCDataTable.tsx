@@ -35,7 +35,7 @@ import { VocData } from 'types/voc';
 // hooks
 import { useSupabaseVoc } from 'hooks/useSupabaseVoc';
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
-import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
+import { useSupabaseUsers } from 'hooks/useSupabaseUsers';
 
 // Icons
 import { Add, Trash, Edit, DocumentDownload } from '@wandersonalwes/iconsax-react';
@@ -98,26 +98,18 @@ export default function VOCDataTable({
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
   // 사용자관리 연동
-  const { users } = useSupabaseUserManagement();
+  const { users } = useSupabaseUsers();
+
+  // 사용자 이름으로 사용자 데이터 찾기
+  const findUserByName = (userName: string) => {
+    return users.find((user) => user.user_name === userName);
+  };
 
   // GROUP023의 VOC유형 목록 가져오기
   const vocTypeOptions = getSubCodesByGroup('GROUP023');
 
-  // 사용자 목록 옵션 생성 (등록자)
-  const userOptions = users
-    .filter(user => user.is_active && user.status === 'active')
-    .map(user => user.user_name);
-
-  // 사용자명으로 사용자 정보를 빠르게 찾기 위한 Map
-  const userMap = useMemo(() => {
-    const map = new Map();
-    users.forEach(user => {
-      if (user.is_active && user.status === 'active') {
-        map.set(user.user_name, user);
-      }
-    });
-    return map;
-  }, [users]);
+  // 사용자 목록 옵션 생성 (등록자) - is_active와 status 필터링 제거 (useSupabaseUsers가 이미 활성 사용자만 반환)
+  const userOptions = users.map((user) => user.user_name);
 
   // GROUP024의 우선순위 목록 가져오기 (현재 미사용이지만 향후 확장을 위해 유지)
   // const priorityOptions = getSubCodesByGroup('GROUP024');
@@ -135,21 +127,21 @@ export default function VOCDataTable({
       '#FFF3E0', // 주황색
       '#E0F2F1', // 청록색
       '#FFF8E1', // 노란색
-      '#FCE4EC'  // 분홍색
+      '#FCE4EC' // 분홍색
     ];
 
     // VOC유형의 인덱스를 기반으로 색상 선택
-    const index = vocTypeOptions.findIndex(option => option.subcode_name === vocType);
+    const index = vocTypeOptions.findIndex((option) => option.subcode_name === vocType);
     return index >= 0 ? colors[index % colors.length] : '#F5F5F5';
   };
 
   // 우선순위별 색상 매핑 함수
   const getPriorityColor = (priority: string) => {
     const priorityColors = {
-      '긴급': '#FFEBEE', // 빨간색
-      '높음': '#FFF3E0', // 주황색
-      '보통': '#E8F5E9', // 초록색
-      '낮음': '#E3F2FD'  // 파란색
+      긴급: '#FFEBEE', // 빨간색
+      높음: '#FFF3E0', // 주황색
+      보통: '#E8F5E9', // 초록색
+      낮음: '#E3F2FD' // 파란색
     };
 
     return priorityColors[priority as keyof typeof priorityColors] || '#F5F5F5';
@@ -620,7 +612,6 @@ export default function VOCDataTable({
     setEditDialog(true);
   };
 
-
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* 로딩 상태 표시 */}
@@ -857,7 +848,7 @@ export default function VOCDataTable({
                     {voc.assignee ? (
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Avatar
-                          src={userMap.get(voc.assignee)?.profile_image_url || userMap.get(voc.assignee)?.avatar_url}
+                          src={findUserByName(voc.assignee)?.avatar_url || findUserByName(voc.assignee)?.profile_image_url}
                           sx={{ width: 24, height: 24, fontSize: '12px' }}
                         >
                           {voc.assignee.charAt(0)}

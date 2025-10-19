@@ -189,7 +189,7 @@ const InvestmentOverviewTab = memo(
         const investmentSubcodes = getSubCodesByGroup('GROUP025');
         console.log('📊 GROUP025 투자유형 서브코드:', investmentSubcodes);
         if (investmentSubcodes && investmentSubcodes.length > 0) {
-          const types = investmentSubcodes.map(subcode => subcode.subcode_name);
+          const types = investmentSubcodes.map((subcode) => subcode.subcode_name);
           console.log('✅ 투자유형 목록 설정:', types);
           setMasterInvestmentTypes(types);
         } else {
@@ -200,7 +200,7 @@ const InvestmentOverviewTab = memo(
         const statusSubcodes = getSubCodesByGroup('GROUP002');
         console.log('📊 GROUP002 상태 서브코드:', statusSubcodes);
         if (statusSubcodes && statusSubcodes.length > 0) {
-          const statuses = statusSubcodes.map(subcode => subcode.subcode_name);
+          const statuses = statusSubcodes.map((subcode) => subcode.subcode_name);
           console.log('✅ 상태 목록 설정:', statuses);
           setMasterStatusOptions(statuses);
         } else {
@@ -220,7 +220,7 @@ const InvestmentOverviewTab = memo(
 
       console.log('🏢 부서 데이터 로딩 시도:', departments);
       if (departments && departments.length > 0) {
-        const names = departments.map(dept => dept.department_name);
+        const names = departments.map((dept) => dept.department_name);
         console.log('✅ 부서명 목록 설정:', names);
         setDepartmentNames(names);
       } else {
@@ -370,12 +370,7 @@ const InvestmentOverviewTab = memo(
                   투자유형 <span style={{ color: 'red' }}>*</span>
                 </span>
               </InputLabel>
-              <Select
-                value={investmentState.investmentType}
-                label="투자유형 *"
-                onChange={handleFieldChange('investmentType')}
-                displayEmpty
-              >
+              <Select value={investmentState.investmentType} label="투자유형 *" onChange={handleFieldChange('investmentType')} displayEmpty>
                 <MenuItem value="">선택</MenuItem>
                 {finalInvestmentTypes?.map((type) => (
                   <MenuItem key={type} value={type}>
@@ -524,10 +519,7 @@ const InvestmentOverviewTab = memo(
                   if (!user) return value;
                   return (
                     <Stack direction="row" spacing={1.5} alignItems="center">
-                      <Avatar
-                        src={user.profile_image_url || user.avatar_url}
-                        sx={{ width: 20, height: 20 }}
-                      >
+                      <Avatar src={user.profile_image_url || user.avatar_url} sx={{ width: 20, height: 20 }}>
                         {value?.charAt(0)}
                       </Avatar>
                       <Typography variant="body1" sx={{ color: '#000000' }}>
@@ -928,9 +920,7 @@ const InvestmentRecordTab = memo(
           }}
         >
           <Typography variant="body2" color="text.secondary">
-            {comments.length > 0
-              ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}`
-              : '0-0 of 0'}
+            {comments.length > 0 ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}` : '0-0 of 0'}
           </Typography>
           {comments.length > 0 && (
             <Pagination
@@ -1364,9 +1354,9 @@ const InvestmentAmountTab = memo(({ mode, investmentId }: { mode: 'add' | 'edit'
 
   // GROUP026 투자세부유형 서브코드 목록
   const investmentDetailTypes = useMemo(() => {
-    const group026Codes = subCodes.filter(code => code.group_code === 'GROUP026');
+    const group026Codes = subCodes.filter((code) => code.group_code === 'GROUP026');
     console.log('📊 GROUP026 투자세부유형 서브코드:', group026Codes);
-    const types = group026Codes.map(code => code.subcode_name);
+    const types = group026Codes.map((code) => code.subcode_name);
     console.log('✅ 투자세부유형 목록:', types);
     return types;
   }, [subCodes]);
@@ -1623,11 +1613,11 @@ const InvestmentAmountTab = memo(({ mode, investmentId }: { mode: 'add' | 'edit'
     const newItem: any = {
       id: Date.now().toString(),
       no: amountItems.length + 1,
-      investmentCategory: '',       // investment_category
-      itemName: '',                  // item_name
-      budgetAmount: 0,              // budget_amount
-      executionAmount: 0,           // execution_amount
-      remarks: ''                   // remarks
+      investmentCategory: '', // investment_category
+      itemName: '', // item_name
+      budgetAmount: 0, // budget_amount
+      executionAmount: 0, // execution_amount
+      remarks: '' // remarks
     };
     setAmountItems([newItem, ...amountItems]);
   };
@@ -1781,8 +1771,8 @@ const InvestmentAmountTab = memo(({ mode, investmentId }: { mode: 'add' | 'edit'
           {field === 'budgetAmount' || field === 'executionAmount'
             ? `₩${(value != null ? Number(value) : 0).toLocaleString()}`
             : field === 'investmentCategory'
-            ? value || '선택'
-            : value || '-'}
+              ? value || '선택'
+              : value || '-'}
         </Typography>
       </Box>
     );
@@ -1873,14 +1863,28 @@ const InvestmentAmountTab = memo(({ mode, investmentId }: { mode: 'add' | 'edit'
                 항목명
               </TableCell>
               <TableCell
-                sx={{ width: columnWidths.budgetAmount, fontWeight: 600, minWidth: columnWidths.budgetAmount, maxWidth: columnWidths.budgetAmount }}
+                sx={{
+                  width: columnWidths.budgetAmount,
+                  fontWeight: 600,
+                  minWidth: columnWidths.budgetAmount,
+                  maxWidth: columnWidths.budgetAmount
+                }}
               >
                 예산금액
               </TableCell>
-              <TableCell sx={{ width: columnWidths.executionAmount, fontWeight: 600, minWidth: columnWidths.executionAmount, maxWidth: columnWidths.executionAmount }}>
+              <TableCell
+                sx={{
+                  width: columnWidths.executionAmount,
+                  fontWeight: 600,
+                  minWidth: columnWidths.executionAmount,
+                  maxWidth: columnWidths.executionAmount
+                }}
+              >
                 집행금액
               </TableCell>
-              <TableCell sx={{ width: columnWidths.remarks, fontWeight: 600, minWidth: columnWidths.remarks, maxWidth: columnWidths.remarks }}>
+              <TableCell
+                sx={{ width: columnWidths.remarks, fontWeight: 600, minWidth: columnWidths.remarks, maxWidth: columnWidths.remarks }}
+              >
                 비고
               </TableCell>
             </TableRow>
@@ -1971,7 +1975,13 @@ const InvestmentAmountTab = memo(({ mode, investmentId }: { mode: 'add' | 'edit'
                   {renderEditableCell(item, 'executionAmount', item.executionAmount)}
                 </TableCell>
                 <TableCell
-                  sx={{ width: columnWidths.remarks, padding: 0, height: 48, minWidth: columnWidths.remarks, maxWidth: columnWidths.remarks }}
+                  sx={{
+                    width: columnWidths.remarks,
+                    padding: 0,
+                    height: 48,
+                    minWidth: columnWidths.remarks,
+                    maxWidth: columnWidths.remarks
+                  }}
                   onClick={() => handleCellClick(item.id, 'remarks')}
                 >
                   {renderEditableCell(item, 'remarks', item.remarks)}
@@ -2079,7 +2089,7 @@ function InvestmentEditDialog({
 
   // feedbacks를 comments 형식으로 변환
   const comments = useMemo(() => {
-    return feedbacks.map(feedback => ({
+    return feedbacks.map((feedback) => ({
       id: feedback.id,
       author: feedback.user_name,
       content: feedback.description,
@@ -2258,9 +2268,12 @@ function InvestmentEditDialog({
     setEditingCommentText('');
   }, []);
 
-  const handleDeleteComment = useCallback(async (commentId: string) => {
-    await deleteFeedback(commentId);
-  }, [deleteFeedback]);
+  const handleDeleteComment = useCallback(
+    async (commentId: string) => {
+      await deleteFeedback(commentId);
+    },
+    [deleteFeedback]
+  );
 
   const handleSave = useCallback(async () => {
     // 개요탭의 현재 입력 값 가져오기

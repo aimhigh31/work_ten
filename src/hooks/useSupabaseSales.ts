@@ -1,13 +1,6 @@
 import { useState, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import {
-  SalesRecord,
-  SalesRecordDB,
-  CreateSalesInput,
-  UpdateSalesInput,
-  convertSalesFromDB,
-  convertSalesToDB
-} from '../types/sales';
+import { SalesRecord, SalesRecordDB, CreateSalesInput, UpdateSalesInput, convertSalesFromDB, convertSalesToDB } from '../types/sales';
 import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
 // Supabase 클라이언트 설정 (RLS 해지 후 ANON_KEY 사용)
@@ -76,7 +69,6 @@ export const useSupabaseSales = (): UseSupabaseSalesReturn => {
       saveToCache(CACHE_KEY, salesRecords);
 
       return salesRecords;
-
     } catch (error) {
       console.log('❌ getSales 실패:', error);
       setError(error instanceof Error ? error.message : '매출 데이터 조회 실패');
@@ -93,11 +85,7 @@ export const useSupabaseSales = (): UseSupabaseSalesReturn => {
       setLoading(true);
       setError(null);
 
-      const { data, error: supabaseError } = await supabase
-        .from('plan_sales_data')
-        .select('*')
-        .eq('id', id)
-        .single();
+      const { data, error: supabaseError } = await supabase.from('plan_sales_data').select('*').eq('id', id).single();
 
       if (supabaseError) {
         console.log('❌ Supabase 조회 오류:', supabaseError);
@@ -106,7 +94,6 @@ export const useSupabaseSales = (): UseSupabaseSalesReturn => {
 
       console.log('✅ getSalesById 성공:', data);
       return convertSalesFromDB(data as SalesRecordDB);
-
     } catch (error) {
       console.log('❌ getSalesById 실패:', error);
       setError(error instanceof Error ? error.message : '매출 데이터 조회 실패');
@@ -117,9 +104,7 @@ export const useSupabaseSales = (): UseSupabaseSalesReturn => {
   }, []);
 
   // 새 매출 생성
-  const createSales = useCallback(async (
-    sales: CreateSalesInput
-  ): Promise<SalesRecord | null> => {
+  const createSales = useCallback(async (sales: CreateSalesInput): Promise<SalesRecord | null> => {
     try {
       console.log('🚀 createSales 시작');
       console.log('📝 생성할 매출 데이터:', sales);
@@ -150,11 +135,7 @@ export const useSupabaseSales = (): UseSupabaseSalesReturn => {
 
       console.log('💾 최종 삽입 데이터:', insertData);
 
-      const { data, error: supabaseError } = await supabase
-        .from('plan_sales_data')
-        .insert([insertData])
-        .select()
-        .single();
+      const { data, error: supabaseError } = await supabase.from('plan_sales_data').insert([insertData]).select().single();
 
       if (supabaseError) {
         console.log('❌ Supabase 생성 오류:', supabaseError);
@@ -171,7 +152,6 @@ export const useSupabaseSales = (): UseSupabaseSalesReturn => {
       sessionStorage.removeItem(CACHE_KEY);
 
       return convertSalesFromDB(data as SalesRecordDB);
-
     } catch (error) {
       console.log('❌ createSales 실패:', error);
       setError(error instanceof Error ? error.message : '매출 생성 실패');
@@ -182,10 +162,7 @@ export const useSupabaseSales = (): UseSupabaseSalesReturn => {
   }, []);
 
   // 매출 업데이트
-  const updateSales = useCallback(async (
-    id: number,
-    sales: UpdateSalesInput
-  ): Promise<boolean> => {
+  const updateSales = useCallback(async (id: number, sales: UpdateSalesInput): Promise<boolean> => {
     try {
       console.log('📞 updateSales 호출:', id);
       console.log('📦 업데이트할 데이터:', sales);
@@ -214,11 +191,7 @@ export const useSupabaseSales = (): UseSupabaseSalesReturn => {
 
       console.log('💾 Supabase로 전송할 데이터:', JSON.stringify(updateData, null, 2));
 
-      const { data, error: supabaseError } = await supabase
-        .from('plan_sales_data')
-        .update(updateData)
-        .eq('id', id)
-        .select();
+      const { data, error: supabaseError } = await supabase.from('plan_sales_data').update(updateData).eq('id', id).select();
 
       if (supabaseError) {
         console.log('❌ Supabase 업데이트 오류 상세:');
@@ -237,7 +210,6 @@ export const useSupabaseSales = (): UseSupabaseSalesReturn => {
       sessionStorage.removeItem(CACHE_KEY);
 
       return true;
-
     } catch (error) {
       console.log('❌ updateSales 실패:', error);
       setError(error instanceof Error ? error.message : '매출 업데이트 실패');
@@ -254,10 +226,7 @@ export const useSupabaseSales = (): UseSupabaseSalesReturn => {
       setLoading(true);
       setError(null);
 
-      const { error: supabaseError } = await supabase
-        .from('plan_sales_data')
-        .delete()
-        .eq('id', id);
+      const { error: supabaseError } = await supabase.from('plan_sales_data').delete().eq('id', id);
 
       if (supabaseError) {
         console.log('❌ Supabase 삭제 오류:', supabaseError);
@@ -271,7 +240,6 @@ export const useSupabaseSales = (): UseSupabaseSalesReturn => {
       sessionStorage.removeItem(CACHE_KEY);
 
       return true;
-
     } catch (error) {
       console.log('❌ deleteSales 실패:', error);
       setError(error instanceof Error ? error.message : '매출 삭제 실패');

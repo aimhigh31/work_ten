@@ -39,7 +39,7 @@ import SecurityIncidentEditDialog from 'components/SecurityIncidentEditDialog';
 
 // data and types
 import { SecurityIncidentRecord, incidentTypeOptions, statusOptions } from 'types/security-incident';
-import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
+import { useSupabaseUsers } from 'hooks/useSupabaseUsers';
 import { useSupabaseSecurityAccident } from 'hooks/useSupabaseSecurityAccident';
 import { TaskTableData, TaskStatus } from 'types/task';
 
@@ -86,7 +86,16 @@ interface SecurityIncidentTableProps {
   selectedAssignee?: string;
   tasks: SecurityIncidentRecord[];
   setTasks: React.Dispatch<React.SetStateAction<SecurityIncidentRecord[]>>;
-  addChangeLog: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string, title?: string) => void;
+  addChangeLog: (
+    action: string,
+    target: string,
+    description: string,
+    team?: string,
+    beforeValue?: string,
+    afterValue?: string,
+    changedField?: string,
+    title?: string
+  ) => void;
   error?: string | null;
   onDataRefresh?: () => Promise<void>;
 }
@@ -103,10 +112,15 @@ export default function SecurityIncidentTable({
   onDataRefresh
 }: SecurityIncidentTableProps) {
   const theme = useTheme();
-  const { users } = useSupabaseUserManagement();
+  const { users } = useSupabaseUsers();
   const { createAccident, updateAccident, deleteAccident } = useSupabaseSecurityAccident();
 
-  // 사용자 이름과 프로필 이미지 매핑
+  // 사용자 이름으로 사용자 데이터 찾기
+  const findUserByName = (userName: string) => {
+    return users.find((user) => user.user_name === userName);
+  };
+
+  // Dialog에 전달하기 위한 userProfiles 매핑 (임시)
   const userProfiles = useMemo(() => {
     const profiles: { [key: string]: string } = {};
     users.forEach((user) => {
@@ -797,7 +811,7 @@ export default function SecurityIncidentTable({
                   <TableCell>
                     <Stack direction="row" spacing={1} alignItems="center">
                       <Avatar
-                        src={task.assignee ? userProfiles[task.assignee] || `/assets/images/users/default.png` : undefined}
+                        src={findUserByName(task.assignee)?.avatar_url || findUserByName(task.assignee)?.profile_image_url}
                         alt={task.assignee}
                         sx={{ width: 24, height: 24 }}
                       >

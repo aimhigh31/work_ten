@@ -67,10 +67,10 @@ export interface ParticipantItem {
 
 // 교육실적보고서 인터페이스
 export interface EducationReport {
-  achievements: string;      // 성과
-  improvements: string;      // 개선사항
-  feedback: string;          // 교육소감 (education_feedback)
-  notes: string;            // 비고 (report_notes)
+  achievements: string; // 성과
+  improvements: string; // 개선사항
+  feedback: string; // 교육소감 (education_feedback)
+  notes: string; // 비고 (report_notes)
 }
 
 // 기타 옵션들

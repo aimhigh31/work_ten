@@ -630,111 +630,110 @@ const OverviewTab = React.memo(
                   );
                 }}
               >
-                {statusTypes && statusTypes.length > 0 ? (
-                  statusTypes.map((statusType) => {
-                    const getStatusStyle = (statusName: string) => {
-                      switch (statusName) {
-                        case '대기':
-                          return { backgroundColor: '#F5F5F5', color: '#757575' };
-                        case '진행':
-                          return { backgroundColor: '#E3F2FD', color: '#1976D2' };
-                        case '승인':
-                        case '완료':
-                          return { backgroundColor: '#E8F5E9', color: '#388E3C' };
-                        case '취소':
-                        case '홀딩':
-                          return { backgroundColor: '#FFEBEE', color: '#D32F2F' };
-                        default:
-                          return { backgroundColor: '#F5F5F5', color: '#757575' };
-                      }
-                    };
-                    const style = getStatusStyle(statusType.subcode_name);
-                    return (
-                      <MenuItem key={statusType.subcode} value={statusType.subcode_name}>
+                {statusTypes && statusTypes.length > 0
+                  ? statusTypes.map((statusType) => {
+                      const getStatusStyle = (statusName: string) => {
+                        switch (statusName) {
+                          case '대기':
+                            return { backgroundColor: '#F5F5F5', color: '#757575' };
+                          case '진행':
+                            return { backgroundColor: '#E3F2FD', color: '#1976D2' };
+                          case '승인':
+                          case '완료':
+                            return { backgroundColor: '#E8F5E9', color: '#388E3C' };
+                          case '취소':
+                          case '홀딩':
+                            return { backgroundColor: '#FFEBEE', color: '#D32F2F' };
+                          default:
+                            return { backgroundColor: '#F5F5F5', color: '#757575' };
+                        }
+                      };
+                      const style = getStatusStyle(statusType.subcode_name);
+                      return (
+                        <MenuItem key={statusType.subcode} value={statusType.subcode_name}>
+                          <Box
+                            sx={{
+                              display: 'inline-block',
+                              px: 2,
+                              py: 0.5,
+                              borderRadius: '16px',
+                              backgroundColor: style.backgroundColor,
+                              color: style.color,
+                              fontWeight: 400,
+                              fontSize: '13px'
+                            }}
+                          >
+                            {statusType.subcode_name}
+                          </Box>
+                        </MenuItem>
+                      );
+                    })
+                  : [
+                      <MenuItem key="대기" value="대기">
                         <Box
                           sx={{
                             display: 'inline-block',
                             px: 2,
                             py: 0.5,
                             borderRadius: '16px',
-                            backgroundColor: style.backgroundColor,
-                            color: style.color,
+                            backgroundColor: '#F5F5F5',
+                            color: '#757575',
                             fontWeight: 400,
                             fontSize: '13px'
                           }}
                         >
-                          {statusType.subcode_name}
+                          대기
+                        </Box>
+                      </MenuItem>,
+                      <MenuItem key="진행" value="진행">
+                        <Box
+                          sx={{
+                            display: 'inline-block',
+                            px: 2,
+                            py: 0.5,
+                            borderRadius: '16px',
+                            backgroundColor: '#E3F2FD',
+                            color: '#1976D2',
+                            fontWeight: 400,
+                            fontSize: '13px'
+                          }}
+                        >
+                          진행
+                        </Box>
+                      </MenuItem>,
+                      <MenuItem key="승인" value="승인">
+                        <Box
+                          sx={{
+                            display: 'inline-block',
+                            px: 2,
+                            py: 0.5,
+                            borderRadius: '16px',
+                            backgroundColor: '#E8F5E9',
+                            color: '#388E3C',
+                            fontWeight: 400,
+                            fontSize: '13px'
+                          }}
+                        >
+                          승인
+                        </Box>
+                      </MenuItem>,
+                      <MenuItem key="취소" value="취소">
+                        <Box
+                          sx={{
+                            display: 'inline-block',
+                            px: 2,
+                            py: 0.5,
+                            borderRadius: '16px',
+                            backgroundColor: '#FFEBEE',
+                            color: '#D32F2F',
+                            fontWeight: 400,
+                            fontSize: '13px'
+                          }}
+                        >
+                          취소
                         </Box>
                       </MenuItem>
-                    );
-                  })
-                ) : [
-                    <MenuItem key="대기" value="대기">
-                      <Box
-                        sx={{
-                          display: 'inline-block',
-                          px: 2,
-                          py: 0.5,
-                          borderRadius: '16px',
-                          backgroundColor: '#F5F5F5',
-                          color: '#757575',
-                          fontWeight: 400,
-                          fontSize: '13px'
-                        }}
-                      >
-                        대기
-                      </Box>
-                    </MenuItem>,
-                    <MenuItem key="진행" value="진행">
-                      <Box
-                        sx={{
-                          display: 'inline-block',
-                          px: 2,
-                          py: 0.5,
-                          borderRadius: '16px',
-                          backgroundColor: '#E3F2FD',
-                          color: '#1976D2',
-                          fontWeight: 400,
-                          fontSize: '13px'
-                        }}
-                      >
-                        진행
-                      </Box>
-                    </MenuItem>,
-                    <MenuItem key="승인" value="승인">
-                      <Box
-                        sx={{
-                          display: 'inline-block',
-                          px: 2,
-                          py: 0.5,
-                          borderRadius: '16px',
-                          backgroundColor: '#E8F5E9',
-                          color: '#388E3C',
-                          fontWeight: 400,
-                          fontSize: '13px'
-                        }}
-                      >
-                        승인
-                      </Box>
-                    </MenuItem>,
-                    <MenuItem key="취소" value="취소">
-                      <Box
-                        sx={{
-                          display: 'inline-block',
-                          px: 2,
-                          py: 0.5,
-                          borderRadius: '16px',
-                          backgroundColor: '#FFEBEE',
-                          color: '#D32F2F',
-                          fontWeight: 400,
-                          fontSize: '13px'
-                        }}
-                      >
-                        취소
-                      </Box>
-                    </MenuItem>
-                  ]
-                }
+                    ]}
               </Select>
             </FormControl>
           </Stack>
@@ -784,20 +783,21 @@ const OverviewTab = React.memo(
               InputLabelProps={{ shrink: true }}
               InputProps={{
                 readOnly: true,
-                startAdornment: assignee && assigneeList ? (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: -0.5 }}>
-                    <Avatar
-                      src={assigneeList.find((user) => user.name === assignee)?.avatar || '/assets/images/users/avatar-1.png'}
-                      alt={assignee}
-                      sx={{ width: 24, height: 24 }}
-                    />
-                    <Typography variant="body1">{assignee}</Typography>
-                  </Box>
-                ) : (
-                  <Typography variant="body1" sx={{ color: 'text.disabled', ml: -0.5 }}>
-                    담당자 미지정
-                  </Typography>
-                )
+                startAdornment:
+                  assignee && assigneeList ? (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: -0.5 }}>
+                      <Avatar
+                        src={assigneeList.find((user) => user.name === assignee)?.avatar || '/assets/images/users/avatar-1.png'}
+                        alt={assignee}
+                        sx={{ width: 24, height: 24 }}
+                      />
+                      <Typography variant="body1">{assignee}</Typography>
+                    </Box>
+                  ) : (
+                    <Typography variant="body1" sx={{ color: 'text.disabled', ml: -0.5 }}>
+                      담당자 미지정
+                    </Typography>
+                  )
               }}
               sx={{
                 '& .MuiOutlinedInput-root': {
@@ -1168,9 +1168,7 @@ const RecordTab = memo(
           }}
         >
           <Typography variant="body2" color="text.secondary">
-            {comments.length > 0
-              ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}`
-              : '0-0 of 0'}
+            {comments.length > 0 ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}` : '0-0 of 0'}
           </Typography>
           {totalPages > 0 && (
             <Pagination
@@ -1779,9 +1777,12 @@ const OverviewPanel = React.memo(
       setEditingCommentText('');
     }, []);
 
-    const handleDeleteComment = useCallback(async (commentId: string) => {
-      await deleteFeedback(commentId);
-    }, [deleteFeedback]);
+    const handleDeleteComment = useCallback(
+      async (commentId: string) => {
+        await deleteFeedback(commentId);
+      },
+      [deleteFeedback]
+    );
 
     if (!selectedItem) {
       return (
@@ -4885,7 +4886,7 @@ export default function TaskManagement() {
       // 모든 파일의 team 필드 확인 (재귀적으로)
       const getAllFiles = (items: FolderItem[]): any[] => {
         const files: any[] = [];
-        items.forEach(item => {
+        items.forEach((item) => {
           if (item.type === 'file') {
             files.push({ id: item.id, name: item.name, team: item.team });
           }
@@ -5123,47 +5124,50 @@ export default function TaskManagement() {
   };
 
   // 파일 업데이트 핸들러 (칸반 드래그 앤 드롭용)
-  const handleUpdateItem = React.useCallback(async (itemId: string, updates: Partial<FolderItem>) => {
-    // 로컬 상태 업데이트
-    setFolderData((prevData) => {
-      const updateItemInArray = (items: FolderItem[]): FolderItem[] => {
-        return items.map((item) => {
-          if (item.id === itemId) {
-            // 변경사항이 있는지 확인하여 불필요한 업데이트 방지
-            const hasChanges = Object.keys(updates).some((key) => (item as any)[key] !== (updates as any)[key]);
-            return hasChanges ? { ...item, ...updates } : item;
-          }
-          if (item.children) {
-            return { ...item, children: updateItemInArray(item.children) };
-          }
-          return item;
-        });
-      };
+  const handleUpdateItem = React.useCallback(
+    async (itemId: string, updates: Partial<FolderItem>) => {
+      // 로컬 상태 업데이트
+      setFolderData((prevData) => {
+        const updateItemInArray = (items: FolderItem[]): FolderItem[] => {
+          return items.map((item) => {
+            if (item.id === itemId) {
+              // 변경사항이 있는지 확인하여 불필요한 업데이트 방지
+              const hasChanges = Object.keys(updates).some((key) => (item as any)[key] !== (updates as any)[key]);
+              return hasChanges ? { ...item, ...updates } : item;
+            }
+            if (item.children) {
+              return { ...item, children: updateItemInArray(item.children) };
+            }
+            return item;
+          });
+        };
 
-      return updateItemInArray(prevData);
-    });
+        return updateItemInArray(prevData);
+      });
 
-    // DB에 저장 (필드명 매핑)
-    const dbUpdateData: any = {};
+      // DB에 저장 (필드명 매핑)
+      const dbUpdateData: any = {};
 
-    if (updates.name !== undefined) dbUpdateData.name = updates.name;
-    if (updates.description !== undefined) dbUpdateData.description = updates.description;
-    if (updates.status !== undefined) dbUpdateData.status = updates.status;
-    if (updates.documentType !== undefined) dbUpdateData.document_type = updates.documentType;
-    if (updates.team !== undefined) dbUpdateData.team = updates.team;
-    if (updates.assignee !== undefined) dbUpdateData.assignee = updates.assignee;
-    if (updates.code !== undefined) dbUpdateData.code = updates.code;
-    if (updates.revision !== undefined) dbUpdateData.revision = updates.revision;
+      if (updates.name !== undefined) dbUpdateData.name = updates.name;
+      if (updates.description !== undefined) dbUpdateData.description = updates.description;
+      if (updates.status !== undefined) dbUpdateData.status = updates.status;
+      if (updates.documentType !== undefined) dbUpdateData.document_type = updates.documentType;
+      if (updates.team !== undefined) dbUpdateData.team = updates.team;
+      if (updates.assignee !== undefined) dbUpdateData.assignee = updates.assignee;
+      if (updates.code !== undefined) dbUpdateData.code = updates.code;
+      if (updates.revision !== undefined) dbUpdateData.revision = updates.revision;
 
-    try {
-      const success = await updateItem(Number(itemId), dbUpdateData);
-      if (!success) {
-        console.error('DB 업데이트 실패');
+      try {
+        const success = await updateItem(Number(itemId), dbUpdateData);
+        if (!success) {
+          console.error('DB 업데이트 실패');
+        }
+      } catch (error) {
+        console.error('DB 업데이트 오류:', error);
       }
-    } catch (error) {
-      console.error('DB 업데이트 오류:', error);
-    }
-  }, [updateItem]);
+    },
+    [updateItem]
+  );
 
   // 카드 클릭 핸들러
   const handleCardClick = (task: RegulationTableData) => {
@@ -5311,9 +5315,12 @@ export default function TaskManagement() {
     setDialogEditingCommentText('');
   }, []);
 
-  const handleDialogDeleteComment = useCallback(async (commentId: string) => {
-    await deleteDialogFeedback(commentId);
-  }, [deleteDialogFeedback]);
+  const handleDialogDeleteComment = useCallback(
+    async (commentId: string) => {
+      await deleteDialogFeedback(commentId);
+    },
+    [deleteDialogFeedback]
+  );
 
   // 폴더에서 모든 파일 추출 함수 (메인에서 정의, 재사용)
   const getAllFilesFromFolders = React.useCallback((folders: FolderItem[]): FolderItem[] => {

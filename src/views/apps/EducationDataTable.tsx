@@ -35,7 +35,7 @@ import { EducationData } from 'types/education';
 // hooks
 import { useSupabaseEducation } from 'hooks/useSupabaseEducation';
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
-import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
+import { useSupabaseUsers } from 'hooks/useSupabaseUsers';
 
 // Icons
 import { Add, Trash, Edit, DocumentDownload } from '@wandersonalwes/iconsax-react';
@@ -92,29 +92,34 @@ export default function EducationDataTable({
   const [isInitialLoading, setIsInitialLoading] = useState(true); // 초기 로딩 상태
 
   // Supabase Education 연동
-  const { getEducations, createEducation, updateEducation, deleteEducation, convertToEducationData, convertToDbEducationData, loading, error } = useSupabaseEducation();
+  const {
+    getEducations,
+    createEducation,
+    updateEducation,
+    deleteEducation,
+    convertToEducationData,
+    convertToDbEducationData,
+    loading,
+    error
+  } = useSupabaseEducation();
 
   // 마스터코드 연동
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
-  // 사용자관리 연동
-  const { users } = useSupabaseUserManagement();
+  // 사용자관리 연동 (Auto-loading 패턴)
+  const { users } = useSupabaseUsers();
 
   // GROUP023의 Education유형 목록 가져오기
   const educationTypeOptions = getSubCodesByGroup('GROUP023');
 
-  // 사용자 목록 옵션 생성 (등록자)
-  const userOptions = users
-    .filter(user => user.is_active && user.status === 'active')
-    .map(user => user.user_name);
+  // 사용자 목록 옵션 생성 (등록자) - useSupabaseUsers가 이미 활성 사용자만 반환
+  const userOptions = users.map((user) => user.user_name);
 
   // 사용자명으로 사용자 정보를 빠르게 찾기 위한 Map
   const userMap = useMemo(() => {
     const map = new Map();
-    users.forEach(user => {
-      if (user.is_active && user.status === 'active') {
-        map.set(user.user_name, user);
-      }
+    users.forEach((user) => {
+      map.set(user.user_name, user);
     });
     return map;
   }, [users]);
@@ -135,21 +140,21 @@ export default function EducationDataTable({
       '#FFF3E0', // 주황색
       '#E0F2F1', // 청록색
       '#FFF8E1', // 노란색
-      '#FCE4EC'  // 분홍색
+      '#FCE4EC' // 분홍색
     ];
 
     // Education유형의 인덱스를 기반으로 색상 선택
-    const index = educationTypeOptions.findIndex(option => option.subcode_name === educationType);
+    const index = educationTypeOptions.findIndex((option) => option.subcode_name === educationType);
     return index >= 0 ? colors[index % colors.length] : '#F5F5F5';
   };
 
   // 우선순위별 색상 매핑 함수
   const getPriorityColor = (priority: string) => {
     const priorityColors = {
-      '긴급': '#FFEBEE', // 빨간색
-      '높음': '#FFF3E0', // 주황색
-      '보통': '#E8F5E9', // 초록색
-      '낮음': '#E3F2FD'  // 파란색
+      긴급: '#FFEBEE', // 빨간색
+      높음: '#FFF3E0', // 주황색
+      보통: '#E8F5E9', // 초록색
+      낮음: '#E3F2FD' // 파란색
     };
 
     return priorityColors[priority as keyof typeof priorityColors] || '#F5F5F5';
@@ -573,9 +578,7 @@ export default function EducationDataTable({
 
         if (success) {
           // 불변성을 유지하면서 배열 업데이트 (.map() 사용)
-          const updatedData = data.map((edu) =>
-            edu.id === updatedEducation.id ? { ...updatedEducation } : edu
-          );
+          const updatedData = data.map((edu) => (edu.id === updatedEducation.id ? { ...updatedEducation } : edu));
           setData(updatedData);
 
           // 부모 컴포넌트로 동기화
@@ -646,7 +649,6 @@ export default function EducationDataTable({
     setEditDialog(true);
   };
 
-
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* 로딩 상태 표시 */}
@@ -675,365 +677,365 @@ export default function EducationDataTable({
       ) : (
         <>
           {/* 상단 정보 및 액션 버튼 */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, mt: 3, flexShrink: 0 }}>
-        <Typography variant="body2" color="text.secondary">
-          총 {filteredData.length}건
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant="outlined"
-            startIcon={<DocumentDownload size={16} />}
-            size="small"
-            onClick={handleExcelDownload}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, mt: 3, flexShrink: 0 }}>
+            <Typography variant="body2" color="text.secondary">
+              총 {filteredData.length}건
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="outlined"
+                startIcon={<DocumentDownload size={16} />}
+                size="small"
+                onClick={handleExcelDownload}
+                sx={{
+                  px: 2,
+                  borderColor: '#4CAF50',
+                  color: '#4CAF50',
+                  '&:hover': {
+                    borderColor: '#4CAF50',
+                    backgroundColor: '#4CAF50',
+                    color: '#fff'
+                  }
+                }}
+              >
+                Excel Down
+              </Button>
+              <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={addNewEducation} sx={{ px: 2 }}>
+                추가
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<Trash size={16} />}
+                size="small"
+                color="error"
+                disabled={selected.length === 0}
+                onClick={handleDeleteSelected}
+                sx={{
+                  px: 2,
+                  borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
+                  color: selected.length > 0 ? 'error.main' : 'grey.500'
+                }}
+              >
+                삭제 {selected.length > 0 && `(${selected.length})`}
+              </Button>
+            </Box>
+          </Box>
+
+          {/* 테이블 */}
+          <TableContainer
             sx={{
-              px: 2,
-              borderColor: '#4CAF50',
-              color: '#4CAF50',
-              '&:hover': {
-                borderColor: '#4CAF50',
-                backgroundColor: '#4CAF50',
-                color: '#fff'
+              flex: 1,
+              border: 'none',
+              borderRadius: 0,
+              overflowX: 'auto',
+              overflowY: 'auto',
+              boxShadow: 'none',
+              minHeight: 0,
+              '& .MuiTable-root': {
+                minWidth: 1400
+              },
+              // 스크롤바 스타일
+              '&::-webkit-scrollbar': {
+                width: '10px',
+                height: '10px'
+              },
+              '&::-webkit-scrollbar-track': {
+                backgroundColor: '#f8f9fa',
+                borderRadius: '4px'
+              },
+              '&::-webkit-scrollbar-thumb': {
+                backgroundColor: '#e9ecef',
+                borderRadius: '4px',
+                border: '2px solid #f8f9fa'
+              },
+              '&::-webkit-scrollbar-thumb:hover': {
+                backgroundColor: '#dee2e6'
+              },
+              '&::-webkit-scrollbar-corner': {
+                backgroundColor: '#f8f9fa'
               }
             }}
           >
-            Excel Down
-          </Button>
-          <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={addNewEducation} sx={{ px: 2 }}>
-            추가
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<Trash size={16} />}
-            size="small"
-            color="error"
-            disabled={selected.length === 0}
-            onClick={handleDeleteSelected}
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ backgroundColor: 'grey.50' }}>
+                  <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
+                    <Checkbox
+                      indeterminate={selected.length > 0 && selected.length < paginatedData.length}
+                      checked={paginatedData.length > 0 && selected.length === paginatedData.length}
+                      onChange={handleSelectAllClick}
+                    />
+                  </TableCell>
+                  <TableCell sx={{ width: columnWidths.no, fontWeight: 600 }}>NO</TableCell>
+                  <TableCell sx={{ width: columnWidths.registrationDate, fontWeight: 600 }}>등록일</TableCell>
+                  <TableCell sx={{ width: columnWidths.code, fontWeight: 600 }}>코드</TableCell>
+                  <TableCell sx={{ width: columnWidths.educationType, fontWeight: 600 }}>교육방식</TableCell>
+                  <TableCell sx={{ width: columnWidths.title, fontWeight: 600 }}>제목</TableCell>
+                  <TableCell sx={{ width: columnWidths.team, fontWeight: 600 }}>팀</TableCell>
+                  <TableCell sx={{ width: columnWidths.assignee, fontWeight: 600 }}>담당자</TableCell>
+                  <TableCell sx={{ width: columnWidths.status, fontWeight: 600 }}>상태</TableCell>
+                  <TableCell sx={{ width: columnWidths.startDate, fontWeight: 600 }}>시작일</TableCell>
+                  <TableCell sx={{ width: columnWidths.completionDate, fontWeight: 600 }}>완료일</TableCell>
+                  <TableCell sx={{ width: columnWidths.action, fontWeight: 600 }}>ACTION</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {paginatedData.length > 0 ? (
+                  paginatedData.map((education) => (
+                    <TableRow
+                      key={education.id}
+                      hover
+                      sx={{
+                        '&:hover': { backgroundColor: 'action.hover' }
+                      }}
+                    >
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          checked={selected.includes(education.id)}
+                          onChange={(event) => {
+                            const selectedIndex = selected.indexOf(education.id);
+                            let newSelected: number[] = [];
+
+                            if (selectedIndex === -1) {
+                              newSelected = newSelected.concat(selected, education.id);
+                            } else if (selectedIndex === 0) {
+                              newSelected = newSelected.concat(selected.slice(1));
+                            } else if (selectedIndex === selected.length - 1) {
+                              newSelected = newSelected.concat(selected.slice(0, -1));
+                            } else if (selectedIndex > 0) {
+                              newSelected = newSelected.concat(selected.slice(0, selectedIndex), selected.slice(selectedIndex + 1));
+                            }
+                            setSelected(newSelected);
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                          {education.no}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                          {education.registrationDate}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                          MAIN-EDU-{new Date(education.registrationDate).getFullYear().toString().slice(-2)}-
+                          {String(education.no).padStart(3, '0')}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                          {education.educationType || '미분류'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                          {education.title || '제목 없음'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                          {education.team || '-'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        {education.assignee ? (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Avatar
+                              src={userMap.get(education.assignee)?.profile_image_url || userMap.get(education.assignee)?.avatar_url}
+                              sx={{ width: 24, height: 24 }}
+                            >
+                              {education.assignee.charAt(0)}
+                            </Avatar>
+                            <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                              {education.assignee}
+                            </Typography>
+                          </Box>
+                        ) : (
+                          <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                            -
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={education.status}
+                          size="small"
+                          sx={{
+                            backgroundColor: getStatusColor(education.status).bgcolor,
+                            color: getStatusColor(education.status).color,
+                            fontSize: '13px',
+                            fontWeight: 500
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                          {education.receptionDate || '-'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                          {education.resolutionDate || '-'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Tooltip title="팝업편집">
+                          <IconButton size="small" onClick={() => handleEditEducation(education)} sx={{ color: 'primary.main' }}>
+                            <Edit size={16} />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={12} align="center" sx={{ py: 4 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        검색 결과가 없습니다.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          {/* 페이지네이션 */}
+          <Box
             sx={{
-              px: 2,
-              borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
-              color: selected.length > 0 ? 'error.main' : 'grey.500'
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              mt: 0.5,
+              px: 1,
+              py: 0.5,
+              borderTop: '1px solid',
+              borderColor: 'divider',
+              flexShrink: 0
             }}
           >
-            삭제 {selected.length > 0 && `(${selected.length})`}
-          </Button>
-        </Box>
-      </Box>
-
-      {/* 테이블 */}
-      <TableContainer
-        sx={{
-          flex: 1,
-          border: 'none',
-          borderRadius: 0,
-          overflowX: 'auto',
-          overflowY: 'auto',
-          boxShadow: 'none',
-          minHeight: 0,
-          '& .MuiTable-root': {
-            minWidth: 1400
-          },
-          // 스크롤바 스타일
-          '&::-webkit-scrollbar': {
-            width: '10px',
-            height: '10px'
-          },
-          '&::-webkit-scrollbar-track': {
-            backgroundColor: '#f8f9fa',
-            borderRadius: '4px'
-          },
-          '&::-webkit-scrollbar-thumb': {
-            backgroundColor: '#e9ecef',
-            borderRadius: '4px',
-            border: '2px solid #f8f9fa'
-          },
-          '&::-webkit-scrollbar-thumb:hover': {
-            backgroundColor: '#dee2e6'
-          },
-          '&::-webkit-scrollbar-corner': {
-            backgroundColor: '#f8f9fa'
-          }
-        }}
-      >
-        <Table size="small">
-          <TableHead>
-            <TableRow sx={{ backgroundColor: 'grey.50' }}>
-              <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
-                <Checkbox
-                  indeterminate={selected.length > 0 && selected.length < paginatedData.length}
-                  checked={paginatedData.length > 0 && selected.length === paginatedData.length}
-                  onChange={handleSelectAllClick}
-                />
-              </TableCell>
-              <TableCell sx={{ width: columnWidths.no, fontWeight: 600 }}>NO</TableCell>
-              <TableCell sx={{ width: columnWidths.registrationDate, fontWeight: 600 }}>등록일</TableCell>
-              <TableCell sx={{ width: columnWidths.code, fontWeight: 600 }}>코드</TableCell>
-              <TableCell sx={{ width: columnWidths.educationType, fontWeight: 600 }}>교육방식</TableCell>
-              <TableCell sx={{ width: columnWidths.title, fontWeight: 600 }}>제목</TableCell>
-              <TableCell sx={{ width: columnWidths.team, fontWeight: 600 }}>팀</TableCell>
-              <TableCell sx={{ width: columnWidths.assignee, fontWeight: 600 }}>담당자</TableCell>
-              <TableCell sx={{ width: columnWidths.status, fontWeight: 600 }}>상태</TableCell>
-              <TableCell sx={{ width: columnWidths.startDate, fontWeight: 600 }}>시작일</TableCell>
-              <TableCell sx={{ width: columnWidths.completionDate, fontWeight: 600 }}>완료일</TableCell>
-              <TableCell sx={{ width: columnWidths.action, fontWeight: 600 }}>ACTION</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {paginatedData.length > 0 ? (
-              paginatedData.map((education) => (
-                <TableRow
-                  key={education.id}
-                  hover
+            {/* 왼쪽: Row per page */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                Row per page
+              </Typography>
+              <FormControl size="small" sx={{ minWidth: 60 }}>
+                <Select
+                  value={rowsPerPage}
+                  onChange={(e) => {
+                    setRowsPerPage(Number(e.target.value));
+                    setPage(0);
+                  }}
                   sx={{
-                    '&:hover': { backgroundColor: 'action.hover' }
+                    '& .MuiSelect-select': {
+                      py: 0.5,
+                      px: 1,
+                      fontSize: '0.875rem'
+                    },
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      border: '1px solid #e0e0e0'
+                    }
                   }}
                 >
-                  <TableCell padding="checkbox">
-                    <Checkbox
-                      checked={selected.includes(education.id)}
-                      onChange={(event) => {
-                        const selectedIndex = selected.indexOf(education.id);
-                        let newSelected: number[] = [];
+                  <MenuItem value={5}>5</MenuItem>
+                  <MenuItem value={10}>10</MenuItem>
+                  <MenuItem value={25}>25</MenuItem>
+                  <MenuItem value={50}>50</MenuItem>
+                </Select>
+              </FormControl>
 
-                        if (selectedIndex === -1) {
-                          newSelected = newSelected.concat(selected, education.id);
-                        } else if (selectedIndex === 0) {
-                          newSelected = newSelected.concat(selected.slice(1));
-                        } else if (selectedIndex === selected.length - 1) {
-                          newSelected = newSelected.concat(selected.slice(0, -1));
-                        } else if (selectedIndex > 0) {
-                          newSelected = newSelected.concat(selected.slice(0, selectedIndex), selected.slice(selectedIndex + 1));
-                        }
-                        setSelected(newSelected);
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
-                      {education.no}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
-                      {education.registrationDate}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
-                      MAIN-EDU-{new Date(education.registrationDate).getFullYear().toString().slice(-2)}-{String(education.no).padStart(3, '0')}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
-                      {education.educationType || '미분류'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
-                      {education.title || '제목 없음'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
-                      {education.team || '-'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    {education.assignee ? (
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Avatar
-                          src={userMap.get(education.assignee)?.profile_image_url || userMap.get(education.assignee)?.avatar_url}
-                          sx={{ width: 24, height: 24 }}
-                        >
-                          {education.assignee.charAt(0)}
-                        </Avatar>
-                        <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
-                          {education.assignee}
-                        </Typography>
-                      </Box>
-                    ) : (
-                      <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
-                        -
-                      </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={education.status}
-                      size="small"
-                      sx={{
-                        backgroundColor: getStatusColor(education.status).bgcolor,
-                        color: getStatusColor(education.status).color,
-                        fontSize: '13px',
-                        fontWeight: 500
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
-                      {education.receptionDate || '-'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
-                      {education.resolutionDate || '-'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Tooltip title="팝업편집">
-                      <IconButton size="small" onClick={() => handleEditEducation(education)} sx={{ color: 'primary.main' }}>
-                        <Edit size={16} />
-                      </IconButton>
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={12} align="center" sx={{ py: 4 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    검색 결과가 없습니다.
-                  </Typography>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      {/* 페이지네이션 */}
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          mt: 0.5,
-          px: 1,
-          py: 0.5,
-          borderTop: '1px solid',
-          borderColor: 'divider',
-          flexShrink: 0
-        }}
-      >
-        {/* 왼쪽: Row per page */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            Row per page
-          </Typography>
-          <FormControl size="small" sx={{ minWidth: 60 }}>
-            <Select
-              value={rowsPerPage}
-              onChange={(e) => {
-                setRowsPerPage(Number(e.target.value));
-                setPage(0);
-              }}
-              sx={{
-                '& .MuiSelect-select': {
-                  py: 0.5,
-                  px: 1,
-                  fontSize: '0.875rem'
-                },
-                '& .MuiOutlinedInput-notchedOutline': {
-                  border: '1px solid #e0e0e0'
-                }
-              }}
-            >
-              <MenuItem value={5}>5</MenuItem>
-              <MenuItem value={10}>10</MenuItem>
-              <MenuItem value={25}>25</MenuItem>
-              <MenuItem value={50}>50</MenuItem>
-            </Select>
-          </FormControl>
-
-          {/* Go to */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Go to
-            </Typography>
-            <TextField
-              size="small"
-              value={goToPage}
-              onChange={(e) => setGoToPage(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  handleGoToPage();
-                }
-              }}
-              placeholder="1"
-              sx={{
-                width: 60,
-                '& .MuiOutlinedInput-root': {
-                  '& input': {
+              {/* Go to */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  Go to
+                </Typography>
+                <TextField
+                  size="small"
+                  value={goToPage}
+                  onChange={(e) => setGoToPage(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      handleGoToPage();
+                    }
+                  }}
+                  placeholder="1"
+                  sx={{
+                    width: 60,
+                    '& .MuiOutlinedInput-root': {
+                      '& input': {
+                        py: 0.5,
+                        px: 1,
+                        fontSize: '0.875rem',
+                        textAlign: 'center'
+                      },
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        border: '1px solid #e0e0e0'
+                      }
+                    }
+                  }}
+                />
+                <Button
+                  size="small"
+                  onClick={handleGoToPage}
+                  sx={{
+                    minWidth: 'auto',
+                    px: 1.5,
                     py: 0.5,
-                    px: 1,
-                    fontSize: '0.875rem',
-                    textAlign: 'center'
-                  },
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    border: '1px solid #e0e0e0'
-                  }
-                }
-              }}
-            />
-            <Button
-              size="small"
-              onClick={handleGoToPage}
-              sx={{
-                minWidth: 'auto',
-                px: 1.5,
-                py: 0.5,
-                fontSize: '0.875rem'
-              }}
-            >
-              Go
-            </Button>
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  Go
+                </Button>
+              </Box>
+            </Box>
+
+            {/* 오른쪽: 페이지 네비게이션 */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                {filteredData.length > 0
+                  ? `${page * rowsPerPage + 1}-${Math.min((page + 1) * rowsPerPage, filteredData.length)} of ${filteredData.length}`
+                  : '0-0 of 0'}
+              </Typography>
+              {totalPages > 0 && (
+                <Pagination
+                  count={totalPages}
+                  page={page + 1}
+                  onChange={handleChangePage}
+                  color="primary"
+                  size="small"
+                  showFirstButton
+                  showLastButton
+                  sx={{
+                    '& .MuiPaginationItem-root': {
+                      fontSize: '0.875rem',
+                      minWidth: '32px',
+                      height: '32px',
+                      borderRadius: '4px'
+                    },
+                    '& .MuiPaginationItem-page.Mui-selected': {
+                      backgroundColor: 'primary.main',
+                      color: 'white !important',
+                      borderRadius: '4px',
+                      fontWeight: 500,
+                      '&:hover': {
+                        backgroundColor: 'primary.dark',
+                        color: 'white !important'
+                      }
+                    },
+                    '& .MuiPaginationItem-page': {
+                      borderRadius: '4px',
+                      '&:hover': {
+                        backgroundColor: 'grey.100'
+                      }
+                    }
+                  }}
+                />
+              )}
+            </Box>
           </Box>
-        </Box>
-
-        {/* 오른쪽: 페이지 네비게이션 */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            {filteredData.length > 0
-              ? `${page * rowsPerPage + 1}-${Math.min((page + 1) * rowsPerPage, filteredData.length)} of ${filteredData.length}`
-              : '0-0 of 0'}
-          </Typography>
-          {totalPages > 0 && (
-            <Pagination
-              count={totalPages}
-              page={page + 1}
-              onChange={handleChangePage}
-              color="primary"
-              size="small"
-              showFirstButton
-              showLastButton
-              sx={{
-                '& .MuiPaginationItem-root': {
-                  fontSize: '0.875rem',
-                  minWidth: '32px',
-                  height: '32px',
-                  borderRadius: '4px'
-                },
-                '& .MuiPaginationItem-page.Mui-selected': {
-                  backgroundColor: 'primary.main',
-                  color: 'white !important',
-                  borderRadius: '4px',
-                  fontWeight: 500,
-                  '&:hover': {
-                    backgroundColor: 'primary.dark',
-                    color: 'white !important'
-                  }
-                },
-                '& .MuiPaginationItem-page': {
-                  borderRadius: '4px',
-                  '&:hover': {
-                    backgroundColor: 'grey.100'
-                  }
-                }
-              }}
-            />
-          )}
-        </Box>
-      </Box>
-
         </>
       )}
 

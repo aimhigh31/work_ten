@@ -25,11 +25,11 @@ export interface ChangeLogData {
 
 // 메타데이터 인터페이스
 export interface ChangeLogMetadata {
-  targetId?: string;           // 대상 ID (커리큘럼 ID, 참석자 ID 등)
-  targetName?: string;          // 대상 이름
-  changeType?: 'create' | 'update' | 'delete';  // 변경 타입
-  fieldName?: string;           // 변경된 필드명
-  [key: string]: any;          // 추가 메타데이터
+  targetId?: string; // 대상 ID (커리큘럼 ID, 참석자 ID 등)
+  targetName?: string; // 대상 이름
+  changeType?: 'create' | 'update' | 'delete'; // 변경 타입
+  fieldName?: string; // 변경된 필드명
+  [key: string]: any; // 추가 메타데이터
 }
 
 // 변경로그 생성 입력 인터페이스
@@ -98,7 +98,7 @@ export const CHANGE_LOG_ACTIONS = {
   FILE_UPDATE: '파일수정'
 } as const;
 
-export type ChangeLogAction = typeof CHANGE_LOG_ACTIONS[keyof typeof CHANGE_LOG_ACTIONS];
+export type ChangeLogAction = (typeof CHANGE_LOG_ACTIONS)[keyof typeof CHANGE_LOG_ACTIONS];
 
 // =====================================================
 // 필드명 한글 매핑

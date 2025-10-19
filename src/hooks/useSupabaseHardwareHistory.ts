@@ -80,9 +80,7 @@ export const useSupabaseHardwareHistory = () => {
       console.log('📍 Supabase URL:', supabaseUrl);
       console.log('🔑 Supabase Key (첫 20자):', supabaseKey?.substring(0, 20) + '...');
 
-      const { count, error } = await supabase
-        .from('it_hardware_history')
-        .select('*', { count: 'exact', head: true });
+      const { count, error } = await supabase.from('it_hardware_history').select('*', { count: 'exact', head: true });
 
       if (error) {
         console.log('❌ Supabase 연결 실패:', JSON.stringify(error, null, 2));
@@ -149,7 +147,6 @@ export const useSupabaseHardwareHistory = () => {
 
       // 2. 캐시에 저장
       saveToCache(cacheKey, data || []);
-
     } catch (err: any) {
       console.log('❌ fetchHistories 오류:', JSON.stringify(err, null, 2));
       setError('이력을 불러오는데 실패했습니다.');
@@ -196,11 +193,7 @@ export const useSupabaseHardwareHistory = () => {
 
     console.log('📝 Supabase에 삽입할 데이터:', newHistoryData);
 
-    const { data, error } = await supabase
-      .from('it_hardware_history')
-      .insert([newHistoryData])
-      .select()
-      .single();
+    const { data, error } = await supabase.from('it_hardware_history').insert([newHistoryData]).select().single();
 
     console.log('📊 Supabase 응답 - data:', data);
     console.log('📊 Supabase 응답 - error:', error);
@@ -245,12 +238,7 @@ export const useSupabaseHardwareHistory = () => {
         updated_by: 'system'
       };
 
-      const { data, error } = await supabase
-        .from('it_hardware_history')
-        .update(updateData)
-        .eq('id', id)
-        .select()
-        .single();
+      const { data, error } = await supabase.from('it_hardware_history').update(updateData).eq('id', id).select().single();
 
       if (error) {
         console.log('❌ 이력 수정 실패:', JSON.stringify(error, null, 2));
@@ -260,15 +248,10 @@ export const useSupabaseHardwareHistory = () => {
       console.log('✅ 이력 수정 성공:', data);
 
       // 로컬 상태 업데이트
-      setHistories(prev =>
-        prev.map(history =>
-          history.id === id ? { ...history, ...data } : history
-        )
-      );
+      setHistories((prev) => prev.map((history) => (history.id === id ? { ...history, ...data } : history)));
       setError(null);
 
       return data;
-
     } catch (err: any) {
       console.log('❌ updateHistory 오류:', JSON.stringify(err, null, 2));
       throw err;
@@ -280,10 +263,7 @@ export const useSupabaseHardwareHistory = () => {
     console.log('🗑️ 이력 삭제 시작:', id);
 
     try {
-      const { error } = await supabase
-        .from('it_hardware_history')
-        .update({ is_active: false, updated_by: 'system' })
-        .eq('id', id);
+      const { error } = await supabase.from('it_hardware_history').update({ is_active: false, updated_by: 'system' }).eq('id', id);
 
       if (error) {
         console.log('❌ 이력 삭제 실패:', JSON.stringify(error, null, 2));
@@ -293,11 +273,10 @@ export const useSupabaseHardwareHistory = () => {
       console.log('✅ 이력 삭제 성공');
 
       // 로컬 상태에서 제거
-      setHistories(prev => prev.filter(history => history.id !== id));
+      setHistories((prev) => prev.filter((history) => history.id !== id));
       setError(null);
 
       return { id };
-
     } catch (err: any) {
       console.log('❌ deleteHistory 오류:', JSON.stringify(err, null, 2));
       throw err;
@@ -319,13 +298,12 @@ export const useSupabaseHardwareHistory = () => {
       }
 
       const total = data.length;
-      const purchase = data.filter(item => item.type === 'purchase').length;
-      const repair = data.filter(item => item.type === 'repair').length;
-      const other = data.filter(item => item.type === 'other').length;
+      const purchase = data.filter((item) => item.type === 'purchase').length;
+      const repair = data.filter((item) => item.type === 'repair').length;
+      const other = data.filter((item) => item.type === 'other').length;
       const totalAmount = data.reduce((sum, item) => sum + (item.amount || 0), 0);
 
       return { total, purchase, repair, other, totalAmount };
-
     } catch (err: any) {
       console.log('❌ getHistoryStats 오류:', JSON.stringify(err, null, 2));
       return { total: 0, purchase: 0, repair: 0, other: 0, totalAmount: 0 };
@@ -357,7 +335,6 @@ export const useSupabaseHardwareHistory = () => {
       console.log('✅ getMaintenanceHistories 조회 성공:', data?.length || 0, '개');
       console.log('📋 조회된 데이터:', data);
       return data || [];
-
     } catch (err: any) {
       console.error('❌ getMaintenanceHistories 오류:', err);
       setError('구매/수리이력을 불러오는데 실패했습니다.');
@@ -446,7 +423,8 @@ export const useSupabaseHardwareHistory = () => {
             registrant: history.registrant?.trim() || '',
             status: history.status?.trim() || '진행중',
             start_date: formatDate(history.startDate) || new Date().toISOString().split('T')[0],
-            completion_date: (history.completionDate?.trim() && history.completionDate.trim() !== '') ? formatDate(history.completionDate) : null,
+            completion_date:
+              history.completionDate?.trim() && history.completionDate.trim() !== '' ? formatDate(history.completionDate) : null,
             created_by: 'system',
             updated_by: 'system',
             is_active: true
@@ -458,10 +436,7 @@ export const useSupabaseHardwareHistory = () => {
 
         console.log('📝 최종 삽입할 데이터:', JSON.stringify(insertData, null, 2));
 
-        const { data, error: insertError } = await supabase
-          .from('it_hardware_history')
-          .insert(insertData)
-          .select('id, type, content');
+        const { data, error: insertError } = await supabase.from('it_hardware_history').insert(insertData).select('id, type, content');
 
         if (insertError) {
           console.error('❌ 구매/수리이력 삽입 실패');
@@ -494,7 +469,6 @@ export const useSupabaseHardwareHistory = () => {
 
       console.log('🎉 구매/수리이력 일괄 저장 완료');
       return true;
-
     } catch (err: any) {
       console.error('❌ saveMaintenanceHistories 예상치 못한 오류:', {
         name: err?.name,

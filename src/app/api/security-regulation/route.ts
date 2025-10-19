@@ -69,11 +69,12 @@ export async function GET(request: NextRequest) {
     console.log('✅ 조회 성공:', data?.length || 0, '개 항목');
 
     // 폴더를 파일보다 먼저 오도록 정렬 (서버에서 처리 완료했지만 확실하게 한번 더)
-    const sortedData = data?.sort((a, b) => {
-      if (a.type === 'folder' && b.type === 'file') return -1;
-      if (a.type === 'file' && b.type === 'folder') return 1;
-      return 0;
-    }) || [];
+    const sortedData =
+      data?.sort((a, b) => {
+        if (a.type === 'folder' && b.type === 'file') return -1;
+        if (a.type === 'file' && b.type === 'folder') return 1;
+        return 0;
+      }) || [];
 
     return NextResponse.json({
       success: true,
@@ -145,11 +146,7 @@ export async function POST(request: NextRequest) {
     };
     console.log('💾 삽입할 데이터:', insertData);
 
-    const { data, error } = await supabase
-      .from('security_regulation_data')
-      .insert([insertData])
-      .select()
-      .single();
+    const { data, error } = await supabase.from('security_regulation_data').insert([insertData]).select().single();
 
     if (error) {
       console.error('❌ 생성 오류:', error);

@@ -11,10 +11,7 @@ export async function GET(request: NextRequest) {
     const currentYear = new Date().getFullYear().toString().slice(-2);
 
     // 현재 연도의 모든 보안사고 코드 조회 (SEC-ACC와 SECACC 형식 모두 포함)
-    const { data, error } = await supabase
-      .from('security_accident_data')
-      .select('code')
-      .order('code', { ascending: false });
+    const { data, error } = await supabase.from('security_accident_data').select('code').order('code', { ascending: false });
 
     if (error) {
       console.error('❌ Supabase 조회 오류:', error);

@@ -413,9 +413,9 @@ export default function InvestmentDataTable({
             disabled={selectedItems.length === 0}
             onClick={() => {
               if (onDeleteInvestments && selectedItems.length > 0) {
-                const selectedInvestments = investments.filter(inv => selectedItems.includes(inv.id));
+                const selectedInvestments = investments.filter((inv) => selectedItems.includes(inv.id));
                 if (window.confirm(`선택한 ${selectedItems.length}개의 투자를 삭제하시겠습니까?`)) {
-                  selectedInvestments.forEach(investment => {
+                  selectedInvestments.forEach((investment) => {
                     // 변경로그 추가 (삭제 전에 호출)
                     if (addChangeLog) {
                       const investmentName = investment.investmentName || '투자';
@@ -567,7 +567,10 @@ export default function InvestmentDataTable({
                 <TableCell>
                   <Stack direction="row" spacing={1} alignItems="center">
                     <Avatar
-                      src={userAvatars[investment.assignee] || investmentAssigneeAvatars[investment.assignee as keyof typeof investmentAssigneeAvatars]}
+                      src={
+                        userAvatars[investment.assignee] ||
+                        investmentAssigneeAvatars[investment.assignee as keyof typeof investmentAssigneeAvatars]
+                      }
                       alt={investment.assignee}
                       sx={{ width: 24, height: 24 }}
                     >

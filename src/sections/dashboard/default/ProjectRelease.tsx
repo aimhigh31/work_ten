@@ -138,10 +138,18 @@ export default function ProjectRelease() {
               }
             }}
           >
-            <MenuItem value="Today" sx={{ fontSize: '0.75rem' }}>Today</MenuItem>
-            <MenuItem value="Weekly" sx={{ fontSize: '0.75rem' }}>Weekly</MenuItem>
-            <MenuItem value="Monthly" sx={{ fontSize: '0.75rem' }}>Monthly</MenuItem>
-            <MenuItem value="Total" sx={{ fontSize: '0.75rem' }}>Total</MenuItem>
+            <MenuItem value="Today" sx={{ fontSize: '0.75rem' }}>
+              Today
+            </MenuItem>
+            <MenuItem value="Weekly" sx={{ fontSize: '0.75rem' }}>
+              Weekly
+            </MenuItem>
+            <MenuItem value="Monthly" sx={{ fontSize: '0.75rem' }}>
+              Monthly
+            </MenuItem>
+            <MenuItem value="Total" sx={{ fontSize: '0.75rem' }}>
+              Total
+            </MenuItem>
           </Select>
         </FormControl>
       }
@@ -166,69 +174,71 @@ export default function ProjectRelease() {
         }
       }}
     >
-      <Box sx={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        minHeight: 0
-      }}>
+      <Box
+        sx={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          minHeight: 0
+        }}
+      >
         <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
           <List disablePadding sx={{ '& .MuiListItem-root': { px: 0, py: 0.75 } }}>
-        {paginatedLogs.length > 0 ? (
-          paginatedLogs.map((log) => (
-            <ListItem
-              key={log.id}
-              sx={{
-                flexDirection: 'column',
-                alignItems: 'flex-start',
-                borderBottom: 1,
-                borderColor: 'divider',
-                '&:last-child': { borderBottom: 0 }
-              }}
-            >
-              <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 500 }}>
-                    {log.page || '페이지'}
-                  </Typography>
-                  <Chip
-                    label={log.action_type}
-                    size="small"
-                    sx={{
-                      backgroundColor: '#E3F2FD',
-                      color: '#1976D2',
-                      fontWeight: 500,
-                      fontSize: '11px',
-                      height: '20px'
-                    }}
+            {paginatedLogs.length > 0 ? (
+              paginatedLogs.map((log) => (
+                <ListItem
+                  key={log.id}
+                  sx={{
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    borderBottom: 1,
+                    borderColor: 'divider',
+                    '&:last-child': { borderBottom: 0 }
+                  }}
+                >
+                  <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 500 }}>
+                        {log.page || '페이지'}
+                      </Typography>
+                      <Chip
+                        label={log.action_type}
+                        size="small"
+                        sx={{
+                          backgroundColor: '#E3F2FD',
+                          color: '#1976D2',
+                          fontWeight: 500,
+                          fontSize: '11px',
+                          height: '20px'
+                        }}
+                      />
+                    </Box>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      {dayjs(log.created_at).format('YYYY-MM-DD HH:mm')}
+                    </Typography>
+                  </Box>
+                  <ListItemText
+                    primary={
+                      <Typography variant="body2" sx={{ fontWeight: 400, color: 'text.secondary' }}>
+                        {log.description}
+                      </Typography>
+                    }
                   />
-                </Box>
-                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  {dayjs(log.created_at).format('YYYY-MM-DD HH:mm')}
-                </Typography>
-              </Box>
-              <ListItemText
-                primary={
-                  <Typography variant="body2" sx={{ fontWeight: 400, color: 'text.secondary' }}>
-                    {log.description}
-                  </Typography>
-                }
-              />
-            </ListItem>
-          ))
-        ) : (
-          <ListItem sx={{ py: 2 }}>
-            <ListItemText
-              primary={
-                <Typography variant="body2" color="text.secondary" textAlign="center">
-                  변경로그가 없습니다
-                </Typography>
-              }
-            />
-          </ListItem>
-        )}
-        </List>
+                </ListItem>
+              ))
+            ) : (
+              <ListItem sx={{ py: 2 }}>
+                <ListItemText
+                  primary={
+                    <Typography variant="body2" color="text.secondary" textAlign="center">
+                      변경로그가 없습니다
+                    </Typography>
+                  }
+                />
+              </ListItem>
+            )}
+          </List>
         </Box>
 
         {/* 페이지네이션 - 하단 고정 */}

@@ -31,10 +31,7 @@ export async function POST(request: NextRequest) {
 
     if (type === 'userAccount') {
       // 사용자계정 중복 체크
-      let query = supabase
-        .from('admin_users_userprofiles')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_account_id', value);
+      let query = supabase.from('admin_users_userprofiles').select('id', { count: 'exact', head: true }).eq('user_account_id', value);
 
       if (currentUserId) {
         // 수정 중인 경우 - 자기 자신은 제외
@@ -51,10 +48,7 @@ export async function POST(request: NextRequest) {
       count = resultCount || 0;
     } else if (type === 'email') {
       // 이메일 중복 체크
-      let query = supabase
-        .from('admin_users_userprofiles')
-        .select('id', { count: 'exact', head: true })
-        .eq('email', value);
+      let query = supabase.from('admin_users_userprofiles').select('id', { count: 'exact', head: true }).eq('email', value);
 
       if (currentUserId) {
         // 수정 중인 경우 - 자기 자신은 제외
@@ -89,8 +83,8 @@ export async function POST(request: NextRequest) {
           ? '이미 사용 중인 사용자계정입니다.'
           : '이미 사용 중인 이메일입니다.'
         : type === 'userAccount'
-        ? '사용 가능한 사용자계정입니다.'
-        : '사용 가능한 이메일입니다.'
+          ? '사용 가능한 사용자계정입니다.'
+          : '사용 가능한 이메일입니다.'
     });
   } catch (error: any) {
     console.error('중복 체크 실패:', error);

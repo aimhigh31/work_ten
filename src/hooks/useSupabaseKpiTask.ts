@@ -36,46 +36,45 @@ export const useSupabaseKpiTask = (kpiId?: number) => {
   const [error, setError] = useState<string | null>(null);
 
   // 특정 KPI의 태스크 목록 조회
-  const fetchTasks = useCallback(async (targetKpiId?: number) => {
-    const fetchKpiId = targetKpiId || kpiId;
-    if (!fetchKpiId) {
-      console.warn('KPI ID가 제공되지 않았습니다.');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const { data, error: fetchError } = await supabase
-        .from('main_kpi_task')
-        .select('*')
-        .eq('kpi_id', fetchKpiId)
-        .order('id', { ascending: true });
-
-      if (fetchError) {
-        throw fetchError;
+  const fetchTasks = useCallback(
+    async (targetKpiId?: number) => {
+      const fetchKpiId = targetKpiId || kpiId;
+      if (!fetchKpiId) {
+        console.warn('KPI ID가 제공되지 않았습니다.');
+        return;
       }
 
-      setTasks(data || []);
-    } catch (err: any) {
-      console.error('KPI Task 조회 오류:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [kpiId]);
+      try {
+        setLoading(true);
+        setError(null);
+
+        const { data, error: fetchError } = await supabase
+          .from('main_kpi_task')
+          .select('*')
+          .eq('kpi_id', fetchKpiId)
+          .order('id', { ascending: true });
+
+        if (fetchError) {
+          throw fetchError;
+        }
+
+        setTasks(data || []);
+      } catch (err: any) {
+        console.error('KPI Task 조회 오류:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [kpiId]
+  );
 
   // 태스크 추가
   const addTask = useCallback(async (taskData: Omit<KpiTaskData, 'id' | 'created_at' | 'updated_at'>) => {
     try {
       console.log('📝 KPI Task 추가 데이터:', taskData);
 
-      const { data, error: insertError } = await supabase
-        .from('main_kpi_task')
-        .insert([taskData])
-        .select()
-        .single();
+      const { data, error: insertError } = await supabase.from('main_kpi_task').insert([taskData]).select().single();
 
       if (insertError) {
         console.error('❌ Supabase Insert 오류:', insertError);
@@ -97,12 +96,7 @@ export const useSupabaseKpiTask = (kpiId?: number) => {
     try {
       console.log('🔧 KPI Task 수정 시작:', { id, updates });
 
-      const { data, error: updateError } = await supabase
-        .from('main_kpi_task')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+      const { data, error: updateError } = await supabase.from('main_kpi_task').update(updates).eq('id', id).select().single();
 
       console.log('📥 Supabase update 응답:', { data, error: updateError });
 
@@ -165,23 +159,26 @@ export const useSupabaseKpiTask = (kpiId?: number) => {
   }, []);
 
   // 특정 KPI의 모든 태스크 삭제
-  const deleteAllTasksByKpiId = useCallback(async (targetKpiId: number) => {
-    try {
-      const { error: deleteError } = await supabase.from('main_kpi_task').delete().eq('kpi_id', targetKpiId);
+  const deleteAllTasksByKpiId = useCallback(
+    async (targetKpiId: number) => {
+      try {
+        const { error: deleteError } = await supabase.from('main_kpi_task').delete().eq('kpi_id', targetKpiId);
 
-      if (deleteError) {
-        throw deleteError;
-      }
+        if (deleteError) {
+          throw deleteError;
+        }
 
-      if (targetKpiId === kpiId) {
-        setTasks([]);
+        if (targetKpiId === kpiId) {
+          setTasks([]);
+        }
+      } catch (err: any) {
+        console.error('KPI Task 전체 삭제 오류:', err);
+        setError(err.message);
+        throw err;
       }
-    } catch (err: any) {
-      console.error('KPI Task 전체 삭제 오류:', err);
-      setError(err.message);
-      throw err;
-    }
-  }, [kpiId]);
+    },
+    [kpiId]
+  );
 
   // 사용자의 모든 KPI Task 조회 (KPI 데이터와 조인, 계층 구조 포함)
   const fetchAllTasksByUser = useCallback(async (userName: string) => {
@@ -204,14 +201,16 @@ export const useSupabaseKpiTask = (kpiId?: number) => {
       // 2. 사용자의 모든 task 조회 (KPI 데이터 포함)
       const { data, error: fetchError } = await supabase
         .from('main_kpi_task')
-        .select(`
+        .select(
+          `
           *,
           main_kpi_data!main_kpi_task_kpi_id_fkey (
             impact,
             work_content,
             selection_background
           )
-        `)
+        `
+        )
         .eq('assignee', userName)
         .order('id', { ascending: false });
 
@@ -236,22 +235,22 @@ export const useSupabaseKpiTask = (kpiId?: number) => {
       // 4. 조회되지 않은 parent task들을 별도로 조회
       let parentTasks: any[] = [];
       if (parentIds.size > 0) {
-        const missingParentIds = Array.from(parentIds).filter(
-          (parentId) => !data?.some((task: any) => task.id === parentId)
-        );
+        const missingParentIds = Array.from(parentIds).filter((parentId) => !data?.some((task: any) => task.id === parentId));
 
         if (missingParentIds.length > 0) {
           console.log('🔍 누락된 parent task 조회:', missingParentIds);
           const { data: parentData, error: parentError } = await supabase
             .from('main_kpi_task')
-            .select(`
+            .select(
+              `
               *,
               main_kpi_data!main_kpi_task_kpi_id_fkey (
                 impact,
                 work_content,
                 selection_background
               )
-            `)
+            `
+            )
             .in('id', missingParentIds);
 
           if (parentError) {

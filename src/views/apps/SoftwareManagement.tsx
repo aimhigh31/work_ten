@@ -118,7 +118,16 @@ interface KanbanViewProps {
   selectedAssignee: string;
   tasks: TaskTableData[];
   setTasks: React.Dispatch<React.SetStateAction<TaskTableData[]>>;
-  addChangeLog: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string, title?: string) => void;
+  addChangeLog: (
+    action: string,
+    target: string,
+    description: string,
+    team?: string,
+    beforeValue?: string,
+    afterValue?: string,
+    changedField?: string,
+    title?: string
+  ) => void;
   assigneeList?: any[];
   assignees: string[];
   teams: string[];
@@ -126,7 +135,20 @@ interface KanbanViewProps {
   softwareStatusColors: Record<string, any>;
 }
 
-function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssignee, tasks, setTasks, addChangeLog, assigneeList, assignees, teams, softwareStatusOptions, softwareStatusColors }: KanbanViewProps) {
+function KanbanView({
+  selectedYear,
+  selectedTeam,
+  selectedStatus,
+  selectedAssignee,
+  tasks,
+  setTasks,
+  addChangeLog,
+  assigneeList,
+  assignees,
+  teams,
+  softwareStatusOptions,
+  softwareStatusColors
+}: KanbanViewProps) {
   const theme = useTheme();
 
   // 상태 관리
@@ -2270,7 +2292,15 @@ export default function SoftwareManagement() {
   const [value, setValue] = useState(0);
 
   // ⭐ Investment 패턴: 데이터 로딩 함수만 가져오기
-  const { getSoftware, createSoftware, updateSoftware, deleteSoftware, deleteMultipleSoftware, loading: softwareLoading, error } = useSupabaseSoftware();
+  const {
+    getSoftware,
+    createSoftware,
+    updateSoftware,
+    deleteSoftware,
+    deleteMultipleSoftware,
+    loading: softwareLoading,
+    error
+  } = useSupabaseSoftware();
   const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 모두 가져오기
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
@@ -2328,7 +2358,7 @@ export default function SoftwareManagement() {
 
   // assignees - 활성 사용자 목록
   const assignees = React.useMemo(() => {
-    return users.filter(user => user.status === 'active').map(user => user.user_name);
+    return users.filter((user) => user.status === 'active').map((user) => user.user_name);
   }, [users]);
 
   // teams - 팀 목록
@@ -2338,13 +2368,13 @@ export default function SoftwareManagement() {
 
   // softwareStatusOptions - 상태 옵션
   const softwareStatusOptions = React.useMemo(() => {
-    return statusTypes.map(item => item.subcode_name);
+    return statusTypes.map((item) => item.subcode_name);
   }, [statusTypes]);
 
   // softwareStatusColors - 상태별 색상
   const softwareStatusColors = React.useMemo(() => {
     const colors: Record<string, any> = {};
-    softwareStatusOptions.forEach(status => {
+    softwareStatusOptions.forEach((status) => {
       switch (status) {
         case '대기':
           colors[status] = { backgroundColor: '#FFF3E0', color: '#333333' };
@@ -2396,7 +2426,7 @@ export default function SoftwareManagement() {
       description: softwareItem.description || '',
       softwareCategory: softwareItem.software_category || '',
       spec: softwareItem.spec || '',
-      currentUser: softwareItem.current_users || '',  // current_users → currentUser
+      currentUser: softwareItem.current_users || '', // current_users → currentUser
       solutionProvider: softwareItem.solution_provider || '',
       userCount: softwareItem.user_count || 0,
       licenseType: softwareItem.license_type || '',
@@ -2441,7 +2471,7 @@ export default function SoftwareManagement() {
   // 변경로그 데이터 변환 (Supabase → UI)
   const changeLogs = React.useMemo(() => {
     return dbChangeLogs.map((log: ChangeLogData) => {
-      const software = tasks.find(t => t.code === log.record_id);
+      const software = tasks.find((t) => t.code === log.record_id);
       const date = new Date(log.created_at);
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -3085,83 +3115,85 @@ export default function SoftwareManagement() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {changeLogs.slice(changeLogPage * changeLogRowsPerPage, (changeLogPage + 1) * changeLogRowsPerPage).map((log, index) => (
-                        <TableRow key={log.id} hover sx={{ '&:hover': { backgroundColor: 'action.hover' } }}>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {changeLogs.length - (changeLogPage * changeLogRowsPerPage + index)}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.dateTime}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.target}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.code}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.action}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.location}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.changedField || '-'}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.beforeValue || '-'}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.afterValue || '-'}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography
-                              variant="body2"
-                              sx={{
-                                fontSize: '13px',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'normal',
-                                display: '-webkit-box',
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: 'vertical',
-                                lineHeight: 1.4
-                              }}
-                              title={log.description}
-                            >
-                              {log.description}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.team}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.user}
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {changeLogs
+                        .slice(changeLogPage * changeLogRowsPerPage, (changeLogPage + 1) * changeLogRowsPerPage)
+                        .map((log, index) => (
+                          <TableRow key={log.id} hover sx={{ '&:hover': { backgroundColor: 'action.hover' } }}>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {changeLogs.length - (changeLogPage * changeLogRowsPerPage + index)}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.dateTime}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.target}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.code}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.action}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.location}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.changedField || '-'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.beforeValue || '-'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.afterValue || '-'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontSize: '13px',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'normal',
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  lineHeight: 1.4
+                                }}
+                                title={log.description}
+                              >
+                                {log.description}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.team}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.user}
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        ))}
                     </TableBody>
                   </Table>
                 </TableContainer>

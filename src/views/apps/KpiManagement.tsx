@@ -1432,10 +1432,18 @@ function ChangeLogView({
                 }
               }}
             >
-              <MenuItem key="rows-5" value={5}>5</MenuItem>
-              <MenuItem key="rows-10" value={10}>10</MenuItem>
-              <MenuItem key="rows-25" value={25}>25</MenuItem>
-              <MenuItem key="rows-50" value={50}>50</MenuItem>
+              <MenuItem key="rows-5" value={5}>
+                5
+              </MenuItem>
+              <MenuItem key="rows-10" value={10}>
+                10
+              </MenuItem>
+              <MenuItem key="rows-25" value={25}>
+                25
+              </MenuItem>
+              <MenuItem key="rows-50" value={50}>
+                50
+              </MenuItem>
             </Select>
           </FormControl>
 
@@ -2449,34 +2457,37 @@ export default function KpiManagement() {
 
   // Supabase 데이터를 TaskTableData 형식으로 변환
   const tasks = React.useMemo(() => {
-    return kpis.map((kpi, index) => ({
-      id: kpi.id,
-      no: kpis.length - index, // 역순 번호
-      code: kpi.code,
-      workContent: kpi.work_content,
-      selectionBackground: kpi.selection_background || '',
-      impact: kpi.impact || '',
-      evaluationCriteria: {
-        S: kpi.evaluation_criteria_s || '',
-        A: kpi.evaluation_criteria_a || '',
-        B: kpi.evaluation_criteria_b || '',
-        C: kpi.evaluation_criteria_c || '',
-        D: kpi.evaluation_criteria_d || ''
-      },
-      assignee: kpi.assignee || '',
-      status: kpi.status as TaskStatus,
-      registrationDate: kpi.registration_date,
-      startDate: kpi.start_date || '',
-      completedDate: kpi.completed_date || '',
-      description: kpi.description || '',
-      team: kpi.team || '',
-      department: kpi.department || '',
-      progress: kpi.progress || 0,
-      managementCategory: kpi.management_category || '',
-      targetKpi: kpi.target_kpi || '',
-      currentKpi: kpi.current_kpi || '',
-      attachments: []
-    } as TaskTableData));
+    return kpis.map(
+      (kpi, index) =>
+        ({
+          id: kpi.id,
+          no: kpis.length - index, // 역순 번호
+          code: kpi.code,
+          workContent: kpi.work_content,
+          selectionBackground: kpi.selection_background || '',
+          impact: kpi.impact || '',
+          evaluationCriteria: {
+            S: kpi.evaluation_criteria_s || '',
+            A: kpi.evaluation_criteria_a || '',
+            B: kpi.evaluation_criteria_b || '',
+            C: kpi.evaluation_criteria_c || '',
+            D: kpi.evaluation_criteria_d || ''
+          },
+          assignee: kpi.assignee || '',
+          status: kpi.status as TaskStatus,
+          registrationDate: kpi.registration_date,
+          startDate: kpi.start_date || '',
+          completedDate: kpi.completed_date || '',
+          description: kpi.description || '',
+          team: kpi.team || '',
+          department: kpi.department || '',
+          progress: kpi.progress || 0,
+          managementCategory: kpi.management_category || '',
+          targetKpi: kpi.target_kpi || '',
+          currentKpi: kpi.current_kpi || '',
+          attachments: []
+        }) as TaskTableData
+    );
   }, [kpis]);
 
   const setTasks = React.useCallback(() => {
@@ -2499,7 +2510,7 @@ export default function KpiManagement() {
 
     return dbChangeLogs.map((log: ChangeLogData) => {
       // record_id로 해당 KPI 찾기 (record_id는 코드로 저장되어 있음)
-      const kpi = tasks.find(t => t.code === log.record_id);
+      const kpi = tasks.find((t) => t.code === log.record_id);
 
       const date = new Date(log.created_at);
       const year = date.getFullYear();
@@ -2558,14 +2569,14 @@ export default function KpiManagement() {
 
         const logData = {
           page: 'main_kpi',
-          record_id: target,              // target → record_id
-          action_type: action,            // action → action_type
+          record_id: target, // target → record_id
+          action_type: action, // action → action_type
           description: description,
           before_value: beforeValue || null,
           after_value: afterValue || null,
           changed_field: changedField || null,
           title: title || null,
-          user_name: userName,            // changed_by → user_name
+          user_name: userName, // changed_by → user_name
           team: currentUser?.department || team || '시스템',
           user_department: currentUser?.department,
           user_position: currentUser?.position,

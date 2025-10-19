@@ -424,6 +424,19 @@ export default function ChecklistManagement() {
   const { users, departments } = useCommonData(); // 🏪 공용 창고에서 가져오기
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
+  // 🔍 디버깅: CommonData에서 받은 users 확인
+  React.useEffect(() => {
+    console.log('🔍 [ChecklistManagement] CommonData users:', users.length);
+    if (users.length > 0) {
+      console.log('🔍 [ChecklistManagement] 첫 번째 user 샘플:', {
+        user_code: users[0].user_code,
+        user_name: users[0].user_name,
+        avatar_url: users[0].avatar_url,
+        profile_image_url: users[0].profile_image_url
+      });
+    }
+  }, [users]);
+
   // 상태 타입 데이터
   const statusTypes = React.useMemo(() => {
     return getSubCodesByGroup('GROUP002');
@@ -915,7 +928,7 @@ export default function ChecklistManagement() {
           onClose={handleEditDialogClose}
           task={editingTask}
           onSave={handleEditTaskSave}
-          assignees={users.filter((user) => user.status === 'active').map((user) => user.user_name)}
+          assignees={users.map((user) => user.user_name)}
           assigneeAvatars={assigneeAvatars}
           statusOptions={statusTypes.map((statusItem) => statusItem.subcode_name)}
           statusColors={taskStatusColors}

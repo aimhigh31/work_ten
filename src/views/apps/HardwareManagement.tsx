@@ -119,13 +119,32 @@ interface KanbanViewProps {
   selectedAssignee: string;
   hardware: HardwareTableData[];
   setHardware: React.Dispatch<React.SetStateAction<HardwareTableData[]>>;
-  addChangeLog: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string) => void;
+  addChangeLog: (
+    action: string,
+    target: string,
+    description: string,
+    team?: string,
+    beforeValue?: string,
+    afterValue?: string,
+    changedField?: string
+  ) => void;
   assigneeList?: any[];
   statusTypes?: any[];
   onHardwareSave?: (hardware: Partial<HardwareRecord>) => Promise<void>;
 }
 
-function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssignee, hardware, setHardware, addChangeLog, assigneeList, statusTypes = [], onHardwareSave }: KanbanViewProps) {
+function KanbanView({
+  selectedYear,
+  selectedTeam,
+  selectedStatus,
+  selectedAssignee,
+  hardware,
+  setHardware,
+  addChangeLog,
+  assigneeList,
+  statusTypes = [],
+  onHardwareSave
+}: KanbanViewProps) {
   const theme = useTheme();
 
   // 상태 관리
@@ -297,11 +316,13 @@ function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssign
       // pillColor를 기반으로 투명도 적용한 배경색 생성
       const hexToRgb = (hex: string) => {
         const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        return result ? {
-          r: parseInt(result[1], 16),
-          g: parseInt(result[2], 16),
-          b: parseInt(result[3], 16)
-        } : null;
+        return result
+          ? {
+              r: parseInt(result[1], 16),
+              g: parseInt(result[2], 16),
+              b: parseInt(result[3], 16)
+            }
+          : null;
       };
       const rgb = hexToRgb(column.pillColor);
       return {
@@ -325,6 +346,13 @@ function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssign
           cursor: isDragging ? 'grabbing' : 'pointer'
         }
       : { cursor: 'pointer' };
+
+    // 사용자 프로필 이미지 가져오기 (최적화: find 한 번만 호출)
+    const assigneeUser = React.useMemo(() => {
+      return assigneeList?.find((user) => user.user_name === task.assignee);
+    }, [task.assignee]);
+
+    const assigneeAvatar = assigneeUser?.profile_image_url || assigneeUser?.avatar_url || '/assets/images/users/avatar-1.png';
 
     return (
       <article
@@ -372,13 +400,13 @@ function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssign
         <div className="card-footer">
           <div className="assignee-info">
             <img
-              src={
-                assigneeList?.find((user) => user.user_name === task.assignee)?.profile_image_url ||
-                assigneeList?.find((user) => user.user_name === task.assignee)?.avatar_url ||
-                '/assets/images/users/avatar-1.png'
-              }
-              alt={task.assignee}
+              src={assigneeAvatar}
+              alt={task.assignee || '미할당'}
               className="assignee-avatar"
+              onError={(e) => {
+                // 이미지 로드 실패 시 기본 이미지로 대체
+                e.currentTarget.src = '/assets/images/users/avatar-1.png';
+              }}
             />
             <span className="assignee-name">{task.assignee || '미할당'}</span>
           </div>
@@ -673,53 +701,57 @@ function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssign
         <HardwareEditDialog
           open={editDialog}
           onClose={handleEditDialogClose}
-          data={editingHardware ? (() => {
-            console.log('🔍 KanbanView editingHardware 전체 데이터:', editingHardware);
-            console.log('🔍 KanbanView 주요 필드들:', {
-              status: editingHardware.status,
-              assignee: editingHardware.assignee,
-              model: editingHardware.model,
-              manufacturer: editingHardware.manufacturer,
-              vendor: editingHardware.vendor,
-              location: editingHardware.location,
-              currentUser: editingHardware.currentUser,
-              serialNumber: editingHardware.serialNumber
-            });
+          data={
+            editingHardware
+              ? (() => {
+                  console.log('🔍 KanbanView editingHardware 전체 데이터:', editingHardware);
+                  console.log('🔍 KanbanView 주요 필드들:', {
+                    status: editingHardware.status,
+                    assignee: editingHardware.assignee,
+                    model: editingHardware.model,
+                    manufacturer: editingHardware.manufacturer,
+                    vendor: editingHardware.vendor,
+                    location: editingHardware.location,
+                    currentUser: editingHardware.currentUser,
+                    serialNumber: editingHardware.serialNumber
+                  });
 
-            const hardwareRecord = {
-              id: String(editingHardware.id),
-              no: editingHardware.no,
-              registrationDate: editingHardware.registrationDate,
-              code: editingHardware.code,
-              assetCategory: editingHardware.assetCategory || '',
-              assetName: editingHardware.assetName || '',
-              assetDescription: editingHardware.assetDescription || '',
-              model: editingHardware.model || '',
-              manufacturer: editingHardware.manufacturer || '',
-              vendor: editingHardware.vendor || '',
-              detailSpec: editingHardware.detailSpec || '',
-              status: editingHardware.status || '예비',
-              purchaseDate: editingHardware.purchaseDate || '',
-              warrantyEndDate: editingHardware.warrantyEndDate || '',
-              serialNumber: editingHardware.serialNumber || '',
-              currentUser: editingHardware.currentUser || '',
-              location: editingHardware.location || '',
-              assignee: editingHardware.assignee || '',
-              team: editingHardware.team || '',
-              registrant: editingHardware.registrant || '',
-              images: [],
-              image_1_url: editingHardware.image_1_url || '',
-              image_2_url: editingHardware.image_2_url || ''
-            };
+                  const hardwareRecord = {
+                    id: String(editingHardware.id),
+                    no: editingHardware.no,
+                    registrationDate: editingHardware.registrationDate,
+                    code: editingHardware.code,
+                    assetCategory: editingHardware.assetCategory || '',
+                    assetName: editingHardware.assetName || '',
+                    assetDescription: editingHardware.assetDescription || '',
+                    model: editingHardware.model || '',
+                    manufacturer: editingHardware.manufacturer || '',
+                    vendor: editingHardware.vendor || '',
+                    detailSpec: editingHardware.detailSpec || '',
+                    status: editingHardware.status || '예비',
+                    purchaseDate: editingHardware.purchaseDate || '',
+                    warrantyEndDate: editingHardware.warrantyEndDate || '',
+                    serialNumber: editingHardware.serialNumber || '',
+                    currentUser: editingHardware.currentUser || '',
+                    location: editingHardware.location || '',
+                    assignee: editingHardware.assignee || '',
+                    team: editingHardware.team || '',
+                    registrant: editingHardware.registrant || '',
+                    images: [],
+                    image_1_url: editingHardware.image_1_url || '',
+                    image_2_url: editingHardware.image_2_url || ''
+                  };
 
-            console.log('🔍 KanbanView Dialog에 전달할 데이터:', {
-              status: hardwareRecord.status,
-              assignee: hardwareRecord.assignee,
-              image_1_url: hardwareRecord.image_1_url,
-              image_2_url: hardwareRecord.image_2_url
-            });
-            return hardwareRecord;
-          })() : null}
+                  console.log('🔍 KanbanView Dialog에 전달할 데이터:', {
+                    status: hardwareRecord.status,
+                    assignee: hardwareRecord.assignee,
+                    image_1_url: hardwareRecord.image_1_url,
+                    image_2_url: hardwareRecord.image_2_url
+                  });
+                  return hardwareRecord;
+                })()
+              : null
+          }
           mode={editingHardware ? 'edit' : 'add'}
           onSave={onHardwareSave || (() => Promise.resolve())}
           statusOptions={statusTypes.length > 0 ? statusTypes.map((s) => s.subcode_name) : undefined}
@@ -1071,7 +1103,6 @@ function MonthlyScheduleView({
     </Box>
   );
 }
-
 
 // 대시보드 뷰 컴포넌트
 interface DashboardViewProps {
@@ -1958,7 +1989,15 @@ export default function HardwareManagement() {
   const [value, setValue] = useState(0);
 
   // ⭐ Investment 패턴: 데이터 로딩 함수만 가져오기
-  const { getHardware, createHardware, updateHardware, deleteHardware, deleteMultipleHardware, loading: hardwareLoading, error } = useSupabaseHardware();
+  const {
+    getHardware,
+    createHardware,
+    updateHardware,
+    deleteHardware,
+    deleteMultipleHardware,
+    loading: hardwareLoading,
+    error
+  } = useSupabaseHardware();
   const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 모두 가져오기
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
@@ -2083,14 +2122,20 @@ export default function HardwareManagement() {
 
     return changeLogData.map((log) => ({
       id: String(log.id),
-      dateTime: log.created_at ? new Date(log.created_at).toLocaleString('ko-KR', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      }).replace(/\. /g, '-').replace('.', '').replace(',', '') : '',
+      dateTime: log.created_at
+        ? new Date(log.created_at)
+            .toLocaleString('ko-KR', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false
+            })
+            .replace(/\. /g, '-')
+            .replace('.', '')
+            .replace(',', '')
+        : '',
       title: log.title || '',
       code: log.record_id || '',
       target: log.record_id || '',
@@ -2286,7 +2331,6 @@ export default function HardwareManagement() {
       }
 
       handleEditDialogClose();
-
     } catch (error) {
       console.error('❌ 하드웨어 저장 실패:', error);
       alert('하드웨어 저장 중 오류가 발생했습니다.');
@@ -2808,83 +2852,85 @@ export default function HardwareManagement() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {changeLogs.slice(changeLogPage * changeLogRowsPerPage, (changeLogPage + 1) * changeLogRowsPerPage).map((log, index) => (
-                        <TableRow key={log.id} hover sx={{ '&:hover': { backgroundColor: 'action.hover' } }}>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {changeLogs.length - (changeLogPage * changeLogRowsPerPage + index)}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.dateTime}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.title}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.code}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.action}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.location}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.changedField || '-'}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.beforeValue || '-'}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.afterValue || '-'}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography
-                              variant="body2"
-                              sx={{
-                                fontSize: '13px',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'normal',
-                                display: '-webkit-box',
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: 'vertical',
-                                lineHeight: 1.4
-                              }}
-                              title={log.description}
-                            >
-                              {log.description}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.team}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                              {log.user}
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {changeLogs
+                        .slice(changeLogPage * changeLogRowsPerPage, (changeLogPage + 1) * changeLogRowsPerPage)
+                        .map((log, index) => (
+                          <TableRow key={log.id} hover sx={{ '&:hover': { backgroundColor: 'action.hover' } }}>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {changeLogs.length - (changeLogPage * changeLogRowsPerPage + index)}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.dateTime}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.title}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.code}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.action}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.location}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.changedField || '-'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.beforeValue || '-'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.afterValue || '-'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontSize: '13px',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'normal',
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  lineHeight: 1.4
+                                }}
+                                title={log.description}
+                              >
+                                {log.description}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.team}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                                {log.user}
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        ))}
                     </TableBody>
                   </Table>
                 </TableContainer>
@@ -3009,44 +3055,48 @@ export default function HardwareManagement() {
         <HardwareEditDialog
           open={editDialog}
           onClose={handleEditDialogClose}
-          data={editingHardware ? (() => {
-            console.log('🔍 editingHardware 전체 데이터:', editingHardware);
-            console.log('🔍 주요 필드들:', {
-              model: editingHardware.model,
-              manufacturer: editingHardware.manufacturer,
-              vendor: editingHardware.vendor,
-              location: editingHardware.location,
-              currentUser: editingHardware.currentUser,
-              serialNumber: editingHardware.serialNumber
-            });
+          data={
+            editingHardware
+              ? (() => {
+                  console.log('🔍 editingHardware 전체 데이터:', editingHardware);
+                  console.log('🔍 주요 필드들:', {
+                    model: editingHardware.model,
+                    manufacturer: editingHardware.manufacturer,
+                    vendor: editingHardware.vendor,
+                    location: editingHardware.location,
+                    currentUser: editingHardware.currentUser,
+                    serialNumber: editingHardware.serialNumber
+                  });
 
-            const hardwareRecord = {
-              id: String(editingHardware.id),
-              no: editingHardware.no,
-              registrationDate: editingHardware.registrationDate,
-              code: editingHardware.code,
-              assetCategory: editingHardware.assetCategory || '',
-              assetName: editingHardware.assetName || '',
-              assetDescription: editingHardware.assetDescription || '',
-              model: editingHardware.model || '',
-              manufacturer: editingHardware.manufacturer || '',
-              vendor: editingHardware.vendor || '',
-              detailSpec: editingHardware.detailSpec || '',
-              status: editingHardware.status,
-              purchaseDate: editingHardware.purchaseDate || '',
-              warrantyEndDate: editingHardware.warrantyEndDate || '',
-              serialNumber: editingHardware.serialNumber || '',
-              currentUser: editingHardware.currentUser || '',
-              location: editingHardware.location || '',
-              assignee: editingHardware.assignee,
-              team: editingHardware.team || '',
-              registrant: editingHardware.registrant || '',
-              images: []
-            };
+                  const hardwareRecord = {
+                    id: String(editingHardware.id),
+                    no: editingHardware.no,
+                    registrationDate: editingHardware.registrationDate,
+                    code: editingHardware.code,
+                    assetCategory: editingHardware.assetCategory || '',
+                    assetName: editingHardware.assetName || '',
+                    assetDescription: editingHardware.assetDescription || '',
+                    model: editingHardware.model || '',
+                    manufacturer: editingHardware.manufacturer || '',
+                    vendor: editingHardware.vendor || '',
+                    detailSpec: editingHardware.detailSpec || '',
+                    status: editingHardware.status,
+                    purchaseDate: editingHardware.purchaseDate || '',
+                    warrantyEndDate: editingHardware.warrantyEndDate || '',
+                    serialNumber: editingHardware.serialNumber || '',
+                    currentUser: editingHardware.currentUser || '',
+                    location: editingHardware.location || '',
+                    assignee: editingHardware.assignee,
+                    team: editingHardware.team || '',
+                    registrant: editingHardware.registrant || '',
+                    images: []
+                  };
 
-            console.log('🔍 Dialog에 전달할 데이터:', hardwareRecord);
-            return hardwareRecord;
-          })() : null}
+                  console.log('🔍 Dialog에 전달할 데이터:', hardwareRecord);
+                  return hardwareRecord;
+                })()
+              : null
+          }
           mode={editingHardware ? 'edit' : 'add'}
           onSave={handleEditHardwareSave}
         />

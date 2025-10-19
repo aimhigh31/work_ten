@@ -7,10 +7,7 @@ console.log('Supabase 환경변수 확인:', {
   keyExists: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 });
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
 // IT교육 참석자 데이터 타입 정의
 export interface ItEducationAttendeeData {
@@ -111,106 +108,110 @@ export function useSupabaseItEducationAttendee() {
   }, []);
 
   // IT교육 참석자 데이터 저장 (교육 ID별 일괄 저장)
-  const saveAttendeesByEducationId = useCallback(async (educationId: number, attendeeItems: Partial<ItEducationAttendeeData>[]): Promise<boolean> => {
-    setLoading(true);
-    setError(null);
+  const saveAttendeesByEducationId = useCallback(
+    async (educationId: number, attendeeItems: Partial<ItEducationAttendeeData>[]): Promise<boolean> => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      console.log('💾 참석자 데이터 저장 시작:', { educationId, itemCount: attendeeItems.length });
+      try {
+        console.log('💾 참석자 데이터 저장 시작:', { educationId, itemCount: attendeeItems.length });
 
-      // 1. 기존 활성 참석자 데이터 삭제 (소프트 삭제)
-      const { error: deleteError } = await supabase
-        .from('it_education_attendee')
-        .update({ is_active: false, updated_at: new Date().toISOString() })
-        .eq('education_id', educationId)
-        .eq('is_active', true);
-
-      if (deleteError) {
-        console.error('❌ 기존 참석자 삭제 실패:', deleteError);
-        throw deleteError;
-      }
-
-      // 2. 새 참석자 데이터 저장
-      if (attendeeItems.length > 0) {
-        const attendeeDataToSave = attendeeItems.map((item) => ({
-          education_id: educationId,
-          user_name: item.user_name || '',
-          user_code: item.user_code || '',
-          department: item.department || '',
-          position: item.position || '',
-          email: item.email || '',
-          phone: item.phone || '',
-          attendance_status: item.attendance_status || '예정',
-          completion_status: item.completion_status || '미완료',
-          score: item.score || null,
-          certificate_issued: item.certificate_issued || false,
-          notes: item.notes || '',
-          is_active: true,
-          created_by: 'user',
-          updated_by: 'user'
-        }));
-
-        const { error: insertError } = await supabase
+        // 1. 기존 활성 참석자 데이터 삭제 (소프트 삭제)
+        const { error: deleteError } = await supabase
           .from('it_education_attendee')
-          .insert(attendeeDataToSave);
+          .update({ is_active: false, updated_at: new Date().toISOString() })
+          .eq('education_id', educationId)
+          .eq('is_active', true);
 
-        if (insertError) {
-          console.error('❌ 새 참석자 저장 실패:', insertError);
-          throw insertError;
+        if (deleteError) {
+          console.error('❌ 기존 참석자 삭제 실패:', deleteError);
+          throw deleteError;
         }
+
+        // 2. 새 참석자 데이터 저장
+        if (attendeeItems.length > 0) {
+          const attendeeDataToSave = attendeeItems.map((item) => ({
+            education_id: educationId,
+            user_name: item.user_name || '',
+            user_code: item.user_code || '',
+            department: item.department || '',
+            position: item.position || '',
+            email: item.email || '',
+            phone: item.phone || '',
+            attendance_status: item.attendance_status || '예정',
+            completion_status: item.completion_status || '미완료',
+            score: item.score || null,
+            certificate_issued: item.certificate_issued || false,
+            notes: item.notes || '',
+            is_active: true,
+            created_by: 'user',
+            updated_by: 'user'
+          }));
+
+          const { error: insertError } = await supabase.from('it_education_attendee').insert(attendeeDataToSave);
+
+          if (insertError) {
+            console.error('❌ 새 참석자 저장 실패:', insertError);
+            throw insertError;
+          }
+        }
+
+        console.log('✅ 참석자 데이터 저장 성공:', { educationId, itemCount: attendeeItems.length });
+        return true;
+      } catch (err) {
+        console.error('❌ 참석자 저장 오류 상세:', {
+          educationId,
+          error: err,
+          message: err instanceof Error ? err.message : '알 수 없는 오류',
+          stack: err instanceof Error ? err.stack : undefined,
+          type: typeof err,
+          stringified: JSON.stringify(err)
+        });
+
+        const errorMessage = err instanceof Error ? err.message : 'IT교육 참석자 저장 중 오류가 발생했습니다.';
+        setError(errorMessage);
+        return false;
+      } finally {
+        setLoading(false);
       }
-
-      console.log('✅ 참석자 데이터 저장 성공:', { educationId, itemCount: attendeeItems.length });
-      return true;
-    } catch (err) {
-      console.error('❌ 참석자 저장 오류 상세:', {
-        educationId,
-        error: err,
-        message: err instanceof Error ? err.message : '알 수 없는 오류',
-        stack: err instanceof Error ? err.stack : undefined,
-        type: typeof err,
-        stringified: JSON.stringify(err)
-      });
-
-      const errorMessage = err instanceof Error ? err.message : 'IT교육 참석자 저장 중 오류가 발생했습니다.';
-      setError(errorMessage);
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   // 특정 참석자 항목 수정
-  const updateAttendeeItem = useCallback(async (id: number, updates: Partial<ItEducationAttendeeData>): Promise<ItEducationAttendeeData | null> => {
-    setLoading(true);
-    setError(null);
+  const updateAttendeeItem = useCallback(
+    async (id: number, updates: Partial<ItEducationAttendeeData>): Promise<ItEducationAttendeeData | null> => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      const { data, error } = await supabase
-        .from('it_education_attendee')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
-        .select()
-        .single();
+      try {
+        const { data, error } = await supabase
+          .from('it_education_attendee')
+          .update({
+            ...updates,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id)
+          .select()
+          .single();
 
-      if (error) {
-        console.error('❌ 참석자 항목 수정 실패:', error);
-        throw error;
+        if (error) {
+          console.error('❌ 참석자 항목 수정 실패:', error);
+          throw error;
+        }
+
+        return data;
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'IT교육 참석자 수정 중 오류가 발생했습니다.';
+        setError(errorMessage);
+        console.error('❌ 참석자 항목 수정 오류:', err);
+        return null;
+      } finally {
+        setLoading(false);
       }
-
-      return data;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'IT교육 참석자 수정 중 오류가 발생했습니다.';
-      setError(errorMessage);
-      console.error('❌ 참석자 항목 수정 오류:', err);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   // 참석자 항목 삭제 (소프트 삭제)
   const deleteAttendeeItem = useCallback(async (id: number): Promise<boolean> => {
@@ -247,7 +248,7 @@ export function useSupabaseItEducationAttendee() {
     return {
       id: supabaseData.id.toString(),
       name: supabaseData.user_name,
-      participant: supabaseData.user_name,  // participant 필드 추가
+      participant: supabaseData.user_name, // participant 필드 추가
       position: supabaseData.position || '',
       department: supabaseData.department || '',
       attendanceCheck: supabaseData.attendance_status || '예정',
@@ -262,7 +263,7 @@ export function useSupabaseItEducationAttendee() {
     let score = null;
     let completionStatus = '미완료';
 
-    notesParts.forEach(part => {
+    notesParts.forEach((part) => {
       if (part.includes('점수:')) {
         const scoreMatch = part.match(/(\d+)점/);
         if (scoreMatch) score = parseInt(scoreMatch[1]);
@@ -274,7 +275,7 @@ export function useSupabaseItEducationAttendee() {
     });
 
     return {
-      user_name: item.participant || item.name,  // participant가 있으면 사용, 없으면 name 사용
+      user_name: item.participant || item.name, // participant가 있으면 사용, 없으면 name 사용
       department: item.department,
       position: item.position,
       attendance_status: item.attendanceCheck,

@@ -340,9 +340,7 @@ const RecordTab = memo(
           }}
         >
           <Typography variant="body2" color="text.secondary">
-            {comments.length > 0
-              ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}`
-              : '0-0 of 0'}
+            {comments.length > 0 ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}` : '0-0 of 0'}
           </Typography>
           {comments.length > 0 && (
             <Pagination
@@ -758,7 +756,7 @@ const editSecurityIncidentReducer = (state: EditSecurityIncidentState, action: E
         registrationDate: action.task.registrationDate || '',
         completedDate: action.task.completedDate || '',
         startDate: action.task.startDate || action.task.registrationDate || '',
-        team: action.task.team || state.team || '',  // task의 team이 없으면 현재 state.team 유지
+        team: action.task.team || state.team || '', // task의 team이 없으면 현재 state.team 유지
         department: action.task.team || 'IT',
         progress: action.task.progress || 0
       };
@@ -841,7 +839,7 @@ const SecurityIncidentEditDialog = memo(
       console.log('🔍 currentUser 계산:', {
         sessionEmail: session?.user?.email,
         usersCount: users.length,
-        users: users.map(u => ({ email: u.email, name: u.user_name }))
+        users: users.map((u) => ({ email: u.email, name: u.user_name }))
       });
       if (!session?.user?.email || users.length === 0) return null;
       const foundUser = users.find((u) => u.email === session.user.email);
@@ -1138,7 +1136,7 @@ const SecurityIncidentEditDialog = memo(
           try {
             const response = await fetch('/api/security-incident/next-code');
             const result = await response.json();
-            const currentUserName = currentUser ? currentUser.user_name : (user ? user.name : '');
+            const currentUserName = currentUser ? currentUser.user_name : user ? user.name : '';
 
             console.log('🔍 initNewTask 실행:', {
               currentUser,
@@ -1175,7 +1173,7 @@ const SecurityIncidentEditDialog = memo(
             // 실패 시 임시 코드 사용
             const tempCode = `SEC-ACC-TEMP-${Date.now()}`;
             const newRegistrationDate = getCurrentDate();
-            const currentUserName = currentUser ? currentUser.user_name : (user ? user.name : '');
+            const currentUserName = currentUser ? currentUser.user_name : user ? user.name : '';
             console.log('✅ INIT_NEW_TASK 디스패치 (에러):', { code: tempCode, assignee: currentUserName });
             dispatch({ type: 'INIT_NEW_TASK', code: tempCode, registrationDate: newRegistrationDate, assignee: currentUserName });
             // INIT 직후 team 설정
@@ -1672,22 +1670,19 @@ const SecurityIncidentEditDialog = memo(
 
         if (task?.id) {
           // 추가된 기록 (temp- ID)
-          const addedFeedbacks = pendingFeedbacks.filter(fb =>
-            fb.id.toString().startsWith('temp-') &&
-            !initialFeedbacks.find(initial => initial.id === fb.id)
+          const addedFeedbacks = pendingFeedbacks.filter(
+            (fb) => fb.id.toString().startsWith('temp-') && !initialFeedbacks.find((initial) => initial.id === fb.id)
           );
 
           // 수정된 기록
-          const updatedFeedbacks = pendingFeedbacks.filter(fb => {
+          const updatedFeedbacks = pendingFeedbacks.filter((fb) => {
             if (fb.id.toString().startsWith('temp-')) return false;
-            const initial = initialFeedbacks.find(initial => initial.id === fb.id);
+            const initial = initialFeedbacks.find((initial) => initial.id === fb.id);
             return initial && initial.description !== fb.description;
           });
 
           // 삭제된 기록
-          const deletedFeedbacks = initialFeedbacks.filter(initial =>
-            !pendingFeedbacks.find(pending => pending.id === initial.id)
-          );
+          const deletedFeedbacks = initialFeedbacks.filter((initial) => !pendingFeedbacks.find((pending) => pending.id === initial.id));
 
           console.log('📊 변경사항:', {
             추가: addedFeedbacks.length,
@@ -1713,7 +1708,7 @@ const SecurityIncidentEditDialog = memo(
           // 삭제 - feedbacks 배열에 존재하는 항목만 삭제
           for (const feedback of deletedFeedbacks) {
             // feedbacks 배열에 해당 ID가 존재하는지 확인
-            const existsInFeedbacks = feedbacks.some(fb => String(fb.id) === String(feedback.id));
+            const existsInFeedbacks = feedbacks.some((fb) => String(fb.id) === String(feedback.id));
             if (existsInFeedbacks) {
               await deleteFeedback(String(feedback.id));
             } else {
@@ -1925,7 +1920,7 @@ const SecurityIncidentEditDialog = memo(
       };
 
       // 로컬 state에만 추가 (즉시 반응)
-      setPendingFeedbacks(prev => [newFeedback, ...prev]);
+      setPendingFeedbacks((prev) => [newFeedback, ...prev]);
       setNewComment('');
     }, [newComment, task, currentUser, user]);
 
@@ -1938,13 +1933,7 @@ const SecurityIncidentEditDialog = memo(
       if (!editingCommentText.trim() || !editingCommentId) return;
 
       // 로컬 state만 업데이트 (즉시 반응)
-      setPendingFeedbacks(prev =>
-        prev.map(fb =>
-          fb.id === editingCommentId
-            ? { ...fb, description: editingCommentText }
-            : fb
-        )
-      );
+      setPendingFeedbacks((prev) => prev.map((fb) => (fb.id === editingCommentId ? { ...fb, description: editingCommentText } : fb)));
 
       setEditingCommentId(null);
       setEditingCommentText('');
@@ -1957,7 +1946,7 @@ const SecurityIncidentEditDialog = memo(
 
     const handleDeleteComment = useCallback((commentId: string) => {
       // 로컬 state에서만 제거 (즉시 반응)
-      setPendingFeedbacks(prev => prev.filter(fb => fb.id !== commentId));
+      setPendingFeedbacks((prev) => prev.filter((fb) => fb.id !== commentId));
     }, []);
 
     const handlePostMeasuresChange = useCallback((field: string, value: string) => {
@@ -2064,12 +2053,7 @@ const SecurityIncidentEditDialog = memo(
               currentUserDepartment={currentUser?.department || user?.department || ''}
             />
           )}
-          {editTab === 3 && (
-            <MaterialTab
-              recordId={task?.id}
-              currentUser={currentUser}
-            />
-          )}
+          {editTab === 3 && <MaterialTab recordId={task?.id} currentUser={currentUser} />}
         </DialogContent>
 
         {/* 에러 메시지 표시 */}

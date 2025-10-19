@@ -9,26 +9,17 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as File;
 
     if (!file) {
-      return NextResponse.json(
-        { error: '파일이 업로드되지 않았습니다.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: '파일이 업로드되지 않았습니다.' }, { status: 400 });
     }
 
     // 파일 유효성 검사
     if (!file.type.startsWith('image/')) {
-      return NextResponse.json(
-        { error: '이미지 파일만 업로드 가능합니다.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: '이미지 파일만 업로드 가능합니다.' }, { status: 400 });
     }
 
     // 파일 크기 제한 (5MB)
     if (file.size > 5 * 1024 * 1024) {
-      return NextResponse.json(
-        { error: '파일 크기는 5MB 이하여야 합니다.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: '파일 크기는 5MB 이하여야 합니다.' }, { status: 400 });
     }
 
     // 업로드 디렉토리 설정
@@ -66,12 +57,8 @@ export async function POST(request: NextRequest) {
       originalName: file.name,
       size: file.size
     });
-
   } catch (error) {
     console.error('❌ 이미지 업로드 오류:', error);
-    return NextResponse.json(
-      { error: '이미지 업로드 중 오류가 발생했습니다.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: '이미지 업로드 중 오류가 발생했습니다.' }, { status: 500 });
   }
 }

@@ -109,49 +109,46 @@ export function useSupabaseSecurityRevision() {
   );
 
   // 리비전 수정 (주로 파일 설명 수정)
-  const updateRevision = useCallback(
-    async (id: number, updateData: Partial<SecurityRevisionItem>): Promise<boolean> => {
-      try {
-        setError(null);
+  const updateRevision = useCallback(async (id: number, updateData: Partial<SecurityRevisionItem>): Promise<boolean> => {
+    try {
+      setError(null);
 
-        console.log('📡 updateRevision: API 호출 시작:', { id, updateData });
-        const response = await fetch('/api/security-regulation-revision', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ id, ...updateData })
-        });
+      console.log('📡 updateRevision: API 호출 시작:', { id, updateData });
+      const response = await fetch('/api/security-regulation-revision', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ id, ...updateData })
+      });
 
-        const result = await response.json();
-        console.log('📥 updateRevision: API 응답:', result);
+      const result = await response.json();
+      console.log('📥 updateRevision: API 응답:', result);
 
-        if (result.success) {
-          // 로컬 state 업데이트
-          setRevisions((prev) =>
-            prev.map((rev) =>
-              rev.id === id
-                ? {
-                    ...rev,
-                    ...updateData,
-                    updated_at: new Date().toISOString()
-                  }
-                : rev
-            )
-          );
-          return true;
-        } else {
-          setError(result.error || '수정에 실패했습니다.');
-          return false;
-        }
-      } catch (error) {
-        console.error('❌ updateRevision: 수정 오류:', error);
-        setError('수정에 실패했습니다.');
+      if (result.success) {
+        // 로컬 state 업데이트
+        setRevisions((prev) =>
+          prev.map((rev) =>
+            rev.id === id
+              ? {
+                  ...rev,
+                  ...updateData,
+                  updated_at: new Date().toISOString()
+                }
+              : rev
+          )
+        );
+        return true;
+      } else {
+        setError(result.error || '수정에 실패했습니다.');
         return false;
       }
-    },
-    []
-  );
+    } catch (error) {
+      console.error('❌ updateRevision: 수정 오류:', error);
+      setError('수정에 실패했습니다.');
+      return false;
+    }
+  }, []);
 
   // 리비전 삭제
   const deleteRevision = useCallback(

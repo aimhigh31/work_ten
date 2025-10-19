@@ -44,12 +44,7 @@ function saveLocalEvents(events: EventInput[]) {
 
 export function useGetEvents() {
   // Use localStorage for event storage
-  const {
-    data,
-    isLoading,
-    error,
-    isValidating
-  } = useSWR(endpoints.key, () => getLocalEvents(), {
+  const { data, isLoading, error, isValidating } = useSWR(endpoints.key, () => getLocalEvents(), {
     revalidateIfStale: false,
     revalidateOnFocus: false,
     revalidateOnReconnect: false,

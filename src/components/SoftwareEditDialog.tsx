@@ -472,9 +472,7 @@ const RecordTab = memo(
           }}
         >
           <Typography variant="body2" color="text.secondary">
-            {comments.length > 0
-              ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}`
-              : '0-0 of 0'}
+            {comments.length > 0 ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}` : '0-0 of 0'}
           </Typography>
           {comments.length > 0 && (
             <Pagination
@@ -721,12 +719,7 @@ const OverviewTab = memo(
 
             <FormControl fullWidth>
               <InputLabel shrink>상태</InputLabel>
-              <Select
-                value={softwareState.status}
-                label="상태"
-                onChange={handleFieldChange('status')}
-                disabled={statusLoading}
-              >
+              <Select value={softwareState.status} label="상태" onChange={handleFieldChange('status')} disabled={statusLoading}>
                 {statusLoading ? (
                   <MenuItem disabled>
                     <Typography variant="body2" sx={{ color: 'text.secondary' }}>
@@ -1370,306 +1363,336 @@ interface UserHistory {
 }
 
 // 사용자이력 탭 컴포넌트
-const UserHistoryTab = memo(({
-  softwareId,
-  mode,
-  userHistories: initialUserHistories,
-  onUserHistoriesChange
-}: {
-  softwareId: number;
-  mode: 'add' | 'edit';
-  userHistories: UserHistory[];
-  onUserHistoriesChange: (histories: UserHistory[]) => void;
-}) => {
-  const { getUserHistories, convertToUserHistory } = useSupabaseSoftwareUser();
+const UserHistoryTab = memo(
+  ({
+    softwareId,
+    mode,
+    userHistories: initialUserHistories,
+    onUserHistoriesChange
+  }: {
+    softwareId: number;
+    mode: 'add' | 'edit';
+    userHistories: UserHistory[];
+    onUserHistoriesChange: (histories: UserHistory[]) => void;
+  }) => {
+    const { getUserHistories, convertToUserHistory } = useSupabaseSoftwareUser();
 
-  // 로컬 사용자이력 상태
-  const [userHistories, setUserHistories] = useState<UserHistory[]>(initialUserHistories);
+    // 로컬 사용자이력 상태
+    const [userHistories, setUserHistories] = useState<UserHistory[]>(initialUserHistories);
 
-  // DB에서 사용자이력 로드 (편집 모드인 경우)
-  useEffect(() => {
-    const loadUserHistories = async () => {
-      if (mode === 'edit' && softwareId) {
-        try {
-          const userData = await getUserHistories(softwareId);
-          const convertedData = userData.map(convertToUserHistory);
-          setUserHistories(convertedData);
-          onUserHistoriesChange(convertedData);
-        } catch (error) {
-          console.warn('⚠️ 사용자이력 로드 중 오류:', error);
-          // 에러가 발생해도 빈 배열로 초기화하여 UI가 정상 작동하도록 함
-          setUserHistories([]);
-          onUserHistoriesChange([]);
+    // DB에서 사용자이력 로드 (편집 모드인 경우)
+    useEffect(() => {
+      const loadUserHistories = async () => {
+        if (mode === 'edit' && softwareId) {
+          try {
+            const userData = await getUserHistories(softwareId);
+            const convertedData = userData.map(convertToUserHistory);
+            setUserHistories(convertedData);
+            onUserHistoriesChange(convertedData);
+          } catch (error) {
+            console.warn('⚠️ 사용자이력 로드 중 오류:', error);
+            // 에러가 발생해도 빈 배열로 초기화하여 UI가 정상 작동하도록 함
+            setUserHistories([]);
+            onUserHistoriesChange([]);
+          }
         }
+      };
+
+      loadUserHistories();
+    }, [mode, softwareId]);
+
+    // 사용자이력 변경 시 부모 컴포넌트에 알림
+    useEffect(() => {
+      onUserHistoriesChange(userHistories);
+    }, [userHistories, onUserHistoriesChange]);
+
+    // 더 많은 샘플 데이터로 페이지네이션 테스트 (add 모드일 때만 사용)
+    const [sampleUserHistories] = useState<UserHistory[]>([
+      {
+        id: '1',
+        registrationDate: '2024-01-15',
+        userId: 'user1',
+        userName: '김철수',
+        department: 'IT팀',
+        exclusiveId: 'SW001-KCS',
+        startDate: '2024-01-15',
+        endDate: '2024-06-30',
+        reason: '부서 이동',
+        status: 'inactive'
+      },
+      {
+        id: '2',
+        registrationDate: '2024-07-01',
+        userId: 'user2',
+        userName: '이영희',
+        department: '개발팀',
+        exclusiveId: 'SW001-LYH',
+        startDate: '2024-07-01',
+        endDate: '',
+        reason: '신규 배정',
+        status: 'active'
+      },
+      {
+        id: '3',
+        registrationDate: '2024-08-01',
+        userId: 'user3',
+        userName: '박민수',
+        department: '디자인팀',
+        exclusiveId: 'SW001-PMS',
+        startDate: '2024-08-01',
+        endDate: '',
+        reason: '신규 배정',
+        status: 'active'
+      },
+      {
+        id: '4',
+        registrationDate: '2024-08-05',
+        userId: 'user4',
+        userName: '최은지',
+        department: '기획팀',
+        exclusiveId: 'SW001-CEJ',
+        startDate: '2024-08-05',
+        endDate: '',
+        reason: '신규 배정',
+        status: 'active'
+      },
+      {
+        id: '5',
+        registrationDate: '2024-08-10',
+        userId: 'user5',
+        userName: '정현우',
+        department: '마케팅팀',
+        exclusiveId: 'SW001-JHW',
+        startDate: '2024-08-10',
+        endDate: '',
+        reason: '신규 배정',
+        status: 'active'
+      },
+      {
+        id: '6',
+        registrationDate: '2024-08-15',
+        userId: 'user6',
+        userName: '강예린',
+        department: 'IT팀',
+        exclusiveId: 'SW001-KYR',
+        startDate: '2024-08-15',
+        endDate: '',
+        reason: '신규 배정',
+        status: 'active'
+      },
+      {
+        id: '7',
+        registrationDate: '2024-08-20',
+        userId: 'user7',
+        userName: '송지훈',
+        department: '개발팀',
+        exclusiveId: 'SW001-SJH',
+        startDate: '2024-08-20',
+        endDate: '',
+        reason: '신규 배정',
+        status: 'active'
+      },
+      {
+        id: '8',
+        registrationDate: '2024-08-22',
+        userId: 'user8',
+        userName: '김소영',
+        department: '디자인팀',
+        exclusiveId: 'SW001-KSY',
+        startDate: '2024-08-22',
+        endDate: '',
+        reason: '신규 배정',
+        status: 'active'
+      },
+      {
+        id: '9',
+        registrationDate: '2024-08-24',
+        userId: 'user9',
+        userName: '이동현',
+        department: '기획팀',
+        exclusiveId: 'SW001-LDH',
+        startDate: '2024-08-24',
+        endDate: '',
+        reason: '신규 배정',
+        status: 'active'
       }
+    ]);
+
+    const [selectedRows, setSelectedRows] = useState<string[]>([]);
+    const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
+    const [statusWarning, setStatusWarning] = useState<string>('');
+
+    // 페이지네이션 상태
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(7);
+
+    // 페이지네이션 계산
+    const totalPages = Math.ceil(userHistories.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const currentItems = userHistories.slice(startIndex, endIndex);
+
+    // 페이지 변경 핸들러 (MUI Pagination 형식에 맞게 수정)
+    const handlePageChange = (event: React.ChangeEvent<unknown>, page: number) => {
+      setCurrentPage(page);
     };
 
-    loadUserHistories();
-  }, [mode, softwareId]);
-
-  // 사용자이력 변경 시 부모 컴포넌트에 알림
-  useEffect(() => {
-    onUserHistoriesChange(userHistories);
-  }, [userHistories, onUserHistoriesChange]);
-
-  // 더 많은 샘플 데이터로 페이지네이션 테스트 (add 모드일 때만 사용)
-  const [sampleUserHistories] = useState<UserHistory[]>([
-    {
-      id: '1',
-      registrationDate: '2024-01-15',
-      userId: 'user1',
-      userName: '김철수',
-      department: 'IT팀',
-      exclusiveId: 'SW001-KCS',
-      startDate: '2024-01-15',
-      endDate: '2024-06-30',
-      reason: '부서 이동',
-      status: 'inactive'
-    },
-    {
-      id: '2',
-      registrationDate: '2024-07-01',
-      userId: 'user2',
-      userName: '이영희',
-      department: '개발팀',
-      exclusiveId: 'SW001-LYH',
-      startDate: '2024-07-01',
-      endDate: '',
-      reason: '신규 배정',
-      status: 'active'
-    },
-    {
-      id: '3',
-      registrationDate: '2024-08-01',
-      userId: 'user3',
-      userName: '박민수',
-      department: '디자인팀',
-      exclusiveId: 'SW001-PMS',
-      startDate: '2024-08-01',
-      endDate: '',
-      reason: '신규 배정',
-      status: 'active'
-    },
-    {
-      id: '4',
-      registrationDate: '2024-08-05',
-      userId: 'user4',
-      userName: '최은지',
-      department: '기획팀',
-      exclusiveId: 'SW001-CEJ',
-      startDate: '2024-08-05',
-      endDate: '',
-      reason: '신규 배정',
-      status: 'active'
-    },
-    {
-      id: '5',
-      registrationDate: '2024-08-10',
-      userId: 'user5',
-      userName: '정현우',
-      department: '마케팅팀',
-      exclusiveId: 'SW001-JHW',
-      startDate: '2024-08-10',
-      endDate: '',
-      reason: '신규 배정',
-      status: 'active'
-    },
-    {
-      id: '6',
-      registrationDate: '2024-08-15',
-      userId: 'user6',
-      userName: '강예린',
-      department: 'IT팀',
-      exclusiveId: 'SW001-KYR',
-      startDate: '2024-08-15',
-      endDate: '',
-      reason: '신규 배정',
-      status: 'active'
-    },
-    {
-      id: '7',
-      registrationDate: '2024-08-20',
-      userId: 'user7',
-      userName: '송지훈',
-      department: '개발팀',
-      exclusiveId: 'SW001-SJH',
-      startDate: '2024-08-20',
-      endDate: '',
-      reason: '신규 배정',
-      status: 'active'
-    },
-    {
-      id: '8',
-      registrationDate: '2024-08-22',
-      userId: 'user8',
-      userName: '김소영',
-      department: '디자인팀',
-      exclusiveId: 'SW001-KSY',
-      startDate: '2024-08-22',
-      endDate: '',
-      reason: '신규 배정',
-      status: 'active'
-    },
-    {
-      id: '9',
-      registrationDate: '2024-08-24',
-      userId: 'user9',
-      userName: '이동현',
-      department: '기획팀',
-      exclusiveId: 'SW001-LDH',
-      startDate: '2024-08-24',
-      endDate: '',
-      reason: '신규 배정',
-      status: 'active'
-    }
-  ]);
-
-  const [selectedRows, setSelectedRows] = useState<string[]>([]);
-  const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
-  const [statusWarning, setStatusWarning] = useState<string>('');
-
-  // 페이지네이션 상태
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(7);
-
-  // 페이지네이션 계산
-  const totalPages = Math.ceil(userHistories.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentItems = userHistories.slice(startIndex, endIndex);
-
-  // 페이지 변경 핸들러 (MUI Pagination 형식에 맞게 수정)
-  const handlePageChange = (event: React.ChangeEvent<unknown>, page: number) => {
-    setCurrentPage(page);
-  };
-
-  const handleCellClick = (id: string, field: string) => {
-    setEditingCell({ id, field });
-  };
-
-  const handleCellBlur = () => {
-    setEditingCell(null);
-  };
-
-  const handleAddHistory = () => {
-    const newHistory: UserHistory = {
-      id: Date.now().toString(),
-      registrationDate: new Date().toISOString().split('T')[0],
-      userId: '',
-      userName: '',
-      department: '',
-      exclusiveId: '',
-      startDate: new Date().toISOString().split('T')[0],
-      endDate: '',
-      reason: '',
-      status: 'active'
+    const handleCellClick = (id: string, field: string) => {
+      setEditingCell({ id, field });
     };
-    setUserHistories([newHistory, ...userHistories]);
-  };
 
-  const handleDeleteSelected = () => {
-    setUserHistories(userHistories.filter((h) => !selectedRows.includes(h.id)));
-    setSelectedRows([]);
-  };
+    const handleCellBlur = () => {
+      setEditingCell(null);
+    };
 
-  const handleEditHistory = (id: string, field: keyof UserHistory, value: string) => {
-    // 소프트웨어는 동시 사용이 가능하므로 상태 검증 제거
-    setUserHistories(userHistories.map((h) => (h.id === id ? { ...h, [field]: value } : h)));
-    setStatusWarning('');
-  };
+    const handleAddHistory = () => {
+      const newHistory: UserHistory = {
+        id: Date.now().toString(),
+        registrationDate: new Date().toISOString().split('T')[0],
+        userId: '',
+        userName: '',
+        department: '',
+        exclusiveId: '',
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: '',
+        reason: '',
+        status: 'active'
+      };
+      setUserHistories([newHistory, ...userHistories]);
+    };
 
-  const handleSelectRow = (id: string) => {
-    if (selectedRows.includes(id)) {
-      setSelectedRows(selectedRows.filter((rowId) => rowId !== id));
-    } else {
-      setSelectedRows([...selectedRows, id]);
-    }
-  };
-
-  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.checked) {
-      setSelectedRows(userHistories.map((h) => h.id));
-    } else {
+    const handleDeleteSelected = () => {
+      setUserHistories(userHistories.filter((h) => !selectedRows.includes(h.id)));
       setSelectedRows([]);
-    }
-  };
+    };
 
-  const statusOptions = useMemo(() => ['사용중', '종료'], []);
-  const statusColors: Record<string, string> = useMemo(() => ({
-    사용중: 'success',
-    종료: 'default'
-  }), []);
+    const handleEditHistory = (id: string, field: keyof UserHistory, value: string) => {
+      // 소프트웨어는 동시 사용이 가능하므로 상태 검증 제거
+      setUserHistories(userHistories.map((h) => (h.id === id ? { ...h, [field]: value } : h)));
+      setStatusWarning('');
+    };
 
-  // 컬럼 너비 및 높이 정의 (편집/읽기 모드 공통)
-  const columnWidths = useMemo(() => ({
-    checkbox: 50,
-    no: 60,
-    registrationDate: 100,
-    team: 100,
-    userName: 120,
-    exclusiveId: 120,
-    reason: 150,
-    status: 100,
-    startDate: 100,
-    endDate: 100
-  }), []);
-
-  const cellHeight = 56; // 고정 셀 높이
-
-  // 편집 가능한 셀 렌더링
-  const renderEditableCell = (history: UserHistory, field: string, value: string, options?: string[]) => {
-    const isEditing = editingCell?.id === history.id && editingCell?.field === field;
-    const fieldWidth = columnWidths[field as keyof typeof columnWidths] || 100;
-
-    if (isEditing) {
-      if (options) {
-        return (
-          <Select
-            value={value}
-            onChange={(e) => {
-              const newValue = e.target.value;
-              if (field === 'status') {
-                const newStatus = newValue === '사용중' ? 'active' : 'inactive';
-                handleEditHistory(history.id, 'status', newStatus);
-              } else {
-                handleEditHistory(history.id, field as keyof UserHistory, newValue);
-              }
-            }}
-            onBlur={handleCellBlur}
-            size="small"
-            autoFocus
-            sx={{
-              width: fieldWidth - 16,
-              minWidth: fieldWidth - 16,
-              height: 40, // 고정 높이
-              '& .MuiSelect-select': {
-                padding: '8px 14px',
-                fontSize: '12px',
-                lineHeight: '1.4'
-              }
-            }}
-          >
-            {options.map((option) => (
-              <MenuItem key={option} value={option}>
-                {field === 'status' ? <Chip label={option} color={statusColors[option] as any} size="small" /> : option}
-              </MenuItem>
-            ))}
-          </Select>
-        );
+    const handleSelectRow = (id: string) => {
+      if (selectedRows.includes(id)) {
+        setSelectedRows(selectedRows.filter((rowId) => rowId !== id));
+      } else {
+        setSelectedRows([...selectedRows, id]);
       }
+    };
 
-      if (field === 'startDate' || field === 'endDate') {
+    const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+      if (event.target.checked) {
+        setSelectedRows(userHistories.map((h) => h.id));
+      } else {
+        setSelectedRows([]);
+      }
+    };
+
+    const statusOptions = useMemo(() => ['사용중', '종료'], []);
+    const statusColors: Record<string, string> = useMemo(
+      () => ({
+        사용중: 'success',
+        종료: 'default'
+      }),
+      []
+    );
+
+    // 컬럼 너비 및 높이 정의 (편집/읽기 모드 공통)
+    const columnWidths = useMemo(
+      () => ({
+        checkbox: 50,
+        no: 60,
+        registrationDate: 100,
+        team: 100,
+        userName: 120,
+        exclusiveId: 120,
+        reason: 150,
+        status: 100,
+        startDate: 100,
+        endDate: 100
+      }),
+      []
+    );
+
+    const cellHeight = 56; // 고정 셀 높이
+
+    // 편집 가능한 셀 렌더링
+    const renderEditableCell = (history: UserHistory, field: string, value: string, options?: string[]) => {
+      const isEditing = editingCell?.id === history.id && editingCell?.field === field;
+      const fieldWidth = columnWidths[field as keyof typeof columnWidths] || 100;
+
+      if (isEditing) {
+        if (options) {
+          return (
+            <Select
+              value={value}
+              onChange={(e) => {
+                const newValue = e.target.value;
+                if (field === 'status') {
+                  const newStatus = newValue === '사용중' ? 'active' : 'inactive';
+                  handleEditHistory(history.id, 'status', newStatus);
+                } else {
+                  handleEditHistory(history.id, field as keyof UserHistory, newValue);
+                }
+              }}
+              onBlur={handleCellBlur}
+              size="small"
+              autoFocus
+              sx={{
+                width: fieldWidth - 16,
+                minWidth: fieldWidth - 16,
+                height: 40, // 고정 높이
+                '& .MuiSelect-select': {
+                  padding: '8px 14px',
+                  fontSize: '12px',
+                  lineHeight: '1.4'
+                }
+              }}
+            >
+              {options.map((option) => (
+                <MenuItem key={option} value={option}>
+                  {field === 'status' ? <Chip label={option} color={statusColors[option] as any} size="small" /> : option}
+                </MenuItem>
+              ))}
+            </Select>
+          );
+        }
+
+        if (field === 'startDate' || field === 'endDate') {
+          return (
+            <TextField
+              type="date"
+              value={value || ''}
+              onChange={(e) => handleEditHistory(history.id, field as keyof UserHistory, e.target.value)}
+              onBlur={handleCellBlur}
+              size="small"
+              autoFocus
+              InputLabelProps={{
+                shrink: true
+              }}
+              sx={{
+                width: fieldWidth - 16,
+                height: 40, // 고정 높이
+                '& .MuiInputBase-root': {
+                  height: 40
+                },
+                '& .MuiInputBase-input': {
+                  fontSize: '12px',
+                  padding: '8px 14px'
+                }
+              }}
+            />
+          );
+        }
+
         return (
           <TextField
-            type="date"
-            value={value || ''}
+            value={value}
             onChange={(e) => handleEditHistory(history.id, field as keyof UserHistory, e.target.value)}
             onBlur={handleCellBlur}
             size="small"
             autoFocus
-            InputLabelProps={{
-              shrink: true
-            }}
+            InputLabelProps={{ shrink: true }}
             sx={{
               width: fieldWidth - 16,
               height: 40, // 고정 높이
@@ -1685,145 +1708,87 @@ const UserHistoryTab = memo(({
         );
       }
 
-      return (
-        <TextField
-          value={value}
-          onChange={(e) => handleEditHistory(history.id, field as keyof UserHistory, e.target.value)}
-          onBlur={handleCellBlur}
-          size="small"
-          autoFocus
-          InputLabelProps={{ shrink: true }}
-          sx={{
-            width: fieldWidth - 16,
-            height: 40, // 고정 높이
-            '& .MuiInputBase-root': {
-              height: 40
-            },
-            '& .MuiInputBase-input': {
-              fontSize: '12px',
-              padding: '8px 14px'
-            }
-          }}
-        />
-      );
-    }
+      // 읽기 모드
+      if (field === 'status') {
+        return (
+          <Box
+            sx={{
+              height: 40, // 고정 높이
+              display: 'flex',
+              alignItems: 'center',
+              cursor: 'pointer'
+            }}
+          >
+            <Chip
+              label={value}
+              color={statusColors[value] as any}
+              size="small"
+              sx={{
+                '&:hover': { opacity: 0.8 },
+                fontSize: '12px'
+              }}
+            />
+          </Box>
+        );
+      }
 
-    // 읽기 모드
-    if (field === 'status') {
       return (
         <Box
           sx={{
             height: 40, // 고정 높이
             display: 'flex',
             alignItems: 'center',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            '&:hover': { bgcolor: 'grey.50' },
+            p: 0.5,
+            borderRadius: 1
           }}
         >
-          <Chip
-            label={value}
-            color={statusColors[value] as any}
-            size="small"
+          <Typography
+            variant="body2"
             sx={{
-              '&:hover': { opacity: 0.8 },
               fontSize: '12px'
             }}
-          />
+          >
+            {value || '-'}
+          </Typography>
         </Box>
       );
-    }
+    };
 
     return (
-      <Box
-        sx={{
-          height: 40, // 고정 높이
-          display: 'flex',
-          alignItems: 'center',
-          cursor: 'pointer',
-          '&:hover': { bgcolor: 'grey.50' },
-          p: 0.5,
-          borderRadius: 1
-        }}
-      >
-        <Typography
-          variant="body2"
+      <Box sx={{ height: '650px', display: 'flex', flexDirection: 'column', p: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Typography variant="h6" sx={{ fontSize: '16px', fontWeight: 600 }}>
+            사용자 이력 관리
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button variant="outlined" color="error" onClick={handleDeleteSelected} disabled={selectedRows.length === 0} size="small">
+              삭제({selectedRows.length})
+            </Button>
+            <Button variant="contained" onClick={handleAddHistory} size="small" sx={{ fontSize: '12px' }}>
+              추가
+            </Button>
+          </Box>
+        </Box>
+
+        <TableContainer
           sx={{
-            fontSize: '12px'
+            flex: 1,
+            overflowY: 'auto',
+            overflowX: 'auto',
+            '& .MuiTable-root': {
+              minWidth: 800
+            }
           }}
         >
-          {value || '-'}
-        </Typography>
-      </Box>
-    );
-  };
-
-  return (
-    <Box sx={{ height: '650px', display: 'flex', flexDirection: 'column', p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h6" sx={{ fontSize: '16px', fontWeight: 600 }}>
-          사용자 이력 관리
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button variant="outlined" color="error" onClick={handleDeleteSelected} disabled={selectedRows.length === 0} size="small">
-            삭제({selectedRows.length})
-          </Button>
-          <Button variant="contained" onClick={handleAddHistory} size="small" sx={{ fontSize: '12px' }}>
-            추가
-          </Button>
-        </Box>
-      </Box>
-
-      <TableContainer
-        sx={{
-          flex: 1,
-          overflowY: 'auto',
-          overflowX: 'auto',
-          '& .MuiTable-root': {
-            minWidth: 800
-          }
-        }}
-      >
-        <Table size="small">
-          <TableHead>
-            <TableRow sx={{ backgroundColor: 'grey.50' }}>
-              <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
-                <Checkbox
-                  checked={selectedRows.length === userHistories.length && userHistories.length > 0}
-                  onChange={handleSelectAll}
-                  color="primary"
-                  size="small"
-                  sx={{
-                    transform: 'scale(0.7)',
-                    '&.Mui-checked': {
-                      color: '#1976d2'
-                    }
-                  }}
-                />
-              </TableCell>
-              <TableCell sx={{ width: columnWidths.no, fontWeight: 600 }}>NO</TableCell>
-              <TableCell sx={{ width: columnWidths.registrationDate, fontWeight: 600 }}>등록일</TableCell>
-              <TableCell sx={{ width: columnWidths.team, fontWeight: 600 }}>팀</TableCell>
-              <TableCell sx={{ width: columnWidths.userName, fontWeight: 600 }}>사용자</TableCell>
-              <TableCell sx={{ width: columnWidths.exclusiveId, fontWeight: 600 }}>전용아이디</TableCell>
-              <TableCell sx={{ width: columnWidths.reason, fontWeight: 600 }}>사유</TableCell>
-              <TableCell sx={{ width: columnWidths.status, fontWeight: 600 }}>사용상태</TableCell>
-              <TableCell sx={{ width: columnWidths.startDate, fontWeight: 600 }}>시작일</TableCell>
-              <TableCell sx={{ width: columnWidths.endDate, fontWeight: 600 }}>종료일</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {currentItems.map((history, index) => (
-              <TableRow
-                key={`history_${history.id}_${index}`}
-                hover
-                sx={{
-                  height: cellHeight,
-                  '&:hover': { backgroundColor: 'action.hover' }
-                }}
-              >
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ backgroundColor: 'grey.50' }}>
                 <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
                   <Checkbox
-                    checked={selectedRows.includes(history.id)}
-                    onChange={() => handleSelectRow(history.id)}
+                    checked={selectedRows.length === userHistories.length && userHistories.length > 0}
+                    onChange={handleSelectAll}
                     color="primary"
                     size="small"
                     sx={{
@@ -1834,112 +1799,148 @@ const UserHistoryTab = memo(({
                     }}
                   />
                 </TableCell>
-                <TableCell sx={{ width: columnWidths.no }}>{userHistories.length - startIndex - index}</TableCell>
-                <TableCell sx={{ width: columnWidths.registrationDate }} onClick={() => handleCellClick(history.id, 'registrationDate')}>
-                  {renderEditableCell(history, 'registrationDate', history.registrationDate)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.team }} onClick={() => handleCellClick(history.id, 'department')}>
-                  {renderEditableCell(history, 'department', history.department)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.userName }} onClick={() => handleCellClick(history.id, 'userName')}>
-                  {renderEditableCell(history, 'userName', history.userName)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.exclusiveId }} onClick={() => handleCellClick(history.id, 'exclusiveId')}>
-                  {renderEditableCell(history, 'exclusiveId', history.exclusiveId)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.reason }} onClick={() => handleCellClick(history.id, 'reason')}>
-                  {renderEditableCell(history, 'reason', history.reason)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.status }} onClick={() => handleCellClick(history.id, 'status')}>
-                  {renderEditableCell(history, 'status', history.status === 'active' ? '사용중' : '종료', statusOptions)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.startDate }} onClick={() => handleCellClick(history.id, 'startDate')}>
-                  {renderEditableCell(history, 'startDate', history.startDate)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.endDate }} onClick={() => handleCellClick(history.id, 'endDate')}>
-                  {renderEditableCell(history, 'endDate', history.endDate)}
-                </TableCell>
+                <TableCell sx={{ width: columnWidths.no, fontWeight: 600 }}>NO</TableCell>
+                <TableCell sx={{ width: columnWidths.registrationDate, fontWeight: 600 }}>등록일</TableCell>
+                <TableCell sx={{ width: columnWidths.team, fontWeight: 600 }}>팀</TableCell>
+                <TableCell sx={{ width: columnWidths.userName, fontWeight: 600 }}>사용자</TableCell>
+                <TableCell sx={{ width: columnWidths.exclusiveId, fontWeight: 600 }}>전용아이디</TableCell>
+                <TableCell sx={{ width: columnWidths.reason, fontWeight: 600 }}>사유</TableCell>
+                <TableCell sx={{ width: columnWidths.status, fontWeight: 600 }}>사용상태</TableCell>
+                <TableCell sx={{ width: columnWidths.startDate, fontWeight: 600 }}>시작일</TableCell>
+                <TableCell sx={{ width: columnWidths.endDate, fontWeight: 600 }}>종료일</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            </TableHead>
+            <TableBody>
+              {currentItems.map((history, index) => (
+                <TableRow
+                  key={`history_${history.id}_${index}`}
+                  hover
+                  sx={{
+                    height: cellHeight,
+                    '&:hover': { backgroundColor: 'action.hover' }
+                  }}
+                >
+                  <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
+                    <Checkbox
+                      checked={selectedRows.includes(history.id)}
+                      onChange={() => handleSelectRow(history.id)}
+                      color="primary"
+                      size="small"
+                      sx={{
+                        transform: 'scale(0.7)',
+                        '&.Mui-checked': {
+                          color: '#1976d2'
+                        }
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell sx={{ width: columnWidths.no }}>{userHistories.length - startIndex - index}</TableCell>
+                  <TableCell sx={{ width: columnWidths.registrationDate }} onClick={() => handleCellClick(history.id, 'registrationDate')}>
+                    {renderEditableCell(history, 'registrationDate', history.registrationDate)}
+                  </TableCell>
+                  <TableCell sx={{ width: columnWidths.team }} onClick={() => handleCellClick(history.id, 'department')}>
+                    {renderEditableCell(history, 'department', history.department)}
+                  </TableCell>
+                  <TableCell sx={{ width: columnWidths.userName }} onClick={() => handleCellClick(history.id, 'userName')}>
+                    {renderEditableCell(history, 'userName', history.userName)}
+                  </TableCell>
+                  <TableCell sx={{ width: columnWidths.exclusiveId }} onClick={() => handleCellClick(history.id, 'exclusiveId')}>
+                    {renderEditableCell(history, 'exclusiveId', history.exclusiveId)}
+                  </TableCell>
+                  <TableCell sx={{ width: columnWidths.reason }} onClick={() => handleCellClick(history.id, 'reason')}>
+                    {renderEditableCell(history, 'reason', history.reason)}
+                  </TableCell>
+                  <TableCell sx={{ width: columnWidths.status }} onClick={() => handleCellClick(history.id, 'status')}>
+                    {renderEditableCell(history, 'status', history.status === 'active' ? '사용중' : '종료', statusOptions)}
+                  </TableCell>
+                  <TableCell sx={{ width: columnWidths.startDate }} onClick={() => handleCellClick(history.id, 'startDate')}>
+                    {renderEditableCell(history, 'startDate', history.startDate)}
+                  </TableCell>
+                  <TableCell sx={{ width: columnWidths.endDate }} onClick={() => handleCellClick(history.id, 'endDate')}>
+                    {renderEditableCell(history, 'endDate', history.endDate)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
 
-      {/* 페이지네이션 - 하단 고정 */}
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          mt: 'auto',
-          pt: 2,
-          px: 2,
-          borderTop: '1px solid',
-          borderColor: 'divider',
-          backgroundColor: 'background.paper',
-          position: 'sticky',
-          bottom: 0
-        }}
-      >
-        <Typography variant="body2" color="text.secondary">
-          {userHistories.length > 0
-            ? `${startIndex + 1}-${Math.min(endIndex, userHistories.length)} of ${userHistories.length}`
-            : '0-0 of 0'}
-        </Typography>
-        {totalPages > 1 && (
-          <Pagination
-            count={totalPages}
-            page={currentPage}
-            onChange={handlePageChange}
-            color="primary"
-            size="small"
-            showFirstButton
-            showLastButton
-            sx={{
-              '& .MuiPaginationItem-root': {
-                fontSize: '0.875rem',
-                minWidth: '32px',
-                height: '32px',
-                borderRadius: '4px'
-              },
-              '& .MuiPaginationItem-page.Mui-selected': {
-                backgroundColor: 'primary.main',
-                color: 'white !important',
-                borderRadius: '4px',
-                fontWeight: 500,
-                '&:hover': {
-                  backgroundColor: 'primary.dark',
-                  color: 'white !important'
-                }
-              },
-              '& .MuiPaginationItem-page': {
-                borderRadius: '4px',
-                '&:hover': {
-                  backgroundColor: 'grey.100'
-                }
-              }
-            }}
-          />
-        )}
-      </Box>
-
-      {/* 경고 메시지 */}
-      {statusWarning && (
-        <Alert
-          severity="warning"
+        {/* 페이지네이션 - 하단 고정 */}
+        <Box
           sx={{
-            mt: 2,
-            mx: 3,
-            mb: 2,
-            animation: 'fadeIn 0.3s ease-in'
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            mt: 'auto',
+            pt: 2,
+            px: 2,
+            borderTop: '1px solid',
+            borderColor: 'divider',
+            backgroundColor: 'background.paper',
+            position: 'sticky',
+            bottom: 0
           }}
         >
-          {statusWarning}
-        </Alert>
-      )}
-    </Box>
-  );
-});
+          <Typography variant="body2" color="text.secondary">
+            {userHistories.length > 0
+              ? `${startIndex + 1}-${Math.min(endIndex, userHistories.length)} of ${userHistories.length}`
+              : '0-0 of 0'}
+          </Typography>
+          {totalPages > 1 && (
+            <Pagination
+              count={totalPages}
+              page={currentPage}
+              onChange={handlePageChange}
+              color="primary"
+              size="small"
+              showFirstButton
+              showLastButton
+              sx={{
+                '& .MuiPaginationItem-root': {
+                  fontSize: '0.875rem',
+                  minWidth: '32px',
+                  height: '32px',
+                  borderRadius: '4px'
+                },
+                '& .MuiPaginationItem-page.Mui-selected': {
+                  backgroundColor: 'primary.main',
+                  color: 'white !important',
+                  borderRadius: '4px',
+                  fontWeight: 500,
+                  '&:hover': {
+                    backgroundColor: 'primary.dark',
+                    color: 'white !important'
+                  }
+                },
+                '& .MuiPaginationItem-page': {
+                  borderRadius: '4px',
+                  '&:hover': {
+                    backgroundColor: 'grey.100'
+                  }
+                }
+              }}
+            />
+          )}
+        </Box>
+
+        {/* 경고 메시지 */}
+        {statusWarning && (
+          <Alert
+            severity="warning"
+            sx={{
+              mt: 2,
+              mx: 3,
+              mb: 2,
+              animation: 'fadeIn 0.3s ease-in'
+            }}
+          >
+            {statusWarning}
+          </Alert>
+        )}
+      </Box>
+    );
+  }
+);
 
 UserHistoryTab.displayName = 'UserHistoryTab';
 
@@ -1958,580 +1959,554 @@ interface MaintenanceHistory {
 }
 
 // 구매/유지보수이력 탭 컴포넌트
-const PurchaseMaintenanceTab = memo(({
-  purchaseHistory,
-  historyTypes,
-  onAddPurchaseHistory,
-  editingPurchaseHistoryId,
-  editingPurchaseHistoryData,
-  onEditPurchaseHistory,
-  onSavePurchaseHistoryEdit,
-  onCancelPurchaseHistoryEdit,
-  onDeletePurchaseHistory,
-  onEditPurchaseHistoryDataChange
-}: {
-  purchaseHistory: any[];
-  historyTypes: string[];
-  onAddPurchaseHistory: (item: any) => void;
-  editingPurchaseHistoryId: number | null;
-  editingPurchaseHistoryData: any;
-  onEditPurchaseHistory: (id: number, data: any) => void;
-  onSavePurchaseHistoryEdit: () => void;
-  onCancelPurchaseHistoryEdit: () => void;
-  onDeletePurchaseHistory: (id: number) => void;
-  onEditPurchaseHistoryDataChange: (data: any) => void;
-}) => {
-  // 설명을 기반으로 이력 타입 결정
-  const getHistoryType = (description: string): 'purchase' | 'maintenance' | 'upgrade' | 'renewal' => {
-    if (description.includes('유지보수')) return 'maintenance';
-    if (description.includes('업그레이드')) return 'upgrade';
-    if (description.includes('갱신') || description.includes('연장')) return 'renewal';
-    return 'purchase';
-  };
-
-  // memo에서 완료일 추출하는 함수
-  const extractCompletionDate = (memo: string): string => {
-    if (!memo) return '';
-    const match = memo.match(/완료일:\s*([^\|]*)/);
-    return match ? match[1].trim() : '';
-  };
-
-  // DB에서 로드된 구매이력을 MaintenanceHistory 형식으로 변환
-  const dbHistories: MaintenanceHistory[] = purchaseHistory.map((item, index) => {
-    const uniqueId = item.id ? item.id.toString() : `temp_${Date.now()}_${index}`;
-    const completionDateFromMemo = extractCompletionDate(item.memo || '');
-
-    return {
-      id: uniqueId,
-      registrationDate: item.registrationDate || item.purchaseDate || '',
-      type: getHistoryType(item.description || ''),
-      content: item.description || '',
-      vendor: item.supplier || '',
-      amount: parseFloat(item.price) || 0,
-      registrant: '시스템',
-      status: item.status || '진행중',
-      startDate: item.purchaseDate || '',
-      completionDate: completionDateFromMemo || (item.status === '완료' ? item.purchaseDate || '' : '')
-    };
-  });
-
-  console.log('🔍 PurchaseMaintenanceTab - 데이터 확인:');
-  console.log('  - purchaseHistory.length:', purchaseHistory.length);
-  console.log('  - dbHistories.length:', dbHistories.length);
-  console.log('  - purchaseHistory 데이터:', purchaseHistory);
-
-  // 실제 데이터를 사용하되, DB 데이터가 없으면 빈 배열 사용
-  const maintenanceHistories: MaintenanceHistory[] = dbHistories.length > 0 ? dbHistories : [];
-
-  console.log('  - 최종 사용할 데이터:', maintenanceHistories.length + '개');
-
-  // purchaseHistory 변경시 로그 출력
-  React.useEffect(() => {
-    console.log('🔄 PurchaseMaintenanceTab - purchaseHistory 변경됨:', purchaseHistory.length + '개');
-    console.log('   변경된 데이터:', purchaseHistory);
-    console.log('   변환된 maintenanceHistories:', dbHistories.length + '개');
-    console.log('   maintenanceHistories 데이터:', dbHistories);
-  }, [purchaseHistory]);
-
-  // 더 많은 샘플 데이터로 페이지네이션 테스트 (참고용 - 더 이상 사용하지 않음)
-  const [fallbackHistories] = useState<MaintenanceHistory[]>([
-    {
-      id: '1',
-      registrationDate: '2024-01-15',
-      type: 'purchase',
-      content: 'Microsoft Office 365 Business Premium 라이선스',
-      vendor: 'Microsoft',
-      amount: 1200000,
-      registrant: '김철수',
-      status: '완료',
-      startDate: '2024-01-10',
-      completionDate: '2024-01-15'
-    },
-    {
-      id: '2',
-      registrationDate: '2024-06-20',
-      type: 'maintenance',
-      content: 'Adobe Creative Suite 유지보수 연장',
-      vendor: 'Adobe',
-      amount: 800000,
-      registrant: '이영희',
-      status: '완료',
-      startDate: '2024-06-15',
-      completionDate: '2024-06-20'
-    },
-    {
-      id: '3',
-      registrationDate: '2024-08-01',
-      type: 'upgrade',
-      content: 'Slack Business+ 플랜 업그레이드',
-      vendor: 'Slack',
-      amount: 500000,
-      registrant: '박민수',
-      status: '완료',
-      startDate: '2024-08-01',
-      completionDate: '2024-08-01'
-    },
-    {
-      id: '4',
-      registrationDate: '2024-08-05',
-      type: 'renewal',
-      content: 'Zoom Pro 라이선스 갱신',
-      vendor: 'Zoom',
-      amount: 300000,
-      registrant: '최은지',
-      status: '완료',
-      startDate: '2024-08-03',
-      completionDate: '2024-08-05'
-    },
-    {
-      id: '5',
-      registrationDate: '2024-08-10',
-      type: 'purchase',
-      content: 'Figma Professional 팀 라이선스',
-      vendor: 'Figma',
-      amount: 450000,
-      registrant: '정현우',
-      status: '완료',
-      startDate: '2024-08-08',
-      completionDate: '2024-08-10'
-    },
-    {
-      id: '6',
-      registrationDate: '2024-08-15',
-      type: 'maintenance',
-      content: 'Jira Software 유지보수',
-      vendor: 'Atlassian',
-      amount: 600000,
-      registrant: '강예린',
-      status: '진행중',
-      startDate: '2024-08-14',
-      completionDate: ''
-    },
-    {
-      id: '7',
-      registrationDate: '2024-08-20',
-      type: 'upgrade',
-      content: 'GitHub Enterprise 플랜 업그레이드',
-      vendor: 'GitHub',
-      amount: 900000,
-      registrant: '송지훈',
-      status: '완료',
-      startDate: '2024-08-20',
-      completionDate: '2024-08-20'
-    },
-    {
-      id: '8',
-      registrationDate: '2024-08-22',
-      type: 'purchase',
-      content: 'Notion Team 워크스페이스',
-      vendor: 'Notion',
-      amount: 200000,
-      registrant: '김소영',
-      status: '완료',
-      startDate: '2024-08-20',
-      completionDate: '2024-08-22'
-    },
-    {
-      id: '9',
-      registrationDate: '2024-08-24',
-      type: 'renewal',
-      content: 'Dropbox Business 라이선스 갱신',
-      vendor: 'Dropbox',
-      amount: 350000,
-      registrant: '이동현',
-      status: '진행중',
-      startDate: '2024-08-23',
-      completionDate: ''
-    }
-  ]);
-
-  const [selectedRows, setSelectedRows] = useState<string[]>([]);
-  const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
-
-  // 페이지네이션 상태
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(7);
-
-  // 신규행(음수 ID)을 맨 위로, 기존 행(양수 ID)을 그 아래에 정렬
-  const sortedMaintenanceHistories = [...maintenanceHistories].sort((a, b) => {
-    // 신규행(음수 ID)을 맨 위에 배치
-    if (a.id < 0 && b.id >= 0) return -1;
-    if (a.id >= 0 && b.id < 0) return 1;
-    // 둘 다 신규행이면 ID 역순 (가장 최근 추가된 것이 위)
-    if (a.id < 0 && b.id < 0) return b.id - a.id;
-    // 둘 다 기존 행이면 ID 역순 (최신이 위)
-    return b.id - a.id;
-  });
-
-  // 페이지네이션 계산
-  const totalPages = Math.ceil(sortedMaintenanceHistories.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentItems = sortedMaintenanceHistories.slice(startIndex, endIndex);
-
-  // 페이지 변경 핸들러 (MUI Pagination 형식에 맞게 수정)
-  const handlePageChange = (event: React.ChangeEvent<unknown>, page: number) => {
-    setCurrentPage(page);
-  };
-
-  const handleCellClick = (id: string, field: string) => {
-    setEditingCell({ id, field });
-  };
-
-  const handleCellBlur = () => {
-    setEditingCell(null);
-  };
-
-  const handleAddHistory = () => {
-    // 안전한 고유 ID 생성 (기존 ID들과 중복되지 않도록)
-    const existingIds = purchaseHistory.map(item => item.id || 0);
-    const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 0;
-    const newId = Math.max(maxId + 1, Date.now());
-
-    const newPurchaseHistory = {
-      id: newId,
-      purchaseDate: new Date().toISOString().split('T')[0],
-      supplier: '',
-      price: '0',
-      quantity: 1,
-      contractNumber: '',
-      description: '',
-      status: '진행중',
-      memo: '',
-      registrationDate: new Date().toISOString().split('T')[0]
+const PurchaseMaintenanceTab = memo(
+  ({
+    purchaseHistory,
+    historyTypes,
+    onAddPurchaseHistory,
+    editingPurchaseHistoryId,
+    editingPurchaseHistoryData,
+    onEditPurchaseHistory,
+    onSavePurchaseHistoryEdit,
+    onCancelPurchaseHistoryEdit,
+    onDeletePurchaseHistory,
+    onEditPurchaseHistoryDataChange
+  }: {
+    purchaseHistory: any[];
+    historyTypes: string[];
+    onAddPurchaseHistory: (item: any) => void;
+    editingPurchaseHistoryId: number | null;
+    editingPurchaseHistoryData: any;
+    onEditPurchaseHistory: (id: number, data: any) => void;
+    onSavePurchaseHistoryEdit: () => void;
+    onCancelPurchaseHistoryEdit: () => void;
+    onDeletePurchaseHistory: (id: number) => void;
+    onEditPurchaseHistoryDataChange: (data: any) => void;
+  }) => {
+    // 설명을 기반으로 이력 타입 결정
+    const getHistoryType = (description: string): 'purchase' | 'maintenance' | 'upgrade' | 'renewal' => {
+      if (description.includes('유지보수')) return 'maintenance';
+      if (description.includes('업그레이드')) return 'upgrade';
+      if (description.includes('갱신') || description.includes('연장')) return 'renewal';
+      return 'purchase';
     };
 
-    console.log('🔄 새 구매이력 추가:', newPurchaseHistory);
-    console.log('   현재 이력 수:', purchaseHistory.length);
+    // memo에서 완료일 추출하는 함수
+    const extractCompletionDate = (memo: string): string => {
+      if (!memo) return '';
+      const match = memo.match(/완료일:\s*([^\|]*)/);
+      return match ? match[1].trim() : '';
+    };
 
-    onAddPurchaseHistory(newPurchaseHistory);
+    // DB에서 로드된 구매이력을 MaintenanceHistory 형식으로 변환
+    const dbHistories: MaintenanceHistory[] = purchaseHistory.map((item, index) => {
+      const uniqueId = item.id ? item.id.toString() : `temp_${Date.now()}_${index}`;
+      const completionDateFromMemo = extractCompletionDate(item.memo || '');
 
-    // 새 항목 추가 후 첫 번째 페이지로 이동
-    setCurrentPage(1);
-  };
-
-  const handleDeleteSelected = () => {
-    selectedRows.forEach(id => {
-      const numericId = parseInt(id);
-      if (!isNaN(numericId)) {
-        onDeletePurchaseHistory(numericId);
-      }
+      return {
+        id: uniqueId,
+        registrationDate: item.registrationDate || item.purchaseDate || '',
+        type: getHistoryType(item.description || ''),
+        content: item.description || '',
+        vendor: item.supplier || '',
+        amount: parseFloat(item.price) || 0,
+        registrant: '시스템',
+        status: item.status || '진행중',
+        startDate: item.purchaseDate || '',
+        completionDate: completionDateFromMemo || (item.status === '완료' ? item.purchaseDate || '' : '')
+      };
     });
-    setSelectedRows([]);
-  };
 
-  const handleEditHistory = (id: string, field: keyof MaintenanceHistory, value: string | number) => {
-    // 편집된 내용을 purchaseHistory 형식으로 변환하여 부모 컴포넌트에 전달
-    const purchaseHistoryItem = purchaseHistory.find(item => item.id?.toString() === id);
-    if (purchaseHistoryItem) {
-      const updatedItem = { ...purchaseHistoryItem };
+    console.log('🔍 PurchaseMaintenanceTab - 데이터 확인:');
+    console.log('  - purchaseHistory.length:', purchaseHistory.length);
+    console.log('  - dbHistories.length:', dbHistories.length);
+    console.log('  - purchaseHistory 데이터:', purchaseHistory);
 
-      // MaintenanceHistory 필드를 PurchaseHistory 필드로 매핑
-      switch (field) {
-        case 'content':
-          updatedItem.description = value as string;
-          break;
-        case 'vendor':
-          updatedItem.supplier = value as string;
-          break;
-        case 'amount':
-          updatedItem.price = value.toString();
-          break;
-        case 'startDate':
-          updatedItem.purchaseDate = value as string;
-          break;
-        case 'status':
-          updatedItem.status = value as string;
-          break;
-        case 'registrationDate':
-          updatedItem.registrationDate = value as string;
-          break;
-        case 'completionDate':
-          // completionDate는 memo 필드에 저장하거나 별도 처리
-          updatedItem.memo = `완료일: ${value}${updatedItem.memo ? ' | ' + updatedItem.memo.replace(/완료일: [^\|]*(\|)?/g, '').trim() : ''}`;
-          break;
+    // 실제 데이터를 사용하되, DB 데이터가 없으면 빈 배열 사용
+    const maintenanceHistories: MaintenanceHistory[] = dbHistories.length > 0 ? dbHistories : [];
+
+    console.log('  - 최종 사용할 데이터:', maintenanceHistories.length + '개');
+
+    // purchaseHistory 변경시 로그 출력
+    React.useEffect(() => {
+      console.log('🔄 PurchaseMaintenanceTab - purchaseHistory 변경됨:', purchaseHistory.length + '개');
+      console.log('   변경된 데이터:', purchaseHistory);
+      console.log('   변환된 maintenanceHistories:', dbHistories.length + '개');
+      console.log('   maintenanceHistories 데이터:', dbHistories);
+    }, [purchaseHistory]);
+
+    // 더 많은 샘플 데이터로 페이지네이션 테스트 (참고용 - 더 이상 사용하지 않음)
+    const [fallbackHistories] = useState<MaintenanceHistory[]>([
+      {
+        id: '1',
+        registrationDate: '2024-01-15',
+        type: 'purchase',
+        content: 'Microsoft Office 365 Business Premium 라이선스',
+        vendor: 'Microsoft',
+        amount: 1200000,
+        registrant: '김철수',
+        status: '완료',
+        startDate: '2024-01-10',
+        completionDate: '2024-01-15'
+      },
+      {
+        id: '2',
+        registrationDate: '2024-06-20',
+        type: 'maintenance',
+        content: 'Adobe Creative Suite 유지보수 연장',
+        vendor: 'Adobe',
+        amount: 800000,
+        registrant: '이영희',
+        status: '완료',
+        startDate: '2024-06-15',
+        completionDate: '2024-06-20'
+      },
+      {
+        id: '3',
+        registrationDate: '2024-08-01',
+        type: 'upgrade',
+        content: 'Slack Business+ 플랜 업그레이드',
+        vendor: 'Slack',
+        amount: 500000,
+        registrant: '박민수',
+        status: '완료',
+        startDate: '2024-08-01',
+        completionDate: '2024-08-01'
+      },
+      {
+        id: '4',
+        registrationDate: '2024-08-05',
+        type: 'renewal',
+        content: 'Zoom Pro 라이선스 갱신',
+        vendor: 'Zoom',
+        amount: 300000,
+        registrant: '최은지',
+        status: '완료',
+        startDate: '2024-08-03',
+        completionDate: '2024-08-05'
+      },
+      {
+        id: '5',
+        registrationDate: '2024-08-10',
+        type: 'purchase',
+        content: 'Figma Professional 팀 라이선스',
+        vendor: 'Figma',
+        amount: 450000,
+        registrant: '정현우',
+        status: '완료',
+        startDate: '2024-08-08',
+        completionDate: '2024-08-10'
+      },
+      {
+        id: '6',
+        registrationDate: '2024-08-15',
+        type: 'maintenance',
+        content: 'Jira Software 유지보수',
+        vendor: 'Atlassian',
+        amount: 600000,
+        registrant: '강예린',
+        status: '진행중',
+        startDate: '2024-08-14',
+        completionDate: ''
+      },
+      {
+        id: '7',
+        registrationDate: '2024-08-20',
+        type: 'upgrade',
+        content: 'GitHub Enterprise 플랜 업그레이드',
+        vendor: 'GitHub',
+        amount: 900000,
+        registrant: '송지훈',
+        status: '완료',
+        startDate: '2024-08-20',
+        completionDate: '2024-08-20'
+      },
+      {
+        id: '8',
+        registrationDate: '2024-08-22',
+        type: 'purchase',
+        content: 'Notion Team 워크스페이스',
+        vendor: 'Notion',
+        amount: 200000,
+        registrant: '김소영',
+        status: '완료',
+        startDate: '2024-08-20',
+        completionDate: '2024-08-22'
+      },
+      {
+        id: '9',
+        registrationDate: '2024-08-24',
+        type: 'renewal',
+        content: 'Dropbox Business 라이선스 갱신',
+        vendor: 'Dropbox',
+        amount: 350000,
+        registrant: '이동현',
+        status: '진행중',
+        startDate: '2024-08-23',
+        completionDate: ''
       }
+    ]);
 
-      // 부모 컴포넌트의 purchaseHistory 상태 업데이트
-      const numericId = parseInt(id);
-      if (!isNaN(numericId)) {
-        onEditPurchaseHistory(numericId, updatedItem);
-      }
-    }
-  };
+    const [selectedRows, setSelectedRows] = useState<string[]>([]);
+    const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
 
-  const handleSelectRow = (id: string) => {
-    if (selectedRows.includes(id)) {
-      setSelectedRows(selectedRows.filter((rowId) => rowId !== id));
-    } else {
-      setSelectedRows([...selectedRows, id]);
-    }
-  };
+    // 페이지네이션 상태
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(7);
 
-  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.checked) {
-      setSelectedRows(maintenanceHistories.map((h) => h.id));
-    } else {
+    // 신규행(음수 ID)을 맨 위로, 기존 행(양수 ID)을 그 아래에 정렬
+    const sortedMaintenanceHistories = [...maintenanceHistories].sort((a, b) => {
+      // 신규행(음수 ID)을 맨 위에 배치
+      if (a.id < 0 && b.id >= 0) return -1;
+      if (a.id >= 0 && b.id < 0) return 1;
+      // 둘 다 신규행이면 ID 역순 (가장 최근 추가된 것이 위)
+      if (a.id < 0 && b.id < 0) return b.id - a.id;
+      // 둘 다 기존 행이면 ID 역순 (최신이 위)
+      return b.id - a.id;
+    });
+
+    // 페이지네이션 계산
+    const totalPages = Math.ceil(sortedMaintenanceHistories.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const currentItems = sortedMaintenanceHistories.slice(startIndex, endIndex);
+
+    // 페이지 변경 핸들러 (MUI Pagination 형식에 맞게 수정)
+    const handlePageChange = (event: React.ChangeEvent<unknown>, page: number) => {
+      setCurrentPage(page);
+    };
+
+    const handleCellClick = (id: string, field: string) => {
+      setEditingCell({ id, field });
+    };
+
+    const handleCellBlur = () => {
+      setEditingCell(null);
+    };
+
+    const handleAddHistory = () => {
+      // 안전한 고유 ID 생성 (기존 ID들과 중복되지 않도록)
+      const existingIds = purchaseHistory.map((item) => item.id || 0);
+      const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 0;
+      const newId = Math.max(maxId + 1, Date.now());
+
+      const newPurchaseHistory = {
+        id: newId,
+        purchaseDate: new Date().toISOString().split('T')[0],
+        supplier: '',
+        price: '0',
+        quantity: 1,
+        contractNumber: '',
+        description: '',
+        status: '진행중',
+        memo: '',
+        registrationDate: new Date().toISOString().split('T')[0]
+      };
+
+      console.log('🔄 새 구매이력 추가:', newPurchaseHistory);
+      console.log('   현재 이력 수:', purchaseHistory.length);
+
+      onAddPurchaseHistory(newPurchaseHistory);
+
+      // 새 항목 추가 후 첫 번째 페이지로 이동
+      setCurrentPage(1);
+    };
+
+    const handleDeleteSelected = () => {
+      selectedRows.forEach((id) => {
+        const numericId = parseInt(id);
+        if (!isNaN(numericId)) {
+          onDeletePurchaseHistory(numericId);
+        }
+      });
       setSelectedRows([]);
-    }
-  };
+    };
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'purchase':
-        return { backgroundColor: '#E3F2FD', color: '#000000' }; // 파스텔 블루
-      case 'maintenance':
-        return { backgroundColor: '#E8F5E8', color: '#000000' }; // 파스텔 그린
-      case 'upgrade':
-        return { backgroundColor: '#FFF3E0', color: '#000000' }; // 파스텔 오렌지
-      case 'renewal':
-        return { backgroundColor: '#F3E5F5', color: '#000000' }; // 파스텔 퍼플
-      default:
-        return { backgroundColor: '#F5F5F5', color: '#000000' }; // 연한 그레이
-    }
-  };
+    const handleEditHistory = (id: string, field: keyof MaintenanceHistory, value: string | number) => {
+      // 편집된 내용을 purchaseHistory 형식으로 변환하여 부모 컴포넌트에 전달
+      const purchaseHistoryItem = purchaseHistory.find((item) => item.id?.toString() === id);
+      if (purchaseHistoryItem) {
+        const updatedItem = { ...purchaseHistoryItem };
 
-  const getTypeLabel = (type: string) => {
-    switch (type) {
-      case 'purchase':
-        return '구매';
-      case 'maintenance':
-        return '유지보수';
-      case 'upgrade':
-        return '업그레이드';
-      case 'renewal':
-        return '갱신';
-      default:
-        return '기타';
-    }
-  };
+        // MaintenanceHistory 필드를 PurchaseHistory 필드로 매핑
+        switch (field) {
+          case 'content':
+            updatedItem.description = value as string;
+            break;
+          case 'vendor':
+            updatedItem.supplier = value as string;
+            break;
+          case 'amount':
+            updatedItem.price = value.toString();
+            break;
+          case 'startDate':
+            updatedItem.purchaseDate = value as string;
+            break;
+          case 'status':
+            updatedItem.status = value as string;
+            break;
+          case 'registrationDate':
+            updatedItem.registrationDate = value as string;
+            break;
+          case 'completionDate':
+            // completionDate는 memo 필드에 저장하거나 별도 처리
+            updatedItem.memo = `완료일: ${value}${updatedItem.memo ? ' | ' + updatedItem.memo.replace(/완료일: [^\|]*(\|)?/g, '').trim() : ''}`;
+            break;
+        }
 
-  // GROUP017 마스터코드에서 가져온 이력유형 사용 (fallback으로 기본값 제공)
-  const typeOptions = useMemo(() =>
-    historyTypes.length > 0 ? historyTypes : ['구매', '유지보수', '업그레이드', '갱신'],
-    [historyTypes]
-  );
-  const statusOptions = useMemo(() => ['진행중', '완료', '만료', '해지'], []);
-  const statusColors: Record<string, string> = useMemo(() => ({
-    진행중: 'primary',
-    완료: 'success',
-    만료: 'warning',
-    해지: 'error'
-  }), []);
-
-  // 컬럼 너비 및 높이 정의 (등록자, 상태 컬럼 제거)
-  const columnWidths = useMemo(() => ({
-    checkbox: 50,
-    no: 60,
-    type: 120,
-    content: 300,
-    vendor: 160,
-    amount: 130,
-    startDate: 110,
-    completionDate: 110
-  }), []);
-
-  const cellHeight = 56;
-
-  // 날짜 표시 형식 변환 (YYYY-MM-DD -> YYYY.MM.DD)
-  const formatDisplayDate = (dateStr: string): string => {
-    if (!dateStr) return '';
-    // YYYY-MM-DD 형식을 YYYY.MM.DD로 변환
-    return dateStr.replace(/-/g, '.');
-  };
-
-  // 편집 가능한 셀 렌더링
-  const renderEditableCell = (history: MaintenanceHistory, field: string, value: string | number, options?: string[]) => {
-    const isEditing = editingCell?.id === history.id && editingCell?.field === field;
-    const fieldWidth = columnWidths[field as keyof typeof columnWidths] || 100;
-
-    if (isEditing) {
-      if (options) {
-        return (
-          <Select
-            value={value}
-            onChange={(e) => {
-              const newValue = e.target.value;
-              if (field === 'type') {
-                const typeMapping: Record<string, string> = {
-                  구매: 'purchase',
-                  유지보수: 'maintenance',
-                  업그레이드: 'upgrade',
-                  갱신: 'renewal'
-                };
-                handleEditHistory(history.id, 'type', typeMapping[newValue] || newValue);
-              } else {
-                handleEditHistory(history.id, field as keyof MaintenanceHistory, newValue);
-              }
-            }}
-            onBlur={handleCellBlur}
-            size="small"
-            sx={{ width: '100%', minWidth: fieldWidth }}
-            autoFocus
-          >
-            {options.map((option) => (
-              <MenuItem key={option} value={option}>
-                {option}
-              </MenuItem>
-            ))}
-          </Select>
-        );
-      } else if (field === 'startDate' || field === 'completionDate') {
-        // 날짜 필드는 date type input 사용
-        return (
-          <TextField
-            type="date"
-            value={value || ''}
-            onChange={(e) => handleEditHistory(history.id, field as keyof MaintenanceHistory, e.target.value)}
-            onBlur={handleCellBlur}
-            size="small"
-            sx={{
-              width: '100%',
-              minWidth: fieldWidth,
-              '& input': {
-                fontSize: '13px',
-                padding: '8px 12px'
-              }
-            }}
-            InputLabelProps={{
-              shrink: true,
-            }}
-            autoFocus
-          />
-        );
-      } else {
-        return (
-          <TextField
-            value={value}
-            onChange={(e) => handleEditHistory(history.id, field as keyof MaintenanceHistory, e.target.value)}
-            onBlur={handleCellBlur}
-            size="small"
-            sx={{ width: '100%', minWidth: fieldWidth }}
-            autoFocus
-          />
-        );
+        // 부모 컴포넌트의 purchaseHistory 상태 업데이트
+        const numericId = parseInt(id);
+        if (!isNaN(numericId)) {
+          onEditPurchaseHistory(numericId, updatedItem);
+        }
       }
-    }
+    };
+
+    const handleSelectRow = (id: string) => {
+      if (selectedRows.includes(id)) {
+        setSelectedRows(selectedRows.filter((rowId) => rowId !== id));
+      } else {
+        setSelectedRows([...selectedRows, id]);
+      }
+    };
+
+    const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+      if (event.target.checked) {
+        setSelectedRows(maintenanceHistories.map((h) => h.id));
+      } else {
+        setSelectedRows([]);
+      }
+    };
+
+    const getTypeColor = (type: string) => {
+      switch (type) {
+        case 'purchase':
+          return { backgroundColor: '#E3F2FD', color: '#000000' }; // 파스텔 블루
+        case 'maintenance':
+          return { backgroundColor: '#E8F5E8', color: '#000000' }; // 파스텔 그린
+        case 'upgrade':
+          return { backgroundColor: '#FFF3E0', color: '#000000' }; // 파스텔 오렌지
+        case 'renewal':
+          return { backgroundColor: '#F3E5F5', color: '#000000' }; // 파스텔 퍼플
+        default:
+          return { backgroundColor: '#F5F5F5', color: '#000000' }; // 연한 그레이
+      }
+    };
+
+    const getTypeLabel = (type: string) => {
+      switch (type) {
+        case 'purchase':
+          return '구매';
+        case 'maintenance':
+          return '유지보수';
+        case 'upgrade':
+          return '업그레이드';
+        case 'renewal':
+          return '갱신';
+        default:
+          return '기타';
+      }
+    };
+
+    // GROUP017 마스터코드에서 가져온 이력유형 사용 (fallback으로 기본값 제공)
+    const typeOptions = useMemo(
+      () => (historyTypes.length > 0 ? historyTypes : ['구매', '유지보수', '업그레이드', '갱신']),
+      [historyTypes]
+    );
+    const statusOptions = useMemo(() => ['진행중', '완료', '만료', '해지'], []);
+    const statusColors: Record<string, string> = useMemo(
+      () => ({
+        진행중: 'primary',
+        완료: 'success',
+        만료: 'warning',
+        해지: 'error'
+      }),
+      []
+    );
+
+    // 컬럼 너비 및 높이 정의 (등록자, 상태 컬럼 제거)
+    const columnWidths = useMemo(
+      () => ({
+        checkbox: 50,
+        no: 60,
+        type: 120,
+        content: 300,
+        vendor: 160,
+        amount: 130,
+        startDate: 110,
+        completionDate: 110
+      }),
+      []
+    );
+
+    const cellHeight = 56;
+
+    // 날짜 표시 형식 변환 (YYYY-MM-DD -> YYYY.MM.DD)
+    const formatDisplayDate = (dateStr: string): string => {
+      if (!dateStr) return '';
+      // YYYY-MM-DD 형식을 YYYY.MM.DD로 변환
+      return dateStr.replace(/-/g, '.');
+    };
+
+    // 편집 가능한 셀 렌더링
+    const renderEditableCell = (history: MaintenanceHistory, field: string, value: string | number, options?: string[]) => {
+      const isEditing = editingCell?.id === history.id && editingCell?.field === field;
+      const fieldWidth = columnWidths[field as keyof typeof columnWidths] || 100;
+
+      if (isEditing) {
+        if (options) {
+          return (
+            <Select
+              value={value}
+              onChange={(e) => {
+                const newValue = e.target.value;
+                if (field === 'type') {
+                  const typeMapping: Record<string, string> = {
+                    구매: 'purchase',
+                    유지보수: 'maintenance',
+                    업그레이드: 'upgrade',
+                    갱신: 'renewal'
+                  };
+                  handleEditHistory(history.id, 'type', typeMapping[newValue] || newValue);
+                } else {
+                  handleEditHistory(history.id, field as keyof MaintenanceHistory, newValue);
+                }
+              }}
+              onBlur={handleCellBlur}
+              size="small"
+              sx={{ width: '100%', minWidth: fieldWidth }}
+              autoFocus
+            >
+              {options.map((option) => (
+                <MenuItem key={option} value={option}>
+                  {option}
+                </MenuItem>
+              ))}
+            </Select>
+          );
+        } else if (field === 'startDate' || field === 'completionDate') {
+          // 날짜 필드는 date type input 사용
+          return (
+            <TextField
+              type="date"
+              value={value || ''}
+              onChange={(e) => handleEditHistory(history.id, field as keyof MaintenanceHistory, e.target.value)}
+              onBlur={handleCellBlur}
+              size="small"
+              sx={{
+                width: '100%',
+                minWidth: fieldWidth,
+                '& input': {
+                  fontSize: '13px',
+                  padding: '8px 12px'
+                }
+              }}
+              InputLabelProps={{
+                shrink: true
+              }}
+              autoFocus
+            />
+          );
+        } else {
+          return (
+            <TextField
+              value={value}
+              onChange={(e) => handleEditHistory(history.id, field as keyof MaintenanceHistory, e.target.value)}
+              onBlur={handleCellBlur}
+              size="small"
+              sx={{ width: '100%', minWidth: fieldWidth }}
+              autoFocus
+            />
+          );
+        }
+      }
+
+      return (
+        <Box
+          sx={{
+            width: '100%',
+            minWidth: fieldWidth,
+            padding: '8px 12px',
+            cursor: 'text',
+            '&:hover': { backgroundColor: 'action.hover' }
+          }}
+        >
+          {field === 'type' ? (
+            <Chip
+              label={getTypeLabel(value as string)}
+              size="small"
+              sx={{
+                ...getTypeColor(value as string),
+                fontSize: '12px',
+                fontWeight: 500,
+                borderRadius: '12px',
+                height: '24px',
+                minWidth: '60px'
+              }}
+            />
+          ) : field === 'status' ? (
+            <Chip
+              label={value}
+              size="small"
+              color={statusColors[value as string] as any}
+              sx={{
+                fontSize: '12px',
+                fontWeight: 500,
+                borderRadius: '12px',
+                height: '24px',
+                minWidth: '60px'
+              }}
+            />
+          ) : field === 'amount' ? (
+            <Typography variant="body2" sx={{ fontSize: '13px' }}>
+              {typeof value === 'number' ? `${value.toLocaleString()}원` : value || '-'}
+            </Typography>
+          ) : field === 'startDate' || field === 'completionDate' ? (
+            <Typography variant="body2" sx={{ fontSize: '13px', color: value ? 'text.primary' : 'text.secondary' }}>
+              {value ? formatDisplayDate(value as string) : '-'}
+            </Typography>
+          ) : (
+            <Typography variant="body2" sx={{ fontSize: '13px' }}>
+              {value || '-'}
+            </Typography>
+          )}
+        </Box>
+      );
+    };
 
     return (
-      <Box
-        sx={{
-          width: '100%',
-          minWidth: fieldWidth,
-          padding: '8px 12px',
-          cursor: 'text',
-          '&:hover': { backgroundColor: 'action.hover' }
-        }}
-      >
-        {field === 'type' ? (
-          <Chip
-            label={getTypeLabel(value as string)}
-            size="small"
-            sx={{
-              ...getTypeColor(value as string),
-              fontSize: '12px',
-              fontWeight: 500,
-              borderRadius: '12px',
-              height: '24px',
-              minWidth: '60px'
-            }}
-          />
-        ) : field === 'status' ? (
-          <Chip
-            label={value}
-            size="small"
-            color={statusColors[value as string] as any}
-            sx={{
-              fontSize: '12px',
-              fontWeight: 500,
-              borderRadius: '12px',
-              height: '24px',
-              minWidth: '60px'
-            }}
-          />
-        ) : field === 'amount' ? (
-          <Typography variant="body2" sx={{ fontSize: '13px' }}>
-            {typeof value === 'number' ? `${value.toLocaleString()}원` : value || '-'}
+      <Box sx={{ height: '650px', display: 'flex', flexDirection: 'column', p: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Typography variant="h6" sx={{ fontSize: '16px', fontWeight: 600 }}>
+            구매/유지보수 이력
           </Typography>
-        ) : field === 'startDate' || field === 'completionDate' ? (
-          <Typography variant="body2" sx={{ fontSize: '13px', color: value ? 'text.primary' : 'text.secondary' }}>
-            {value ? formatDisplayDate(value as string) : '-'}
-          </Typography>
-        ) : (
-          <Typography variant="body2" sx={{ fontSize: '13px' }}>
-            {value || '-'}
-          </Typography>
-        )}
-      </Box>
-    );
-  };
-
-  return (
-    <Box sx={{ height: '650px', display: 'flex', flexDirection: 'column', p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h6" sx={{ fontSize: '16px', fontWeight: 600 }}>
-          구매/유지보수 이력
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button variant="outlined" color="error" onClick={handleDeleteSelected} disabled={selectedRows.length === 0} size="small">
-            삭제({selectedRows.length})
-          </Button>
-          <Button variant="contained" onClick={handleAddHistory} size="small" sx={{ fontSize: '12px' }}>
-            추가
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button variant="outlined" color="error" onClick={handleDeleteSelected} disabled={selectedRows.length === 0} size="small">
+              삭제({selectedRows.length})
+            </Button>
+            <Button variant="contained" onClick={handleAddHistory} size="small" sx={{ fontSize: '12px' }}>
+              추가
+            </Button>
+          </Box>
         </Box>
-      </Box>
 
-      <TableContainer
-        sx={{
-          flex: 1,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          '& .MuiTable-root': {
-            minWidth: 'auto'
-          }
-        }}
-      >
-        <Table size="small">
-          <TableHead>
-            <TableRow sx={{ backgroundColor: 'grey.50' }}>
-              <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
-                <Checkbox
-                  checked={selectedRows.length === maintenanceHistories.length && maintenanceHistories.length > 0}
-                  onChange={handleSelectAll}
-                  color="primary"
-                  size="small"
-                  sx={{
-                    transform: 'scale(0.7)',
-                    '&.Mui-checked': {
-                      color: '#1976d2'
-                    }
-                  }}
-                />
-              </TableCell>
-              <TableCell sx={{ width: columnWidths.no, fontWeight: 600 }}>NO</TableCell>
-              <TableCell sx={{ width: columnWidths.type, fontWeight: 600 }}>유형</TableCell>
-              <TableCell sx={{ width: columnWidths.content, fontWeight: 600 }}>내용</TableCell>
-              <TableCell sx={{ width: columnWidths.vendor, fontWeight: 600 }}>업체</TableCell>
-              <TableCell sx={{ width: columnWidths.amount, fontWeight: 600 }}>금액</TableCell>
-              <TableCell sx={{ width: columnWidths.startDate, fontWeight: 600 }}>시작일</TableCell>
-              <TableCell sx={{ width: columnWidths.completionDate, fontWeight: 600 }}>완료일</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {currentItems.map((history, index) => (
-              <TableRow
-                key={`history_${history.id}_${index}`}
-                hover
-                sx={{
-                  height: cellHeight,
-                  '&:hover': { backgroundColor: 'action.hover' }
-                }}
-              >
+        <TableContainer
+          sx={{
+            flex: 1,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            '& .MuiTable-root': {
+              minWidth: 'auto'
+            }
+          }}
+        >
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ backgroundColor: 'grey.50' }}>
                 <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
                   <Checkbox
-                    checked={selectedRows.includes(history.id)}
-                    onChange={() => handleSelectRow(history.id)}
+                    checked={selectedRows.length === maintenanceHistories.length && maintenanceHistories.length > 0}
+                    onChange={handleSelectAll}
                     color="primary"
                     size="small"
                     sx={{
@@ -2542,91 +2517,125 @@ const PurchaseMaintenanceTab = memo(({
                     }}
                   />
                 </TableCell>
-                <TableCell sx={{ width: columnWidths.no }}>{sortedMaintenanceHistories.length - startIndex - index}</TableCell>
-                <TableCell sx={{ width: columnWidths.type }} onClick={() => handleCellClick(history.id, 'type')}>
-                  {renderEditableCell(history, 'type', history.type, typeOptions)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.content }} onClick={() => handleCellClick(history.id, 'content')}>
-                  {renderEditableCell(history, 'content', history.content)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.vendor }} onClick={() => handleCellClick(history.id, 'vendor')}>
-                  {renderEditableCell(history, 'vendor', history.vendor)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.amount }} onClick={() => handleCellClick(history.id, 'amount')}>
-                  {renderEditableCell(history, 'amount', history.amount)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.startDate }} onClick={() => handleCellClick(history.id, 'startDate')}>
-                  {renderEditableCell(history, 'startDate', history.startDate)}
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.completionDate }} onClick={() => handleCellClick(history.id, 'completionDate')}>
-                  {renderEditableCell(history, 'completionDate', history.completionDate)}
-                </TableCell>
+                <TableCell sx={{ width: columnWidths.no, fontWeight: 600 }}>NO</TableCell>
+                <TableCell sx={{ width: columnWidths.type, fontWeight: 600 }}>유형</TableCell>
+                <TableCell sx={{ width: columnWidths.content, fontWeight: 600 }}>내용</TableCell>
+                <TableCell sx={{ width: columnWidths.vendor, fontWeight: 600 }}>업체</TableCell>
+                <TableCell sx={{ width: columnWidths.amount, fontWeight: 600 }}>금액</TableCell>
+                <TableCell sx={{ width: columnWidths.startDate, fontWeight: 600 }}>시작일</TableCell>
+                <TableCell sx={{ width: columnWidths.completionDate, fontWeight: 600 }}>완료일</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            </TableHead>
+            <TableBody>
+              {currentItems.map((history, index) => (
+                <TableRow
+                  key={`history_${history.id}_${index}`}
+                  hover
+                  sx={{
+                    height: cellHeight,
+                    '&:hover': { backgroundColor: 'action.hover' }
+                  }}
+                >
+                  <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
+                    <Checkbox
+                      checked={selectedRows.includes(history.id)}
+                      onChange={() => handleSelectRow(history.id)}
+                      color="primary"
+                      size="small"
+                      sx={{
+                        transform: 'scale(0.7)',
+                        '&.Mui-checked': {
+                          color: '#1976d2'
+                        }
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell sx={{ width: columnWidths.no }}>{sortedMaintenanceHistories.length - startIndex - index}</TableCell>
+                  <TableCell sx={{ width: columnWidths.type }} onClick={() => handleCellClick(history.id, 'type')}>
+                    {renderEditableCell(history, 'type', history.type, typeOptions)}
+                  </TableCell>
+                  <TableCell sx={{ width: columnWidths.content }} onClick={() => handleCellClick(history.id, 'content')}>
+                    {renderEditableCell(history, 'content', history.content)}
+                  </TableCell>
+                  <TableCell sx={{ width: columnWidths.vendor }} onClick={() => handleCellClick(history.id, 'vendor')}>
+                    {renderEditableCell(history, 'vendor', history.vendor)}
+                  </TableCell>
+                  <TableCell sx={{ width: columnWidths.amount }} onClick={() => handleCellClick(history.id, 'amount')}>
+                    {renderEditableCell(history, 'amount', history.amount)}
+                  </TableCell>
+                  <TableCell sx={{ width: columnWidths.startDate }} onClick={() => handleCellClick(history.id, 'startDate')}>
+                    {renderEditableCell(history, 'startDate', history.startDate)}
+                  </TableCell>
+                  <TableCell sx={{ width: columnWidths.completionDate }} onClick={() => handleCellClick(history.id, 'completionDate')}>
+                    {renderEditableCell(history, 'completionDate', history.completionDate)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
 
-      {/* 페이지네이션 - 하단 고정 */}
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          mt: 'auto',
-          pt: 2,
-          px: 2,
-          borderTop: '1px solid',
-          borderColor: 'divider',
-          backgroundColor: 'background.paper',
-          position: 'sticky',
-          bottom: 0
-        }}
-      >
-        <Typography variant="body2" color="text.secondary">
-          {maintenanceHistories.length > 0
-            ? `${startIndex + 1}-${Math.min(endIndex, maintenanceHistories.length)} of ${maintenanceHistories.length}`
-            : '0-0 of 0'}
-        </Typography>
-        {totalPages > 1 && (
-          <Pagination
-            count={totalPages}
-            page={currentPage}
-            onChange={handlePageChange}
-            color="primary"
-            size="small"
-            showFirstButton
-            showLastButton
-            sx={{
-              '& .MuiPaginationItem-root': {
-                fontSize: '0.875rem',
-                minWidth: '32px',
-                height: '32px',
-                borderRadius: '4px'
-              },
-              '& .MuiPaginationItem-page.Mui-selected': {
-                backgroundColor: 'primary.main',
-                color: 'white !important',
-                borderRadius: '4px',
-                fontWeight: 500,
-                '&:hover': {
-                  backgroundColor: 'primary.dark',
-                  color: 'white !important'
+        {/* 페이지네이션 - 하단 고정 */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            mt: 'auto',
+            pt: 2,
+            px: 2,
+            borderTop: '1px solid',
+            borderColor: 'divider',
+            backgroundColor: 'background.paper',
+            position: 'sticky',
+            bottom: 0
+          }}
+        >
+          <Typography variant="body2" color="text.secondary">
+            {maintenanceHistories.length > 0
+              ? `${startIndex + 1}-${Math.min(endIndex, maintenanceHistories.length)} of ${maintenanceHistories.length}`
+              : '0-0 of 0'}
+          </Typography>
+          {totalPages > 1 && (
+            <Pagination
+              count={totalPages}
+              page={currentPage}
+              onChange={handlePageChange}
+              color="primary"
+              size="small"
+              showFirstButton
+              showLastButton
+              sx={{
+                '& .MuiPaginationItem-root': {
+                  fontSize: '0.875rem',
+                  minWidth: '32px',
+                  height: '32px',
+                  borderRadius: '4px'
+                },
+                '& .MuiPaginationItem-page.Mui-selected': {
+                  backgroundColor: 'primary.main',
+                  color: 'white !important',
+                  borderRadius: '4px',
+                  fontWeight: 500,
+                  '&:hover': {
+                    backgroundColor: 'primary.dark',
+                    color: 'white !important'
+                  }
+                },
+                '& .MuiPaginationItem-page': {
+                  borderRadius: '4px',
+                  '&:hover': {
+                    backgroundColor: 'grey.100'
+                  }
                 }
-              },
-              '& .MuiPaginationItem-page': {
-                borderRadius: '4px',
-                '&:hover': {
-                  backgroundColor: 'grey.100'
-                }
-              }
-            }}
-          />
-        )}
+              }}
+            />
+          )}
+        </Box>
       </Box>
-    </Box>
-  );
-});
+    );
+  }
+);
 
 PurchaseMaintenanceTab.displayName = 'PurchaseMaintenanceTab';
 
@@ -2711,10 +2720,10 @@ const SoftwareEditDialog = memo(
     // 소프트웨어 분류 옵션 - GROUP015에서 동적으로 로드됨 (softwareCategories 변수는 useGroup015 훅에서 제공)
 
     // 라이센스 유형 옵션 (메모이제이션)
-    const licenseTypes = useMemo(() => [
-      '상용 라이센스', '오픈소스', '프리웨어', '셰어웨어',
-      '사이트 라이센스', '볼륨 라이센스', '구독형', '임대형'
-    ], []);
+    const licenseTypes = useMemo(
+      () => ['상용 라이센스', '오픈소스', '프리웨어', '셰어웨어', '사이트 라이센스', '볼륨 라이센스', '구독형', '임대형'],
+      []
+    );
 
     // 코드 자동 생성 함수 (IT-SW-YY-NNN 형식)
     const generateSoftwareCode = useCallback(async () => {
@@ -2745,7 +2754,6 @@ const SoftwareEditDialog = memo(
         const formattedSequence = nextSequence.toString().padStart(3, '0');
 
         return `IT-SW-${currentYearStr}-${formattedSequence}`;
-
       } catch (error) {
         console.error('❌ 코드 생성 중 오류:', error);
         // 오류 시 임시 코드 생성
@@ -2949,12 +2957,16 @@ const SoftwareEditDialog = memo(
           user_count: Number(softwareState.userCount) || 0,
           license_type: softwareState.licenseType?.trim() || '',
           license_key: softwareState.licenseKey?.trim() || '',
-          start_date: softwareState.startDate ?
-            (softwareState.startDate.includes('T') ? softwareState.startDate.split('T')[0] : softwareState.startDate) :
-            new Date().toISOString().split('T')[0],
-          completed_date: softwareState.completedDate ?
-            (softwareState.completedDate.includes('T') ? softwareState.completedDate.split('T')[0] : softwareState.completedDate) :
-            null,
+          start_date: softwareState.startDate
+            ? softwareState.startDate.includes('T')
+              ? softwareState.startDate.split('T')[0]
+              : softwareState.startDate
+            : new Date().toISOString().split('T')[0],
+          completed_date: softwareState.completedDate
+            ? softwareState.completedDate.includes('T')
+              ? softwareState.completedDate.split('T')[0]
+              : softwareState.completedDate
+            : null,
           code: softwareState.code?.trim() || '',
           team: softwareState.team?.trim() || '',
           department: 'IT'
@@ -3071,12 +3083,22 @@ const SoftwareEditDialog = memo(
 
         onSave(resultTask);
         onClose();
-
       } catch (error: any) {
         console.error('❌ 소프트웨어 저장 실패:', error);
         setValidationError(error.message || '저장 중 오류가 발생했습니다.');
       }
-    }, [task, softwareState, onSave, onClose, createSoftware, updateSoftware, currentUserHistories, saveUserHistories, purchaseHistory, savePurchaseHistories]);
+    }, [
+      task,
+      softwareState,
+      onSave,
+      onClose,
+      createSoftware,
+      updateSoftware,
+      currentUserHistories,
+      saveUserHistories,
+      purchaseHistory,
+      savePurchaseHistories
+    ]);
 
     const handleClose = useCallback(() => {
       setEditTab(0);
@@ -3285,9 +3307,12 @@ const SoftwareEditDialog = memo(
       setEditingCommentText('');
     }, []);
 
-    const handleDeleteComment = useCallback(async (commentId: string) => {
-      await deleteFeedback(commentId);
-    }, [deleteFeedback]);
+    const handleDeleteComment = useCallback(
+      async (commentId: string) => {
+        await deleteFeedback(commentId);
+      },
+      [deleteFeedback]
+    );
 
     // 사용자이력 핸들러들
     const handleAddUserHistory = useCallback((userHistoryItem: any) => {
@@ -3328,7 +3353,7 @@ const SoftwareEditDialog = memo(
       setPurchaseHistory((prev) => {
         console.log('   이전 이력:', prev.length + '개', prev);
         // ID 중복 체크
-        const existingIds = prev.map(item => item.id);
+        const existingIds = prev.map((item) => item.id);
         console.log('   기존 ID들:', existingIds);
 
         if (existingIds.includes(purchaseHistoryItem.id)) {
@@ -3344,9 +3369,7 @@ const SoftwareEditDialog = memo(
 
     const handleEditPurchaseHistory = useCallback((id: number, data: any) => {
       // 직접 purchaseHistory 상태를 업데이트
-      setPurchaseHistory((prev) =>
-        prev.map((item) => (item.id === id ? { ...item, ...data } : item))
-      );
+      setPurchaseHistory((prev) => prev.map((item) => (item.id === id ? { ...item, ...data } : item)));
     }, []);
 
     const handleSaveEditPurchaseHistory = useCallback(() => {
@@ -3433,13 +3456,24 @@ const SoftwareEditDialog = memo(
         licenseError,
         masterLicenseTypes
       }),
-      [softwareState, users, usersLoading, usersError, categoriesLoading, categoriesError, statusLoading, statusError, licenseLoading, licenseError]
+      [
+        softwareState,
+        users,
+        usersLoading,
+        usersError,
+        categoriesLoading,
+        categoriesError,
+        statusLoading,
+        statusError,
+        licenseLoading,
+        licenseError
+      ]
     );
 
     const userHistoryTabProps = useMemo(
       () => ({
         softwareId: task?.id || 0,
-        mode: task ? 'edit' as const : 'add' as const,
+        mode: task ? ('edit' as const) : ('add' as const),
         userHistories: currentUserHistories,
         onUserHistoriesChange: handleUserHistoriesChange
       }),
@@ -3477,7 +3511,6 @@ const SoftwareEditDialog = memo(
         currentUser
       ]
     );
-
 
     const purchaseMaintenanceTabProps = useMemo(
       () => ({

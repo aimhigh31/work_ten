@@ -18,10 +18,7 @@ export async function GET() {
     console.log('🔍 사용자 목록 조회 시작...');
 
     // admin_users_userprofiles 테이블에서 사용자 조회
-    const { data, error } = await supabase
-      .from('admin_users_userprofiles')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const { data, error } = await supabase.from('admin_users_userprofiles').select('*').order('created_at', { ascending: false });
 
     if (error) {
       console.error('❌ Supabase 조회 실패:', error);
@@ -106,11 +103,7 @@ export async function POST(request: NextRequest) {
       insertData.profile_image_url = userData.profile_image_url || null;
     }
 
-    const { data, error } = await supabase
-      .from('admin_users_userprofiles')
-      .insert([insertData])
-      .select()
-      .single();
+    const { data, error } = await supabase.from('admin_users_userprofiles').insert([insertData]).select().single();
 
     if (error) {
       console.error('사용자 생성 실패:', error);
@@ -166,12 +159,7 @@ export async function PUT(request: NextRequest) {
       updateData.profile_image_url = userData.profile_image_url || null;
     }
 
-    const { data, error } = await supabase
-      .from('admin_users_userprofiles')
-      .update(updateData)
-      .eq('id', userData.id)
-      .select()
-      .single();
+    const { data, error } = await supabase.from('admin_users_userprofiles').update(updateData).eq('id', userData.id).select().single();
 
     if (error) {
       console.error('사용자 수정 실패:', error);
@@ -228,12 +216,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const { data, error } = await supabase
-      .from('admin_users_userprofiles')
-      .delete()
-      .eq('id', id)
-      .select()
-      .single();
+    const { data, error } = await supabase.from('admin_users_userprofiles').delete().eq('id', id).select().single();
 
     if (error) {
       console.error('사용자 삭제 실패:', error);

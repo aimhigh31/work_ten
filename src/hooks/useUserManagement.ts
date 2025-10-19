@@ -46,23 +46,26 @@ export const useUserManagement = () => {
       console.log('✅ 사용자설정 데이터 조회 성공:', data?.length + '명');
 
       // UserInfo 형식으로 변환
-      const convertedUsers: UserInfo[] = data?.map(user => ({
-        id: user.id.toString(),
-        name: user.user_name,
-        department: user.department || '부서없음',
-        email: user.email,
-        user_code: user.user_code,
-        position: user.position,
-        status: user.status,
-        avatar: user.profile_image_url || `/assets/images/users/avatar-${(user.id % 10) + 1}.png`
-      })) || [];
+      const convertedUsers: UserInfo[] =
+        data?.map((user) => ({
+          id: user.id.toString(),
+          name: user.user_name,
+          department: user.department || '부서없음',
+          email: user.email,
+          user_code: user.user_code,
+          position: user.position,
+          status: user.status,
+          avatar: user.profile_image_url || `/assets/images/users/avatar-${(user.id % 10) + 1}.png`
+        })) || [];
 
       setUsers(convertedUsers);
-      setUserNames(convertedUsers.map(user => user.name));
+      setUserNames(convertedUsers.map((user) => user.name));
 
-      console.log('👥 사용자 목록:', convertedUsers.map(u => `${u.name} (${u.department})`));
+      console.log(
+        '👥 사용자 목록:',
+        convertedUsers.map((u) => `${u.name} (${u.department})`)
+      );
       setError(null);
-
     } catch (err: any) {
       console.error('❌ fetchUsers 오류:', err);
       setError(err.message || '사용자 데이터 조회 중 오류가 발생했습니다.');
@@ -75,17 +78,17 @@ export const useUserManagement = () => {
 
   // 사용자명으로 사용자 정보 찾기
   const findUserByName = (name: string): UserInfo | null => {
-    return users.find(user => user.name === name) || null;
+    return users.find((user) => user.name === name) || null;
   };
 
   // ID로 사용자 정보 찾기
   const findUserById = (id: string): UserInfo | null => {
-    return users.find(user => user.id === id) || null;
+    return users.find((user) => user.id === id) || null;
   };
 
   // 부서별 사용자 조회
   const getUsersByDepartment = (department: string): UserInfo[] => {
-    return users.filter(user => user.department === department);
+    return users.filter((user) => user.department === department);
   };
 
   // 컴포넌트 마운트 시 데이터 조회
@@ -94,13 +97,13 @@ export const useUserManagement = () => {
   }, []);
 
   return {
-    users,              // UserInfo[] - 전체 사용자 정보
-    userNames,          // string[] - 사용자명 배열
+    users, // UserInfo[] - 전체 사용자 정보
+    userNames, // string[] - 사용자명 배열
     loading,
     error,
     fetchUsers,
-    findUserByName,     // 사용자명 → 사용자 정보
-    findUserById,       // ID → 사용자 정보
+    findUserByName, // 사용자명 → 사용자 정보
+    findUserById, // ID → 사용자 정보
     getUsersByDepartment // 부서별 사용자 조회
   };
 };

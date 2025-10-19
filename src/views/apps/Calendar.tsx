@@ -43,7 +43,12 @@ export default function Calendar() {
   const [assigneeFilter, setAssigneeFilter] = useState<string>('');
   const [attendeesFilter, setAttendeesFilter] = useState<string[]>([]);
   const calendarRef = useRef<FullCalendar>(null);
-  const { events: supabaseEvents, createEvent: supabaseCreateEvent, updateEvent: supabaseUpdateEvent, deleteEvent: supabaseDeleteEvent } = useSupabaseCalendar();
+  const {
+    events: supabaseEvents,
+    createEvent: supabaseCreateEvent,
+    updateEvent: supabaseUpdateEvent,
+    deleteEvent: supabaseDeleteEvent
+  } = useSupabaseCalendar();
 
   // Supabase 이벤트를 FullCalendar 형식으로 변환
   const events = useMemo(() => {
@@ -227,161 +232,161 @@ export default function Calendar() {
       />
 
       <CalendarStyled>
-          <FullCalendar
-            weekends
-            editable
-            droppable
-            selectable
-            events={filteredEvents as EventSourceInput}
-            ref={calendarRef}
-            rerenderDelay={10}
-            initialDate={date}
-            initialView={calendarView}
-            dayMaxEvents={3}
-            eventDisplay="block"
-            headerToolbar={false}
-            allDayMaintainDuration
-            eventResizableFromStart
-            displayEventTime={true}
-            locale="ko"
-            stickyHeaderDates={true}
-            eventTimeFormat={{
-              hour: 'numeric',
-              minute: '2-digit',
-              meridiem: 'short'
-            }}
-            dayCellClassNames={(dateInfo) => {
-              const dayOfWeek = dateInfo.date.getDay();
-              // 일요일(0) 또는 토요일(6)
-              if (dayOfWeek === 0 || dayOfWeek === 6) {
-                return 'weekend-date';
-              }
-              return '';
-            }}
-            eventDidMount={(info) => {
-              // 이벤트 마운트 시 CSS 변수 설정
-              const color = info.event.backgroundColor || info.event.extendedProps?.color || '#1976d2';
-              info.el.style.setProperty('--event-color', color);
-            }}
-            eventContent={(arg) => {
-              const event = arg.event;
-              const isAllDay = event.allDay;
+        <FullCalendar
+          weekends
+          editable
+          droppable
+          selectable
+          events={filteredEvents as EventSourceInput}
+          ref={calendarRef}
+          rerenderDelay={10}
+          initialDate={date}
+          initialView={calendarView}
+          dayMaxEvents={3}
+          eventDisplay="block"
+          headerToolbar={false}
+          allDayMaintainDuration
+          eventResizableFromStart
+          displayEventTime={true}
+          locale="ko"
+          stickyHeaderDates={true}
+          eventTimeFormat={{
+            hour: 'numeric',
+            minute: '2-digit',
+            meridiem: 'short'
+          }}
+          dayCellClassNames={(dateInfo) => {
+            const dayOfWeek = dateInfo.date.getDay();
+            // 일요일(0) 또는 토요일(6)
+            if (dayOfWeek === 0 || dayOfWeek === 6) {
+              return 'weekend-date';
+            }
+            return '';
+          }}
+          eventDidMount={(info) => {
+            // 이벤트 마운트 시 CSS 변수 설정
+            const color = info.event.backgroundColor || info.event.extendedProps?.color || '#1976d2';
+            info.el.style.setProperty('--event-color', color);
+          }}
+          eventContent={(arg) => {
+            const event = arg.event;
+            const isAllDay = event.allDay;
 
-              // FullCalendar는 모든 커스텀 속성을 extendedProps에 저장
-              const assignee = event.extendedProps?.assignee;
-              const team = event.extendedProps?.team;
-              const attendees = event.extendedProps?.attendees;
-              const title = event.title;
+            // FullCalendar는 모든 커스텀 속성을 extendedProps에 저장
+            const assignee = event.extendedProps?.assignee;
+            const team = event.extendedProps?.team;
+            const attendees = event.extendedProps?.attendees;
+            const title = event.title;
 
-              // 시간 텍스트 생성
-              const timeText = isAllDay ? 'AllDay' : arg.timeText;
+            // 시간 텍스트 생성
+            const timeText = isAllDay ? 'AllDay' : arg.timeText;
 
-              // 팀명 담당자명 형태로 구성
-              const teamAssigneeText = team && assignee ? `${team} ${assignee}` : team ? team : assignee ? assignee : '';
+            // 팀명 담당자명 형태로 구성
+            const teamAssigneeText = team && assignee ? `${team} ${assignee}` : team ? team : assignee ? assignee : '';
 
-              // 참석자 수 계산
-              const attendeesCount = attendees ? attendees.split(',').filter((name: string) => name.trim()).length : 0;
+            // 참석자 수 계산
+            const attendeesCount = attendees ? attendees.split(',').filter((name: string) => name.trim()).length : 0;
 
-              return (
+            return (
+              <div
+                style={{
+                  padding: '3px 6px 3px 10px',
+                  fontSize: '0.75rem',
+                  lineHeight: 1.4,
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'flex-start'
+                }}
+              >
+                {/* 첫 번째 줄: 시간(왼쪽) - 팀 담당자(오른쪽) */}
                 <div
                   style={{
-                    padding: '3px 6px 3px 10px',
-                    fontSize: '0.75rem',
-                    lineHeight: 1.4,
-                    height: '100%',
                     display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'flex-start'
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '2px',
+                    fontSize: '0.7rem',
+                    fontWeight: '600',
+                    color: 'rgba(0,0,0,0.8)',
+                    flexShrink: 0,
+                    minHeight: '14px'
                   }}
                 >
-                  {/* 첫 번째 줄: 시간(왼쪽) - 팀 담당자(오른쪽) */}
-                  <div
+                  <span
                     style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: '2px',
-                      fontSize: '0.7rem',
-                      fontWeight: '600',
-                      color: 'rgba(0,0,0,0.8)',
-                      flexShrink: 0,
-                      minHeight: '14px'
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      flex: '0 1 auto'
                     }}
                   >
+                    {timeText}
+                  </span>
+                  {teamAssigneeText && (
                     <span
                       style={{
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
-                        flex: '0 1 auto'
+                        marginLeft: '4px',
+                        flex: '0 1 auto',
+                        textAlign: 'right'
                       }}
                     >
-                      {timeText}
+                      {teamAssigneeText}
                     </span>
-                    {teamAssigneeText && (
-                      <span
-                        style={{
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          marginLeft: '4px',
-                          flex: '0 1 auto',
-                          textAlign: 'right'
-                        }}
-                      >
-                        {teamAssigneeText}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* 두 번째 줄: 제목(왼쪽) - 참석인원(오른쪽) */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      fontSize: '0.75rem',
-                      color: 'rgba(0,0,0,0.9)',
-                      flex: 1
-                    }}
-                  >
-                    <span
-                      style={{
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        fontWeight: 'normal',
-                        flex: '1 1 auto'
-                      }}
-                    >
-                      {title}
-                    </span>
-                    {attendeesCount > 0 && (
-                      <span
-                        style={{
-                          marginLeft: '4px',
-                          fontSize: '0.7rem',
-                          fontWeight: '600',
-                          color: 'rgba(0,0,0,0.7)',
-                          flexShrink: 0
-                        }}
-                      >
-                        {attendeesCount}명
-                      </span>
-                    )}
-                  </div>
+                  )}
                 </div>
-              );
-            }}
-            select={handleRangeSelect}
-            eventDrop={handleEventUpdate}
-            eventClick={handleEventSelect}
-            eventResize={handleEventUpdate}
-            height="auto"
-            contentHeight={650}
-            plugins={[listPlugin, dayGridPlugin, timelinePlugin, timeGridPlugin, interactionPlugin]}
-          />
-        </CalendarStyled>
+
+                {/* 두 번째 줄: 제목(왼쪽) - 참석인원(오른쪽) */}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    fontSize: '0.75rem',
+                    color: 'rgba(0,0,0,0.9)',
+                    flex: 1
+                  }}
+                >
+                  <span
+                    style={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      fontWeight: 'normal',
+                      flex: '1 1 auto'
+                    }}
+                  >
+                    {title}
+                  </span>
+                  {attendeesCount > 0 && (
+                    <span
+                      style={{
+                        marginLeft: '4px',
+                        fontSize: '0.7rem',
+                        fontWeight: '600',
+                        color: 'rgba(0,0,0,0.7)',
+                        flexShrink: 0
+                      }}
+                    >
+                      {attendeesCount}명
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          }}
+          select={handleRangeSelect}
+          eventDrop={handleEventUpdate}
+          eventClick={handleEventSelect}
+          eventResize={handleEventUpdate}
+          height="auto"
+          contentHeight={650}
+          plugins={[listPlugin, dayGridPlugin, timelinePlugin, timeGridPlugin, interactionPlugin]}
+        />
+      </CalendarStyled>
 
       {/* Dialog renders its body even if not open */}
       <Dialog

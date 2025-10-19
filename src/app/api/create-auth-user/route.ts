@@ -11,19 +11,7 @@ const pool = new Pool({
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const {
-      email,
-      password,
-      user_name,
-      department,
-      position,
-      role,
-      user_account_id,
-      phone,
-      country,
-      address,
-      profile_image_url
-    } = body;
+    const { email, password, user_name, department, position, role, user_account_id, phone, country, address, profile_image_url } = body;
 
     if (!email || !password) {
       return NextResponse.json(
@@ -54,16 +42,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Supabase Admin 클라이언트 생성 (Service Role Key 사용)
-    const supabaseAdmin = createClient(
-      supabaseUrl,
-      serviceRoleKey,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
       }
-    );
+    });
 
     // Supabase Auth에 사용자 생성 (Admin API 사용)
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -94,7 +78,7 @@ export async function POST(req: NextRequest) {
 
     // 추가 필드들을 프로필 테이블에 업데이트
     // 트리거가 프로필을 생성할 시간을 주기 위해 약간의 delay
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     try {
       const updateQuery = `

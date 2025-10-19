@@ -52,7 +52,7 @@ import { costData } from 'data/cost';
 import { useSupabaseCostFinance } from '../../hooks/useSupabaseCostFinance';
 import { useSupabaseMasterCode3 } from '../../hooks/useSupabaseMasterCode3';
 import { useSupabaseDepartments } from '../../hooks/useSupabaseDepartments';
-import { useSupabaseUserManagement } from '../../hooks/useSupabaseUserManagement';
+import { useSupabaseUsers } from '../../hooks/useSupabaseUsers';
 import { useSupabaseFeedback } from '../../hooks/useSupabaseFeedback';
 import { PAGE_IDENTIFIERS } from '../../types/feedback';
 import useUser from '../../hooks/useUser';
@@ -355,9 +355,7 @@ const RecordTab = memo(
           }}
         >
           <Typography variant="body2" color="text.secondary">
-            {comments.length > 0
-              ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}`
-              : '0-0 of 0'}
+            {comments.length > 0 ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}` : '0-0 of 0'}
           </Typography>
           {comments.length > 0 && (
             <Pagination
@@ -516,7 +514,12 @@ export default function CostDataTable({
   const { departments } = useSupabaseDepartments();
 
   // 사용자 데이터 연동
-  const { users } = useSupabaseUserManagement();
+  const { users } = useSupabaseUsers();
+
+  // 사용자 이름으로 사용자 데이터 찾기
+  const findUserByName = (userName: string) => {
+    return users.find((user) => user.user_name === userName);
+  };
 
   // 로그인된 사용자 정보
   const user = useUser();
@@ -546,39 +549,35 @@ export default function CostDataTable({
 
   // GROUP027 비용유형 목록
   const costTypes = useMemo(() => {
-    const group027Codes = subCodes.filter(code => code.group_code === 'GROUP027');
-    return group027Codes.map(code => code.subcode_name);
+    const group027Codes = subCodes.filter((code) => code.group_code === 'GROUP027');
+    return group027Codes.map((code) => code.subcode_name);
   }, [subCodes]);
 
   // GROUP028 비용세부유형 목록 (금액탭용)
   const costDetailTypes = useMemo(() => {
-    const group028Codes = subCodes.filter(code => code.group_code === 'GROUP028');
-    return group028Codes.map(code => code.subcode_name);
+    const group028Codes = subCodes.filter((code) => code.group_code === 'GROUP028');
+    return group028Codes.map((code) => code.subcode_name);
   }, [subCodes]);
 
   // GROUP002 상태 목록
   const statusList = useMemo(() => {
-    const group002Codes = subCodes.filter(code => code.group_code === 'GROUP002');
-    return group002Codes.map(code => code.subcode_name);
+    const group002Codes = subCodes.filter((code) => code.group_code === 'GROUP002');
+    return group002Codes.map((code) => code.subcode_name);
   }, [subCodes]);
 
   // 부서명 목록
   const teamList = useMemo(() => {
-    return departments
-      .filter(dept => dept.is_active)
-      .map(dept => dept.department_name);
+    return departments.filter((dept) => dept.is_active).map((dept) => dept.department_name);
   }, [departments]);
 
-  // 사용자 목록 (프로필 사진 포함)
+  // 사용자 목록 (프로필 사진 포함) - useSupabaseUsers가 이미 활성 사용자만 반환하므로 필터링 불필요
   const assigneeList = useMemo(() => {
-    return users
-      .filter(user => user.is_active && user.status === 'active')
-      .map(user => ({
-        id: user.id,
-        name: user.user_name,
-        avatar: user.profile_image_url || user.avatar_url,
-        department: user.department
-      }));
+    return users.map((user) => ({
+      id: user.id,
+      name: user.user_name,
+      avatar: user.profile_image_url || user.avatar_url,
+      department: user.department
+    }));
   }, [users]);
 
   // 상태 관리
@@ -591,19 +590,21 @@ export default function CostDataTable({
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentText, setEditingCommentText] = useState<string>('');
   // 임시 저장된 기록들 (저장 버튼 클릭 시 DB에 저장)
-  const [pendingComments, setPendingComments] = useState<Array<{
-    id: string;
-    content: string;
-    timestamp: string;
-    author: string;
-    avatar?: string;
-    department?: string;
-    position?: string;
-    role?: string;
-    isNew: boolean;
-  }>>([]);
+  const [pendingComments, setPendingComments] = useState<
+    Array<{
+      id: string;
+      content: string;
+      timestamp: string;
+      author: string;
+      avatar?: string;
+      department?: string;
+      position?: string;
+      role?: string;
+      isNew: boolean;
+    }>
+  >([]);
   // 수정된 기록들 추적
-  const [modifiedComments, setModifiedComments] = useState<{[key: string]: string}>({});
+  const [modifiedComments, setModifiedComments] = useState<{ [key: string]: string }>({});
   // 삭제된 기록 ID들
   const [deletedCommentIds, setDeletedCommentIds] = useState<string[]>([]);
 
@@ -644,7 +645,7 @@ export default function CostDataTable({
   const comments = useMemo(() => {
     // 기존 DB의 feedbacks (삭제된 것 제외)
     const existingComments = feedbacks
-      .filter(feedback => !deletedCommentIds.includes(String(feedback.id)))
+      .filter((feedback) => !deletedCommentIds.includes(String(feedback.id)))
       .map((feedback) => {
         // user_name으로 사용자 찾기
         const feedbackUser = users.find((u) => u.user_name === feedback.user_name);
@@ -667,7 +668,7 @@ export default function CostDataTable({
       });
 
     // 임시 저장된 새 기록들
-    const newComments = pendingComments.map(comment => ({
+    const newComments = pendingComments.map((comment) => ({
       ...comment,
       isNew: true
     }));
@@ -1516,7 +1517,7 @@ export default function CostDataTable({
       isNew: true
     };
 
-    setPendingComments(prev => [tempComment, ...prev]);
+    setPendingComments((prev) => [tempComment, ...prev]);
     setNewComment('');
   }, [newComment, users, user]);
 
@@ -1531,16 +1532,12 @@ export default function CostDataTable({
     // 임시 저장된 기록인지 확인 (ID가 temp_로 시작)
     if (editingCommentId.startsWith('temp_')) {
       // pendingComments에서 직접 수정
-      setPendingComments(prev =>
-        prev.map(comment =>
-          comment.id === editingCommentId
-            ? { ...comment, content: editingCommentText }
-            : comment
-        )
+      setPendingComments((prev) =>
+        prev.map((comment) => (comment.id === editingCommentId ? { ...comment, content: editingCommentText } : comment))
       );
     } else {
       // 기존 DB 데이터는 수정 목록에 추가 (저장 시 DB 업데이트)
-      setModifiedComments(prev => ({
+      setModifiedComments((prev) => ({
         ...prev,
         [editingCommentId]: editingCommentText
       }));
@@ -1559,10 +1556,10 @@ export default function CostDataTable({
     // 임시 저장된 기록인지 확인 (ID가 temp_로 시작)
     if (commentId.startsWith('temp_')) {
       // pendingComments에서 직접 삭제
-      setPendingComments(prev => prev.filter(comment => comment.id !== commentId));
+      setPendingComments((prev) => prev.filter((comment) => comment.id !== commentId));
     } else {
       // 기존 DB 데이터는 삭제 목록에 추가 (저장 시 DB에서 삭제)
-      setDeletedCommentIds(prev => [...prev, commentId]);
+      setDeletedCommentIds((prev) => [...prev, commentId]);
     }
   }, []);
 
@@ -2060,7 +2057,10 @@ export default function CostDataTable({
                 <TableCell>
                   {record.assignee ? (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Avatar src={assigneeList.find((a) => a.name === record.assignee)?.avatar} sx={{ width: 24, height: 24 }}>
+                      <Avatar
+                        src={findUserByName(record.assignee)?.avatar_url || findUserByName(record.assignee)?.profile_image_url}
+                        sx={{ width: 24, height: 24 }}
+                      >
                         {record.assignee.charAt(0)}
                       </Avatar>
                       <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
@@ -2421,19 +2421,17 @@ export default function CostDataTable({
                       displayEmpty
                     >
                       <MenuItem value="">선택</MenuItem>
-                      {costTypes.length > 0 ? (
-                        costTypes.map((option) => (
-                          <MenuItem key={option} value={option}>
-                            {option}
-                          </MenuItem>
-                        ))
-                      ) : (
-                        costTypeOptions.map((option) => (
-                          <MenuItem key={option} value={option}>
-                            {option}
-                          </MenuItem>
-                        ))
-                      )}
+                      {costTypes.length > 0
+                        ? costTypes.map((option) => (
+                            <MenuItem key={option} value={option}>
+                              {option}
+                            </MenuItem>
+                          ))
+                        : costTypeOptions.map((option) => (
+                            <MenuItem key={option} value={option}>
+                              {option}
+                            </MenuItem>
+                          ))}
                     </Select>
                   </FormControl>
                 </Grid>
@@ -2572,10 +2570,7 @@ export default function CostDataTable({
                     InputProps={{
                       readOnly: true,
                       startAdornment: (
-                        <Avatar
-                          src={currentUser.profileImage}
-                          sx={{ width: 24, height: 24, mr: 0 }}
-                        >
+                        <Avatar src={currentUser.profileImage} sx={{ width: 24, height: 24, mr: 0 }}>
                           {currentUser.name[0]}
                         </Avatar>
                       )
@@ -3043,15 +3038,11 @@ export default function CostDataTable({
           )}
 
           {/* 자료 탭 */}
-          {tabValue === 3 && (
-            <MaterialTab recordId={dialog.recordId} currentUser={currentUser} />
-          )}
+          {tabValue === 3 && <MaterialTab recordId={dialog.recordId} currentUser={currentUser} />}
         </DialogContent>
         {validationError && (
           <Box sx={{ px: 3, pb: 2, pt: 0 }}>
-            <Alert severity="error">
-              {validationError}
-            </Alert>
+            <Alert severity="error">{validationError}</Alert>
           </Box>
         )}
       </Dialog>

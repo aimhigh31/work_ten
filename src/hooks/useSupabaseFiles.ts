@@ -26,17 +26,13 @@ const filesFetcher = async (key: string) => {
 
   console.log('🔍 filesFetcher 쿼리 파라미터:', {
     'SWR key': key,
-    'page': page,
-    'recordId': recordId,
+    page: page,
+    recordId: recordId,
     'recordId 타입': typeof recordId,
     'recordId가 undefined 문자열인가?': recordId === 'undefined'
   });
 
-  let query = supabase
-    .from('common_files_data')
-    .select('*', { count: 'exact' })
-    .eq('page', page)
-    .order('created_at', { ascending: false });
+  let query = supabase.from('common_files_data').select('*', { count: 'exact' }).eq('page', page).order('created_at', { ascending: false });
 
   if (recordId && recordId !== 'undefined') {
     console.log('✅ record_id 필터 적용:', recordId);
@@ -70,7 +66,7 @@ export function useSupabaseFiles(page: string, recordId?: string | number) {
     '원본 타입': typeof recordId,
     '변환된 normalizedRecordId': normalizedRecordId,
     '변환된 타입': typeof normalizedRecordId,
-    'page': page
+    page: page
   });
 
   // 개별 작업 loading 상태
@@ -81,25 +77,25 @@ export function useSupabaseFiles(page: string, recordId?: string | number) {
   const supabase = createClient();
 
   // SWR로 캐싱 적용
-  const isValidRecordId = normalizedRecordId &&
-                          normalizedRecordId !== 'undefined' &&
-                          normalizedRecordId.trim() !== '';
+  const isValidRecordId = normalizedRecordId && normalizedRecordId !== 'undefined' && normalizedRecordId.trim() !== '';
   const swrKey = isValidRecordId ? `files|${page}|${normalizedRecordId}` : null;
   console.log('🔍 SWR Key:', swrKey, '| 유효한 recordId:', isValidRecordId);
 
-  const { data: files = [], error, mutate, isLoading, isValidating } = useSWR<FileData[]>(
-    swrKey,
-    filesFetcher,
-    {
-      revalidateOnMount: true,
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
-      dedupingInterval: 60000,
-      revalidateIfStale: false,
-      shouldRetryOnError: false,
-      keepPreviousData: true,
-    }
-  );
+  const {
+    data: files = [],
+    error,
+    mutate,
+    isLoading,
+    isValidating
+  } = useSWR<FileData[]>(swrKey, filesFetcher, {
+    revalidateOnMount: true,
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+    dedupingInterval: 60000,
+    revalidateIfStale: false,
+    shouldRetryOnError: false,
+    keepPreviousData: true
+  });
 
   // 파일 조회 (SWR mutate로 수동 갱신)
   const fetchFiles = async () => {
@@ -141,7 +137,7 @@ export function useSupabaseFiles(page: string, recordId?: string | number) {
       user_name: input.user_name || '알 수 없음',
       team: input.team,
       created_at: new Date().toISOString(),
-      metadata: input.metadata,
+      metadata: input.metadata
     };
 
     console.time('⏱️ Optimistic UI Update');
@@ -151,12 +147,10 @@ export function useSupabaseFiles(page: string, recordId?: string | number) {
     try {
       // 3. Storage에 파일 업로드
       console.time('⏱️ Storage Upload');
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from(STORAGE_BUCKET)
-        .upload(safeFileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
+      const { data: uploadData, error: uploadError } = await supabase.storage.from(STORAGE_BUCKET).upload(safeFileName, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
       console.timeEnd('⏱️ Storage Upload');
 
       if (uploadError) {
@@ -167,9 +161,7 @@ export function useSupabaseFiles(page: string, recordId?: string | number) {
       console.log('✅ Storage 업로드 완료:', uploadData);
 
       // 4. Public URL 생성
-      const { data: urlData } = supabase.storage
-        .from(STORAGE_BUCKET)
-        .getPublicUrl(safeFileName);
+      const { data: urlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(safeFileName);
 
       const publicUrl = urlData.publicUrl;
       console.log('✅ Public URL 생성:', publicUrl);
@@ -181,16 +173,12 @@ export function useSupabaseFiles(page: string, recordId?: string | number) {
         file_name: file.name,
         file_url: publicUrl,
         file_size: file.size,
-        file_type: file.type,
+        file_type: file.type
       };
 
       console.log('🔍 DB Insert 시작, dbInput:', JSON.stringify(dbInput, null, 2));
 
-      const { data: dbData, error: insertError } = await supabase
-        .from('common_files_data')
-        .insert([dbInput])
-        .select()
-        .single();
+      const { data: dbData, error: insertError } = await supabase.from('common_files_data').insert([dbInput]).select().single();
 
       console.timeEnd('⏱️ DB Insert');
       console.log('🔍 DB Insert 결과:', { data: dbData, error: insertError });
@@ -213,7 +201,7 @@ export function useSupabaseFiles(page: string, recordId?: string | number) {
       if (dbData) {
         const currentCache = await mutate();
         await mutate(
-          (currentCache || files).map(f => f.id === tempId ? dbData : f),
+          (currentCache || files).map((f) => (f.id === tempId ? dbData : f)),
           false
         );
       }
@@ -232,7 +220,10 @@ export function useSupabaseFiles(page: string, recordId?: string | number) {
       // 7. 실패: 롤백 (임시 항목 제거)
       console.error('❌ 파일 업로드 실패:', err);
       console.time('⏱️ Rollback');
-      await mutate(files.filter(f => f.id !== tempId), false);
+      await mutate(
+        files.filter((f) => f.id !== tempId),
+        false
+      );
       console.timeEnd('⏱️ Rollback');
 
       const endTime = performance.now();
@@ -253,7 +244,7 @@ export function useSupabaseFiles(page: string, recordId?: string | number) {
     console.time('⏱️ updateFile Total');
 
     // 1. 이전 데이터 백업
-    const previousFile = files.find(f => String(f.id) === String(id));
+    const previousFile = files.find((f) => String(f.id) === String(id));
     if (!previousFile) {
       console.error('❌ 수정할 파일을 찾을 수 없습니다:', id);
       setIsUpdating(false);
@@ -263,7 +254,7 @@ export function useSupabaseFiles(page: string, recordId?: string | number) {
     // 2. Optimistic Update
     console.time('⏱️ Optimistic UI Update');
     await mutate(
-      files.map(f => String(f.id) === String(id) ? { ...f, ...updates } : f),
+      files.map((f) => (String(f.id) === String(id) ? { ...f, ...updates } : f)),
       false
     );
     console.timeEnd('⏱️ Optimistic UI Update');
@@ -271,12 +262,7 @@ export function useSupabaseFiles(page: string, recordId?: string | number) {
     try {
       // 3. DB 업데이트
       console.time('⏱️ DB Update');
-      const { data, error: updateError } = await supabase
-        .from('common_files_data')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+      const { data, error: updateError } = await supabase.from('common_files_data').update(updates).eq('id', id).select().single();
       console.timeEnd('⏱️ DB Update');
 
       if (updateError) {
@@ -286,7 +272,7 @@ export function useSupabaseFiles(page: string, recordId?: string | number) {
       // 4. 성공: 서버 데이터로 최종 업데이트
       if (data) {
         await mutate(
-          files.map(f => String(f.id) === String(id) ? data : f),
+          files.map((f) => (String(f.id) === String(id) ? data : f)),
           false
         );
       }
@@ -305,7 +291,7 @@ export function useSupabaseFiles(page: string, recordId?: string | number) {
       console.error('❌ 파일 수정 실패:', err);
       console.time('⏱️ Rollback');
       await mutate(
-        files.map(f => String(f.id) === String(id) ? previousFile : f),
+        files.map((f) => (String(f.id) === String(id) ? previousFile : f)),
         false
       );
       console.timeEnd('⏱️ Rollback');
@@ -328,7 +314,7 @@ export function useSupabaseFiles(page: string, recordId?: string | number) {
     console.time('⏱️ deleteFile Total');
 
     // 1. 이전 데이터 백업 (Storage 경로 추출용)
-    const previousFile = files.find(f => String(f.id) === String(id));
+    const previousFile = files.find((f) => String(f.id) === String(id));
     if (!previousFile) {
       console.error('❌ 삭제할 파일을 찾을 수 없습니다:', id);
       setIsDeleting(false);
@@ -346,7 +332,7 @@ export function useSupabaseFiles(page: string, recordId?: string | number) {
     // 3. Optimistic Update: 즉시 UI에서 제거
     console.time('⏱️ Optimistic UI Update');
     await mutate(
-      files.filter(f => String(f.id) !== String(id)),
+      files.filter((f) => String(f.id) !== String(id)),
       false
     );
     console.timeEnd('⏱️ Optimistic UI Update');
@@ -354,10 +340,7 @@ export function useSupabaseFiles(page: string, recordId?: string | number) {
     try {
       // 4. DB 삭제
       console.time('⏱️ DB Delete');
-      const { error: deleteError } = await supabase
-        .from('common_files_data')
-        .delete()
-        .eq('id', id);
+      const { error: deleteError } = await supabase.from('common_files_data').delete().eq('id', id);
       console.timeEnd('⏱️ DB Delete');
 
       if (deleteError) {
@@ -367,9 +350,7 @@ export function useSupabaseFiles(page: string, recordId?: string | number) {
       // 5. Storage 파일 삭제 (실패해도 계속 진행 - DB가 우선)
       if (storagePath) {
         console.time('⏱️ Storage Delete');
-        const { error: storageError } = await supabase.storage
-          .from(STORAGE_BUCKET)
-          .remove([storagePath]);
+        const { error: storageError } = await supabase.storage.from(STORAGE_BUCKET).remove([storagePath]);
         console.timeEnd('⏱️ Storage Delete');
 
         if (storageError) {
@@ -393,9 +374,7 @@ export function useSupabaseFiles(page: string, recordId?: string | number) {
       console.error('❌ 파일 삭제 실패:', err);
       console.time('⏱️ Rollback');
       await mutate(
-        [previousFile, ...files].sort((a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        ),
+        [previousFile, ...files].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
         false
       );
       console.timeEnd('⏱️ Rollback');

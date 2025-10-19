@@ -2645,9 +2645,7 @@ export default function CostManagement() {
                     if (created) {
                       const updated = await getCosts();
                       // 신규 생성된 레코드에 isNew 플래그 설정
-                      const updatedWithNew = updated.map(cost =>
-                        cost.id === created.id ? { ...cost, isNew: true } : cost
-                      );
+                      const updatedWithNew = updated.map((cost) => (cost.id === created.id ? { ...cost, isNew: true } : cost));
                       setCostRecords(updatedWithNew);
                       return created;
                     }

@@ -395,10 +395,7 @@ const OverviewTab = memo(
               disabled
               label="등록자"
               required
-              value={
-                users.find((u) => u.user_code === taskState.assignee)?.user_name ||
-                ''
-              }
+              value={users.find((u) => u.user_code === taskState.assignee)?.user_name || ''}
               InputLabelProps={{
                 shrink: true,
                 sx: {
@@ -1750,7 +1747,7 @@ const ChecklistEditDialog = memo(
     // 세션 email로 DB에서 사용자 찾기
     const currentUser = useMemo(() => {
       if (!session?.user?.email || users.length === 0) return null;
-      return users.find(u => u.email === session.user.email);
+      return users.find((u) => u.email === session.user.email);
     }, [session, users]);
 
     const currentUserCode = currentUser?.user_code || '';
@@ -2736,7 +2733,13 @@ const ChecklistEditDialog = memo(
                   체크리스트 항목 관리
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Button variant="outlined" color="error" onClick={handleDeleteSelectedItems} disabled={selectedItems.length === 0} size="small">
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    onClick={handleDeleteSelectedItems}
+                    disabled={selectedItems.length === 0}
+                    size="small"
+                  >
                     삭제({selectedItems.length})
                   </Button>
                   <Button variant="contained" onClick={handleAddItem} size="small" sx={{ fontSize: '12px' }}>
@@ -2772,7 +2775,9 @@ const ChecklistEditDialog = memo(
                     <TableRow sx={{ backgroundColor: 'grey.50' }}>
                       <TableCell padding="checkbox" sx={{ width: 50, minWidth: 50, maxWidth: 50 }}>
                         <Checkbox
-                          checked={paginatedChecklistItems.length > 0 && paginatedChecklistItems.every((item) => selectedItems.includes(item.id))}
+                          checked={
+                            paginatedChecklistItems.length > 0 && paginatedChecklistItems.every((item) => selectedItems.includes(item.id))
+                          }
                           onChange={handleSelectAllItems}
                           color="primary"
                           size="small"
@@ -2815,7 +2820,10 @@ const ChecklistEditDialog = memo(
                             {checklistItems.length - (editorPage * editorRowsPerPage + index)}
                           </Box>
                         </TableCell>
-                        <TableCell sx={{ width: 120, padding: 0, height: 48, minWidth: 120, maxWidth: 120 }} onClick={() => setEditingCell({ itemId: item.id, field: 'majorCategory' })}>
+                        <TableCell
+                          sx={{ width: 120, padding: 0, height: 48, minWidth: 120, maxWidth: 120 }}
+                          onClick={() => setEditingCell({ itemId: item.id, field: 'majorCategory' })}
+                        >
                           {editingCell?.itemId === item.id && editingCell.field === 'majorCategory' ? (
                             <Box sx={{ width: '100%', height: '48px', position: 'relative', padding: '8px 12px' }}>
                               <TextField
@@ -2845,7 +2853,10 @@ const ChecklistEditDialog = memo(
                             </Box>
                           )}
                         </TableCell>
-                        <TableCell sx={{ width: 120, padding: 0, height: 48, minWidth: 120, maxWidth: 120 }} onClick={() => setEditingCell({ itemId: item.id, field: 'subCategory' })}>
+                        <TableCell
+                          sx={{ width: 120, padding: 0, height: 48, minWidth: 120, maxWidth: 120 }}
+                          onClick={() => setEditingCell({ itemId: item.id, field: 'subCategory' })}
+                        >
                           {editingCell?.itemId === item.id && editingCell.field === 'subCategory' ? (
                             <Box sx={{ width: '100%', height: '48px', position: 'relative', padding: '8px 12px' }}>
                               <TextField
@@ -2875,7 +2886,10 @@ const ChecklistEditDialog = memo(
                             </Box>
                           )}
                         </TableCell>
-                        <TableCell sx={{ width: 200, padding: 0, height: 48, minWidth: 200, maxWidth: 200 }} onClick={() => setEditingCell({ itemId: item.id, field: 'title' })}>
+                        <TableCell
+                          sx={{ width: 200, padding: 0, height: 48, minWidth: 200, maxWidth: 200 }}
+                          onClick={() => setEditingCell({ itemId: item.id, field: 'title' })}
+                        >
                           {editingCell?.itemId === item.id && editingCell.field === 'title' ? (
                             <Box sx={{ width: '100%', height: '48px', position: 'relative', padding: '8px 12px' }}>
                               <TextField
@@ -2905,7 +2919,10 @@ const ChecklistEditDialog = memo(
                             </Box>
                           )}
                         </TableCell>
-                        <TableCell sx={{ width: 250, padding: 0, height: 48, minWidth: 250, maxWidth: 250 }} onClick={() => setEditingCell({ itemId: item.id, field: 'description' })}>
+                        <TableCell
+                          sx={{ width: 250, padding: 0, height: 48, minWidth: 250, maxWidth: 250 }}
+                          onClick={() => setEditingCell({ itemId: item.id, field: 'description' })}
+                        >
                           {editingCell?.itemId === item.id && editingCell.field === 'description' ? (
                             <Box sx={{ width: '100%', height: '48px', position: 'relative', padding: '8px 12px' }}>
                               <TextField
@@ -2958,7 +2975,9 @@ const ChecklistEditDialog = memo(
                 }}
               >
                 <Typography variant="body2" color="text.secondary">
-                  {checklistItems.length > 0 ? `${editorPage * editorRowsPerPage + 1}-${Math.min((editorPage + 1) * editorRowsPerPage, checklistItems.length)} of ${checklistItems.length}` : '0-0 of 0'}
+                  {checklistItems.length > 0
+                    ? `${editorPage * editorRowsPerPage + 1}-${Math.min((editorPage + 1) * editorRowsPerPage, checklistItems.length)} of ${checklistItems.length}`
+                    : '0-0 of 0'}
                 </Typography>
                 {checklistItems.length > 0 && (
                   <Pagination

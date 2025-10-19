@@ -401,9 +401,7 @@ const RecordTab = memo(
           }}
         >
           <Typography variant="body2" color="text.secondary">
-            {comments.length > 0
-              ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}`
-              : '0-0 of 0'}
+            {comments.length > 0 ? `${startIndex + 1}-${Math.min(endIndex, comments.length)} of ${comments.length}` : '0-0 of 0'}
           </Typography>
           {comments.length > 0 && (
             <Pagination
@@ -857,19 +855,21 @@ const OverviewTab = memo(
               InputLabelProps={{ shrink: true }}
               InputProps={{
                 readOnly: true,
-                startAdornment: educationState.assignee ? (() => {
-                  // educationState.assignee에 해당하는 사용자 찾기
-                  const assigneeUser = users.find((user) => user.user_name === educationState.assignee);
-                  return (
-                    <Avatar
-                      src={assigneeUser?.profile_image_url || assigneeUser?.avatar_url}
-                      alt={educationState.assignee}
-                      sx={{ width: 24, height: 24, mr: 0.25 }}
-                    >
-                      {educationState.assignee.charAt(0)}
-                    </Avatar>
-                  );
-                })() : null
+                startAdornment: educationState.assignee
+                  ? (() => {
+                      // educationState.assignee에 해당하는 사용자 찾기
+                      const assigneeUser = users.find((user) => user.user_name === educationState.assignee);
+                      return (
+                        <Avatar
+                          src={assigneeUser?.profile_image_url || assigneeUser?.avatar_url}
+                          alt={educationState.assignee}
+                          sx={{ width: 24, height: 24, mr: 0.25 }}
+                        >
+                          {educationState.assignee.charAt(0)}
+                        </Avatar>
+                      );
+                    })()
+                  : null
               }}
               sx={{
                 '& .MuiOutlinedInput-root': {
@@ -1106,11 +1106,8 @@ const ParticipantsTab = memo(
     onParticipantCountChange?: (count: number) => void;
   }) => {
     // 참석자 관리 훅 사용
-    const {
-      getAttendeesByEducationId,
-      convertSupabaseToParticipantItem,
-      convertParticipantItemToSupabase
-    } = useSupabaseItEducationAttendee();
+    const { getAttendeesByEducationId, convertSupabaseToParticipantItem, convertParticipantItemToSupabase } =
+      useSupabaseItEducationAttendee();
     const mockData = [
       {
         id: '1',
@@ -1918,9 +1915,7 @@ const CurriculumTab = memo(({ mode, educationId }: { mode: 'add' | 'edit'; educa
   // 전역 함수로 현재 커리큘럼 데이터를 외부에서 접근할 수 있도록 설정 (data_relation.md 패턴)
   useEffect(() => {
     (window as any).getCurrentCurriculumData = () => {
-      return curriculumItems.map((item, index) =>
-        convertCurriculumItemToSupabase(item, index + 1)
-      );
+      return curriculumItems.map((item, index) => convertCurriculumItemToSupabase(item, index + 1));
     };
 
     return () => {
@@ -2509,7 +2504,6 @@ const ReportsTab = memo(
   }
 );
 
-
 // 자료 탭 컴포넌트 - DB 기반 (보안교육관리와 동일 패턴)
 const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | string; currentUser?: any }) => {
   // 파일 관리 훅
@@ -2860,7 +2854,7 @@ interface ITEducationDialogProps {
   onClose: () => void;
   onSave: (data: ITEducationRecord) => void;
   recordId?: number;
-  tasks?: ITEducationRecord[];  // 전체 tasks 배열
+  tasks?: ITEducationRecord[]; // 전체 tasks 배열
 }
 
 export default function ITEducationDialog({ open, onClose, onSave, recordId, tasks = [] }: ITEducationDialogProps) {
@@ -2868,48 +2862,44 @@ export default function ITEducationDialog({ open, onClose, onSave, recordId, tas
   const mode = recordId ? 'edit' : 'add';
 
   // recordId로 데이터 찾기
-  const data = recordId ? tasks.find(task => task.id === recordId) : null;
+  const data = recordId ? tasks.find((task) => task.id === recordId) : null;
   const [value, setValue] = useState(0);
 
   // 유효성 검증 에러 상태
   const [validationError, setValidationError] = useState<string>('');
 
   // Supabase 훅 사용
-  const {
-    loading,
-    error,
-    getItEducationById,
-    addItEducation,
-    updateItEducation,
-    generateItEducationCode
-  } = useSupabaseItEducation();
+  const { loading, error, getItEducationById, addItEducation, updateItEducation, generateItEducationCode } = useSupabaseItEducation();
 
   // 마스터코드 훅 사용
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
   // 안전한 getSubCodesByGroup 함수 (fallback 포함)
-  const safeGetSubCodesByGroup = useCallback((groupCode: string) => {
-    if (getSubCodesByGroup && typeof getSubCodesByGroup === 'function') {
-      return getSubCodesByGroup(groupCode);
-    }
-    // fallback: 기본값 반환
-    if (groupCode === 'GROUP008') {
-      return [
-        { subcode: 'EDU_ONLINE', subcode_name: '온라인' },
-        { subcode: 'EDU_OFFLINE', subcode_name: '오프라인' },
-        { subcode: 'EDU_HYBRID', subcode_name: '하이브리드' }
-      ];
-    }
-    if (groupCode === 'GROUP002') {
-      return [
-        { subcode: 'STATUS_PLAN', subcode_name: '계획' },
-        { subcode: 'STATUS_PROGRESS', subcode_name: '진행중' },
-        { subcode: 'STATUS_COMPLETE', subcode_name: '완료' },
-        { subcode: 'STATUS_CANCEL', subcode_name: '취소' }
-      ];
-    }
-    return [];
-  }, [getSubCodesByGroup]);
+  const safeGetSubCodesByGroup = useCallback(
+    (groupCode: string) => {
+      if (getSubCodesByGroup && typeof getSubCodesByGroup === 'function') {
+        return getSubCodesByGroup(groupCode);
+      }
+      // fallback: 기본값 반환
+      if (groupCode === 'GROUP008') {
+        return [
+          { subcode: 'EDU_ONLINE', subcode_name: '온라인' },
+          { subcode: 'EDU_OFFLINE', subcode_name: '오프라인' },
+          { subcode: 'EDU_HYBRID', subcode_name: '하이브리드' }
+        ];
+      }
+      if (groupCode === 'GROUP002') {
+        return [
+          { subcode: 'STATUS_PLAN', subcode_name: '계획' },
+          { subcode: 'STATUS_PROGRESS', subcode_name: '진행중' },
+          { subcode: 'STATUS_COMPLETE', subcode_name: '완료' },
+          { subcode: 'STATUS_CANCEL', subcode_name: '취소' }
+        ];
+      }
+      return [];
+    },
+    [getSubCodesByGroup]
+  );
 
   // 현재 로그인 사용자 정보
   const user = useUser();
@@ -3139,23 +3129,26 @@ export default function ITEducationDialog({ open, onClose, onSave, recordId, tas
   }, []);
 
   // 교육실적보고 변경 핸들러
-  const handleEducationReportChange = useCallback((field: keyof EducationReport, value: string) => {
-    console.log(`🔥 교육실적보고 입력 감지: field=${field}, value="${value}"`);
+  const handleEducationReportChange = useCallback(
+    (field: keyof EducationReport, value: string) => {
+      console.log(`🔥 교육실적보고 입력 감지: field=${field}, value="${value}"`);
 
-    // 로컬 상태 즉시 업데이트
-    const updatedReport = {
-      ...educationReport,
-      [field]: value
-    };
-    setEducationReport(updatedReport);
+      // 로컬 상태 즉시 업데이트
+      const updatedReport = {
+        ...educationReport,
+        [field]: value
+      };
+      setEducationReport(updatedReport);
 
-    // sessionStorage에 임시 저장
-    if (data?.id) {
-      const tempKey = `it_education_report_temp_${data.id}`;
-      sessionStorage.setItem(tempKey, JSON.stringify(updatedReport));
-      console.log(`💾 교육실적보고 임시저장: ${tempKey}`, updatedReport);
-    }
-  }, [educationReport, data]);
+      // sessionStorage에 임시 저장
+      if (data?.id) {
+        const tempKey = `it_education_report_temp_${data.id}`;
+        sessionStorage.setItem(tempKey, JSON.stringify(updatedReport));
+        console.log(`💾 교육실적보고 임시저장: ${tempKey}`, updatedReport);
+      }
+    },
+    [educationReport, data]
+  );
 
   // 참석자 수 변경 핸들러 (참석자 탭에서 호출됨)
   const handleParticipantCountChange = useCallback((count: number) => {
@@ -3190,7 +3183,7 @@ export default function ITEducationDialog({ open, onClose, onSave, recordId, tas
     };
 
     // 로컬 state에만 추가 (즉시 반응)
-    setPendingFeedbacks(prev => [newFeedback, ...prev]);
+    setPendingFeedbacks((prev) => [newFeedback, ...prev]);
     setNewComment('');
   }, [newComment, recordId, currentUser, user]);
 
@@ -3203,13 +3196,7 @@ export default function ITEducationDialog({ open, onClose, onSave, recordId, tas
     if (!editingCommentText.trim() || !editingCommentId) return;
 
     // 로컬 state만 업데이트 (즉시 반응)
-    setPendingFeedbacks(prev =>
-      prev.map(fb =>
-        fb.id === editingCommentId
-          ? { ...fb, description: editingCommentText }
-          : fb
-      )
-    );
+    setPendingFeedbacks((prev) => prev.map((fb) => (fb.id === editingCommentId ? { ...fb, description: editingCommentText } : fb)));
 
     setEditingCommentId(null);
     setEditingCommentText('');
@@ -3222,7 +3209,7 @@ export default function ITEducationDialog({ open, onClose, onSave, recordId, tas
 
   const handleDeleteComment = useCallback((id: string) => {
     // 로컬 state에서만 제거 (즉시 반응)
-    setPendingFeedbacks(prev => prev.filter(fb => fb.id !== id));
+    setPendingFeedbacks((prev) => prev.filter((fb) => fb.id !== id));
   }, []);
 
   const handleSave = useCallback(async () => {
@@ -3346,22 +3333,19 @@ export default function ITEducationDialog({ open, onClose, onSave, recordId, tas
 
         if (result.id) {
           // 추가된 기록 (temp- ID)
-          const addedFeedbacks = pendingFeedbacks.filter(fb =>
-            fb.id.toString().startsWith('temp-') &&
-            !initialFeedbacks.find(initial => initial.id === fb.id)
+          const addedFeedbacks = pendingFeedbacks.filter(
+            (fb) => fb.id.toString().startsWith('temp-') && !initialFeedbacks.find((initial) => initial.id === fb.id)
           );
 
           // 수정된 기록
-          const updatedFeedbacks = pendingFeedbacks.filter(fb => {
+          const updatedFeedbacks = pendingFeedbacks.filter((fb) => {
             if (fb.id.toString().startsWith('temp-')) return false;
-            const initial = initialFeedbacks.find(initial => initial.id === fb.id);
+            const initial = initialFeedbacks.find((initial) => initial.id === fb.id);
             return initial && initial.description !== fb.description;
           });
 
           // 삭제된 기록
-          const deletedFeedbacks = initialFeedbacks.filter(initial =>
-            !pendingFeedbacks.find(pending => pending.id === initial.id)
-          );
+          const deletedFeedbacks = initialFeedbacks.filter((initial) => !pendingFeedbacks.find((pending) => pending.id === initial.id));
 
           // 추가 (역순으로 저장)
           const reversedAddedFeedbacks = [...addedFeedbacks].reverse();
@@ -3379,7 +3363,7 @@ export default function ITEducationDialog({ open, onClose, onSave, recordId, tas
 
           // 삭제 - feedbacks 배열에 존재하는 항목만 삭제
           for (const feedback of deletedFeedbacks) {
-            const existsInFeedbacks = feedbacks.some(fb => String(fb.id) === String(feedback.id));
+            const existsInFeedbacks = feedbacks.some((fb) => String(fb.id) === String(feedback.id));
             if (existsInFeedbacks) {
               await deleteFeedback(String(feedback.id));
             } else {
@@ -3436,7 +3420,23 @@ export default function ITEducationDialog({ open, onClose, onSave, recordId, tas
     } catch (error) {
       console.error('저장 중 오류 발생:', error);
     }
-  }, [educationState, data, mode, onSave, onClose, addItEducation, updateItEducation, saveCurriculumByEducationId, saveAttendeesByEducationId, pendingFeedbacks, initialFeedbacks, feedbacks, addFeedback, updateFeedback, deleteFeedback]);
+  }, [
+    educationState,
+    data,
+    mode,
+    onSave,
+    onClose,
+    addItEducation,
+    updateItEducation,
+    saveCurriculumByEducationId,
+    saveAttendeesByEducationId,
+    pendingFeedbacks,
+    initialFeedbacks,
+    feedbacks,
+    addFeedback,
+    updateFeedback,
+    deleteFeedback
+  ]);
 
   const handleClose = useCallback(() => {
     setValidationError(''); // 에러 상태 초기화
@@ -3491,12 +3491,7 @@ export default function ITEducationDialog({ open, onClose, onSave, recordId, tas
           <Button onClick={handleClose} variant="outlined" size="small">
             취소
           </Button>
-          <Button
-            onClick={handleSave}
-            variant="contained"
-            size="small"
-            disabled={loading}
-          >
+          <Button onClick={handleSave} variant="contained" size="small" disabled={loading}>
             {loading ? '저장 중...' : '저장'}
           </Button>
         </Box>

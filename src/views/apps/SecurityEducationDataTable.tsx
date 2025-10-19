@@ -48,7 +48,7 @@ import { SecurityEducationTableData, SecurityEducationStatus, SecurityEducationR
 
 // hooks
 import { useSupabaseSecurityEducation } from '../../hooks/useSupabaseSecurityEducation';
-import { useSupabaseUserManagement } from '../../hooks/useSupabaseUserManagement';
+import { useSupabaseUsers } from '../../hooks/useSupabaseUsers';
 import useIdGenerator from '../../hooks/useIdGenerator';
 import { supabase } from '../../lib/supabase';
 
@@ -167,7 +167,16 @@ interface SecurityEducationTableProps {
   selectedAssignee?: string;
   tasks?: SecurityEducationTableData[];
   setTasks?: React.Dispatch<React.SetStateAction<SecurityEducationTableData[]>>;
-  addChangeLog?: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string, title?: string) => void;
+  addChangeLog?: (
+    action: string,
+    target: string,
+    description: string,
+    team?: string,
+    beforeValue?: string,
+    afterValue?: string,
+    changedField?: string,
+    title?: string
+  ) => void;
   onDataRefresh?: () => Promise<void>;
 }
 
@@ -187,58 +196,12 @@ export default function SecurityEducationTable({
 
   // Supabase 훅
   const { createEducation, updateEducation, deleteEducation } = useSupabaseSecurityEducation();
-  const { users } = useSupabaseUserManagement();
+  const { users } = useSupabaseUsers();
   const { generateNextId, syncMaxId } = useIdGenerator();
 
-  // 담당자 프로필 이미지 가져오기 함수 (팝업창과 동일한 로직 사용)
-  const getAssigneeAvatar = (assigneeName: string) => {
-    if (!assigneeName) {
-      console.log('⚠️ 담당자 이름이 없습니다');
-      return '/assets/images/users/avatar-1.png';
-    }
-
-    console.log('🎭 담당자 이름:', assigneeName);
-
-    // 1. 사용자 관리 시스템에서 찾기 (팝업창과 동일한 로직)
-    const user = users.find((u) => u.name === assigneeName || u.user_name === assigneeName);
-    if (user) {
-      const avatarUrl = user.profile_image_url || user.avatar_url;
-      if (avatarUrl) {
-        console.log('✅ 사용자 관리에서 찾은 프로필:', avatarUrl);
-        return avatarUrl;
-      }
-    }
-
-    // 2. 정적 아바타 매핑에서 찾기
-    const staticAvatar = assigneeAvatars[assigneeName as keyof typeof assigneeAvatars];
-    if (staticAvatar) {
-      console.log('✅ 정적 매핑에서 찾은 아바타:', staticAvatar);
-      return staticAvatar;
-    }
-
-    // 3. 동적 아바타 생성 (새로운 사용자나 매핑되지 않은 사용자용)
-    const availableAvatars = [
-      '/assets/images/users/avatar-1.png',
-      '/assets/images/users/avatar-2.png',
-      '/assets/images/users/avatar-3.png',
-      '/assets/images/users/avatar-4.png',
-      '/assets/images/users/avatar-5.png',
-      '/assets/images/users/avatar-6.png',
-      '/assets/images/users/avatar-7.png',
-      '/assets/images/users/avatar-8.png',
-      '/assets/images/users/avatar-9.png',
-      '/assets/images/users/avatar-10.png'
-    ];
-
-    // 이름의 해시값을 이용해 일관된 아바타 선택
-    const nameHash = assigneeName.split('').reduce((hash, char) => {
-      return hash + char.charCodeAt(0);
-    }, 0);
-
-    const selectedAvatar = availableAvatars[nameHash % availableAvatars.length];
-    console.log('🎲 동적 아바타 선택:', selectedAvatar, '(해시:', nameHash, ')');
-
-    return selectedAvatar;
+  // 사용자 이름으로 사용자 데이터 찾기
+  const findUserByName = (userName: string) => {
+    return users.find((user) => user.user_name === userName);
   };
 
   const [page, setPage] = useState(0);
@@ -518,7 +481,7 @@ export default function SecurityEducationTable({
           console.log('✅ 수정 성공');
 
           // 원본 데이터에서 code 가져오기
-          const originalTask = data.find(t => t.id === updatedTask.id);
+          const originalTask = data.find((t) => t.id === updatedTask.id);
 
           console.log('🔍🔍🔍 CODE 디버깅:', {
             'updatedTask.id': updatedTask.id,
@@ -684,7 +647,7 @@ export default function SecurityEducationTable({
 
           console.log('🔍 변경로그 저장:', {
             'createdData?.code': createdData?.code,
-            'codeToUse': codeToUse
+            codeToUse: codeToUse
           });
 
           if (addChangeLog) {
@@ -743,11 +706,7 @@ export default function SecurityEducationTable({
   const handleEditTask = async (task: SecurityEducationTableData) => {
     try {
       // DB에서 최신 데이터 가져오기
-      const { data: latestData, error } = await supabase
-        .from('security_education_data')
-        .select('*')
-        .eq('id', task.id)
-        .single();
+      const { data: latestData, error } = await supabase.from('security_education_data').select('*').eq('id', task.id).single();
 
       if (error) {
         console.error('❌ DB 조회 실패:', error);
@@ -1010,7 +969,11 @@ export default function SecurityEducationTable({
                   </TableCell>
                   <TableCell>
                     <Stack direction="row" spacing={1} alignItems="center">
-                      <Avatar src={getAssigneeAvatar(task.assignee || '')} alt={task.assignee} sx={{ width: 24, height: 24 }}>
+                      <Avatar
+                        src={findUserByName(task.assignee)?.avatar_url || findUserByName(task.assignee)?.profile_image_url}
+                        alt={task.assignee}
+                        sx={{ width: 24, height: 24 }}
+                      >
                         {task.assignee?.charAt(0)}
                       </Avatar>
                       <Typography variant="body2" noWrap sx={{ maxWidth: 80, fontSize: '13px' }}>

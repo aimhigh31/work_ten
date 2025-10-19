@@ -220,7 +220,9 @@ export function useSupabaseMenuManagement() {
 
       // 2단계: 기본 연결 테스트 (단순 쿼리로 변경)
       console.log('🔍 2단계: 기본 데이터베이스 연결 테스트...');
-      const { count: healthCount, error: healthError } = await supabase.from('admin_systemsetting_menu').select('*', { count: 'exact', head: true }); // 올바른 카운트 쿼리
+      const { count: healthCount, error: healthError } = await supabase
+        .from('admin_systemsetting_menu')
+        .select('*', { count: 'exact', head: true }); // 올바른 카운트 쿼리
 
       if (healthError) {
         console.log('=== 연결 테스트 오류 분석 ===');

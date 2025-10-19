@@ -50,10 +50,7 @@ export const useSupabaseSoftwareHistory = () => {
   const [error, setError] = useState<string | null>(null);
 
   // 구매/유지보수이력 일괄 저장 (data_relation.md 패턴)
-  const savePurchaseHistories = async (
-    softwareId: number,
-    purchaseHistories: PurchaseHistory[]
-  ): Promise<boolean> => {
+  const savePurchaseHistories = async (softwareId: number, purchaseHistories: PurchaseHistory[]): Promise<boolean> => {
     console.log('💾 구매/유지보수이력 일괄 저장 시작');
     console.log('📌 소프트웨어 ID:', softwareId);
     console.log('📌 저장할 이력 수:', purchaseHistories.length);
@@ -227,7 +224,6 @@ export const useSupabaseSoftwareHistory = () => {
 
       console.log('🎉 구매/유지보수이력 일괄 저장 완료');
       return true;
-
     } catch (err: any) {
       console.warn('❌ savePurchaseHistories 예상치 못한 오류:', {
         name: err?.name,
@@ -311,7 +307,6 @@ export const useSupabaseSoftwareHistory = () => {
       saveToCache(cacheKey, histories);
 
       return histories;
-
     } catch (err: any) {
       console.warn('❌ 구매/유지보수이력 조회 실패 (최종 catch):', err);
       console.warn('❌ 에러 스택:', err?.stack);

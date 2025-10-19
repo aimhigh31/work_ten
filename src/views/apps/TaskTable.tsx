@@ -42,6 +42,7 @@ import { TaskTableData, TaskStatus } from 'types/task';
 
 // Hooks
 import { useSupabaseTaskManagement } from 'hooks/useSupabaseTaskManagement';
+import { useSupabaseUsers } from 'hooks/useSupabaseUsers';
 
 // Icons
 import { Add, Trash, Edit, DocumentDownload } from '@wandersonalwes/iconsax-react';
@@ -98,6 +99,14 @@ export default function TaskTable({
   // Supabase 훅 사용 (투자관리 방식)
   const { getTasks, loading, error, addTask, updateTask, deleteTask, checkCodeExists } = useSupabaseTaskManagement();
 
+  // 사용자 관리
+  const { users } = useSupabaseUsers();
+
+  // 사용자 이름으로 사용자 데이터 찾기
+  const findUserByName = (userName: string) => {
+    return users.find((user) => user.user_name === userName);
+  };
+
   // 업무 데이터 상태
   const [supabaseTasks, setSupabaseTasks] = useState<any[]>([]);
 
@@ -124,55 +133,26 @@ export default function TaskTable({
   const [editingTask, setEditingTask] = useState<TaskTableData | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
 
-  // 사용자 프로필 이미지 매핑
-  const [userProfileImages, setUserProfileImages] = useState<Record<string, string>>({});
-
-  // 사용자 프로필 이미지 로드
-  useEffect(() => {
-    const fetchUserProfiles = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('admin_users_userprofiles')
-          .select('user_name, profile_image_url')
-          .eq('is_active', true);
-
-        if (error) {
-          console.error('사용자 프로필 조회 실패:', error);
-          return;
-        }
-
-        const profileMap: Record<string, string> = {};
-        data.forEach(user => {
-          if (user.user_name && user.profile_image_url) {
-            profileMap[user.user_name] = user.profile_image_url;
-          }
-        });
-        setUserProfileImages(profileMap);
-      } catch (err) {
-        console.error('사용자 프로필 조회 중 오류:', err);
-      }
-    };
-
-    fetchUserProfiles();
-  }, []);
-
   // Supabase 데이터를 프론트엔드 형식으로 변환
   const taskData = useMemo(() => {
-    return supabaseTasks.map((task, index) => ({
-      id: parseInt(task.id.split('-')[0], 16), // UUID를 숫자로 변환
-      no: supabaseTasks.length - index, // 역순 NO
-      registrationDate: task.registration_date,
-      code: task.code,
-      department: task.department || '',
-      workContent: task.work_content || '',
-      description: task.description || '',
-      team: task.team || '',
-      assignee: task.assignee_name || '',
-      progress: task.progress || 0,
-      status: task.status as TaskStatus,
-      startDate: task.start_date || '',
-      completedDate: task.completed_date || ''
-    } as any));
+    return supabaseTasks.map(
+      (task, index) =>
+        ({
+          id: parseInt(task.id.split('-')[0], 16), // UUID를 숫자로 변환
+          no: supabaseTasks.length - index, // 역순 NO
+          registrationDate: task.registration_date,
+          code: task.code,
+          department: task.department || '',
+          workContent: task.work_content || '',
+          description: task.description || '',
+          team: task.team || '',
+          assignee: task.assignee_name || '',
+          progress: task.progress || 0,
+          status: task.status as TaskStatus,
+          startDate: task.start_date || '',
+          completedDate: task.completed_date || ''
+        }) as any
+    );
   }, [supabaseTasks]);
 
   const [data, setData] = useState<TaskTableData[]>(taskData);
@@ -304,7 +284,7 @@ export default function TaskTable({
 
       // 각 선택된 업무를 Supabase에서 삭제 (is_active = false)
       for (const task of deletedTasks) {
-        const supabaseTask = supabaseTasks.find(t => parseInt(t.id.split('-')[0], 16) === task.id);
+        const supabaseTask = supabaseTasks.find((t) => parseInt(t.id.split('-')[0], 16) === task.id);
         if (supabaseTask) {
           await deleteTask(supabaseTask.id);
 
@@ -346,11 +326,11 @@ export default function TaskTable({
     console.log('💾 Task 저장 요청:', updatedTask);
 
     // Supabase의 task 찾기
-    const supabaseTask = supabaseTasks.find(t => parseInt(t.id.split('-')[0], 16) === updatedTask.id);
+    const supabaseTask = supabaseTasks.find((t) => parseInt(t.id.split('-')[0], 16) === updatedTask.id);
 
     if (supabaseTask) {
       // 원본 데이터 찾기 (변경 전 값 확인용)
-      const originalTask = data.find(t => t.id === updatedTask.id);
+      const originalTask = data.find((t) => t.id === updatedTask.id);
 
       // 기존 Task 업데이트
       const success = await updateTask(supabaseTask.id, {
@@ -430,8 +410,8 @@ export default function TaskTable({
 
       // 기존 코드에서 번호 추출
       const existingCodes = supabaseTasks
-        .filter(item => item.code.startsWith(`MAIN-TASK-${yearSuffix}-`))
-        .map(item => {
+        .filter((item) => item.code.startsWith(`MAIN-TASK-${yearSuffix}-`))
+        .map((item) => {
           const parts = item.code.split('-');
           return parseInt(parts[3]) || 0;
         });
@@ -716,7 +696,7 @@ export default function TaskTable({
                   <TableCell>
                     <Stack direction="row" spacing={1} alignItems="center">
                       <Avatar
-                        src={userProfileImages[task.assignee] || assigneeAvatars[task.assignee as keyof typeof assigneeAvatars]}
+                        src={findUserByName(task.assignee)?.avatar_url || findUserByName(task.assignee)?.profile_image_url}
                         alt={task.assignee}
                         sx={{ width: 24, height: 24 }}
                       >

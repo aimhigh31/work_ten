@@ -85,7 +85,6 @@ export const useSupabaseSoftwareUser = () => {
       saveToCache(cacheKey, data || []);
 
       return data || [];
-
     } catch (err: any) {
       console.warn('❌ getUserHistories 상세 오류:', {
         error: err,
@@ -136,7 +135,6 @@ export const useSupabaseSoftwareUser = () => {
 
       console.log('✅ 사용자이력 생성 성공:', data);
       return data;
-
     } catch (err: any) {
       console.warn('❌ createUserHistory 오류:', err);
       setError(err.message || '사용자이력 생성 중 오류가 발생했습니다.');
@@ -172,7 +170,6 @@ export const useSupabaseSoftwareUser = () => {
 
       console.log('✅ 사용자이력 업데이트 성공:', data);
       return data;
-
     } catch (err: any) {
       console.warn('❌ updateUserHistory 오류:', err);
       setError(err.message || '사용자이력 업데이트 중 오류가 발생했습니다.');
@@ -206,7 +203,6 @@ export const useSupabaseSoftwareUser = () => {
 
       console.log('✅ 사용자이력 삭제 성공');
       return true;
-
     } catch (err: any) {
       console.warn('❌ deleteUserHistory 오류:', err);
       setError(err.message || '사용자이력 삭제 중 오류가 발생했습니다.');
@@ -248,10 +244,7 @@ export const useSupabaseSoftwareUser = () => {
 
       // 테이블 존재 여부 먼저 확인
       console.log('🔍 테이블 존재 여부 확인 중...');
-      const { data: testData, error: testError } = await supabase
-        .from('it_software_user')
-        .select('id')
-        .limit(1);
+      const { data: testData, error: testError } = await supabase.from('it_software_user').select('id').limit(1);
 
       if (testError) {
         console.warn('❌ 테이블 확인 중 오류 발생:', {
@@ -262,7 +255,12 @@ export const useSupabaseSoftwareUser = () => {
           hint: testError.hint
         });
 
-        if (testError.code === 'PGRST116' || testError.message?.includes('table') || testError.message?.includes('relation') || testError.message?.includes('does not exist')) {
+        if (
+          testError.code === 'PGRST116' ||
+          testError.message?.includes('table') ||
+          testError.message?.includes('relation') ||
+          testError.message?.includes('does not exist')
+        ) {
           console.warn('⚠️ it_software_user 테이블이 존재하지 않거나 접근할 수 없습니다.');
           console.log('💡 다음 스크립트를 실행하여 테이블을 생성하세요:');
           console.log('   node create_it_software_user_supabase.js');
@@ -411,7 +409,6 @@ export const useSupabaseSoftwareUser = () => {
 
       console.log('🎉 사용자이력 일괄 저장 완료');
       return true;
-
     } catch (err: any) {
       console.warn('❌ saveUserHistories 예상치 못한 오류:', {
         name: err?.name,

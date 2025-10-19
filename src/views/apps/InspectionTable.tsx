@@ -36,7 +36,7 @@ import MainCard from 'components/MainCard';
 import InspectionEditDialog from 'components/InspectionEditDialog';
 
 // hooks
-import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
+import { useSupabaseUsers } from 'hooks/useSupabaseUsers';
 
 // data and types
 import {
@@ -77,7 +77,16 @@ interface InspectionTableProps {
   selectedAssignee?: string;
   inspections?: InspectionTableData[];
   setInspections?: React.Dispatch<React.SetStateAction<InspectionTableData[]>>;
-  addChangeLog?: (action: string, target: string, description: string, team?: string, beforeValue?: string, afterValue?: string, changedField?: string, title?: string) => void;
+  addChangeLog?: (
+    action: string,
+    target: string,
+    description: string,
+    team?: string,
+    beforeValue?: string,
+    afterValue?: string,
+    changedField?: string,
+    title?: string
+  ) => void;
   onSave?: (inspection: InspectionTableData) => Promise<void>;
   onDelete?: (ids: number[]) => Promise<void>;
   generateInspectionCode?: () => Promise<string>;
@@ -105,18 +114,12 @@ export default function InspectionTable({
   const [goToPage, setGoToPage] = useState('');
 
   // 사용자관리 데이터 가져오기
-  const { users } = useSupabaseUserManagement();
+  const { users } = useSupabaseUsers();
 
-  // 사용자명 -> 프로필 이미지 URL 매핑
-  const userAvatarMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    users.forEach((user) => {
-      if (user.user_name) {
-        map[user.user_name] = user.profile_image_url || user.avatar_url || '';
-      }
-    });
-    return map;
-  }, [users]);
+  // 사용자 이름으로 사용자 데이터 찾기
+  const findUserByName = (userName: string) => {
+    return users.find((user) => user.user_name === userName);
+  };
 
   // Edit 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);
@@ -467,7 +470,6 @@ export default function InspectionTable({
             inspectionTitle
           );
         }
-
       } catch (error) {
         console.error('❌ Supabase 저장 실패:', error);
         alert('저장 중 오류가 발생했습니다. 다시 시도해주세요.');
@@ -876,7 +878,7 @@ export default function InspectionTable({
                   <TableCell>
                     <Stack direction="row" spacing={1} alignItems="center">
                       <Avatar
-                        src={userAvatarMap[inspection.assignee] || ''}
+                        src={findUserByName(inspection.assignee)?.avatar_url || findUserByName(inspection.assignee)?.profile_image_url}
                         alt={inspection.assignee}
                         sx={{ width: 24, height: 24 }}
                       >

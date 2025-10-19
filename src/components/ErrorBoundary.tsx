@@ -78,12 +78,7 @@ class ErrorBoundary extends React.Component<React.PropsWithChildren<{}>, ErrorBo
       }
 
       // 5. 빈 객체 {} 필터링
-      if (
-        typeof reason === 'object' &&
-        reason !== null &&
-        Object.keys(reason).length === 0 &&
-        reason.constructor === Object
-      ) {
+      if (typeof reason === 'object' && reason !== null && Object.keys(reason).length === 0 && reason.constructor === Object) {
         console.debug('🟡 빈 객체 오류 무시됨');
         event.preventDefault();
         return;

@@ -64,11 +64,7 @@ export async function POST(request: NextRequest) {
       description: departmentData.description
     };
 
-    const { data, error } = await supabase
-      .from('admin_users_department')
-      .insert([insertData])
-      .select()
-      .single();
+    const { data, error } = await supabase.from('admin_users_department').insert([insertData]).select().single();
 
     if (error) {
       console.error('부서 생성 실패:', error);
@@ -116,12 +112,7 @@ export async function PUT(request: NextRequest) {
       updated_by: 'system'
     };
 
-    const { data, error } = await supabase
-      .from('admin_users_department')
-      .update(updateData)
-      .eq('id', departmentData.id)
-      .select()
-      .single();
+    const { data, error } = await supabase.from('admin_users_department').update(updateData).eq('id', departmentData.id).select().single();
 
     if (error) {
       console.error('부서 수정 실패:', error);
@@ -194,12 +185,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const { data, error } = await supabase
-      .from('admin_users_department')
-      .delete()
-      .eq('id', id)
-      .select()
-      .single();
+    const { data, error } = await supabase.from('admin_users_department').delete().eq('id', id).select().single();
 
     if (error) {
       console.error('부서 삭제 실패:', error);
