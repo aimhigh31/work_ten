@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requirePermission } from 'lib/authMiddleware'; // ✅ 추가
 
 // Supabase 클라이언트 (Service Role Key 사용)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -13,19 +14,37 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 });
 
 // GET: 사용자 목록 조회
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // ✅ 권한 체크 추가 - user-settings 권한으로 통일
+    const { hasPermission, error } = await requirePermission(request, '/admin-panel/user-settings', 'read');
+
+    if (!hasPermission) {
+      return NextResponse.json({ success: false, error: error || '권한이 없습니다.' }, { status: 403 });
+    }
+
     console.log('🔍 사용자 목록 조회 시작...');
 
     // admin_users_userprofiles 테이블에서 사용자 조회
-    const { data, error } = await supabase.from('admin_users_userprofiles').select('*').order('created_at', { ascending: false });
+    const { data, error: queryError } = await supabase.from('admin_users_userprofiles').select('*').order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('❌ Supabase 조회 실패:', error);
-      throw error;
+    if (queryError) {
+      console.error('❌ Supabase 조회 실패:', queryError);
+      throw queryError;
     }
 
     console.log(`✅ 조회 성공: ${data?.length || 0}명`);
+
+    // 첫 번째 사용자 데이터 샘플 확인
+    if (data && data.length > 0) {
+      console.log('📋 첫 번째 사용자 원본 데이터 샘플:', {
+        user_account_id: data[0].user_account_id,
+        phone: data[0].phone,
+        country: data[0].country,
+        address: data[0].address,
+        email: data[0].email
+      });
+    }
 
     // assigned_roles를 JSON에서 배열로 파싱 (안전하게 처리)
     const processedData = data.map((row) => {
@@ -62,6 +81,17 @@ export async function GET() {
       };
     });
 
+    // 첫 번째 처리된 데이터 샘플 확인
+    if (processedData && processedData.length > 0) {
+      console.log('📤 프론트엔드로 전송할 첫 번째 사용자 데이터:', {
+        user_account_id: processedData[0].user_account_id,
+        phone: processedData[0].phone,
+        country: processedData[0].country,
+        address: processedData[0].address,
+        email: processedData[0].email
+      });
+    }
+
     return NextResponse.json({
       success: true,
       data: processedData
@@ -81,6 +111,13 @@ export async function GET() {
 // POST: 사용자 생성
 export async function POST(request: NextRequest) {
   try {
+    // ✅ 권한 체크 추가 (쓰기 권한 필요) - user-settings 권한으로 통일
+    const { hasPermission, error } = await requirePermission(request, '/admin-panel/user-settings', 'write');
+
+    if (!hasPermission) {
+      return NextResponse.json({ success: false, error: error || '권한이 없습니다.' }, { status: 403 });
+    }
+
     const userData = await request.json();
 
     const insertData: any = {
@@ -103,13 +140,13 @@ export async function POST(request: NextRequest) {
       insertData.profile_image_url = userData.profile_image_url || null;
     }
 
-    const { data, error } = await supabase.from('admin_users_userprofiles').insert([insertData]).select().single();
+    const { data, error: insertError } = await supabase.from('admin_users_userprofiles').insert([insertData]).select().single();
 
-    if (error) {
-      console.error('사용자 생성 실패:', error);
+    if (insertError) {
+      console.error('사용자 생성 실패:', insertError);
 
       let errorMessage = '사용자 생성에 실패했습니다.';
-      if (error.code === '23505') {
+      if (insertError.code === '23505') {
         errorMessage = '이미 존재하는 사용자 코드 또는 이메일입니다.';
       }
 
@@ -135,7 +172,24 @@ export async function POST(request: NextRequest) {
 // PUT: 사용자 수정
 export async function PUT(request: NextRequest) {
   try {
+    // ✅ 권한 체크 추가 (쓰기 권한 필요) - user-settings 또는 user-management 권한
+    const { hasPermission, error } = await requirePermission(request, '/admin-panel/user-settings', 'write');
+
+    if (!hasPermission) {
+      console.error('❌ 권한 체크 실패:', error);
+      return NextResponse.json({ success: false, error: error || '권한이 없습니다.' }, { status: 403 });
+    }
+
     const userData = await request.json();
+
+    console.log('📝 받은 사용자 데이터:', {
+      phone: userData.phone,
+      country: userData.country,
+      address: userData.address,
+      department: userData.department,
+      position: userData.position,
+      role: userData.role
+    });
 
     const updateData: any = {
       user_code: userData.user_code,
@@ -159,22 +213,34 @@ export async function PUT(request: NextRequest) {
       updateData.profile_image_url = userData.profile_image_url || null;
     }
 
-    const { data, error } = await supabase.from('admin_users_userprofiles').update(updateData).eq('id', userData.id).select().single();
+    console.log('🔄 Supabase 업데이트 데이터:', {
+      phone: updateData.phone,
+      country: updateData.country,
+      address: updateData.address,
+      department: updateData.department,
+      position: updateData.position,
+      role: updateData.role
+    });
 
-    if (error) {
-      console.error('사용자 수정 실패:', error);
+    const { data, error: updateError } = await supabase.from('admin_users_userprofiles').update(updateData).eq('id', userData.id).select().single();
+
+    if (updateError) {
+      console.error('❌ Supabase 업데이트 실패:', updateError);
 
       let errorMessage = '사용자 수정에 실패했습니다.';
-      if (error.code === '23505') {
+      if (updateError.code === '23505') {
         errorMessage = '이미 존재하는 사용자 코드 또는 이메일입니다.';
-      } else if (error.code === 'PGRST116') {
+      } else if (updateError.code === 'PGRST116') {
         errorMessage = '수정할 사용자를 찾을 수 없습니다.';
+      } else {
+        errorMessage = `사용자 수정 실패: ${updateError.message || updateError.code || '알 수 없는 오류'}`;
       }
 
       throw new Error(errorMessage);
     }
 
     if (!data) {
+      console.error('❌ 수정된 데이터가 없음 (사용자를 찾을 수 없음)');
       return NextResponse.json(
         {
           success: false,
@@ -183,6 +249,16 @@ export async function PUT(request: NextRequest) {
         { status: 404 }
       );
     }
+
+    console.log('✅ 사용자 수정 성공:', {
+      phone: data.phone,
+      country: data.country,
+      address: data.address,
+      department: data.department,
+      position: data.position,
+      role: data.role
+    });
+    console.log('✅ DB에 저장된 전체 데이터:', data);
 
     return NextResponse.json({
       success: true,
@@ -203,6 +279,13 @@ export async function PUT(request: NextRequest) {
 // DELETE: 사용자 삭제
 export async function DELETE(request: NextRequest) {
   try {
+    // ✅ 권한 체크 추가 (전체 권한 필요) - user-settings 권한으로 통일
+    const { hasPermission, error } = await requirePermission(request, '/admin-panel/user-settings', 'full');
+
+    if (!hasPermission) {
+      return NextResponse.json({ success: false, error: error || '권한이 없습니다.' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
@@ -216,12 +299,12 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const { data, error } = await supabase.from('admin_users_userprofiles').delete().eq('id', id).select().single();
+    const { data, error: deleteError } = await supabase.from('admin_users_userprofiles').delete().eq('id', id).select().single();
 
-    if (error) {
-      console.error('사용자 삭제 실패:', error);
+    if (deleteError) {
+      console.error('사용자 삭제 실패:', deleteError);
 
-      if (error.code === 'PGRST116') {
+      if (deleteError.code === 'PGRST116') {
         return NextResponse.json(
           {
             success: false,
@@ -231,7 +314,7 @@ export async function DELETE(request: NextRequest) {
         );
       }
 
-      throw error;
+      throw deleteError;
     }
 
     return NextResponse.json({

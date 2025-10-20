@@ -240,12 +240,15 @@ export default function InvestmentDataTable({
   // 상태 색상
   const getStatusColor = (status: InvestmentStatus) => {
     switch (status) {
+      case '대기':
       case '검토중':
         return { backgroundColor: '#F5F5F5', color: '#757575' };
+      case '진행':
       case '진행중':
         return { backgroundColor: '#E3F2FD', color: '#1976D2' };
       case '완료':
         return { backgroundColor: '#E8F5E9', color: '#388E3C' };
+      case '홀딩':
       case '보류':
         return { backgroundColor: '#FFEBEE', color: '#D32F2F' };
       default:

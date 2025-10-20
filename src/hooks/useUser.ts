@@ -1,7 +1,7 @@
 // next
 import { useSession } from 'next-auth/react';
 import { useMemo } from 'react';
-import { useSupabaseUserManagement } from './useSupabaseUserManagement';
+import { useCommonData } from 'contexts/CommonDataContext';
 
 interface UserProps {
   name: string;
@@ -15,7 +15,7 @@ interface UserProps {
 
 export default function useUser() {
   const { data: session } = useSession();
-  const { users } = useSupabaseUserManagement();
+  const { users } = useCommonData(); // ✅ CommonData에서 캐싱된 사용자 데이터 사용
 
   return useMemo(() => {
     if (!session) {
@@ -25,8 +25,18 @@ export default function useUser() {
     const user = session?.user;
     const provider = session?.provider;
 
+    console.log('🔍 [useUser] 세션 user.email:', user?.email);
+    console.log('🔍 [useUser] CommonData users 개수:', users?.length);
+
     // DB에서 현재 사용자의 프로필 정보 가져오기
     const dbUser = users.find((u) => u.email === user?.email);
+
+    console.log('🔍 [useUser] 찾은 dbUser:', dbUser ? {
+      user_name: dbUser.user_name,
+      department: dbUser.department,
+      position: dbUser.position,
+      role: dbUser.role
+    } : '없음');
     const profileImage = dbUser?.profile_image_url || dbUser?.avatar_url;
 
     let thumb = profileImage || user?.image || '/assets/images/users/avatar-1.png';

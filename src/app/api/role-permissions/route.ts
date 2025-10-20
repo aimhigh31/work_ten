@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requirePermission } from 'lib/authMiddleware'; // ✅ 추가
 
 // Supabase 클라이언트 (Service Role Key 사용)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -15,33 +16,60 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 // GET: 역할별 권한 조회
 export async function GET(request: NextRequest) {
   try {
+    // ✅ 권한 체크 추가 (사용자설정 페이지에서도 접근 가능하도록 user-settings 권한 사용)
+    const { hasPermission, error } = await requirePermission(request, '/admin-panel/user-settings', 'read');
+
+    if (!hasPermission) {
+      return NextResponse.json({ success: false, error: error || '권한이 없습니다.' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     const roleCode = searchParams.get('roleCode');
 
+    const startTime = performance.now();
     console.log('🔍 역할 권한 조회 시작...', roleCode ? `roleCode: ${roleCode}` : '전체');
 
-    // 역할 조회
+    // ⚡ 성능 개선 1: 역할 조회와 메뉴 조회를 병렬로 실행
     let rolesQuery = supabase.from('admin_users_rules').select('*').eq('is_active', true).order('display_order', { ascending: true });
 
     if (roleCode) {
       rolesQuery = rolesQuery.eq('role_code', roleCode);
     }
 
-    const { data: roles, error: rolesError } = await rolesQuery;
+    const [{ data: roles, error: rolesError }, { data: menus, error: menuError }] = await Promise.all([
+      rolesQuery,
+      supabase
+        .from('admin_systemsetting_menu')
+        .select('id, menu_category, menu_page, menu_description, menu_icon, menu_url, menu_level')
+        .eq('is_enabled', true)
+        .order('display_order', { ascending: true })
+    ]);
+
+    const t1 = performance.now();
+    console.log(`⚡ 역할+메뉴 병렬 조회 완료: ${(t1 - startTime).toFixed(2)}ms`);
 
     if (rolesError) {
       console.error('❌ 역할 조회 실패:', rolesError);
       throw rolesError;
     }
 
-    console.log(`✅ 역할 조회 성공: ${roles?.length || 0}개`);
+    if (menuError) {
+      console.error('❌ 메뉴 조회 실패:', menuError);
+      throw menuError;
+    }
 
-    // 각 역할에 대한 상세 권한 정보도 가져오기
-    for (let role of roles || []) {
-      const { data: permissions, error: permError } = await supabase
+    console.log(`✅ 역할 조회 성공: ${roles?.length || 0}개`);
+    console.log(`✅ 메뉴 조회 성공: ${menus?.length || 0}개`);
+
+    // ⚡ 성능 개선 2: 모든 역할의 권한을 한 번에 조회 (N+1 문제 해결)
+    const roleIds = (roles || []).map((r) => r.id);
+
+    if (roleIds.length > 0) {
+      const { data: allPermissions, error: permError } = await supabase
         .from('admin_users_rules_permissions')
         .select(
           `
+          role_id,
           menu_id,
           can_read,
           can_write,
@@ -53,39 +81,51 @@ export async function GET(request: NextRequest) {
           )
         `
         )
-        .eq('role_id', role.id)
+        .in('role_id', roleIds)
         .order('menu_id', { ascending: true });
 
+      const t2 = performance.now();
+
       if (permError) {
-        console.error(`❌ 역할 ID ${role.id} 권한 조회 실패:`, permError);
-        role.detailed_permissions = [];
+        console.error('❌ 권한 조회 실패:', permError);
+        // 에러 발생 시 모든 역할에 빈 배열 할당
+        for (let role of roles || []) {
+          role.detailed_permissions = [];
+        }
       } else {
-        // 데이터 구조 평탄화
-        role.detailed_permissions = (permissions || []).map((p: any) => ({
-          menu_id: p.menu_id,
-          can_read: p.can_read,
-          can_write: p.can_write,
-          can_full: p.can_full,
-          menu_category: p.admin_systemsetting_menu?.menu_category,
-          menu_page: p.admin_systemsetting_menu?.menu_page,
-          menu_description: p.admin_systemsetting_menu?.menu_description
-        }));
+        // 역할별로 권한 그룹핑
+        const permissionsByRole = (allPermissions || []).reduce((acc: any, p: any) => {
+          if (!acc[p.role_id]) {
+            acc[p.role_id] = [];
+          }
+          acc[p.role_id].push({
+            menu_id: p.menu_id,
+            can_read: p.can_read,
+            can_write: p.can_write,
+            can_full: p.can_full,
+            menu_category: p.admin_systemsetting_menu?.menu_category,
+            menu_page: p.admin_systemsetting_menu?.menu_page,
+            menu_description: p.admin_systemsetting_menu?.menu_description
+          });
+          return acc;
+        }, {});
+
+        // 각 역할에 권한 할당
+        for (let role of roles || []) {
+          role.detailed_permissions = permissionsByRole[role.id] || [];
+        }
+
+        console.log(`⚡ 권한 조회 성공: ${allPermissions?.length || 0}개 (${(t2 - t1).toFixed(2)}ms)`);
+      }
+    } else {
+      // 역할이 없으면 빈 배열
+      for (let role of roles || []) {
+        role.detailed_permissions = [];
       }
     }
 
-    // 메뉴 목록도 함께 가져오기
-    const { data: menus, error: menuError } = await supabase
-      .from('admin_systemsetting_menu')
-      .select('id, menu_category, menu_page, menu_description, menu_icon, menu_url, menu_level')
-      .eq('is_enabled', true)
-      .order('display_order', { ascending: true });
-
-    if (menuError) {
-      console.error('❌ 메뉴 조회 실패:', menuError);
-      throw menuError;
-    }
-
-    console.log(`✅ 메뉴 조회 성공: ${menus?.length || 0}개`);
+    const endTime = performance.now();
+    console.log(`✅ 전체 조회 완료: ${(endTime - startTime).toFixed(2)}ms`);
 
     return NextResponse.json({
       success: true,
@@ -107,6 +147,13 @@ export async function GET(request: NextRequest) {
 // POST: 역할 생성 및 권한 업데이트
 export async function POST(request: NextRequest) {
   try {
+    // ✅ 권한 체크 추가 (쓰기 권한 필요)
+    const { hasPermission, error } = await requirePermission(request, '/admin-panel/user-settings', 'write');
+
+    if (!hasPermission) {
+      return NextResponse.json({ success: false, error: error || '권한이 없습니다.' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { action, roleId, permissions, roleData } = body;
 
@@ -325,6 +372,13 @@ export async function POST(request: NextRequest) {
 // DELETE: 역할 삭제
 export async function DELETE(request: NextRequest) {
   try {
+    // ✅ 권한 체크 추가 (전체 권한 필요)
+    const { hasPermission, error } = await requirePermission(request, '/admin-panel/user-settings', 'full');
+
+    if (!hasPermission) {
+      return NextResponse.json({ success: false, error: error || '권한이 없습니다.' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     const roleIds = searchParams.get('roleIds');
 

@@ -25,10 +25,9 @@ import {
 } from '@mui/material';
 // Icons - 기존 프로젝트에서 사용하는 iconsax 사용
 import { CloseCircle, Edit, TickSquare, CloseSquare } from '@wandersonalwes/iconsax-react';
-import { useSupabaseMasterCode3 } from '../hooks/useSupabaseMasterCode3';
+import { useCommonData } from '../contexts/CommonDataContext';
 import { useSupabaseFeedback } from '../hooks/useSupabaseFeedback';
 import { PAGE_IDENTIFIERS } from '../types/feedback';
-import { useSupabaseUserManagement } from '../hooks/useSupabaseUserManagement';
 import useUser from '../hooks/useUser';
 import type { SalesRecord } from '../types/sales';
 import { useSupabaseFiles } from '../hooks/useSupabaseFiles';
@@ -758,35 +757,56 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
     role: user ? user.role : ''
   };
 
-  // 마스터코드 데이터 가져오기
-  const { getSubCodesByGroup } = useSupabaseMasterCode3();
+  // ✅ 공용 창고에서 마스터코드 및 사용자 데이터 가져오기
+  const { masterCodes, users } = useCommonData();
+
+  console.log('🔍 [SalesEditDialog] masterCodes:', masterCodes?.length);
+  console.log('🔍 [SalesEditDialog] users:', users?.length);
+
+  // 마스터코드에서 서브코드 가져오기 함수
+  const getSubCodesByGroup = useCallback((groupCode: string) => {
+    if (!masterCodes || masterCodes.length === 0) {
+      console.log(`⚠️ [SalesEditDialog] masterCodes가 아직 로드되지 않음`);
+      return [];
+    }
+    const subCodes = masterCodes
+      .filter(code => code.group_code === groupCode && code.is_active)
+      .filter(code => code.subcode && code.subcode_name); // 빈 값 필터링
+    console.log(`🔍 [SalesEditDialog] ${groupCode} 필터링 결과:`, subCodes.length, '개');
+    return subCodes;
+  }, [masterCodes]);
 
   // GROUP035 사업부 서브코드 목록
   const businessUnits = useMemo(() => {
     const group035Codes = getSubCodesByGroup('GROUP035');
-    return group035Codes.map((code) => code.subcode_name);
+    const names = group035Codes.map((code) => code.subcode_name);
+    console.log('✅ 사업부 목록:', names);
+    return names;
   }, [getSubCodesByGroup]);
 
   // GROUP039 고객명 서브코드 목록
   const customerNames = useMemo(() => {
     const group039Codes = getSubCodesByGroup('GROUP039');
-    return group039Codes.map((code) => code.subcode_name);
+    const names = group039Codes.map((code) => code.subcode_name);
+    console.log('✅ 고객명 목록:', names);
+    return names;
   }, [getSubCodesByGroup]);
 
   // GROUP036 판매유형 서브코드 목록
   const salesTypes = useMemo(() => {
     const group036Codes = getSubCodesByGroup('GROUP036');
-    return group036Codes.map((code) => code.subcode_name);
+    const types = group036Codes.map((code) => code.subcode_name);
+    console.log('✅ 판매유형 목록:', types);
+    return types;
   }, [getSubCodesByGroup]);
 
   // GROUP002 상태 서브코드 목록
   const statusOptions = useMemo(() => {
     const group002Codes = getSubCodesByGroup('GROUP002');
-    return group002Codes.map((code) => code.subcode_name);
+    const statuses = group002Codes.map((code) => code.subcode_name);
+    console.log('✅ 상태 목록:', statuses);
+    return statuses;
   }, [getSubCodesByGroup]);
-
-  // 사용자관리 훅 (담당자 목록용)
-  const { users } = useSupabaseUserManagement();
 
   // 피드백/기록 훅
   const {
@@ -1521,11 +1541,23 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
                     variant="outlined"
                     InputProps={{
                       readOnly: true,
-                      startAdornment: (
-                        <Avatar src={currentUser.profileImage} sx={{ width: 24, height: 24, mr: 0 }}>
-                          {currentUser.name[0]}
-                        </Avatar>
-                      )
+                      startAdornment: (() => {
+                        console.log('🔍 [매출 등록자 프로필] registrant:', formData.registrant);
+                        console.log('🔍 [매출 등록자 프로필] users 개수:', users?.length);
+                        const registrantUser = users.find((u) => u.user_name === formData.registrant);
+                        console.log('🔍 [매출 등록자 프로필] 찾은 registrantUser:', registrantUser ? {
+                          user_name: registrantUser.user_name,
+                          profile_image_url: registrantUser.profile_image_url,
+                          avatar_url: registrantUser.avatar_url
+                        } : '없음');
+                        const avatarSrc = registrantUser ? (registrantUser.profile_image_url || registrantUser.avatar_url) : currentUser.profileImage;
+                        const avatarInitial = formData.registrant ? formData.registrant[0] : currentUser.name[0];
+                        return (
+                          <Avatar src={avatarSrc} sx={{ width: 24, height: 24, mr: 0 }}>
+                            {avatarInitial}
+                          </Avatar>
+                        );
+                      })()
                     }}
                     sx={{
                       '& .MuiOutlinedInput-root': {

@@ -3,7 +3,7 @@ import { useSession } from 'next-auth/react';
 import { useSWRConfig } from 'swr';
 import { supabase } from '../lib/supabase';
 import { useSupabaseAccidentReport } from '../hooks/useSupabaseAccidentReport';
-import { useSupabaseUserManagement } from '../hooks/useSupabaseUserManagement';
+import { useCommonData } from '../contexts/CommonDataContext'; // ✅ 공용 창고
 import { useSupabaseFeedback } from '../hooks/useSupabaseFeedback';
 import { useSupabaseFiles } from '../hooks/useSupabaseFiles';
 import useUser from '../hooks/useUser';
@@ -831,19 +831,23 @@ const SecurityIncidentEditDialog = memo(
     // 로그인한 사용자 정보 가져오기 (InspectionEditDialog 패턴)
     const { data: session } = useSession();
 
-    // 사용자관리 훅 (담당자 목록용)
-    const { users } = useSupabaseUserManagement();
+    // ✅ 공용 창고에서 사용자 데이터 가져오기
+    const { users } = useCommonData();
 
     // 세션 email로 DB에서 사용자 찾기 (InspectionEditDialog 패턴)
     const currentUser = React.useMemo(() => {
-      console.log('🔍 currentUser 계산:', {
+      console.log('🔍 [SecurityIncidentEditDialog] currentUser 계산:', {
         sessionEmail: session?.user?.email,
         usersCount: users.length,
         users: users.map((u) => ({ email: u.email, name: u.user_name }))
       });
       if (!session?.user?.email || users.length === 0) return null;
       const foundUser = users.find((u) => u.email === session.user.email);
-      console.log('✅ 찾은 사용자:', foundUser);
+      console.log('✅ [SecurityIncidentEditDialog] 찾은 사용자:', foundUser ? {
+        user_name: foundUser.user_name,
+        email: foundUser.email,
+        profile_image_url: foundUser.profile_image_url
+      } : '없음');
       return foundUser;
     }, [session, users]);
 

@@ -33,12 +33,11 @@ import { useOptimizedInput } from '../hooks/useDebounce';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 
 // Hooks
-import { useSupabaseMasterCode3 } from '../hooks/useSupabaseMasterCode3';
+import { useCommonData } from '../contexts/CommonDataContext';
 import { useSupabaseDepartments } from '../hooks/useSupabaseDepartments';
 import { useSupabaseUsers } from '../hooks/useSupabaseUsers';
 import { useSupabaseInvestmentFinance } from '../hooks/useSupabaseInvestmentFinance';
 import { useSupabaseFeedback } from '../hooks/useSupabaseFeedback';
-import { useSupabaseUserManagement } from '../hooks/useSupabaseUserManagement';
 import { PAGE_IDENTIFIERS, FeedbackData } from '../types/feedback';
 import { useSupabaseFiles } from '../hooks/useSupabaseFiles';
 import { FileData } from '../types/files';
@@ -149,19 +148,12 @@ const InvestmentOverviewTab = memo(
     teams: string[];
     totalInvestmentAmount: number;
   }) => {
-    // 마스터코드에서 투자유형 및 상태 데이터 가져오기
-    const { getSubCodesByGroup, subCodes, loading: masterCodeLoading } = useSupabaseMasterCode3();
-    const [masterInvestmentTypes, setMasterInvestmentTypes] = useState<string[]>([]);
-    const [masterStatusOptions, setMasterStatusOptions] = useState<string[]>([]);
+    // ✅ 공용 창고에서 마스터코드, 부서, 사용자 데이터 가져오기
+    const { masterCodes, departments, users } = useCommonData();
 
-    // 부서 데이터 가져오기
-    const { departments, loading: departmentLoading } = useSupabaseDepartments();
-    const [departmentNames, setDepartmentNames] = useState<string[]>([]);
-
-    // 사용자 데이터 가져오기
-    const { users, getActiveUserNames, getUserAvatars } = useSupabaseUsers();
-    const [userNames, setUserNames] = useState<string[]>([]);
-    const [userAvatars, setUserAvatars] = useState<Record<string, string>>({});
+    console.log('🔍 [InvestmentEditDialog OverviewTab] masterCodes:', masterCodes?.length);
+    console.log('🔍 [InvestmentEditDialog OverviewTab] departments:', departments?.length);
+    console.log('🔍 [InvestmentEditDialog OverviewTab] users:', users?.length);
 
     // 세션 정보 가져오기
     const { data: session } = useSession();
@@ -172,72 +164,70 @@ const InvestmentOverviewTab = memo(
       return users.find((u) => u.email === session.user.email);
     }, [session, users]);
 
-    useEffect(() => {
-      // 마스터코드 로딩이 완료된 후에만 실행
-      if (masterCodeLoading) {
-        console.log('⏳ 마스터코드 로딩 중...');
-        return;
+    // 마스터코드에서 서브코드 가져오기 함수
+    const getSubCodesByGroup = React.useCallback((groupCode: string) => {
+      if (!masterCodes || masterCodes.length === 0) {
+        console.log(`⚠️ [InvestmentEditDialog] masterCodes가 아직 로드되지 않음`);
+        return [];
       }
+      const subCodes = masterCodes
+        .filter(code => code.group_code === groupCode && code.is_active)
+        .filter(code => code.subcode && code.subcode_name); // 빈 값 필터링
+      console.log(`🔍 [InvestmentEditDialog] ${groupCode} 필터링 결과:`, subCodes.length, '개', subCodes);
+      return subCodes;
+    }, [masterCodes]);
 
-      try {
-        console.log('🔄 마스터코드 데이터 로딩 시도', {
-          subCodesLength: subCodes.length,
-          masterCodeLoading
-        });
-
-        // GROUP025: 투자유형
-        const investmentSubcodes = getSubCodesByGroup('GROUP025');
-        console.log('📊 GROUP025 투자유형 서브코드:', investmentSubcodes);
-        if (investmentSubcodes && investmentSubcodes.length > 0) {
-          const types = investmentSubcodes.map((subcode) => subcode.subcode_name);
-          console.log('✅ 투자유형 목록 설정:', types);
-          setMasterInvestmentTypes(types);
-        } else {
-          console.log('❌ GROUP025 투자유형 서브코드 없음');
-        }
-
-        // GROUP002: 상태
-        const statusSubcodes = getSubCodesByGroup('GROUP002');
-        console.log('📊 GROUP002 상태 서브코드:', statusSubcodes);
-        if (statusSubcodes && statusSubcodes.length > 0) {
-          const statuses = statusSubcodes.map((subcode) => subcode.subcode_name);
-          console.log('✅ 상태 목록 설정:', statuses);
-          setMasterStatusOptions(statuses);
-        } else {
-          console.log('❌ GROUP002 상태 서브코드 없음');
-        }
-      } catch (error) {
-        console.error('❌ 마스터코드 로드 중 오류:', error);
+    // GROUP025: 투자유형
+    const masterInvestmentTypes = React.useMemo(() => {
+      const investmentSubcodes = getSubCodesByGroup('GROUP025');
+      if (investmentSubcodes && investmentSubcodes.length > 0) {
+        const types = investmentSubcodes.map((subcode) => subcode.subcode_name);
+        console.log('✅ 투자유형 목록:', types);
+        return types;
       }
-    }, [getSubCodesByGroup, subCodes, masterCodeLoading]);
+      return [];
+    }, [getSubCodesByGroup]);
 
-    // 부서 목록 업데이트
-    useEffect(() => {
-      if (departmentLoading) {
-        console.log('⏳ 부서 데이터 로딩 중...');
-        return;
+    // GROUP002: 상태
+    const masterStatusOptions = React.useMemo(() => {
+      const statusSubcodes = getSubCodesByGroup('GROUP002');
+      if (statusSubcodes && statusSubcodes.length > 0) {
+        const statuses = statusSubcodes.map((subcode) => subcode.subcode_name);
+        console.log('✅ 상태 목록:', statuses);
+        return statuses;
       }
+      return [];
+    }, [getSubCodesByGroup]);
 
-      console.log('🏢 부서 데이터 로딩 시도:', departments);
+    // 부서 목록
+    const departmentNames = React.useMemo(() => {
       if (departments && departments.length > 0) {
         const names = departments.map((dept) => dept.department_name);
-        console.log('✅ 부서명 목록 설정:', names);
-        setDepartmentNames(names);
-      } else {
-        console.log('❌ 부서 데이터 없음');
+        console.log('✅ 부서명 목록:', names);
+        return names;
       }
-    }, [departments, departmentLoading]);
+      return [];
+    }, [departments]);
 
-    // 사용자 목록 업데이트
-    useEffect(() => {
-      const activeUsers = getActiveUserNames();
-      if (activeUsers && activeUsers.length > 0) {
-        setUserNames(activeUsers);
+    // 활성 사용자 목록
+    const userNames = React.useMemo(() => {
+      const activeUsers = users.filter((user) => user.is_active && user.status === 'active');
+      if (activeUsers.length > 0) {
+        return activeUsers.map((user) => user.user_name);
       }
+      return [];
+    }, [users]);
 
-      const avatars = getUserAvatars();
-      setUserAvatars(avatars);
-    }, [users, getActiveUserNames, getUserAvatars]);
+    // 사용자 아바타 매핑
+    const userAvatars = React.useMemo(() => {
+      const avatarMap: Record<string, string> = {};
+      users.forEach((user) => {
+        if (user.profile_image_url || user.avatar_url) {
+          avatarMap[user.user_name] = user.profile_image_url || user.avatar_url || '';
+        }
+      });
+      return avatarMap;
+    }, [users]);
 
     // 마스터코드 데이터가 있으면 사용, 없으면 기본값 사용
     const finalInvestmentTypes = masterInvestmentTypes.length > 0 ? masterInvestmentTypes : investmentTypes;
@@ -1349,17 +1339,23 @@ const InvestmentAmountTab = memo(({ mode, investmentId }: { mode: 'add' | 'edit'
   // 투자금액 DB 연동
   const { getFinanceItems, saveFinanceItems, deleteFinanceItem } = useSupabaseInvestmentFinance();
 
-  // 마스터코드 데이터 가져오기
-  const { subCodes, loading: masterLoading } = useSupabaseMasterCode3();
+  // ✅ 공용 창고에서 마스터코드 데이터 가져오기
+  const { masterCodes } = useCommonData();
+
+  console.log('🔍 [InvestmentAmountTab] masterCodes:', masterCodes?.length);
 
   // GROUP026 투자세부유형 서브코드 목록
   const investmentDetailTypes = useMemo(() => {
-    const group026Codes = subCodes.filter((code) => code.group_code === 'GROUP026');
+    if (!masterCodes || masterCodes.length === 0) {
+      console.log('⚠️ [InvestmentAmountTab] masterCodes가 아직 로드되지 않음');
+      return [];
+    }
+    const group026Codes = masterCodes.filter((code) => code.group_code === 'GROUP026' && code.is_active && code.subcode && code.subcode_name);
     console.log('📊 GROUP026 투자세부유형 서브코드:', group026Codes);
     const types = group026Codes.map((code) => code.subcode_name);
     console.log('✅ 투자세부유형 목록:', types);
     return types;
-  }, [subCodes]);
+  }, [masterCodes]);
 
   // 투자금액 샘플 데이터
   const mockAmountData = [
@@ -2067,13 +2063,17 @@ function InvestmentEditDialog({
   // 세션 정보
   const { data: session } = useSession();
 
-  // 사용자 관리 훅
-  const { users } = useSupabaseUserManagement();
+  // ✅ 공용 창고에서 사용자 데이터 가져오기
+  const { users } = useCommonData();
+
+  console.log('🔍 [InvestmentEditDialog] users:', users?.length);
 
   // 현재 로그인한 사용자 정보
   const currentUser = useMemo(() => {
     if (!session?.user?.email || users.length === 0) return null;
-    return users.find((u) => u.email === session.user.email);
+    const found = users.find((u) => u.email === session.user.email);
+    console.log('🔍 [InvestmentEditDialog] currentUser:', found ? found.user_name : '없음');
+    return found;
   }, [session, users]);
 
   // 피드백 훅 사용 (DB 연동)

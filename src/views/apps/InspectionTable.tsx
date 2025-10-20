@@ -54,6 +54,9 @@ import { InspectionTableData, InspectionStatus } from 'types/inspection';
 // Icons
 import { Add, Trash, Edit, DocumentDownload } from '@wandersonalwes/iconsax-react';
 
+// Hooks
+import { useMenuPermission } from 'hooks/usePermissions';
+
 // 컬럼 너비 정의 (VOC관리와 유사하게)
 const columnWidths = {
   checkbox: 50,
@@ -105,6 +108,10 @@ export default function InspectionTable({
   generateInspectionCode
 }: InspectionTableProps) {
   const theme = useTheme();
+
+  // ✅ 권한 체크
+  const { canRead, canWrite, canFull, loading: permissionLoading } = useMenuPermission('/security/inspection');
+
   const [data, setData] = useState<InspectionTableData[]>(
     inspections ? inspections : inspectionData.map((inspection) => ({ ...inspection }))
   );
@@ -693,6 +700,17 @@ export default function InspectionTable({
     return { color: '#333333' };
   };
 
+  // ✅ 권한 없음 - 접근 차단
+  if (!canRead && !permissionLoading) {
+    return (
+      <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Typography variant="h6" color="error">
+          이 페이지에 접근할 권한이 없습니다.
+        </Typography>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* 상단 정보 및 액션 버튼 */}
@@ -701,42 +719,48 @@ export default function InspectionTable({
           총 {filteredData.length}건
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant="outlined"
-            startIcon={<DocumentDownload size={16} />}
-            size="small"
-            onClick={handleExcelDownload}
-            sx={{
-              px: 2,
-              borderColor: '#4CAF50',
-              color: '#4CAF50',
-              '&:hover': {
+          {canRead && (
+            <Button
+              variant="outlined"
+              startIcon={<DocumentDownload size={16} />}
+              size="small"
+              onClick={handleExcelDownload}
+              sx={{
+                px: 2,
                 borderColor: '#4CAF50',
-                backgroundColor: '#4CAF50',
-                color: '#fff'
-              }
-            }}
-          >
-            Excel Down
-          </Button>
-          <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={addNewInspection} sx={{ px: 2 }}>
-            추가
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<Trash size={16} />}
-            size="small"
-            color="error"
-            disabled={selected.length === 0}
-            onClick={handleDeleteSelected}
-            sx={{
-              px: 2,
-              borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
-              color: selected.length > 0 ? 'error.main' : 'grey.500'
-            }}
-          >
-            삭제 {selected.length > 0 && `(${selected.length})`}
-          </Button>
+                color: '#4CAF50',
+                '&:hover': {
+                  borderColor: '#4CAF50',
+                  backgroundColor: '#4CAF50',
+                  color: '#fff'
+                }
+              }}
+            >
+              Excel Down
+            </Button>
+          )}
+          {canWrite && (
+            <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={addNewInspection} sx={{ px: 2 }}>
+              추가
+            </Button>
+          )}
+          {canFull && (
+            <Button
+              variant="outlined"
+              startIcon={<Trash size={16} />}
+              size="small"
+              color="error"
+              disabled={selected.length === 0}
+              onClick={handleDeleteSelected}
+              sx={{
+                px: 2,
+                borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
+                color: selected.length > 0 ? 'error.main' : 'grey.500'
+              }}
+            >
+              삭제 {selected.length > 0 && `(${selected.length})`}
+            </Button>
+          )}
         </Box>
       </Box>
 
@@ -907,11 +931,13 @@ export default function InspectionTable({
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      <Tooltip title="수정">
-                        <IconButton size="small" onClick={() => handleEditInspection(inspection)} sx={{ color: 'primary.main' }}>
-                          <Edit size={16} />
-                        </IconButton>
-                      </Tooltip>
+                      {canWrite && (
+                        <Tooltip title="수정">
+                          <IconButton size="small" onClick={() => handleEditInspection(inspection)} sx={{ color: 'primary.main' }}>
+                            <Edit size={16} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                     </Box>
                   </TableCell>
                 </TableRow>

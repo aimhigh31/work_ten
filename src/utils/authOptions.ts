@@ -9,6 +9,8 @@ declare module 'next-auth' {
     position?: string;
     department?: string;
     profileImage?: string;
+    roleId?: number;        // ✅ 추가: 역할 ID
+    roleName?: string;      // ✅ 추가: 역할명
   }
   interface Session {
     user: {
@@ -17,6 +19,8 @@ declare module 'next-auth' {
       image?: string | null;
       position?: string;
       department?: string;
+      roleId?: number;      // ✅ 추가: 역할 ID
+      roleName?: string;    // ✅ 추가: 역할명
     };
   }
 }
@@ -56,7 +60,12 @@ export const authOptions: NextAuthOptions = {
           console.log('🔍 Querying user profile...');
           const { data: users, error: queryError } = await supabaseAdmin
             .from('admin_users_userprofiles')
-            .select('email, user_name, status, is_active, auth_user_id, position, department, avatar_url, profile_image_url')
+            .select(`
+              email, user_name, status, is_active, auth_user_id,
+              position, department, avatar_url, profile_image_url,
+              role_id,
+              admin_users_rules!inner(id, role_name)
+            `)
             .or(`user_code.eq.${credentials.email},user_account_id.eq.${credentials.email}`)
             .limit(1);
 
@@ -105,6 +114,13 @@ export const authOptions: NextAuthOptions = {
           // 프로필 이미지 우선순위: profile_image_url > avatar_url > 기본 이미지
           const profileImage = userProfile.profile_image_url || userProfile.avatar_url || '/assets/images/users/avatar-1.png';
 
+          // 역할 정보 추출 (admin_users_rules 조인 데이터)
+          const roleData = userProfile.admin_users_rules;
+          const roleId = userProfile.role_id || null;
+          const roleName = roleData?.role_name || '역할 미지정';
+
+          console.log('✅ 사용자 역할 정보:', { roleId, roleName });
+
           return {
             id: authData.user.id,
             name: userProfile.user_name,
@@ -112,6 +128,8 @@ export const authOptions: NextAuthOptions = {
             position: userProfile.position,
             department: userProfile.department,
             profileImage: profileImage,
+            roleId: roleId,              // ✅ 추가
+            roleName: roleName,          // ✅ 추가
             accessToken: authData.session?.access_token || 'authenticated'
           };
         } catch (e: any) {
@@ -168,6 +186,8 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         token.email = user.email;
         token.name = user.name;
+        token.roleId = user.roleId;       // ✅ 추가
+        token.roleName = user.roleName;   // ✅ 추가
       }
       return token;
     },
@@ -176,6 +196,8 @@ export const authOptions: NextAuthOptions = {
         session.id = token.id;
         session.user.email = token.email as string;
         session.user.name = token.name as string;
+        session.user.roleId = token.roleId as number;       // ✅ 추가
+        session.user.roleName = token.roleName as string;   // ✅ 추가
       }
       return session;
     },

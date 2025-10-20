@@ -47,7 +47,7 @@ const CACHE_KEY = createCacheKey('department_management', 'data');
 
 export function useSupabaseDepartmentManagement() {
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Investment 패턴: 초기값 false (수동 로딩)
   const [error, setError] = useState<string | null>(null);
 
   // 에러 클리어

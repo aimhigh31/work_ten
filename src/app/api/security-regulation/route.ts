@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requirePermission } from 'lib/authMiddleware'; // ✅ 추가
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -14,6 +15,13 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 // GET: 폴더/파일 구조 조회
 export async function GET(request: NextRequest) {
   try {
+    // ✅ 권한 체크 추가
+    const { hasPermission, error } = await requirePermission(request, '/security/regulation', 'read');
+
+    if (!hasPermission) {
+      return NextResponse.json({ success: false, error: error || '권한이 없습니다.' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     const parentId = searchParams.get('parentId');
     const type = searchParams.get('type');
@@ -53,14 +61,14 @@ export async function GET(request: NextRequest) {
       .order('sort_order', { ascending: true })
       .order('name', { ascending: true });
 
-    const { data, error } = await query;
+    const { data, error: queryError } = await query;
 
-    if (error) {
-      console.error('❌ Supabase 조회 오류:', error);
+    if (queryError) {
+      console.error('❌ Supabase 조회 오류:', queryError);
       return NextResponse.json(
         {
           success: false,
-          error: error.message
+          error: queryError.message
         },
         { status: 500 }
       );
@@ -146,14 +154,14 @@ export async function POST(request: NextRequest) {
     };
     console.log('💾 삽입할 데이터:', insertData);
 
-    const { data, error } = await supabase.from('security_regulation_data').insert([insertData]).select().single();
+    const { data, error: insertError } = await supabase.from('security_regulation_data').insert([insertData]).select().single();
 
-    if (error) {
-      console.error('❌ 생성 오류:', error);
+    if (insertError) {
+      console.error('❌ 생성 오류:', insertError);
       return NextResponse.json(
         {
           success: false,
-          error: error.message
+          error: insertError.message
         },
         { status: 500 }
       );
@@ -193,7 +201,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // 데이터 업데이트
-    const { data, error } = await supabase
+    const { data, error: updateError } = await supabase
       .from('security_regulation_data')
       .update({
         ...updateData,
@@ -204,12 +212,12 @@ export async function PUT(request: NextRequest) {
       .select()
       .single();
 
-    if (error) {
-      console.error('수정 오류:', error);
+    if (updateError) {
+      console.error('수정 오류:', updateError);
       return NextResponse.json(
         {
           success: false,
-          error: error.message
+          error: updateError.message
         },
         { status: 500 }
       );
@@ -248,7 +256,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // 하위 항목도 함께 비활성화 (재귀적)
-    const { error } = await supabase
+    const { error: deleteError } = await supabase
       .from('security_regulation_data')
       .update({
         is_active: false,
@@ -257,12 +265,12 @@ export async function DELETE(request: NextRequest) {
       })
       .or(`id.eq.${id},parent_id.eq.${id}`);
 
-    if (error) {
-      console.error('삭제 오류:', error);
+    if (deleteError) {
+      console.error('삭제 오류:', deleteError);
       return NextResponse.json(
         {
           success: false,
-          error: error.message
+          error: deleteError.message
         },
         { status: 500 }
       );

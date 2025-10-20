@@ -408,9 +408,13 @@ const OverviewTab = memo(
               label="진행율 (%)"
               type="number"
               value={taskState.progress || 0}
-              onChange={(e) => onFieldChange('progress', String(Number(e.target.value) || 0))}
+              onChange={(e) => {
+                const value = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                console.log('📊 [Task 진행율] 입력값:', e.target.value, '→ 제한된 값:', value);
+                onFieldChange('progress', String(value));
+              }}
               InputProps={{
-                inputProps: { min: 0, max: 100 }
+                inputProps: { min: 0, max: 100, step: 1 }
               }}
               variant="outlined"
               InputLabelProps={{ shrink: true }}

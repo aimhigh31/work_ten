@@ -30,8 +30,7 @@ import {
 } from '@mui/material';
 import { VocData, VOC_STATUS, VOC_TYPES, VOC_CHANNELS, VOC_PRIORITIES } from '../types/voc';
 import { useOptimizedInput } from '../hooks/useDebounce';
-import { useSupabaseMasterCode3 } from '../hooks/useSupabaseMasterCode3';
-import { useSupabaseUserManagement } from '../hooks/useSupabaseUserManagement';
+import { useCommonData } from '../contexts/CommonDataContext';
 import { useSupabaseFeedback } from '../hooks/useSupabaseFeedback';
 import { PAGE_IDENTIFIERS, FeedbackData } from '../types/feedback';
 import { useSupabaseFiles } from '../hooks/useSupabaseFiles';
@@ -148,11 +147,24 @@ const OverviewTab = memo(
     const requestContentRef = useRef<HTMLInputElement>(null);
     const actionContentRef = useRef<HTMLTextAreaElement>(null);
 
-    // 마스터코드 훅 사용
-    const { getSubCodesByGroup } = useSupabaseMasterCode3();
+    // ✅ 공용 창고에서 마스터코드 및 사용자 데이터 가져오기
+    const { masterCodes, users } = useCommonData();
 
-    // 사용자관리 훅 사용
-    const { users } = useSupabaseUserManagement();
+    console.log('🔍 [VOCEditDialog OverviewTab] masterCodes:', masterCodes?.length);
+    console.log('🔍 [VOCEditDialog OverviewTab] users:', users?.length);
+
+    // 마스터코드에서 서브코드 가져오기 함수
+    const getSubCodesByGroup = React.useCallback((groupCode: string) => {
+      if (!masterCodes || masterCodes.length === 0) {
+        console.log(`⚠️ [VOCEditDialog] masterCodes가 아직 로드되지 않음`);
+        return [];
+      }
+      const subCodes = masterCodes
+        .filter(code => code.group_code === groupCode && code.is_active)
+        .filter(code => code.subcode && code.subcode_name); // 빈 값 필터링
+      console.log(`🔍 [VOCEditDialog] ${groupCode} 필터링 결과:`, subCodes.length, '개', subCodes);
+      return subCodes;
+    }, [masterCodes]);
 
     // GROUP023의 서브코드 목록 가져오기 (VOC 유형)
     const vocTypeOptions = getSubCodesByGroup('GROUP023').map((subCode) => ({
@@ -178,12 +190,18 @@ const OverviewTab = memo(
     // 사용자 목록 옵션 생성 (등록자)
     const userOptions = users
       .filter((user) => user.is_active && user.status === 'active')
-      .map((user) => ({
-        value: user.user_name,
-        label: user.user_name,
-        department: user.department || '',
-        avatar: user.profile_image_url || user.avatar_url || ''
-      }));
+      .map((user) => {
+        const avatarUrl = user.profile_image_url || user.avatar_url || '';
+        console.log('🔍 [VOC 사용자 옵션] user:', user.user_name, 'avatar:', avatarUrl);
+        return {
+          value: user.user_name,
+          label: user.user_name,
+          department: user.department || '',
+          avatar: avatarUrl
+        };
+      });
+
+    console.log('🔍 [VOC 사용자 옵션] 총 userOptions:', userOptions.length, '개');
 
     // 텍스트 필드용 최적화된 입력 관리
     const contentInput = useOptimizedInput(vocState.content, 150);
@@ -524,7 +542,14 @@ const OverviewTab = memo(
                   }
                 }}
                 renderValue={(value) => {
+                  console.log('🔍 [VOC 담당자 프로필] assignee:', value);
+                  console.log('🔍 [VOC 담당자 프로필] userOptions 개수:', userOptions?.length);
                   const user = userOptions.find((u) => u.value === value);
+                  console.log('🔍 [VOC 담당자 프로필] 찾은 user:', user ? {
+                    value: user.value,
+                    label: user.label,
+                    avatar: user.avatar
+                  } : '없음');
                   if (!user) return value;
                   return (
                     <Stack direction="row" spacing={1.5} alignItems="center">
@@ -1323,13 +1348,17 @@ const VOCEditDialog = memo(
     // 세션 정보
     const { data: session } = useSession();
 
-    // 사용자 관리 훅
-    const { users } = useSupabaseUserManagement();
+    // ✅ 공용 창고에서 사용자 데이터 가져오기
+    const { users } = useCommonData();
+
+    console.log('🔍 [VOCEditDialog] users:', users?.length);
 
     // 현재 로그인한 사용자 정보
     const currentUser = useMemo(() => {
       if (!session?.user?.email || users.length === 0) return null;
-      return users.find((u) => u.email === session.user.email);
+      const found = users.find((u) => u.email === session.user.email);
+      console.log('🔍 [VOCEditDialog] currentUser:', found ? found.user_name : '없음');
+      return found;
     }, [session, users]);
 
     // 피드백 훅 사용 (DB 연동)

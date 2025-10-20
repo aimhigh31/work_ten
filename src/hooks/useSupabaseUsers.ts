@@ -18,6 +18,21 @@ export interface SimpleUser {
   is_active: boolean;
   avatar_url?: string;
   profile_image_url?: string;
+  user_account_id?: string;
+  phone?: string;
+  country?: string;
+  address?: string;
+  created_at?: string;
+  updated_at?: string;
+  last_login?: string;
+  hire_date?: string;
+  is_system?: boolean;
+  created_by?: string;
+  updated_by?: string;
+  metadata?: any;
+  assignedRole?: string[];
+  assigned_roles?: any;
+  rule?: string;
 }
 
 export function useSupabaseUsers() {
@@ -35,31 +50,32 @@ export function useSupabaseUsers() {
 
       const { data, error: fetchError } = await supabase
         .from('admin_users_userprofiles')
-        .select(
-          `
-          id,
-          user_code,
-          user_name,
-          email,
-          department,
-          position,
-          role,
-          status,
-          is_active,
-          avatar_url,
-          profile_image_url
-        `
-        )
-        .eq('is_active', true)
-        .eq('status', 'active')
-        .order('user_name', { ascending: true });
+        .select('*')
+        .order('created_at', { ascending: false });
 
       if (fetchError) {
-        console.error('🔴 사용자 조회 오류:', fetchError);
+        console.error('🔴 사용자 조회 오류:', {
+          message: fetchError.message,
+          details: fetchError.details,
+          hint: fetchError.hint,
+          code: fetchError.code,
+          full: fetchError
+        });
         throw fetchError;
       }
 
       console.log('👥 사용자 목록 조회 성공:', data);
+      if (data && data.length > 0) {
+        console.log('👥 첫 번째 사용자 샘플 데이터:', {
+          user_name: data[0].user_name,
+          user_account_id: data[0].user_account_id,
+          department: data[0].department,
+          position: data[0].position,
+          phone: data[0].phone,
+          country: data[0].country,
+          address: data[0].address
+        });
+      }
       setUsers(data || []);
       saveToCache(CACHE_KEY, data || []); // 캐시에 저장
     } catch (err) {

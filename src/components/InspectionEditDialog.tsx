@@ -33,10 +33,9 @@ import {
   Alert
 } from '@mui/material';
 import { Add, Trash, AttachSquare } from '@wandersonalwes/iconsax-react';
-import { useSupabaseMasterCode3 } from '../hooks/useSupabaseMasterCode3';
 import { useSupabaseSecurityInspectionOpl, OPLItem } from '../hooks/useSupabaseSecurityInspectionOpl';
 import { useDepartmentNames } from '../hooks/useDepartmentNames';
-import { useSupabaseUserManagement } from '../hooks/useSupabaseUserManagement';
+import { useCommonData } from '../contexts/CommonDataContext'; // ✅ 공용 창고
 import { useSupabaseChecklistManagement } from '../hooks/useSupabaseChecklistManagement';
 import { useSupabaseChecklistEditor } from '../hooks/useSupabaseChecklistEditor';
 import { useSupabaseSecurityInspectionChecksheet } from '../hooks/useSupabaseSecurityInspectionChecksheet';
@@ -785,15 +784,27 @@ export default function InspectionEditDialog({
     deleteFeedback
   } = useSupabaseFeedback(PAGE_IDENTIFIERS.SECURITY_INSPECTION, inspection?.id?.toString());
 
-  // 마스터코드 훅 - GROUP002, GROUP033, GROUP034 서브코드 가져오기
-  const { getSubCodesByGroup, subCodes } = useSupabaseMasterCode3();
+  // ✅ 공용 창고에서 마스터코드 데이터 가져오기
+  const { masterCodes, users, departments } = useCommonData();
+
+  console.log('🔍 [InspectionEditDialog] masterCodes 전체:', masterCodes?.length, '개');
+  console.log('🔍 [InspectionEditDialog] users:', users?.length, '명');
+
+  // 마스터코드에서 서브코드 가져오기 함수
+  const getSubCodesByGroup = useCallback((groupCode: string) => {
+    if (!masterCodes || masterCodes.length === 0) {
+      console.log(`⚠️ [InspectionEditDialog] masterCodes가 아직 로드되지 않음`);
+      return [];
+    }
+    const subCodes = masterCodes.filter(code => code.group_code === groupCode && code.is_active);
+    console.log(`🔍 [InspectionEditDialog] ${groupCode} 필터링 결과:`, subCodes.length, '개');
+    return subCodes;
+  }, [masterCodes]);
+
   const [statusOptions, setStatusOptions] = useState<Array<{ code: string; name: string }>>([]);
 
-  // 부서명 훅
+  // 부서명 훅 (fallback용)
   const { departmentOptions } = useDepartmentNames();
-
-  // 사용자관리 훅
-  const { users } = useSupabaseUserManagement();
 
   // 로그인한 사용자 정보 가져오기
   const { data: session } = useSession();
@@ -801,7 +812,9 @@ export default function InspectionEditDialog({
   // 세션 email로 DB에서 사용자 찾기
   const currentUser = React.useMemo(() => {
     if (!session?.user?.email || users.length === 0) return null;
-    return users.find((u) => u.email === session.user.email);
+    const found = users.find((u) => u.email === session.user.email);
+    console.log('🔍 [InspectionEditDialog] currentUser:', found ? found.user_name : '없음');
+    return found;
   }, [session, users]);
 
   const currentUserCode = currentUser?.user_code || '';
@@ -870,17 +883,29 @@ export default function InspectionEditDialog({
 
   // GROUP033의 서브코드들 가져오기 (점검유형)
   const inspectionTypeOptionsFromMasterCode = React.useMemo(() => {
+    console.log('🔍 [InspectionEditDialog] GROUP033 점검유형 로딩 시작...');
     const group033SubCodes = getSubCodesByGroup('GROUP033');
-    console.log('🔍 InspectionEditDialog - GROUP033 서브코드:', group033SubCodes);
-    return group033SubCodes.filter((subCode) => subCode.subcode_status === 'active');
-  }, [getSubCodesByGroup, subCodes]);
+    console.log('🔍 [InspectionEditDialog] GROUP033 서브코드:', group033SubCodes?.length, '개');
+    console.log('🔍 [InspectionEditDialog] GROUP033 전체 데이터:', group033SubCodes);
+    const activeOptions = group033SubCodes.filter(
+      (subCode) => subCode.subcode_status === 'active' && subCode.subcode && subCode.subcode_name
+    );
+    console.log('✅ [InspectionEditDialog] GROUP033 활성 옵션 (필터링 후):', activeOptions?.length, '개', activeOptions);
+    return activeOptions;
+  }, [getSubCodesByGroup]);
 
   // GROUP034의 서브코드들 가져오기 (점검대상)
   const inspectionTargetOptionsFromMasterCode = React.useMemo(() => {
+    console.log('🔍 [InspectionEditDialog] GROUP034 점검대상 로딩 시작...');
     const group034SubCodes = getSubCodesByGroup('GROUP034');
-    console.log('🔍 InspectionEditDialog - GROUP034 서브코드:', group034SubCodes);
-    return group034SubCodes.filter((subCode) => subCode.subcode_status === 'active');
-  }, [getSubCodesByGroup, subCodes]);
+    console.log('🔍 [InspectionEditDialog] GROUP034 서브코드:', group034SubCodes?.length, '개');
+    console.log('🔍 [InspectionEditDialog] GROUP034 전체 데이터:', group034SubCodes);
+    const activeOptions = group034SubCodes.filter(
+      (subCode) => subCode.subcode_status === 'active' && subCode.subcode && subCode.subcode_name
+    );
+    console.log('✅ [InspectionEditDialog] GROUP034 활성 옵션 (필터링 후):', activeOptions?.length, '개', activeOptions);
+    return activeOptions;
+  }, [getSubCodesByGroup]);
 
   // 활성화된 사용자 목록 (담당자용)
   const activeUsers = React.useMemo(() => {
@@ -956,20 +981,28 @@ export default function InspectionEditDialog({
   // GROUP002 상태 옵션 로드
   useEffect(() => {
     try {
+      console.log('🔍 [InspectionEditDialog] GROUP002 상태 로딩 시작...');
       const subcodes = getSubCodesByGroup('GROUP002');
-      const options = subcodes.map((item) => ({
-        code: item.subcode,
-        name: item.subcode_name
-      }));
+      console.log('🔍 [InspectionEditDialog] GROUP002 서브코드:', subcodes?.length, '개');
+      console.log('🔍 [InspectionEditDialog] GROUP002 전체 데이터:', subcodes);
+      const options = subcodes
+        .map((item) => ({
+          code: item.subcode,
+          name: item.subcode_name
+        }))
+        .filter((option) => option.code && option.name); // 빈 값 필터링
+      console.log('✅ [InspectionEditDialog] GROUP002 상태 옵션 (필터링 후):', options?.length, '개', options);
       setStatusOptions(options);
     } catch (error) {
-      console.error('상태 옵션 로드 실패:', error);
+      console.error('❌ [InspectionEditDialog] 상태 옵션 로드 실패:', error);
       // 기본값 설정
-      setStatusOptions([
+      const fallbackOptions = [
         { code: 'WAIT', name: '대기' },
         { code: 'PROGRESS', name: '진행' },
         { code: 'COMPLETE', name: '완료' }
-      ]);
+      ];
+      console.log('⚠️ [InspectionEditDialog] 기본 상태 옵션 사용:', fallbackOptions);
+      setStatusOptions(fallbackOptions);
     }
   }, [getSubCodesByGroup]);
 

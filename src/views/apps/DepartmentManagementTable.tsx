@@ -40,6 +40,7 @@ import DepartmentEditDialog from 'components/DepartmentEditDialog';
 // Hooks
 import { useSupabaseDepartmentManagement, Department } from 'hooks/useSupabaseDepartmentManagement';
 import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
+import { useMenuPermission } from 'hooks/usePermissions';
 
 // 부서 데이터 타입 정의 (기존 호환성 유지)
 interface DepartmentData {
@@ -164,12 +165,18 @@ export default function DepartmentManagementTable({
 }: DepartmentManagementTableProps) {
   const theme = useTheme();
 
+  // ✅ 권한 체크
+  const { canRead, canWrite, canFull, loading: permissionLoading } = useMenuPermission('/admin-panel/user-settings');
+
   // 🏪 공용 창고에서 데이터 가져오기 (중복 로딩 방지!)
-  const { departments: supabaseDepartments } = useCommonData();
+  const { departments: supabaseDepartments, isLoading: commonDataLoading } = useCommonData();
 
   // Supabase 훅 사용 (데이터 수정 함수만)
   const { loading, error, clearError, createDepartment, updateDepartment, deleteDepartment, toggleDepartmentStatus } =
     useSupabaseDepartmentManagement();
+
+  // 전체 로딩 상태 (CommonData 로딩 중 또는 수정 작업 로딩 중)
+  const isLoading = commonDataLoading || loading;
 
   // 변환된 부서 데이터
   const transformedDepartments = useMemo(() => {
@@ -238,14 +245,14 @@ export default function DepartmentManagementTable({
 
   // 에러 처리 (로딩 완료 후에만 에러 표시)
   useEffect(() => {
-    if (error && !loading) {
+    if (error && !isLoading) {
       console.error('부서 데이터 에러:', error);
       // 에러를 일정 시간 후 자동 클리어
       setTimeout(() => {
         clearError();
       }, 5000);
     }
-  }, [error, loading, clearError]);
+  }, [error, isLoading, clearError]);
 
   // 필터링된 데이터 (역순 정렬 추가)
   const filteredData = useMemo(() => {
@@ -418,6 +425,17 @@ export default function DepartmentManagementTable({
     }
   };
 
+  // ✅ 권한 없음 - 접근 차단
+  if (!canRead && !permissionLoading) {
+    return (
+      <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Typography variant="h6" color="error">
+          이 페이지에 접근할 권한이 없습니다.
+        </Typography>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* 상단 정보 및 액션 버튼 */}
@@ -426,42 +444,48 @@ export default function DepartmentManagementTable({
           총 {filteredData.length}건
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant="outlined"
-            startIcon={<DocumentDownload size={16} />}
-            size="small"
-            onClick={handleExcelDownload}
-            sx={{
-              px: 2,
-              borderColor: '#4CAF50',
-              color: '#4CAF50',
-              '&:hover': {
+          {canRead && (
+            <Button
+              variant="outlined"
+              startIcon={<DocumentDownload size={16} />}
+              size="small"
+              onClick={handleExcelDownload}
+              sx={{
+                px: 2,
                 borderColor: '#4CAF50',
-                backgroundColor: '#4CAF50',
-                color: '#fff'
-              }
-            }}
-          >
-            Excel Down
-          </Button>
-          <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={addNewDepartment} sx={{ px: 2 }}>
-            추가
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<Trash size={16} />}
-            size="small"
-            color="error"
-            disabled={selected.length === 0}
-            onClick={handleDeleteSelected}
-            sx={{
-              px: 2,
-              borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
-              color: selected.length > 0 ? 'error.main' : 'grey.500'
-            }}
-          >
-            삭제 {selected.length > 0 && `(${selected.length})`}
-          </Button>
+                color: '#4CAF50',
+                '&:hover': {
+                  borderColor: '#4CAF50',
+                  backgroundColor: '#4CAF50',
+                  color: '#fff'
+                }
+              }}
+            >
+              Excel Down
+            </Button>
+          )}
+          {canWrite && (
+            <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={addNewDepartment} sx={{ px: 2 }}>
+              추가
+            </Button>
+          )}
+          {canFull && (
+            <Button
+              variant="outlined"
+              startIcon={<Trash size={16} />}
+              size="small"
+              color="error"
+              disabled={selected.length === 0}
+              onClick={handleDeleteSelected}
+              sx={{
+                px: 2,
+                borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
+                color: selected.length > 0 ? 'error.main' : 'grey.500'
+              }}
+            >
+              삭제 {selected.length > 0 && `(${selected.length})`}
+            </Button>
+          )}
         </Box>
       </Box>
 
@@ -618,16 +642,18 @@ export default function DepartmentManagementTable({
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      <Tooltip title="수정">
-                        <IconButton size="small" onClick={() => handleEditDepartment(dept)} sx={{ color: 'primary.main' }}>
-                          <Edit size={16} />
-                        </IconButton>
-                      </Tooltip>
+                      {canWrite && (
+                        <Tooltip title="수정">
+                          <IconButton size="small" onClick={() => handleEditDepartment(dept)} sx={{ color: 'primary.main' }}>
+                            <Edit size={16} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                     </Box>
                   </TableCell>
                 </TableRow>
               ))
-            ) : loading ? (
+            ) : isLoading ? (
               <TableRow>
                 <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                   <LinearProgress sx={{ width: '100%', mb: 2 }} />

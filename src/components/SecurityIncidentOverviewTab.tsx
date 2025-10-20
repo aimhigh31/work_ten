@@ -4,8 +4,7 @@ import { TaskTableData, TaskStatus } from '../types/task';
 import { useOptimizedInput } from '../hooks/useDebounce';
 import { useSupabaseMasterCode3 } from '../hooks/useSupabaseMasterCode3';
 import { useSupabaseDepartments } from '../hooks/useSupabaseDepartments';
-import { useSupabaseUsers } from '../hooks/useSupabaseUsers';
-import useUser from '../hooks/useUser';
+import { useCommonData } from '../contexts/CommonDataContext'; // ✅ 공용 창고
 
 // 보안사고 전용 개요 탭 컴포넌트
 const SecurityIncidentOverviewTab = memo(
@@ -36,11 +35,11 @@ const SecurityIncidentOverviewTab = memo(
     // 부서 훅 사용
     const { departments } = useSupabaseDepartments();
 
-    // 사용자 훅 사용
-    const { users, getActiveUserNames, getUserAvatars } = useSupabaseUsers();
+    // ✅ 공용 창고에서 사용자 데이터 가져오기
+    const { users } = useCommonData();
 
-    // 로그인한 사용자 정보
-    const currentUser = useUser();
+    console.log('🔍 [SecurityIncidentOverviewTab] users 개수:', users?.length);
+    console.log('🔍 [SecurityIncidentOverviewTab] taskState.assignee:', taskState?.assignee);
 
     // GROUP009의 서브코드들 가져오기 (사고유형)
     const incidentTypeOptions = useMemo(() => {
@@ -62,19 +61,28 @@ const SecurityIncidentOverviewTab = memo(
       return departments.filter((dept) => dept.is_active);
     }, [departments]);
 
-    // 활성화된 사용자 목록 (담당자)
-    const assigneeOptionsFromUsers = useMemo(() => {
-      const activeUserNames = getActiveUserNames();
-      console.log('👥 활성 사용자 목록:', activeUserNames);
-      return activeUserNames;
-    }, [getActiveUserNames]);
+    // 담당자 정보 찾기
+    const assigneeInfo = useMemo(() => {
+      if (!taskState?.assignee || !users || users.length === 0) {
+        console.log('⚠️ [SecurityIncidentOverviewTab] 담당자 정보 없음:', {
+          assignee: taskState?.assignee,
+          usersLength: users?.length
+        });
+        return null;
+      }
 
-    // 사용자 아바타 매핑
-    const userAvatars = useMemo(() => {
-      const avatarMap = getUserAvatars();
-      console.log('🖼️ 사용자 아바타 매핑:', avatarMap);
-      return avatarMap;
-    }, [getUserAvatars]);
+      const found = users.find((u) => u.user_name === taskState.assignee);
+      console.log('🔍 [SecurityIncidentOverviewTab] 담당자 찾기:', {
+        찾는담당자: taskState.assignee,
+        찾은결과: found ? {
+          user_name: found.user_name,
+          profile_image_url: found.profile_image_url,
+          avatar_url: found.avatar_url
+        } : '없음'
+      });
+
+      return found;
+    }, [taskState?.assignee, users]);
 
     // TextField 직접 참조를 위한 ref
     const mainContentRef = useRef<HTMLInputElement>(null);
@@ -431,22 +439,26 @@ const SecurityIncidentOverviewTab = memo(
                   담당자 <span style={{ color: 'red' }}>*</span>
                 </span>
               }
-              value={currentUser ? currentUser.name : taskState.assignee || ''}
+              value={taskState.assignee || ''}
               InputLabelProps={{ shrink: true }}
               variant="outlined"
               InputProps={{
                 readOnly: true,
-                startAdornment: (
+                startAdornment: taskState.assignee ? (
                   <InputAdornment position="start" sx={{ mr: -0.5 }}>
                     <Avatar
-                      src={currentUser ? currentUser.avatar : userAvatars[taskState.assignee || '']}
-                      alt={currentUser ? currentUser.name : taskState.assignee}
+                      src={
+                        assigneeInfo?.profile_image_url ||
+                        assigneeInfo?.avatar_url ||
+                        '/assets/images/users/avatar-1.png'
+                      }
+                      alt={taskState.assignee}
                       sx={{ width: 24, height: 24 }}
                     >
-                      {(currentUser ? currentUser.name : taskState.assignee || '')?.charAt(0)}
+                      {taskState.assignee?.charAt(0)}
                     </Avatar>
                   </InputAdornment>
-                )
+                ) : null
               }}
               sx={{
                 '& .MuiOutlinedInput-root': {

@@ -37,6 +37,12 @@ import { Add, Trash, Edit, DocumentDownload } from '@wandersonalwes/iconsax-reac
 // Components
 import RoleEditDialog from '../../components/RoleEditDialog';
 
+// Hooks
+import { useMenuPermission } from 'hooks/usePermissions'; // ✅ 권한 체크 훅
+
+// Utils
+import { loadFromCache, saveToCache, createCacheKey, clearCache, DEFAULT_CACHE_EXPIRY_MS } from 'utils/cacheUtils';
+
 // 역할 데이터 타입 정의
 interface RoleData {
   id: number;
@@ -88,6 +94,9 @@ export default function RoleManagementTable({
 }: RoleManagementTableProps) {
   const theme = useTheme();
 
+  // ✅ 권한 체크
+  const { canRead, canWrite, canFull, loading: permissionLoading } = useMenuPermission('/admin-panel/user-settings');
+
   // 로컬 상태
   const [data, setData] = useState<RoleData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,14 +110,30 @@ export default function RoleManagementTable({
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<RoleData | null>(null);
 
+  // 캐시 키
+  const CACHE_KEY = createCacheKey('role_management', 'roles');
+
   // 역할 데이터 가져오기 함수
   const fetchRoles = async () => {
     try {
+      // 1. 캐시 확인
+      const cachedData = loadFromCache<RoleData[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
+      if (cachedData && cachedData.length > 0) {
+        console.log('⚡ [역할관리] 캐시 데이터 사용 (즉시 표시)');
+        setData(cachedData);
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError(null);
 
+      const t1 = performance.now();
       const response = await fetch('/api/role-permissions');
       const result = await response.json();
+      const t2 = performance.now();
+
+      console.log(`⚡ [역할관리] API 응답 시간: ${(t2 - t1).toFixed(2)}ms`);
 
       if (result.success) {
         // admin_users_rules 데이터를 UI 포맷으로 변환
@@ -126,6 +151,10 @@ export default function RoleManagementTable({
           lastModifiedDate: role.updated_at ? new Date(role.updated_at).toISOString().split('T')[0] : '2025-09-01',
           lastModifiedBy: role.updated_by || '시스템'
         }));
+
+        // 2. 캐시에 저장
+        saveToCache(CACHE_KEY, formattedRoles);
+        console.log('💾 [역할관리] 데이터 캐싱 완료');
 
         console.log('✅ 역할 데이터 로드 성공:', formattedRoles);
         setData(formattedRoles);
@@ -266,6 +295,10 @@ export default function RoleManagementTable({
           }
         }
 
+        // 캐시 무효화
+        clearCache(CACHE_KEY);
+        console.log('🗑️ [역할관리] 캐시 무효화 (삭제)');
+
         // 데이터 새로고침
         await fetchRoles();
 
@@ -321,6 +354,10 @@ export default function RoleManagementTable({
             addChangeLog('역할 수정', updatedRole.code || `RULE-${updatedRole.id}`, `${updatedRole.role} 정보 수정`);
           }
 
+          // 캐시 무효화
+          clearCache(CACHE_KEY);
+          console.log('🗑️ [역할관리] 캐시 무효화 (수정)');
+
           // 데이터 새로고침
           await fetchRoles();
         } else {
@@ -360,6 +397,10 @@ export default function RoleManagementTable({
           updatedRole.id = result.roleId;
           updatedRole.code = result.roleCode;
 
+          // 캐시 무효화
+          clearCache(CACHE_KEY);
+          console.log('🗑️ [역할관리] 캐시 무효화 (생성)');
+
           // 데이터 새로고침
           await fetchRoles();
         } else {
@@ -393,6 +434,17 @@ export default function RoleManagementTable({
     }
   };
 
+  // ✅ 권한 없을 경우 접근 차단
+  if (!canRead && !permissionLoading) {
+    return (
+      <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Typography variant="h6" color="error">
+          이 페이지에 접근할 권한이 없습니다.
+        </Typography>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* 상단 정보 및 액션 버튼 */}
@@ -401,51 +453,57 @@ export default function RoleManagementTable({
           총 {filteredData.length}건
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant="outlined"
-            startIcon={<DocumentDownload size={16} />}
-            size="small"
-            onClick={handleExcelDownload}
-            sx={{
-              px: 2,
-              borderColor: '#4CAF50',
-              color: '#4CAF50',
-              '&:hover': {
+          {canRead && (
+            <Button
+              variant="outlined"
+              startIcon={<DocumentDownload size={16} />}
+              size="small"
+              onClick={handleExcelDownload}
+              sx={{
+                px: 2,
                 borderColor: '#4CAF50',
-                backgroundColor: '#4CAF50',
-                color: '#fff'
-              }
-            }}
-          >
-            Excel Down
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<Add size={16} />}
-            size="small"
-            onClick={() => {
-              setEditingRole(null);
-              setEditDialogOpen(true);
-            }}
-            sx={{ px: 2 }}
-          >
-            추가
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<Trash size={16} />}
-            size="small"
-            color="error"
-            disabled={selected.length === 0}
-            onClick={handleDeleteSelected}
-            sx={{
-              px: 2,
-              borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
-              color: selected.length > 0 ? 'error.main' : 'grey.500'
-            }}
-          >
-            삭제 {selected.length > 0 && `(${selected.length})`}
-          </Button>
+                color: '#4CAF50',
+                '&:hover': {
+                  borderColor: '#4CAF50',
+                  backgroundColor: '#4CAF50',
+                  color: '#fff'
+                }
+              }}
+            >
+              Excel Down
+            </Button>
+          )}
+          {canWrite && (
+            <Button
+              variant="contained"
+              startIcon={<Add size={16} />}
+              size="small"
+              onClick={() => {
+                setEditingRole(null);
+                setEditDialogOpen(true);
+              }}
+              sx={{ px: 2 }}
+            >
+              추가
+            </Button>
+          )}
+          {canFull && (
+            <Button
+              variant="outlined"
+              startIcon={<Trash size={16} />}
+              size="small"
+              color="error"
+              disabled={selected.length === 0}
+              onClick={handleDeleteSelected}
+              sx={{
+                px: 2,
+                borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
+                color: selected.length > 0 ? 'error.main' : 'grey.500'
+              }}
+            >
+              삭제 {selected.length > 0 && `(${selected.length})`}
+            </Button>
+          )}
         </Box>
       </Box>
 
@@ -614,21 +672,23 @@ export default function RoleManagementTable({
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Tooltip title="편집">
-                      <IconButton
-                        size="small"
-                        onClick={() => handleEditRole(role)}
-                        sx={{
-                          color: 'primary.main',
-                          '&:hover': {
-                            backgroundColor: 'primary.main',
-                            color: 'white'
-                          }
-                        }}
-                      >
-                        <Edit size={16} />
-                      </IconButton>
-                    </Tooltip>
+                    {canWrite && (
+                      <Tooltip title="편집">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleEditRole(role)}
+                          sx={{
+                            color: 'primary.main',
+                            '&:hover': {
+                              backgroundColor: 'primary.main',
+                              color: 'white'
+                            }
+                          }}
+                        >
+                          <Edit size={16} />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                   </TableCell>
                 </TableRow>
               ))

@@ -31,9 +31,7 @@ import {
 import { SolutionTableData, SolutionStatus, DbSolutionData } from '../types/solution';
 import { useOptimizedInput } from '../hooks/useDebounce';
 import { useSupabaseSolution } from '../hooks/useSupabaseSolution';
-import { useSupabaseMasterCode3 } from '../hooks/useSupabaseMasterCode3';
-import { useSupabaseDepartmentManagement } from '../hooks/useSupabaseDepartmentManagement';
-import { useSupabaseUserManagement } from '../hooks/useSupabaseUserManagement';
+import { useCommonData } from '../contexts/CommonDataContext';
 import { useSupabaseFeedback } from '../hooks/useSupabaseFeedback';
 import { PAGE_IDENTIFIERS, FeedbackData } from '../types/feedback';
 import { useSupabaseFiles } from '../hooks/useSupabaseFiles';
@@ -144,17 +142,30 @@ const OverviewTab = memo(
     const workContentRef = useRef<HTMLInputElement>(null);
     const descriptionRef = useRef<HTMLTextAreaElement>(null);
 
-    // 마스터코드 훅 - GROUP021 솔루션유형, GROUP022 개발유형, GROUP002 상태 조회
-    const { getSubCodesByGroup } = useSupabaseMasterCode3();
+    // ✅ 공용 창고에서 마스터코드, 부서, 사용자 데이터 가져오기
+    const { masterCodes, departments, users } = useCommonData();
+
+    console.log('🔍 [SolutionEditDialog OverviewTab] masterCodes:', masterCodes?.length);
+    console.log('🔍 [SolutionEditDialog OverviewTab] departments:', departments?.length);
+    console.log('🔍 [SolutionEditDialog OverviewTab] users:', users?.length);
+
+    // 마스터코드에서 서브코드 가져오기 함수
+    const getSubCodesByGroup = React.useCallback((groupCode: string) => {
+      if (!masterCodes || masterCodes.length === 0) {
+        console.log(`⚠️ [SolutionEditDialog] masterCodes가 아직 로드되지 않음`);
+        return [];
+      }
+      const subCodes = masterCodes
+        .filter(code => code.group_code === groupCode && code.is_active)
+        .filter(code => code.subcode && code.subcode_name); // 빈 값 필터링
+      console.log(`🔍 [SolutionEditDialog] ${groupCode} 필터링 결과:`, subCodes.length, '개', subCodes);
+      return subCodes;
+    }, [masterCodes]);
+
+    // GROUP021 솔루션유형, GROUP022 개발유형, GROUP002 상태 조회
     const solutionTypeOptions = getSubCodesByGroup('GROUP021');
     const developmentTypeOptions = getSubCodesByGroup('GROUP022');
     const masterCodeStatusOptions = getSubCodesByGroup('GROUP002');
-
-    // 부서관리 훅 - 팀 필드 연동
-    const { departments } = useSupabaseDepartmentManagement();
-
-    // 사용자관리 훅 - 담당자 필드 연동
-    const { users } = useSupabaseUserManagement();
 
     // 텍스트 필드용 최적화된 입력 관리
     const titleInput = useOptimizedInput(solutionState.title, 150);
@@ -502,7 +513,14 @@ const OverviewTab = memo(
                   }
                 }}
                 renderValue={(value) => {
+                  console.log('🔍 [솔루션 담당자 프로필] assignee:', value);
+                  console.log('🔍 [솔루션 담당자 프로필] users 개수:', users?.length);
                   const user = users.find((u) => u.user_name === value);
+                  console.log('🔍 [솔루션 담당자 프로필] 찾은 user:', user ? {
+                    user_name: user.user_name,
+                    profile_image_url: user.profile_image_url,
+                    avatar_url: user.avatar_url
+                  } : '없음');
                   if (!user) return value;
                   return (
                     <Stack direction="row" spacing={1.5} alignItems="center">
@@ -1313,13 +1331,17 @@ const SolutionEditDialog = memo(
     // 세션 정보
     const { data: session } = useSession();
 
-    // 사용자 관리 훅
-    const { users } = useSupabaseUserManagement();
+    // ✅ 공용 창고에서 사용자 데이터 가져오기
+    const { users } = useCommonData();
+
+    console.log('🔍 [SolutionEditDialog] users:', users?.length);
 
     // 현재 로그인한 사용자 정보
     const currentUser = useMemo(() => {
       if (!session?.user?.email || users.length === 0) return null;
-      return users.find((u) => u.email === session.user.email);
+      const found = users.find((u) => u.email === session.user.email);
+      console.log('🔍 [SolutionEditDialog] currentUser:', found ? found.user_name : '없음');
+      return found;
     }, [session, users]);
 
     // DB 연동 훅

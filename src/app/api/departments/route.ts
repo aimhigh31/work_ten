@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requirePermission } from 'lib/authMiddleware'; // ✅ 추가
 
 // Supabase 클라이언트 (Service Role Key 사용)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -13,8 +14,15 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 });
 
 // GET: 부서 목록 조회
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // ✅ 권한 체크 추가 (사용자설정 페이지에서도 접근 가능하도록 user-settings 권한 사용)
+    const { hasPermission, error: permError } = await requirePermission(request, '/admin-panel/user-settings', 'read');
+
+    if (!hasPermission) {
+      return NextResponse.json({ success: false, error: permError || '권한이 없습니다.' }, { status: 403 });
+    }
+
     console.log('🔍 부서 목록 조회 시작...');
 
     const { data, error } = await supabase
@@ -49,6 +57,13 @@ export async function GET() {
 // POST: 부서 생성
 export async function POST(request: NextRequest) {
   try {
+    // ✅ 권한 체크 추가 (쓰기 권한 필요)
+    const { hasPermission, error: permError } = await requirePermission(request, '/admin-panel/user-settings', 'write');
+
+    if (!hasPermission) {
+      return NextResponse.json({ success: false, error: permError || '권한이 없습니다.' }, { status: 403 });
+    }
+
     const departmentData = await request.json();
 
     const insertData = {
@@ -96,6 +111,13 @@ export async function POST(request: NextRequest) {
 // PUT: 부서 수정
 export async function PUT(request: NextRequest) {
   try {
+    // ✅ 권한 체크 추가 (쓰기 권한 필요)
+    const { hasPermission, error: permError } = await requirePermission(request, '/admin-panel/user-settings', 'write');
+
+    if (!hasPermission) {
+      return NextResponse.json({ success: false, error: permError || '권한이 없습니다.' }, { status: 403 });
+    }
+
     const departmentData = await request.json();
 
     const updateData = {
@@ -156,6 +178,13 @@ export async function PUT(request: NextRequest) {
 // DELETE: 부서 삭제
 export async function DELETE(request: NextRequest) {
   try {
+    // ✅ 권한 체크 추가 (전체 권한 필요)
+    const { hasPermission, error: permError } = await requirePermission(request, '/admin-panel/user-settings', 'full');
+
+    if (!hasPermission) {
+      return NextResponse.json({ success: false, error: permError || '권한이 없습니다.' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 

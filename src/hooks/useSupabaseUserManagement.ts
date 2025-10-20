@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS, clearCache } from '../utils/cacheUtils';
 
 // 사용자 데이터 타입
 export interface UserProfile {
@@ -123,6 +123,10 @@ export function useSupabaseUserManagement() {
         const result = await response.json();
 
         if (result.success) {
+          // 캐시 무효화 (최신 데이터 반영)
+          clearCache(CACHE_KEY);
+          console.log('🗑️ 사용자 캐시 무효화');
+
           // 목록 새로고침
           await fetchUsers();
           return true;
@@ -147,6 +151,8 @@ export function useSupabaseUserManagement() {
       try {
         setError(null);
 
+        console.log('🔄 사용자 수정 요청 데이터:', userData);
+
         const response = await fetch('/api/users', {
           method: 'PUT',
           headers: {
@@ -157,17 +163,26 @@ export function useSupabaseUserManagement() {
 
         const result = await response.json();
 
+        console.log('📡 사용자 수정 응답:', result);
+
         if (result.success) {
+          // 캐시 무효화 (최신 데이터 반영)
+          clearCache(CACHE_KEY);
+          console.log('🗑️ 사용자 캐시 무효화');
+
           // 목록 새로고침
           await fetchUsers();
           return true;
         } else {
+          console.error('❌ 사용자 수정 실패:', result.error);
           setError(result.error || '사용자 수정에 실패했습니다.');
+          alert(`사용자 수정 실패: ${result.error || '알 수 없는 오류'}`);
           return false;
         }
       } catch (err) {
         console.error('사용자 수정 실패:', err);
         setError('사용자 수정에 실패했습니다.');
+        alert('사용자 수정 중 오류가 발생했습니다.');
         return false;
       }
     },
@@ -187,6 +202,10 @@ export function useSupabaseUserManagement() {
         const result = await response.json();
 
         if (result.success) {
+          // 캐시 무효화 (최신 데이터 반영)
+          clearCache(CACHE_KEY);
+          console.log('🗑️ 사용자 캐시 무효화');
+
           // 목록 새로고침
           await fetchUsers();
           return true;
@@ -220,6 +239,10 @@ export function useSupabaseUserManagement() {
         const result = await response.json();
 
         if (result.success) {
+          // 캐시 무효화 (최신 데이터 반영)
+          clearCache(CACHE_KEY);
+          console.log('🗑️ 사용자 캐시 무효화');
+
           // 목록 새로고침
           await fetchUsers();
           return true;

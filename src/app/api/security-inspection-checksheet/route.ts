@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requirePermission } from 'lib/authMiddleware'; // ✅ 추가
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -14,6 +15,13 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 // GET: 점검 체크시트 항목 조회
 export async function GET(request: NextRequest) {
   try {
+    // ✅ 권한 체크 추가
+    const { hasPermission, error } = await requirePermission(request, '/security/inspection', 'read');
+
+    if (!hasPermission) {
+      return NextResponse.json({ success: false, error: error || '권한이 없습니다.' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     const inspectionId = searchParams.get('inspection_id');
     const checklistId = searchParams.get('checklist_id');
@@ -35,14 +43,14 @@ export async function GET(request: NextRequest) {
       query = query.eq('checklist_id', checklistId);
     }
 
-    const { data, error } = await query.order('id', { ascending: true });
+    const { data, error: queryError } = await query.order('id', { ascending: true });
 
-    if (error) {
-      console.error('체크시트 조회 오류:', error);
+    if (queryError) {
+      console.error('체크시트 조회 오류:', queryError);
       return NextResponse.json(
         {
           success: false,
-          error: error.message
+          error: queryError.message
         },
         { status: 500 }
       );

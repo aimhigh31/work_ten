@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requirePermission } from 'lib/authMiddleware'; // ✅ 추가
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -12,8 +13,15 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 });
 
 // GET: 체크리스트 목록 조회
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // ✅ 권한 체크 추가
+    const { hasPermission, error: permError } = await requirePermission(request, '/admin-panel/checklist-management', 'read');
+
+    if (!hasPermission) {
+      return NextResponse.json({ success: false, error: permError || '권한이 없습니다.' }, { status: 403 });
+    }
+
     const { data, error } = await supabase.from('admin_checklist_data').select('*').eq('is_active', true).order('no', { ascending: false });
 
     if (error) {
@@ -46,6 +54,13 @@ export async function GET() {
 // POST: 체크리스트 생성
 export async function POST(request: NextRequest) {
   try {
+    // ✅ 권한 체크 추가
+    const { hasPermission, error } = await requirePermission(request, '/admin-panel/checklist-management', 'write');
+
+    if (!hasPermission) {
+      return NextResponse.json({ success: false, error: error || '권한이 없습니다.' }, { status: 403 });
+    }
+
     const body = await request.json();
 
     // 다음 NO 값 가져오기
@@ -54,7 +69,7 @@ export async function POST(request: NextRequest) {
     const nextNo = maxNoData && maxNoData.length > 0 ? maxNoData[0].no + 1 : 1;
 
     // 데이터 삽입
-    const { data, error } = await supabase
+    const { data, error: insertError } = await supabase
       .from('admin_checklist_data')
       .insert([
         {
@@ -70,12 +85,12 @@ export async function POST(request: NextRequest) {
       .select()
       .single();
 
-    if (error) {
-      console.error('체크리스트 생성 오류:', error);
+    if (insertError) {
+      console.error('체크리스트 생성 오류:', insertError);
       return NextResponse.json(
         {
           success: false,
-          error: error.message
+          error: insertError.message
         },
         { status: 500 }
       );
@@ -100,6 +115,13 @@ export async function POST(request: NextRequest) {
 // PUT: 체크리스트 수정
 export async function PUT(request: NextRequest) {
   try {
+    // ✅ 권한 체크 추가
+    const { hasPermission, error } = await requirePermission(request, '/admin-panel/checklist-management', 'write');
+
+    if (!hasPermission) {
+      return NextResponse.json({ success: false, error: error || '권한이 없습니다.' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { code, ...updateData } = body;
 
@@ -122,7 +144,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // 데이터 업데이트
-    const { data, error } = await supabase
+    const { data, error: updateError } = await supabase
       .from('admin_checklist_data')
       .update({
         ...updateData,
@@ -133,12 +155,12 @@ export async function PUT(request: NextRequest) {
       .select()
       .single();
 
-    if (error) {
-      console.error('체크리스트 수정 오류:', error);
+    if (updateError) {
+      console.error('체크리스트 수정 오류:', updateError);
       return NextResponse.json(
         {
           success: false,
-          error: error.message
+          error: updateError.message
         },
         { status: 500 }
       );
@@ -163,6 +185,13 @@ export async function PUT(request: NextRequest) {
 // DELETE: 체크리스트 삭제
 export async function DELETE(request: NextRequest) {
   try {
+    // ✅ 권한 체크 추가
+    const { hasPermission, error } = await requirePermission(request, '/admin-panel/checklist-management', 'full');
+
+    if (!hasPermission) {
+      return NextResponse.json({ success: false, error: error || '권한이 없습니다.' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     const code = searchParams.get('code');
 
@@ -177,7 +206,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // 소프트 삭제 (is_active를 false로 설정)
-    const { error } = await supabase
+    const { error: deleteError } = await supabase
       .from('admin_checklist_data')
       .update({
         is_active: false,
@@ -186,12 +215,12 @@ export async function DELETE(request: NextRequest) {
       })
       .eq('code', code);
 
-    if (error) {
-      console.error('체크리스트 삭제 오류:', error);
+    if (deleteError) {
+      console.error('체크리스트 삭제 오류:', deleteError);
       return NextResponse.json(
         {
           success: false,
-          error: error.message
+          error: deleteError.message
         },
         { status: 500 }
       );

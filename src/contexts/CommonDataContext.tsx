@@ -48,6 +48,14 @@ export function CommonDataProvider({ children }: CommonDataProviderProps) {
     if (usersFromHook.length > 0) {
       console.log('🔍 [CommonDataContext] 첫 번째 user 샘플:', {
         user_name: usersFromHook[0].user_name,
+        user_account_id: usersFromHook[0].user_account_id,
+        department: usersFromHook[0].department,
+        position: usersFromHook[0].position,
+        role: usersFromHook[0].role,
+        phone: usersFromHook[0].phone,
+        country: usersFromHook[0].country,
+        address: usersFromHook[0].address,
+        email: usersFromHook[0].email,
         avatar_url: usersFromHook[0].avatar_url,
         profile_image_url: usersFromHook[0].profile_image_url
       });

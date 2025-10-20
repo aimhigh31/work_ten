@@ -30,8 +30,7 @@ import {
 } from '@mui/material';
 import { EducationData, Education_STATUS, Education_TYPES, Education_CHANNELS, Education_PRIORITIES } from '../types/education';
 import { useOptimizedInput } from '../hooks/useDebounce';
-import { useSupabaseMasterCode3 } from '../hooks/useSupabaseMasterCode3';
-import { useSupabaseUserManagement } from '../hooks/useSupabaseUserManagement';
+import { useCommonData } from '../contexts/CommonDataContext';
 import { useSupabaseFeedback } from '../hooks/useSupabaseFeedback';
 import { PAGE_IDENTIFIERS, FeedbackData } from '../types/feedback';
 import { useSupabaseFiles } from '../hooks/useSupabaseFiles';
@@ -148,11 +147,21 @@ const OverviewTab = memo(
     const requestContentRef = useRef<HTMLInputElement>(null);
     const actionContentRef = useRef<HTMLTextAreaElement>(null);
 
-    // 마스터코드 훅 사용
-    const { getSubCodesByGroup } = useSupabaseMasterCode3();
+    // CommonData 훅 사용 (캐싱된 데이터)
+    const { masterCodes, users } = useCommonData();
 
-    // 사용자관리 훅 사용
-    const { users } = useSupabaseUserManagement();
+    // 커스텀 getSubCodesByGroup 함수 (빈 값 필터링 포함)
+    const getSubCodesByGroup = useCallback((groupCode: string) => {
+      if (!masterCodes || masterCodes.length === 0) {
+        console.log(`⚠️ [개인교육관리 OverviewTab] masterCodes가 아직 로드되지 않음`);
+        return [];
+      }
+      const subCodes = masterCodes
+        .filter(code => code.group_code === groupCode && code.is_active)
+        .filter(code => code.subcode && code.subcode_name); // 빈 값 필터링
+      console.log(`✅ [개인교육관리 OverviewTab] ${groupCode} 서브코드:`, subCodes.length, '개');
+      return subCodes;
+    }, [masterCodes]);
 
     // GROUP029의 서브코드 목록 가져오기 (교육분야)
     const educationFieldOptions = getSubCodesByGroup('GROUP029').map((subCode) => ({
@@ -182,15 +191,23 @@ const OverviewTab = memo(
       description: subCode.subcode_description
     }));
 
-    // 사용자 목록 옵션 생성 (등록자)
+    // 사용자 목록 옵션 생성 (담당자)
     const userOptions = users
       .filter((user) => user.is_active && user.status === 'active')
-      .map((user) => ({
-        value: user.user_name,
-        label: user.user_name,
-        department: user.department || '',
-        avatar: user.profile_image_url || user.avatar_url || ''
-      }));
+      .map((user) => {
+        const avatarUrl = user.profile_image_url || user.avatar_url || '';
+        console.log(`👤 [개인교육관리 OverviewTab] 사용자 ${user.user_name} 프로필 이미지:`, {
+          profile_image_url: user.profile_image_url,
+          avatar_url: user.avatar_url,
+          selected: avatarUrl
+        });
+        return {
+          value: user.user_name,
+          label: user.user_name,
+          department: user.department || '',
+          avatar: avatarUrl
+        };
+      });
 
     // 텍스트 필드용 최적화된 입력 관리
     const contentInput = useOptimizedInput(educationState.content, 150);
@@ -490,6 +507,12 @@ const OverviewTab = memo(
                 }}
                 renderValue={(value) => {
                   const user = userOptions.find((u) => u.value === value);
+                  console.log('🎨 [개인교육관리 담당자 renderValue] 렌더링:', {
+                    value,
+                    found: !!user,
+                    avatar: user?.avatar,
+                    label: user?.label
+                  });
                   if (!user) return value;
                   return (
                     <Stack direction="row" spacing={1.5} alignItems="center">
@@ -1288,13 +1311,20 @@ const EducationEditDialog = memo(
     // 세션 정보
     const { data: session } = useSession();
 
-    // 사용자 관리 훅
-    const { users } = useSupabaseUserManagement();
+    // CommonData 훅 사용 (캐싱된 데이터)
+    const { users } = useCommonData();
 
     // 현재 로그인한 사용자 정보
     const currentUser = useMemo(() => {
       if (!session?.user?.email || users.length === 0) return null;
-      return users.find((u) => u.email === session.user.email);
+      const foundUser = users.find((u) => u.email === session.user.email);
+      console.log('👤 [개인교육관리 메인] 현재 로그인 사용자:', {
+        email: session.user.email,
+        user_name: foundUser?.user_name,
+        profile_image_url: foundUser?.profile_image_url,
+        avatar_url: foundUser?.avatar_url
+      });
+      return foundUser;
     }, [session, users]);
 
     // 피드백 훅 사용 (DB 연동)

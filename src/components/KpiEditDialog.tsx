@@ -35,8 +35,7 @@ import {
 } from '@mui/material';
 import { TaskTableData, TaskStatus, ChecklistItem } from '../types/kpi';
 import { useOptimizedInput } from '../hooks/useDebounce';
-import { useSupabaseMasterCode3 } from '../hooks/useSupabaseMasterCode3';
-import { useSupabaseUserManagement } from '../hooks/useSupabaseUserManagement';
+import { useCommonData } from '../contexts/CommonDataContext';
 import { useSupabaseDepartmentManagement } from '../hooks/useSupabaseDepartmentManagement';
 import { useSupabaseKpiTask } from '../hooks/useSupabaseKpiTask';
 import { useSupabaseKpiRecord } from '../hooks/useSupabaseKpiRecord';
@@ -178,6 +177,20 @@ const OverviewTab = memo(
     departmentOptions: Array<{ subcode: string; subcode_name: string }>;
     users: any[];
   }) => {
+    // users 배열 상태 로그
+    console.log('👥 [KPI OverviewTab] users 배열:', {
+      count: users?.length || 0,
+      loaded: !!users && users.length > 0
+    });
+
+    // 관리분류, 업무분류 옵션 상태 로그
+    console.log('📋 [KPI OverviewTab] 옵션 배열:', {
+      managementCategoryCount: managementCategoryOptions?.length || 0,
+      departmentCount: departmentOptions?.length || 0,
+      managementCategoryLoaded: !!managementCategoryOptions && managementCategoryOptions.length > 0,
+      departmentLoaded: !!departmentOptions && departmentOptions.length > 0
+    });
+
     // TextField 직접 참조를 위한 ref
     const workContentRef = useRef<HTMLInputElement>(null);
     const selectionBackgroundRef = useRef<HTMLTextAreaElement>(null);
@@ -518,15 +531,22 @@ const OverviewTab = memo(
               <Select
                 value={taskState.managementCategory || ''}
                 label="관리분류 *"
-                onChange={(e) => onFieldChange('managementCategory', e.target.value)}
+                onChange={(e) => {
+                  console.log('📋 [KPI 관리분류] 선택됨:', e.target.value);
+                  onFieldChange('managementCategory', e.target.value);
+                }}
                 displayEmpty
               >
                 <MenuItem value="">선택</MenuItem>
-                {managementCategoryOptions.map((option) => (
-                  <MenuItem key={option.subcode} value={option.subcode_name}>
-                    {option.subcode_name}
-                  </MenuItem>
-                ))}
+                {managementCategoryOptions.length > 0 ? (
+                  managementCategoryOptions.map((option) => (
+                    <MenuItem key={option.subcode} value={option.subcode_name}>
+                      {option.subcode_name}
+                    </MenuItem>
+                  ))
+                ) : (
+                  <MenuItem value="">관리분류 로딩중...</MenuItem>
+                )}
               </Select>
             </FormControl>
 
@@ -563,13 +583,25 @@ const OverviewTab = memo(
               <InputLabel shrink>
                 업무분류 <span style={{ color: 'red' }}>*</span>
               </InputLabel>
-              <Select value={taskState.department} label="업무분류 *" onChange={handleFieldChange('department')} displayEmpty>
+              <Select
+                value={taskState.department}
+                label="업무분류 *"
+                onChange={(e) => {
+                  console.log('📋 [KPI 업무분류] 선택됨:', e.target.value);
+                  onFieldChange('department', e.target.value);
+                }}
+                displayEmpty
+              >
                 <MenuItem value="">선택</MenuItem>
-                {departmentOptions.map((option) => (
-                  <MenuItem key={option.subcode} value={option.subcode_name}>
-                    {option.subcode_name}
-                  </MenuItem>
-                ))}
+                {departmentOptions.length > 0 ? (
+                  departmentOptions.map((option) => (
+                    <MenuItem key={option.subcode} value={option.subcode_name}>
+                      {option.subcode_name}
+                    </MenuItem>
+                  ))
+                ) : (
+                  <MenuItem value="">업무분류 로딩중...</MenuItem>
+                )}
               </Select>
             </FormControl>
 
@@ -692,10 +724,18 @@ const OverviewTab = memo(
               InputProps={{
                 startAdornment: (() => {
                   const assigneeUser = users.find((user) => user.user_name === taskState.assignee);
+                  const avatarUrl = assigneeUser ? (assigneeUser.profile_image_url || assigneeUser.avatar_url) : '';
+                  console.log('👤 [KPI 담당자 필드] 프로필 이미지:', {
+                    assignee: taskState.assignee,
+                    found: !!assigneeUser,
+                    profile_image_url: assigneeUser?.profile_image_url,
+                    avatar_url: assigneeUser?.avatar_url,
+                    selected: avatarUrl
+                  });
                   return (
                     assigneeUser && (
                       <Avatar
-                        src={assigneeUser.profile_image_url || assigneeUser.avatar_url}
+                        src={avatarUrl}
                         alt={assigneeUser.user_name}
                         sx={{ width: 24, height: 24, mr: 0.25 }}
                       >
@@ -3759,16 +3799,28 @@ const TaskEditDialog = memo(
     // 성능 모니터링
     // const { renderCount, logStats } = usePerformanceMonitor('TaskEditDialog');
 
-    // 마스터코드 훅 - GROUP040, GROUP041 서브코드 가져오기
-    const { getSubCodesByGroup, subCodes } = useSupabaseMasterCode3();
+    // CommonData 훅 - 캐싱된 마스터코드 사용
+    const { masterCodes, users } = useCommonData();
 
     // 사용자 정보 가져오기
     const { data: session } = useSession();
-    const { users } = useSupabaseUserManagement();
     const user = useUser(); // MaterialTab에서 사용할 사용자 정보
 
     // 부서 정보 가져오기
     const { departments } = useSupabaseDepartmentManagement();
+
+    // 커스텀 getSubCodesByGroup 함수 (빈 값 필터링 포함)
+    const getSubCodesByGroup = useCallback((groupCode: string) => {
+      if (!masterCodes || masterCodes.length === 0) {
+        console.log(`⚠️ [KPI] masterCodes가 아직 로드되지 않음`);
+        return [];
+      }
+      const subCodes = masterCodes
+        .filter(code => code.group_code === groupCode && code.is_active)
+        .filter(code => code.subcode && code.subcode_name); // 빈 값 필터링
+      console.log(`✅ [KPI] ${groupCode} 서브코드:`, subCodes.length, '개');
+      return subCodes;
+    }, [masterCodes]);
 
     // KPI Task 데이터 관리
     const {
@@ -3823,20 +3875,28 @@ const TaskEditDialog = memo(
     // GROUP040의 서브코드들 가져오기 (관리분류)
     const managementCategoryOptions = useMemo(() => {
       const group040SubCodes = getSubCodesByGroup('GROUP040');
-      return group040SubCodes.filter((subCode) => subCode.subcode_status === 'active');
-    }, [getSubCodesByGroup, subCodes]);
+      console.log('📋 [KPI] 관리분류 옵션:', {
+        count: group040SubCodes.length,
+        options: group040SubCodes.map(s => s.subcode_name)
+      });
+      return group040SubCodes;
+    }, [getSubCodesByGroup]);
 
     // GROUP041의 서브코드들 가져오기 (업무분류)
     const departmentOptions = useMemo(() => {
       const group041SubCodes = getSubCodesByGroup('GROUP041');
-      return group041SubCodes.filter((subCode) => subCode.subcode_status === 'active');
-    }, [getSubCodesByGroup, subCodes]);
+      console.log('📋 [KPI] 업무분류 옵션:', {
+        count: group041SubCodes.length,
+        options: group041SubCodes.map(s => s.subcode_name)
+      });
+      return group041SubCodes;
+    }, [getSubCodesByGroup]);
 
     // GROUP012의 서브코드들 가져오기 (영향도)
     const priorityOptions = useMemo(() => {
       const group012SubCodes = getSubCodesByGroup('GROUP012');
-      return group012SubCodes.filter((subCode) => subCode.subcode_status === 'active');
-    }, [getSubCodesByGroup, subCodes]);
+      return group012SubCodes;
+    }, [getSubCodesByGroup]);
 
     // 코드 자동 생성 함수
     const generateTaskCode = useCallback(() => {
@@ -4051,7 +4111,14 @@ const TaskEditDialog = memo(
     // 로그인한 사용자 정보
     const currentUser = useMemo(() => {
       if (!session?.user?.email) return null;
-      return users.find((user) => user.email === session.user.email);
+      const foundUser = users.find((user) => user.email === session.user.email);
+      console.log('👤 [KPI 메인] 현재 로그인 사용자:', {
+        email: session.user.email,
+        user_name: foundUser?.user_name,
+        profile_image_url: foundUser?.profile_image_url,
+        avatar_url: foundUser?.avatar_url
+      });
+      return foundUser;
     }, [session, users]);
 
     // 팀을 로그인한 사용자의 부서로 자동 설정

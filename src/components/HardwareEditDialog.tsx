@@ -47,7 +47,7 @@ import Grid from '@mui/material/Grid';
 import { HardwareRecord, assetCategoryOptions, assigneeOptions, currentUserOptions } from 'types/hardware';
 import { useSupabaseHardwareHistory, HardwareHistory } from '../hooks/useSupabaseHardwareHistory';
 import { useSupabaseHardwareUser, HardwareUserHistory } from '../hooks/useSupabaseHardwareUser';
-import { useSupabaseUserManagement } from '../hooks/useSupabaseUserManagement';
+import { useCommonData } from '../contexts/CommonDataContext';
 import { useSupabaseImageUpload } from '../hooks/useSupabaseImageUpload';
 import { useSupabaseFeedback } from '../hooks/useSupabaseFeedback';
 import { PAGE_IDENTIFIERS, FeedbackData } from '../types/feedback';
@@ -461,8 +461,15 @@ const OverviewTab = memo(
                 startAdornment: hardwareState.assignee ? (
                   <Avatar
                     src={(() => {
+                      console.log('🔍 [하드웨어 담당자 프로필] assignee:', hardwareState.assignee);
+                      console.log('🔍 [하드웨어 담당자 프로필] users 개수:', users?.length);
                       const user = users.find((u) => u.user_name === hardwareState.assignee);
-                      return user?.avatar_url || user?.profile_image_url;
+                      console.log('🔍 [하드웨어 담당자 프로필] 찾은 user:', user ? {
+                        user_name: user.user_name,
+                        avatar_url: user.avatar_url,
+                        profile_image_url: user.profile_image_url
+                      } : '없음');
+                      return user?.profile_image_url || user?.avatar_url;
                     })()}
                     alt={hardwareState.assignee}
                     sx={{ width: 24, height: 24, mr: 0.5 }}
@@ -2968,8 +2975,10 @@ export default function HardwareDialog({
   // 세션 정보
   const { data: session } = useSession();
 
-  // Dialog 내부에서 직접 사용자 목록 가져오기
-  const { users } = useSupabaseUserManagement();
+  // ✅ 공용 창고에서 사용자 데이터와 마스터코드 가져오기
+  const { users, masterCodes } = useCommonData();
+
+  console.log('🔍 HardwareDialog - masterCodes 전체:', masterCodes?.length, '개');
 
   // 현재 로그인한 사용자 정보
   const currentUser = React.useMemo(() => {
@@ -2977,7 +2986,7 @@ export default function HardwareDialog({
     console.log('🔍 HardwareDialog - users 개수:', users.length);
     if (!session?.user?.email || users.length === 0) return null;
     const found = users.find((u) => u.email === session.user.email);
-    console.log('🔍 HardwareDialog - currentUser:', found);
+    console.log('🔍 HardwareDialog - currentUser:', found ? found.user_name : '없음');
     return found;
   }, [session, users]);
 
@@ -3418,13 +3427,38 @@ export default function HardwareDialog({
     {} as Record<string, string>
   );
 
-  // 상태 옵션과 색상 (props 우선, 없으면 기본값)
-  const statusOptionsToUse = propStatusOptions || ['예비', '사용중', '보관', '폐기'];
+  // ✅ 마스터코드에서 상태 옵션 가져오기 (GROUP002)
+  const statusOptionsFromMasterCode = React.useMemo(() => {
+    if (!masterCodes || masterCodes.length === 0) {
+      console.log('⚠️ [HardwareDialog] masterCodes가 아직 로드되지 않음');
+      return propStatusOptions || ['예비', '사용중', '보관', '폐기'];
+    }
+    console.log('🔍 [HardwareDialog] GROUP002 상태 로딩 시작...');
+    const group002SubCodes = masterCodes.filter(
+      (code) => code.group_code === 'GROUP002' && code.is_active && code.subcode && code.subcode_name
+    );
+    console.log('🔍 [HardwareDialog] GROUP002 서브코드:', group002SubCodes.length, '개', group002SubCodes);
+
+    if (group002SubCodes.length === 0) {
+      console.log('⚠️ [HardwareDialog] GROUP002 서브코드 없음, 기본값 사용');
+      return propStatusOptions || ['예비', '사용중', '보관', '폐기'];
+    }
+
+    const statusNames = group002SubCodes.map((code) => code.subcode_name);
+    console.log('✅ [HardwareDialog] 상태 옵션:', statusNames);
+    return statusNames;
+  }, [masterCodes, propStatusOptions]);
+
+  const statusOptionsToUse = statusOptionsFromMasterCode;
   const statusColors = propStatusColors || {
     예비: 'default',
+    대기: 'default',
     사용중: 'success',
+    진행: 'success',
     보관: 'warning',
-    폐기: 'error'
+    완료: 'success',
+    폐기: 'error',
+    홀딩: 'error'
   };
 
   return (

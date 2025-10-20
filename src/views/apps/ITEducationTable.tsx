@@ -615,12 +615,15 @@ export default function ITEducationTable({
     setEditDialog(true);
   };
 
-  // 상태 색상 (비용관리와 동일한 형식)
+  // 상태 색상
   const getStatusColor = (status: ITEducationStatus) => {
     const colors: Record<string, any> = {
+      대기: { bgcolor: '#F5F5F5', color: '#757575' },
       계획: { bgcolor: '#F5F5F5', color: '#757575' },
+      진행: { bgcolor: '#E3F2FD', color: '#1976D2' },
       진행중: { bgcolor: '#E3F2FD', color: '#1976D2' },
       완료: { bgcolor: '#E8F5E9', color: '#388E3C' },
+      홀딩: { bgcolor: '#FFEBEE', color: '#D32F2F' },
       취소: { bgcolor: '#FFEBEE', color: '#D32F2F' }
     };
     return colors[status] || { bgcolor: '#F5F5F5', color: '#757575' };

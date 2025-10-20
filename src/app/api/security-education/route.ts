@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requirePermission } from 'lib/authMiddleware'; // ✅ 추가
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -14,6 +15,13 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 // GET: 보안교육 데이터 조회
 export async function GET(request: NextRequest) {
   try {
+    // ✅ 권한 체크 추가
+    const { hasPermission, error } = await requirePermission(request, '/security/education', 'read');
+
+    if (!hasPermission) {
+      return NextResponse.json({ success: false, error: error || '권한이 없습니다.' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
@@ -62,17 +70,17 @@ export async function GET(request: NextRequest) {
       });
     } else {
       // 전체 교육 목록 조회
-      const { data, error } = await supabase
+      const { data, error: queryError } = await supabase
         .from('security_education_data')
         .select('*')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
-      if (error) {
+      if (queryError) {
         return NextResponse.json(
           {
             success: false,
-            error: error.message
+            error: queryError.message
           },
           { status: 500 }
         );

@@ -563,21 +563,29 @@ const OverviewTab = React.memo(
                 }}
               >
                 <MenuItem value="">선택</MenuItem>
-                {documentTypes && documentTypes.length > 0 ? (
-                  documentTypes.map((docType) => (
-                    <MenuItem key={docType.subcode} value={docType.subcode_name}>
-                      {docType.subcode_name}
-                    </MenuItem>
-                  ))
-                ) : (
-                  <>
-                    <MenuItem value="보안규정">보안규정</MenuItem>
-                    <MenuItem value="보안지침">보안지침</MenuItem>
-                    <MenuItem value="보안절차">보안절차</MenuItem>
-                    <MenuItem value="보안매뉴얼">보안매뉴얼</MenuItem>
-                    <MenuItem value="보안정책">보안정책</MenuItem>
-                  </>
-                )}
+                {documentTypes && documentTypes.length > 0
+                  ? documentTypes.map((docType) => (
+                      <MenuItem key={docType.subcode} value={docType.subcode_name}>
+                        {docType.subcode_name}
+                      </MenuItem>
+                    ))
+                  : [
+                      <MenuItem key="1" value="보안규정">
+                        보안규정
+                      </MenuItem>,
+                      <MenuItem key="2" value="보안지침">
+                        보안지침
+                      </MenuItem>,
+                      <MenuItem key="3" value="보안절차">
+                        보안절차
+                      </MenuItem>,
+                      <MenuItem key="4" value="보안매뉴얼">
+                        보안매뉴얼
+                      </MenuItem>,
+                      <MenuItem key="5" value="보안정책">
+                        보안정책
+                      </MenuItem>
+                    ]}
               </Select>
             </FormControl>
             <FormControl fullWidth variant="outlined">

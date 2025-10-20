@@ -59,8 +59,7 @@ import {
 } from '../types/it-education';
 import { assignees, itEducationStatusOptions, assigneeAvatars } from '../data/it-education';
 import { useSupabaseItEducation, ItEducationData } from '../hooks/useSupabaseItEducation';
-import { useSupabaseMasterCode3 } from '../hooks/useSupabaseMasterCode3';
-import { useSupabaseUserManagement } from '../hooks/useSupabaseUserManagement';
+import { useCommonData } from '../contexts/CommonDataContext';
 import { useSupabaseItEducationCurriculum, CurriculumItem } from '../hooks/useSupabaseItEducationCurriculum';
 import { useSupabaseItEducationAttendee, ParticipantItem } from '../hooks/useSupabaseItEducationAttendee';
 import { useSupabaseFeedback } from '../hooks/useSupabaseFeedback';
@@ -858,7 +857,14 @@ const OverviewTab = memo(
                 startAdornment: educationState.assignee
                   ? (() => {
                       // educationState.assignee에 해당하는 사용자 찾기
+                      console.log('🔍 [담당자 프로필] assignee:', educationState.assignee);
+                      console.log('🔍 [담당자 프로필] users 개수:', users?.length);
                       const assigneeUser = users.find((user) => user.user_name === educationState.assignee);
+                      console.log('🔍 [담당자 프로필] 찾은 assigneeUser:', assigneeUser ? {
+                        user_name: assigneeUser.user_name,
+                        profile_image_url: assigneeUser.profile_image_url,
+                        avatar_url: assigneeUser.avatar_url
+                      } : '없음');
                       return (
                         <Avatar
                           src={assigneeUser?.profile_image_url || assigneeUser?.avatar_url}
@@ -2871,34 +2877,41 @@ export default function ITEducationDialog({ open, onClose, onSave, recordId, tas
   // Supabase 훅 사용
   const { loading, error, getItEducationById, addItEducation, updateItEducation, generateItEducationCode } = useSupabaseItEducation();
 
-  // 마스터코드 훅 사용
-  const { getSubCodesByGroup } = useSupabaseMasterCode3();
+  // ✅ 공용 창고에서 마스터코드 데이터 가져오기
+  const { masterCodes, users: allUsers } = useCommonData();
 
-  // 안전한 getSubCodesByGroup 함수 (fallback 포함)
+  console.log('🔍 [ITEducationEditDialog] masterCodes 전체:', masterCodes?.length, '개');
+
+  // 마스터코드에서 서브코드 가져오기 함수
   const safeGetSubCodesByGroup = useCallback(
     (groupCode: string) => {
-      if (getSubCodesByGroup && typeof getSubCodesByGroup === 'function') {
-        return getSubCodesByGroup(groupCode);
+      if (!masterCodes || masterCodes.length === 0) {
+        console.log(`⚠️ [ITEducationEditDialog] masterCodes가 아직 로드되지 않음`);
+        // fallback: 기본값 반환
+        if (groupCode === 'GROUP008') {
+          return [
+            { subcode: 'EDU_ONLINE', subcode_name: '온라인' },
+            { subcode: 'EDU_OFFLINE', subcode_name: '오프라인' },
+            { subcode: 'EDU_HYBRID', subcode_name: '하이브리드' }
+          ];
+        }
+        if (groupCode === 'GROUP002') {
+          return [
+            { subcode: 'STATUS_PLAN', subcode_name: '계획' },
+            { subcode: 'STATUS_PROGRESS', subcode_name: '진행중' },
+            { subcode: 'STATUS_COMPLETE', subcode_name: '완료' },
+            { subcode: 'STATUS_CANCEL', subcode_name: '취소' }
+          ];
+        }
+        return [];
       }
-      // fallback: 기본값 반환
-      if (groupCode === 'GROUP008') {
-        return [
-          { subcode: 'EDU_ONLINE', subcode_name: '온라인' },
-          { subcode: 'EDU_OFFLINE', subcode_name: '오프라인' },
-          { subcode: 'EDU_HYBRID', subcode_name: '하이브리드' }
-        ];
-      }
-      if (groupCode === 'GROUP002') {
-        return [
-          { subcode: 'STATUS_PLAN', subcode_name: '계획' },
-          { subcode: 'STATUS_PROGRESS', subcode_name: '진행중' },
-          { subcode: 'STATUS_COMPLETE', subcode_name: '완료' },
-          { subcode: 'STATUS_CANCEL', subcode_name: '취소' }
-        ];
-      }
-      return [];
+      const subCodes = masterCodes
+        .filter(code => code.group_code === groupCode && code.is_active)
+        .filter(code => code.subcode && code.subcode_name); // 빈 값 필터링
+      console.log(`🔍 [ITEducationEditDialog] ${groupCode} 필터링 결과:`, subCodes.length, '개', subCodes);
+      return subCodes;
     },
-    [getSubCodesByGroup]
+    [masterCodes]
   );
 
   // 현재 로그인 사용자 정보
@@ -2907,13 +2920,14 @@ export default function ITEducationDialog({ open, onClose, onSave, recordId, tas
   // 세션 정보 가져오기
   const { data: session } = useSession();
 
-  // 사용자관리 훅 사용 (담당자 목록 가져오기)
-  const { users: allUsers } = useSupabaseUserManagement();
+  console.log('🔍 [ITEducationEditDialog] allUsers:', allUsers?.length, '명');
 
   // 세션 email로 DB에서 사용자 찾기
   const currentUser = useMemo(() => {
     if (!session?.user?.email || allUsers.length === 0) return null;
-    return allUsers.find((u) => u.email === session.user.email);
+    const found = allUsers.find((u) => u.email === session.user.email);
+    console.log('🔍 [ITEducationEditDialog] currentUser:', found ? found.user_name : '없음');
+    return found;
   }, [session, allUsers]);
 
   // 커리큘럼 관리 훅 사용

@@ -49,7 +49,7 @@ interface ChecklistEditorItem {
 import { useOptimizedInput } from '../hooks/useDebounce';
 import { useSupabaseMasterCode3 } from '../hooks/useSupabaseMasterCode3';
 import useUser from '../hooks/useUser';
-import { useSupabaseUserManagement } from '../hooks/useSupabaseUserManagement';
+import { useCommonData } from '../contexts/CommonDataContext';
 import { useSupabaseChecklistEditor } from '../hooks/useSupabaseChecklistEditor';
 import { useSupabaseDepartmentManagement } from '../hooks/useSupabaseDepartmentManagement';
 import { useSupabaseChecklistManagement } from '../hooks/useSupabaseChecklistManagement';
@@ -144,7 +144,6 @@ const OverviewTab = memo(
     teamOptions,
     departmentLoading,
     assigneeOptions,
-    userLoading,
     currentUser,
     currentUserCode,
     users
@@ -160,11 +159,17 @@ const OverviewTab = memo(
     teamOptions: { value: string; label: string }[];
     departmentLoading: boolean;
     assigneeOptions: { value: string; label: string; email?: string; avatar?: string }[];
-    userLoading: boolean;
     currentUser: any;
     currentUserCode: string;
     users: any[];
   }) => {
+    // users 배열 상태 로그
+    console.log('👥 [체크리스트 OverviewTab] users 배열:', {
+      count: users?.length || 0,
+      loaded: !!users && users.length > 0,
+      taskStateAssignee: taskState.assignee
+    });
+
     // TextField 직접 참조를 위한 ref
     const workContentRef = useRef<HTMLInputElement>(null);
     const descriptionRef = useRef<HTMLTextAreaElement>(null);
@@ -407,10 +412,19 @@ const OverviewTab = memo(
               InputProps={{
                 startAdornment: (() => {
                   const assigneeUser = users.find((u) => u.user_code === taskState.assignee);
+                  const avatarUrl = assigneeUser ? (assigneeUser.profile_image_url || assigneeUser.avatar_url) : '';
+                  console.log('👤 [체크리스트 등록자 필드] 프로필 이미지:', {
+                    assignee: taskState.assignee,
+                    found: !!assigneeUser,
+                    user_name: assigneeUser?.user_name,
+                    profile_image_url: assigneeUser?.profile_image_url,
+                    avatar_url: assigneeUser?.avatar_url,
+                    selected: avatarUrl
+                  });
                   return (
                     assigneeUser && (
                       <Avatar
-                        src={assigneeUser.profile_image_url || assigneeUser.avatar_url}
+                        src={avatarUrl}
                         alt={assigneeUser.user_name}
                         sx={{ width: 24, height: 24, mr: 0.25 }}
                       >
@@ -1741,13 +1755,21 @@ const ChecklistEditDialog = memo(
     // 부서관리 훅 사용
     const { departments, loading: departmentLoading } = useSupabaseDepartmentManagement();
 
-    // 사용자관리 훅 사용
-    const { users, loading: userLoading } = useSupabaseUserManagement();
+    // CommonData 훅 사용 (캐싱된 사용자 데이터)
+    const { users } = useCommonData();
 
     // 세션 email로 DB에서 사용자 찾기
     const currentUser = useMemo(() => {
       if (!session?.user?.email || users.length === 0) return null;
-      return users.find((u) => u.email === session.user.email);
+      const foundUser = users.find((u) => u.email === session.user.email);
+      console.log('👤 [체크리스트 메인] 현재 로그인 사용자:', {
+        email: session.user.email,
+        user_name: foundUser?.user_name,
+        user_code: foundUser?.user_code,
+        profile_image_url: foundUser?.profile_image_url,
+        avatar_url: foundUser?.avatar_url
+      });
+      return foundUser;
     }, [session, users]);
 
     const currentUserCode = currentUser?.user_code || '';
@@ -1825,14 +1847,8 @@ const ChecklistEditDialog = memo(
 
     // 사용자 목록을 담당자 드롭다운 옵션으로 변환
     const assigneeOptions = useMemo(() => {
-      console.log('👤 사용자 목록 조회 시작');
-      console.log('📊 사용자 로딩 상태:', userLoading);
-      console.log('📋 전체 사용자 수:', users.length);
-
-      if (userLoading) {
-        console.log('⏳ 사용자 데이터 로딩 중...');
-        return [];
-      }
+      console.log('👤 [체크리스트] 사용자 목록 조회 시작');
+      console.log('📋 [체크리스트] 전체 사용자 수:', users.length);
 
       // 활성화된 사용자만 필터링하고 담당자 드롭다운 옵션으로 변환
       // value는 user_code, label은 user_name으로 설정
@@ -1845,9 +1861,9 @@ const ChecklistEditDialog = memo(
           avatar: user.profile_image_url || user.avatar_url // 프로필 이미지 URL
         }));
 
-      console.log('🎯 변환된 담당자 옵션:', activeUsers);
+      console.log('🎯 [체크리스트] 변환된 담당자 옵션:', activeUsers.length, '개');
       return activeUsers;
-    }, [users, userLoading]);
+    }, [users]);
 
     // user_code로 user_name을 찾는 헬퍼 함수
     const getUserNameByCode = useCallback(
@@ -2555,7 +2571,6 @@ const ChecklistEditDialog = memo(
         teamOptions,
         departmentLoading,
         assigneeOptions,
-        userLoading,
         currentUser,
         currentUserCode,
         users
@@ -2572,7 +2587,6 @@ const ChecklistEditDialog = memo(
         teamOptions,
         departmentLoading,
         assigneeOptions,
-        userLoading,
         currentUser,
         currentUserCode,
         users

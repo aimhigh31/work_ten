@@ -43,6 +43,7 @@ import UserEditDialog from 'components/UserEditDialog';
 import { useSupabaseUserManagement, UserProfile } from 'hooks/useSupabaseUserManagement';
 import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
+import { useMenuPermission } from 'hooks/usePermissions'; // ✅ 권한 체크 훅
 
 // 사용자 데이터 타입 정의 (기존 호환성 유지)
 interface UserData {
@@ -103,15 +104,15 @@ const transformUserProfile = (profile: UserProfile, index: number, totalCount: n
     pending: '대기' as const
   };
 
-  return {
+  const transformed = {
     id: profile.id,
     no: totalCount - index, // 역순 번호 (최신이 더 큰 번호)
-    registrationDate: profile.created_at.split('T')[0],
-    code: profile.user_code,
-    userName: profile.user_name,
+    registrationDate: profile.created_at ? profile.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+    code: profile.user_code || '',
+    userName: profile.user_name || '',
     department: profile.department || '',
     position: profile.position || '',
-    role: profile.role,
+    role: profile.role || '',
     status: statusMap[profile.status] || '활성',
     lastLogin: profile.last_login
       ? new Date(profile.last_login)
@@ -137,6 +138,30 @@ const transformUserProfile = (profile: UserProfile, index: number, totalCount: n
     assignedRole: profile.assignedRole || [],
     rule: profile.rule || 'RULE-25-003'
   };
+
+  // 디버깅: 변환된 데이터 확인 (모든 사용자에 대해 로그 출력)
+  console.log(`📞 transformUserProfile [${profile.user_name}]:`, {
+    id: profile.id,
+    userAccountId: profile.user_account_id,
+    department: profile.department,
+    position: profile.position,
+    role: profile.role,
+    phone: profile.phone,
+    country: profile.country,
+    address: profile.address
+  });
+
+  console.log(`📤 transformed 결과 [${profile.user_name}]:`, {
+    userAccount: transformed.userAccount,
+    department: transformed.department,
+    position: transformed.position,
+    role: transformed.role,
+    phone: transformed.phone,
+    country: transformed.country,
+    address: transformed.address
+  });
+
+  return transformed;
 };
 
 export default function UserManagementTable({
@@ -153,8 +178,11 @@ export default function UserManagementTable({
   const searchParams = useSearchParams();
   const { data: session } = useSession();
 
+  // ✅ 권한 체크
+  const { canRead, canWrite, canFull, loading: permissionLoading } = useMenuPermission('/admin-panel/user-settings');
+
   // 🏪 공용 창고에서 데이터 가져오기 (중복 로딩 방지!)
-  const { users: supabaseUsers, departments: supabaseDepartments } = useCommonData();
+  const { users: supabaseUsers, departments: supabaseDepartments, refreshCommonData } = useCommonData();
 
   // Supabase 훅 사용 (데이터 수정 함수만)
   const { loading, error, clearError, fetchUsers, createUser, updateUser, toggleUserStatus, deleteUser } = useSupabaseUserManagement();
@@ -375,6 +403,10 @@ export default function UserManagementTable({
       const deletePromises = selected.map((id) => deleteUser(id));
       await Promise.all(deletePromises);
 
+      // 🔄 CommonData 새로고침 (화면에 삭제 반영)
+      await refreshCommonData();
+      console.log('✅ CommonData 새로고침 완료');
+
       setSelected([]);
     }
   };
@@ -415,15 +447,62 @@ export default function UserManagementTable({
         rule: updatedUser.rule || 'RULE-25-003'
       };
 
+      console.log('📝 사용자 업데이트 데이터:', {
+        phone: updateData.phone,
+        country: updateData.country,
+        address: updateData.address,
+        department: updateData.department,
+        position: updateData.position,
+        role: updateData.role
+      });
+      console.log('📝 전체 updateData:', updateData);
+
       const success = await updateUser(updateData);
 
-      if (success && addChangeLog) {
-        addChangeLog(
-          '사용자 정보 수정',
-          updatedUser.code || `USER-${updatedUser.id}`,
-          `${updatedUser.userName || '사용자'} 정보 수정`,
-          updatedUser.department
+      if (success) {
+        console.log('✅ 사용자 업데이트 성공');
+
+        // 🔥 즉시 로컬 상태 업데이트 (깜빡임 없이 즉시 반영)
+        setData((prevData) =>
+          prevData.map((user) =>
+            user.id === updatedUser.id
+              ? {
+                  ...user,
+                  userName: updatedUser.userName,
+                  department: updatedUser.department,
+                  position: updatedUser.position,
+                  role: updatedUser.role,
+                  email: updatedUser.email,
+                  phone: updatedUser.phone,
+                  country: updatedUser.country,
+                  address: updatedUser.address,
+                  status: updatedUser.status,
+                  profileImage: updatedUser.profileImage || updatedUser.profile_image_url,
+                  profile_image_url: updatedUser.profile_image_url || updatedUser.profileImage
+                }
+              : user
+          )
         );
+        console.log('✅ 로컬 상태 즉시 업데이트 완료');
+
+        // 🔄 CommonData 백그라운드 새로고침 (await 제거로 즉시 진행)
+        refreshCommonData();
+        console.log('🔄 CommonData 백그라운드 새로고침 시작');
+
+        // 다이얼로그 닫기
+        handleEditDialogClose();
+
+        if (addChangeLog) {
+          addChangeLog(
+            '사용자 정보 수정',
+            updatedUser.code || `USER-${updatedUser.id}`,
+            `${updatedUser.userName || '사용자'} 정보 수정`,
+            updatedUser.department
+          );
+        }
+      } else {
+        console.error('❌ 사용자 업데이트 실패');
+        alert('사용자 정보 수정에 실패했습니다.');
       }
     } else {
       // 새 사용자 추가 - Supabase Auth로 생성
@@ -477,21 +556,23 @@ export default function UserManagementTable({
 
         console.log('✅ Auth 사용자 생성 성공, 트리거에 의해 프로필도 자동 생성됨');
 
-        // 사용자 목록 새로고침
-        await fetchUsers();
+        // 🔄 CommonData 새로고침 (화면에 새 사용자 반영)
+        await refreshCommonData();
+        console.log('✅ CommonData 새로고침 완료');
 
         if (addChangeLog) {
           addChangeLog('새 사용자 생성', result.auth_user_id, `${updatedUser.userName || '새 사용자'} 생성`, updatedUser.department);
         }
 
         alert(`사용자가 생성되었습니다.\n이메일: ${baseEmail}\n초기 비밀번호: ${defaultPassword}\n(로그인 후 비밀번호를 변경해주세요)`);
+
+        // 다이얼로그 닫기
+        handleEditDialogClose();
       } catch (error: any) {
         console.error('사용자 생성 중 오류:', error);
         alert('사용자 생성 중 오류가 발생했습니다.');
       }
     }
-
-    handleEditDialogClose();
   };
 
   // 새 User 추가
@@ -502,6 +583,15 @@ export default function UserManagementTable({
 
   // 편집 핸들러
   const handleEditUser = (user: UserData) => {
+    console.log('✏️✏️✏️ 편집할 사용자 전체 데이터:', user);
+    console.log('✏️ userAccount:', user.userAccount);
+    console.log('✏️ department:', user.department);
+    console.log('✏️ position:', user.position);
+    console.log('✏️ role:', user.role);
+    console.log('✏️ phone:', user.phone);
+    console.log('✏️ country:', user.country);
+    console.log('✏️ address:', user.address);
+    console.log('✏️ email:', user.email);
     setEditingUser(user);
     setEditDialog(true);
   };
@@ -525,6 +615,17 @@ export default function UserManagementTable({
     return { color: '#333333' };
   };
 
+  // ✅ 권한 없을 경우 접근 차단
+  if (!canRead && !permissionLoading) {
+    return (
+      <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Typography variant="h6" color="error">
+          이 페이지에 접근할 권한이 없습니다.
+        </Typography>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* 상단 정보 및 액션 버튼 */}
@@ -533,42 +634,48 @@ export default function UserManagementTable({
           총 {filteredData.length}건
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant="outlined"
-            startIcon={<DocumentDownload size={16} />}
-            size="small"
-            onClick={handleExcelDownload}
-            sx={{
-              px: 2,
-              borderColor: '#4CAF50',
-              color: '#4CAF50',
-              '&:hover': {
+          {canRead && (
+            <Button
+              variant="outlined"
+              startIcon={<DocumentDownload size={16} />}
+              size="small"
+              onClick={handleExcelDownload}
+              sx={{
+                px: 2,
                 borderColor: '#4CAF50',
-                backgroundColor: '#4CAF50',
-                color: '#fff'
-              }
-            }}
-          >
-            Excel Down
-          </Button>
-          <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={addNewUser} sx={{ px: 2 }}>
-            추가
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<Trash size={16} />}
-            size="small"
-            color="error"
-            disabled={selected.length === 0}
-            onClick={handleDeleteSelected}
-            sx={{
-              px: 2,
-              borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
-              color: selected.length > 0 ? 'error.main' : 'grey.500'
-            }}
-          >
-            삭제 {selected.length > 0 && `(${selected.length})`}
-          </Button>
+                color: '#4CAF50',
+                '&:hover': {
+                  borderColor: '#4CAF50',
+                  backgroundColor: '#4CAF50',
+                  color: '#fff'
+                }
+              }}
+            >
+              Excel Down
+            </Button>
+          )}
+          {canWrite && (
+            <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={addNewUser} sx={{ px: 2 }}>
+              추가
+            </Button>
+          )}
+          {canFull && (
+            <Button
+              variant="outlined"
+              startIcon={<Trash size={16} />}
+              size="small"
+              color="error"
+              disabled={selected.length === 0}
+              onClick={handleDeleteSelected}
+              sx={{
+                px: 2,
+                borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
+                color: selected.length > 0 ? 'error.main' : 'grey.500'
+              }}
+            >
+              삭제 {selected.length > 0 && `(${selected.length})`}
+            </Button>
+          )}
         </Box>
       </Box>
 
@@ -740,11 +847,13 @@ export default function UserManagementTable({
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      <Tooltip title="수정">
-                        <IconButton size="small" onClick={() => handleEditUser(user)} sx={{ color: 'primary.main' }}>
-                          <Edit size={16} />
-                        </IconButton>
-                      </Tooltip>
+                      {canWrite && (
+                        <Tooltip title="수정">
+                          <IconButton size="small" onClick={() => handleEditUser(user)} sx={{ color: 'primary.main' }}>
+                            <Edit size={16} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                     </Box>
                   </TableCell>
                 </TableRow>

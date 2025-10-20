@@ -65,13 +65,14 @@ import { useSupabaseFeedback } from '../hooks/useSupabaseFeedback';
 import { PAGE_IDENTIFIERS } from '../types/feedback';
 import { useSupabaseFiles } from '../hooks/useSupabaseFiles';
 import { FileData } from '../types/files';
-import { useSupabaseUserManagement, UserProfile } from '../hooks/useSupabaseUserManagement';
+import { UserProfile } from '../hooks/useSupabaseUserManagement';
 import { useSupabaseSecurityCurriculum, SecurityCurriculumItem } from '../hooks/useSupabaseSecurityCurriculum';
 import { useSupabaseSecurityAttendee, SecurityAttendeeItem } from '../hooks/useSupabaseSecurityAttendee';
 import { useSupabaseSecurityEducation } from '../hooks/useSupabaseSecurityEducation';
 import { useSupabaseDepartments } from '../hooks/useSupabaseDepartments';
 import useIdGenerator from '../hooks/useIdGenerator';
 import useUser from '../hooks/useUser';
+import { useCommonData } from '../contexts/CommonDataContext'; // ✅ 공용 창고
 import { supabase } from '../lib/supabase';
 import { useSupabaseChangeLog } from '../hooks/useSupabaseChangeLog';
 import { CreateChangeLogInput, CHANGE_LOG_ACTIONS, ChangeLogMetadata } from '../types/changelog';
@@ -3073,13 +3074,27 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
   // 마스터코드 훅 (GROUP008 서브코드 가져오기)
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
-  // 사용자관리 훅 (담당자 목록용)
-  const { users } = useSupabaseUserManagement();
+  // ✅ 공용 창고에서 사용자 데이터 가져오기 (캐싱된 데이터 사용)
+  const { users } = useCommonData();
+
+  console.log('🔍 [SecurityEducationEditDialog] CommonData users 개수:', users?.length);
 
   // 세션 email로 DB에서 사용자 찾기 (InspectionEditDialog 패턴)
   const currentUser = React.useMemo(() => {
-    if (!session?.user?.email || users.length === 0) return null;
-    return users.find((u) => u.email === session.user.email);
+    if (!session?.user?.email || users.length === 0) {
+      console.log('⚠️ [SecurityEducationEditDialog] currentUser 찾기 실패:', {
+        hasEmail: !!session?.user?.email,
+        usersLength: users.length
+      });
+      return null;
+    }
+    const found = users.find((u) => u.email === session.user.email);
+    console.log('✅ [SecurityEducationEditDialog] currentUser 찾음:', found ? {
+      user_name: found.user_name,
+      email: found.email,
+      profile_image_url: found.profile_image_url
+    } : '없음');
+    return found;
   }, [session, users]);
 
   // 보안교육 훅 (코드 생성용)
@@ -3118,7 +3133,14 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
 
   // 활성 사용자 담당자 목록 생성
   const assigneeList = useMemo(() => {
-    return users.filter((user) => user.status === 'active');
+    const activeUsers = users.filter((user) => user.status === 'active');
+    console.log('🔍 [SecurityEducationEditDialog] 활성 담당자 목록:', activeUsers.length, '명');
+    console.log('🔍 [SecurityEducationEditDialog] 첫 번째 담당자:', activeUsers[0] ? {
+      user_name: activeUsers[0].user_name,
+      profile_image_url: activeUsers[0].profile_image_url,
+      avatar_url: activeUsers[0].avatar_url
+    } : '없음');
+    return activeUsers;
   }, [users]);
 
   // 교육 상태 관리
