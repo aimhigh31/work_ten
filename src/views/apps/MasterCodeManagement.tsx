@@ -49,6 +49,7 @@ import { Code, Add, Edit, Trash, Eye, Setting2, TableDocument, DocumentText } fr
 
 // Supabase 타입 import - 마스터코드3 플랫 구조 사용
 import { useSupabaseMasterCode3, GroupInfo, SubCodeInfo, MasterCodeFlat } from '../../hooks/useSupabaseMasterCode3';
+import { useCommonData } from '../../contexts/CommonDataContext';
 
 // 플랫 구조에 맞춘 타입 별칭
 type MasterCodeData2 = GroupInfo;
@@ -792,6 +793,9 @@ export default function MasterCodeManagement() {
     getSubCodesByGroup
   } = useSupabaseMasterCode3();
 
+  // CommonDataContext에서 refreshCommonData 가져오기
+  const { refreshCommonData } = useCommonData();
+
   // 기존 컴포넌트와 호환성을 위한 데이터 변환
   const masterCodes: MasterCodeData2[] = groups
     .sort((a, b) => a.group_code.localeCompare(b.group_code)) // 그룹 코드 순서로 정렬
@@ -972,6 +976,9 @@ export default function MasterCodeManagement() {
       if (groupCode) {
         await deleteGroup(groupCode);
 
+        // 데이터 새로고침
+        await refreshData();
+
         setSnackbar({
           open: true,
           message: '마스터코드 그룹이 삭제되었습니다.',
@@ -1015,6 +1022,9 @@ export default function MasterCodeManagement() {
 
         console.log('✅ 그룹 수정 성공');
 
+        // 데이터 새로고침
+        await refreshData();
+
         setSnackbar({
           open: true,
           message: '마스터코드 그룹이 수정되었습니다.',
@@ -1032,6 +1042,9 @@ export default function MasterCodeManagement() {
           group_code_status: data.is_active ? 'active' : 'inactive',
           group_code_order: data.display_order
         });
+
+        // 데이터 새로고침
+        await refreshData();
 
         setSnackbar({
           open: true,
@@ -1094,6 +1107,10 @@ export default function MasterCodeManagement() {
       const subCodeToDelete = filteredSubCodes.find((sc) => sc.id === id);
       await deleteSubCode(id);
 
+      // 데이터 새로고침
+      await refreshData();
+      await refreshCommonData(); // 전역 캐시도 갱신
+
       setSnackbar({
         open: true,
         message: '서브코드가 삭제되었습니다.',
@@ -1126,6 +1143,10 @@ export default function MasterCodeManagement() {
           is_active: data.is_active
         });
 
+        // 데이터 새로고침
+        await refreshData();
+        await refreshCommonData(); // 전역 캐시도 갱신
+
         setSnackbar({
           open: true,
           message: '서브코드가 수정되었습니다.',
@@ -1143,6 +1164,10 @@ export default function MasterCodeManagement() {
             subcode_status: data.is_active ? 'active' : 'inactive',
             subcode_order: data.display_order
           });
+
+          // 데이터 새로고침
+          await refreshData();
+          await refreshCommonData(); // 전역 캐시도 갱신
 
           setSnackbar({
             open: true,
@@ -1213,6 +1238,10 @@ export default function MasterCodeManagement() {
     try {
       await createSubCode(newSubCodeData);
 
+      // 데이터 새로고침
+      await refreshData();
+      await refreshCommonData(); // 전역 캐시도 갱신
+
       setSnackbar({
         open: true,
         message: '서브코드가 생성되었습니다.',
@@ -1245,6 +1274,10 @@ export default function MasterCodeManagement() {
       await updateSubCode(updateData.id, {
         subcode_order: updateData.display_order
       });
+
+      // 데이터 새로고침
+      await refreshData();
+      await refreshCommonData(); // 전역 캐시도 갱신
 
       setSnackbar({
         open: true,
@@ -1780,6 +1813,8 @@ export default function MasterCodeManagement() {
                                             if (newValue && newValue !== subCode.sub_code_name) {
                                               try {
                                                 await updateSubCode(subCode.id, { subcode_name: newValue });
+                                                await refreshData();
+                                                await refreshCommonData(); // 전역 캐시도 갱신
                                                 setSnackbar({
                                                   open: true,
                                                   message: '서브코드명이 수정되었습니다.',
@@ -1801,6 +1836,8 @@ export default function MasterCodeManagement() {
                                               if (newValue && newValue !== subCode.sub_code_name) {
                                                 try {
                                                   await updateSubCode(subCode.id, { subcode_name: newValue });
+                                                  await refreshData();
+                                                  await refreshCommonData(); // 전역 캐시도 갱신
                                                   setSnackbar({
                                                     open: true,
                                                     message: '서브코드명이 수정되었습니다.',
@@ -1845,6 +1882,8 @@ export default function MasterCodeManagement() {
                                             if (!isNaN(newValue) && newValue !== subCode.display_order) {
                                               try {
                                                 await updateSubCode(subCode.id, { subcode_order: newValue });
+                                                await refreshData();
+                                                await refreshCommonData(); // 전역 캐시도 갱신
                                                 setSnackbar({
                                                   open: true,
                                                   message: '정렬순서가 수정되었습니다.',
@@ -1866,6 +1905,8 @@ export default function MasterCodeManagement() {
                                               if (!isNaN(newValue) && newValue !== subCode.display_order) {
                                                 try {
                                                   await updateSubCode(subCode.id, { subcode_order: newValue });
+                                                  await refreshData();
+                                                  await refreshCommonData(); // 전역 캐시도 갱신
                                                   setSnackbar({
                                                     open: true,
                                                     message: '정렬순서가 수정되었습니다.',
@@ -1909,6 +1950,8 @@ export default function MasterCodeManagement() {
                                             if (newValue !== subCode.sub_code_description) {
                                               try {
                                                 await updateSubCode(subCode.id, { subcode_description: newValue || '' });
+                                                await refreshData();
+                                                await refreshCommonData(); // 전역 캐시도 갱신
                                                 setSnackbar({
                                                   open: true,
                                                   message: '비고가 수정되었습니다.',
@@ -1930,6 +1973,8 @@ export default function MasterCodeManagement() {
                                               if (newValue !== subCode.sub_code_description) {
                                                 try {
                                                   await updateSubCode(subCode.id, { subcode_description: newValue || '' });
+                                                  await refreshData();
+                                                  await refreshCommonData(); // 전역 캐시도 갱신
                                                   setSnackbar({
                                                     open: true,
                                                     message: '비고가 수정되었습니다.',

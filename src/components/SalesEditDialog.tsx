@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import {
   Dialog,
   DialogTitle,
@@ -763,50 +764,84 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
   console.log('🔍 [SalesEditDialog] masterCodes:', masterCodes?.length);
   console.log('🔍 [SalesEditDialog] users:', users?.length);
 
-  // 마스터코드에서 서브코드 가져오기 함수
-  const getSubCodesByGroup = useCallback((groupCode: string) => {
-    if (!masterCodes || masterCodes.length === 0) {
-      console.log(`⚠️ [SalesEditDialog] masterCodes가 아직 로드되지 않음`);
-      return [];
-    }
-    const subCodes = masterCodes
-      .filter(code => code.group_code === groupCode && code.is_active)
-      .filter(code => code.subcode && code.subcode_name); // 빈 값 필터링
-    console.log(`🔍 [SalesEditDialog] ${groupCode} 필터링 결과:`, subCodes.length, '개');
-    return subCodes;
-  }, [masterCodes]);
+  // Supabase 클라이언트 생성 (DB 직접 조회용)
+  const supabaseClient = React.useMemo(() => {
+    return createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+  }, []);
 
-  // GROUP035 사업부 서브코드 목록
-  const businessUnits = useMemo(() => {
-    const group035Codes = getSubCodesByGroup('GROUP035');
-    const names = group035Codes.map((code) => code.subcode_name);
-    console.log('✅ 사업부 목록:', names);
-    return names;
-  }, [getSubCodesByGroup]);
+  // DB 직접 조회 상태
+  const [businessUnitsFromDB, setBusinessUnitsFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+  const [customerNamesFromDB, setCustomerNamesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+  const [salesTypesFromDB, setSalesTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+  const [statusTypesFromDB, setStatusTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
 
-  // GROUP039 고객명 서브코드 목록
-  const customerNames = useMemo(() => {
-    const group039Codes = getSubCodesByGroup('GROUP039');
-    const names = group039Codes.map((code) => code.subcode_name);
-    console.log('✅ 고객명 목록:', names);
-    return names;
-  }, [getSubCodesByGroup]);
+  // Dialog 열릴 때마다 DB에서 직접 조회
+  useEffect(() => {
+    if (!open) return;
 
-  // GROUP036 판매유형 서브코드 목록
-  const salesTypes = useMemo(() => {
-    const group036Codes = getSubCodesByGroup('GROUP036');
-    const types = group036Codes.map((code) => code.subcode_name);
-    console.log('✅ 판매유형 목록:', types);
-    return types;
-  }, [getSubCodesByGroup]);
+    const fetchMasterCodeData = async () => {
+      // GROUP035: 사업부
+      const { data: group035Data } = await supabaseClient
+        .from('admin_mastercode_data')
+        .select('subcode, subcode_name, subcode_order')
+        .eq('codetype', 'subcode')
+        .eq('group_code', 'GROUP035')
+        .eq('is_active', true)
+        .order('subcode_order', { ascending: true });
 
-  // GROUP002 상태 서브코드 목록
-  const statusOptions = useMemo(() => {
-    const group002Codes = getSubCodesByGroup('GROUP002');
-    const statuses = group002Codes.map((code) => code.subcode_name);
-    console.log('✅ 상태 목록:', statuses);
-    return statuses;
-  }, [getSubCodesByGroup]);
+      if (group035Data) {
+        setBusinessUnitsFromDB(group035Data);
+        console.log('✅ [SalesEditDialog] GROUP035 사업부 DB 조회 완료:', group035Data.length, '개');
+      }
+
+      // GROUP039: 고객명
+      const { data: group039Data } = await supabaseClient
+        .from('admin_mastercode_data')
+        .select('subcode, subcode_name, subcode_order')
+        .eq('codetype', 'subcode')
+        .eq('group_code', 'GROUP039')
+        .eq('is_active', true)
+        .order('subcode_order', { ascending: true });
+
+      if (group039Data) {
+        setCustomerNamesFromDB(group039Data);
+        console.log('✅ [SalesEditDialog] GROUP039 고객명 DB 조회 완료:', group039Data.length, '개');
+      }
+
+      // GROUP036: 판매유형
+      const { data: group036Data } = await supabaseClient
+        .from('admin_mastercode_data')
+        .select('subcode, subcode_name, subcode_order')
+        .eq('codetype', 'subcode')
+        .eq('group_code', 'GROUP036')
+        .eq('is_active', true)
+        .order('subcode_order', { ascending: true });
+
+      if (group036Data) {
+        setSalesTypesFromDB(group036Data);
+        console.log('✅ [SalesEditDialog] GROUP036 판매유형 DB 조회 완료:', group036Data.length, '개');
+      }
+
+      // GROUP002: 상태
+      const { data: group002Data } = await supabaseClient
+        .from('admin_mastercode_data')
+        .select('subcode, subcode_name, subcode_order')
+        .eq('codetype', 'subcode')
+        .eq('group_code', 'GROUP002')
+        .eq('is_active', true)
+        .order('subcode_order', { ascending: true });
+
+      if (group002Data) {
+        setStatusTypesFromDB(group002Data);
+        console.log('✅ [SalesEditDialog] GROUP002 상태 DB 조회 완료:', group002Data.length, '개');
+      }
+    };
+
+    fetchMasterCodeData();
+  }, [supabaseClient, open]);
 
   // 피드백/기록 훅
   const {
@@ -1235,6 +1270,12 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
                       label="사업부 *"
                       onChange={(e) => handleInputChange('businessUnit', e.target.value)}
                       displayEmpty
+                      notched
+                      renderValue={(selected) => {
+                        if (!selected) return '선택';
+                        const item = businessUnitsFromDB.find(b => b.subcode === selected);
+                        return item ? item.subcode_name : selected;
+                      }}
                       sx={{
                         '& .MuiOutlinedInput-notchedOutline': {
                           borderColor: '#e0e0e0'
@@ -1242,9 +1283,9 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
                       }}
                     >
                       <MenuItem value="">선택</MenuItem>
-                      {businessUnits.map((unit) => (
-                        <MenuItem key={unit} value={unit}>
-                          {unit}
+                      {businessUnitsFromDB.map((option) => (
+                        <MenuItem key={option.subcode} value={option.subcode}>
+                          {option.subcode_name}
                         </MenuItem>
                       ))}
                     </Select>
@@ -1259,6 +1300,12 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
                       label="고객명 *"
                       onChange={(e) => handleInputChange('customerName', e.target.value)}
                       displayEmpty
+                      notched
+                      renderValue={(selected) => {
+                        if (!selected) return '선택';
+                        const item = customerNamesFromDB.find(c => c.subcode === selected);
+                        return item ? item.subcode_name : selected;
+                      }}
                       sx={{
                         '& .MuiOutlinedInput-notchedOutline': {
                           borderColor: '#e0e0e0'
@@ -1266,9 +1313,9 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
                       }}
                     >
                       <MenuItem value="">선택</MenuItem>
-                      {customerNames.map((name) => (
-                        <MenuItem key={name} value={name}>
-                          {name}
+                      {customerNamesFromDB.map((option) => (
+                        <MenuItem key={option.subcode} value={option.subcode}>
+                          {option.subcode_name}
                         </MenuItem>
                       ))}
                     </Select>
@@ -1423,6 +1470,12 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
                       label="판매유형 *"
                       onChange={(e) => handleInputChange('salesType', e.target.value)}
                       displayEmpty
+                      notched
+                      renderValue={(selected) => {
+                        if (!selected) return '선택';
+                        const item = salesTypesFromDB.find(s => s.subcode === selected);
+                        return item ? item.subcode_name : selected;
+                      }}
                       sx={{
                         '& .MuiOutlinedInput-notchedOutline': {
                           borderColor: '#e0e0e0'
@@ -1430,9 +1483,9 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
                       }}
                     >
                       <MenuItem value="">선택</MenuItem>
-                      {salesTypes.map((type) => (
-                        <MenuItem key={type} value={type}>
-                          {type}
+                      {salesTypesFromDB.map((option) => (
+                        <MenuItem key={option.subcode} value={option.subcode}>
+                          {option.subcode_name}
                         </MenuItem>
                       ))}
                     </Select>
@@ -1463,35 +1516,74 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
                       value={formData.status || ''}
                       label="상태"
                       onChange={(e) => handleInputChange('status', e.target.value)}
+                      notched
+                      renderValue={(selected) => {
+                        if (!selected) return '';
+                        const item = statusTypesFromDB.find(s => s.subcode === selected);
+                        const displayName = item ? item.subcode_name : selected;
+
+                        const getStatusColor = (statusName: string) => {
+                          switch (statusName) {
+                            case '대기':
+                              return { bgcolor: '#F5F5F5', color: '#757575' };
+                            case '진행':
+                            case '진행중':
+                              return { bgcolor: '#E3F2FD', color: '#1976D2' };
+                            case '완료':
+                              return { bgcolor: '#E8F5E9', color: '#388E3C' };
+                            case '홀딩':
+                            case '취소':
+                              return { bgcolor: '#FFEBEE', color: '#D32F2F' };
+                            default:
+                              return { bgcolor: '#F5F5F5', color: '#757575' };
+                          }
+                        };
+
+                        return (
+                          <Chip
+                            label={displayName}
+                            size="small"
+                            sx={{
+                              backgroundColor: getStatusColor(displayName).bgcolor,
+                              color: getStatusColor(displayName).color,
+                              fontSize: '13px',
+                              fontWeight: 400
+                            }}
+                          />
+                        );
+                      }}
                       sx={{
                         '& .MuiOutlinedInput-notchedOutline': {
                           borderColor: '#e0e0e0'
                         }
                       }}
                     >
-                      {statusOptions.map((status) => {
+                      {statusTypesFromDB.map((option) => {
                         const getStatusColor = (statusName: string) => {
                           switch (statusName) {
                             case '대기':
                               return { bgcolor: '#F5F5F5', color: '#757575' };
                             case '진행':
+                            case '진행중':
                               return { bgcolor: '#E3F2FD', color: '#1976D2' };
                             case '완료':
                               return { bgcolor: '#E8F5E9', color: '#388E3C' };
                             case '홀딩':
+                            case '취소':
                               return { bgcolor: '#FFEBEE', color: '#D32F2F' };
                             default:
                               return { bgcolor: '#F5F5F5', color: '#757575' };
                           }
                         };
+
                         return (
-                          <MenuItem key={status} value={status}>
+                          <MenuItem key={option.subcode} value={option.subcode}>
                             <Chip
-                              label={status}
+                              label={option.subcode_name}
                               size="small"
                               sx={{
-                                backgroundColor: getStatusColor(status).bgcolor,
-                                color: getStatusColor(status).color,
+                                backgroundColor: getStatusColor(option.subcode_name).bgcolor,
+                                color: getStatusColor(option.subcode_name).color,
                                 fontSize: '13px',
                                 fontWeight: 400
                               }}

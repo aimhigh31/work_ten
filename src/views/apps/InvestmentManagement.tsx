@@ -53,7 +53,6 @@ import { ThemeMode } from 'config';
 import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
 import { useSupabaseInvestment } from 'hooks/useSupabaseInvestment';
 import { useSupabaseInvestmentFinance } from 'hooks/useSupabaseInvestmentFinance';
-import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
 import { ChangeLogData } from 'types/changelog';
 import { createClient } from '@/lib/supabase/client';
@@ -2120,7 +2119,7 @@ export default function InvestmentManagement() {
   const [value, setValue] = useState(0);
 
   // 🏪 공용 창고에서 재료 가져오기
-  const { users, departments } = useCommonData();
+  const { users, departments, masterCodes } = useCommonData();
 
   // Supabase 투자관리 연동
   const {
@@ -2134,7 +2133,6 @@ export default function InvestmentManagement() {
     error
   } = useSupabaseInvestment();
   const { saveFinanceItems } = useSupabaseInvestmentFinance();
-  const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
   // Supabase 변경로그 연동
   const { data: session } = useSession();
@@ -2143,16 +2141,53 @@ export default function InvestmentManagement() {
   const currentUser = users.find((u) => u.email === session?.user?.email);
   const { logs: changeLogData, fetchChangeLogs } = useSupabaseChangeLog('plan_investment');
 
-  // 마스터코드에서 상태 옵션 가져오기
+  // 마스터코드에서 상태 옵션 가져오기 (GROUP002의 서브코드만 필터링)
   const statusTypes = React.useMemo(() => {
-    return getSubCodesByGroup('GROUP002');
-  }, [getSubCodesByGroup]);
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 마스터코드에서 투자유형 옵션 가져오기 (GROUP025)
+  const investmentTypesMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP025' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 마스터코드에서 투자세부유형 옵션 가져오기 (GROUP026)
+  const investmentDetailTypesMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP026' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // subcode → subcode_name 변환 함수들
+  const getInvestmentTypeName = React.useCallback((subcode: string) => {
+    const found = investmentTypesMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [investmentTypesMap]);
+
+  const getInvestmentDetailTypeName = React.useCallback((subcode: string) => {
+    const found = investmentDetailTypesMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [investmentDetailTypesMap]);
+
+  const getStatusName = React.useCallback((subcode: string) => {
+    const found = statusTypes.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [statusTypes]);
 
   // 투자 데이터 상태 - 모든 탭에서 공유
   const [investments, setInvestments] = useState<InvestmentTableData[]>([]);
 
-  // 동적 데이터 상태
-  const [investmentTypeOptions, setInvestmentTypeOptions] = useState<string[]>([]);
+  // 동적 데이터 상태 - 마스터코드에서 투자 유형 옵션 가져오기 (GROUP025)
+  const investmentTypeOptions = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP025' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order)
+      .map((item) => item.subcode_name);
+  }, [masterCodes]);
 
   // 필터 상태
   const [selectedInvestmentType, setSelectedInvestmentType] = useState('전체');
@@ -2268,15 +2303,6 @@ export default function InvestmentManagement() {
 
     loadInvestments();
   }, [getInvestments, convertToInvestmentData]);
-
-  // 마스터코드 데이터 로드 (투자유형)
-  useEffect(() => {
-    const loadMasterCodes = async () => {
-      const investmentTypes = await getSubCodesByGroup('GROUP025');
-      setInvestmentTypeOptions(investmentTypes.map((item) => item.subCodeName));
-    };
-    loadMasterCodes();
-  }, [getSubCodesByGroup]);
 
   // NO 할당 헬퍼 함수
   const assignNoToInvestments = (investments: InvestmentData[]) => {

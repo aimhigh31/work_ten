@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, useReducer, memo, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
+import { createClient } from '@supabase/supabase-js';
 import {
   Dialog,
   DialogTitle,
@@ -150,7 +151,69 @@ const OverviewTab = memo(
     // CommonData 훅 사용 (캐싱된 데이터)
     const { masterCodes, users } = useCommonData();
 
-    // 커스텀 getSubCodesByGroup 함수 (빈 값 필터링 포함)
+    // Supabase 클라이언트 생성 (DB 직접 조회용)
+    const supabaseClient = React.useMemo(() => {
+      return createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+    }, []);
+
+    // DB 직접 조회 상태
+    const [educationFieldsFromDB, setEducationFieldsFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+    const [educationTypesFromDB, setEducationTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+    const [statusTypesFromDB, setStatusTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+
+    // Dialog 열릴 때마다 DB에서 직접 조회
+    useEffect(() => {
+      const fetchMasterCodeData = async () => {
+        // GROUP029: 교육분야
+        const { data: group029Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP029')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+
+        if (group029Data) {
+          setEducationFieldsFromDB(group029Data);
+          console.log('✅ [EducationOverviewTab] GROUP029 교육분야 DB 조회 완료:', group029Data.length, '개');
+        }
+
+        // GROUP008: 교육유형
+        const { data: group008Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP008')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+
+        if (group008Data) {
+          setEducationTypesFromDB(group008Data);
+          console.log('✅ [EducationOverviewTab] GROUP008 교육유형 DB 조회 완료:', group008Data.length, '개');
+        }
+
+        // GROUP002: 상태
+        const { data: group002Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP002')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+
+        if (group002Data) {
+          setStatusTypesFromDB(group002Data);
+          console.log('✅ [EducationOverviewTab] GROUP002 상태 DB 조회 완료:', group002Data.length, '개');
+        }
+      };
+
+      fetchMasterCodeData();
+    }, [supabaseClient]);
+
+    // 커스텀 getSubCodesByGroup 함수 (빈 값 필터링 포함) - 우선순위용으로 유지
     const getSubCodesByGroup = useCallback((groupCode: string) => {
       if (!masterCodes || masterCodes.length === 0) {
         console.log(`⚠️ [개인교육관리 OverviewTab] masterCodes가 아직 로드되지 않음`);
@@ -163,29 +226,8 @@ const OverviewTab = memo(
       return subCodes;
     }, [masterCodes]);
 
-    // GROUP029의 서브코드 목록 가져오기 (교육분야)
-    const educationFieldOptions = getSubCodesByGroup('GROUP029').map((subCode) => ({
-      value: subCode.subcode_name,
-      label: subCode.subcode_name,
-      description: subCode.subcode_description
-    }));
-
-    // GROUP008의 서브코드 목록 가져오기 (교육방식)
-    const educationTypeOptions = getSubCodesByGroup('GROUP008').map((subCode) => ({
-      value: subCode.subcode_name,
-      label: subCode.subcode_name,
-      description: subCode.subcode_description
-    }));
-
     // GROUP024의 서브코드 목록 가져오기 (우선순위)
     const priorityOptions = getSubCodesByGroup('GROUP024').map((subCode) => ({
-      value: subCode.subcode_name,
-      label: subCode.subcode_name,
-      description: subCode.subcode_description
-    }));
-
-    // GROUP002의 서브코드 목록 가져오기 (상태)
-    const statusOptionsFromMaster = getSubCodesByGroup('GROUP002').map((subCode) => ({
       value: subCode.subcode_name,
       label: subCode.subcode_name,
       description: subCode.subcode_description
@@ -315,17 +357,24 @@ const OverviewTab = memo(
                   교육분야 <span style={{ color: 'red' }}>*</span>
                 </span>
               </InputLabel>
-              <Select value={educationState.customerName} label="교육분야 *" onChange={handleFieldChange('customerName')} displayEmpty>
+              <Select
+                value={educationState.customerName}
+                label="교육분야 *"
+                onChange={handleFieldChange('customerName')}
+                displayEmpty
+                notched
+                renderValue={(selected) => {
+                  if (!selected) return '선택';
+                  const item = educationFieldsFromDB.find(f => f.subcode === selected);
+                  return item ? item.subcode_name : selected;
+                }}
+              >
                 <MenuItem value="">선택</MenuItem>
-                {educationFieldOptions.length > 0 ? (
-                  educationFieldOptions.map((option) => (
-                    <MenuItem key={option.value} value={option.value} title={option.description}>
-                      {option.label}
-                    </MenuItem>
-                  ))
-                ) : (
-                  <MenuItem value="">교육분야 로딩중...</MenuItem>
-                )}
+                {educationFieldsFromDB.map((option) => (
+                  <MenuItem key={option.subcode} value={option.subcode}>
+                    {option.subcode_name}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
 
@@ -335,83 +384,91 @@ const OverviewTab = memo(
                   교육유형 <span style={{ color: 'red' }}>*</span>
                 </span>
               </InputLabel>
-              <Select value={educationState.educationType} label="교육유형 *" onChange={handleFieldChange('educationType')} displayEmpty>
+              <Select
+                value={educationState.educationType}
+                label="교육유형 *"
+                onChange={handleFieldChange('educationType')}
+                displayEmpty
+                notched
+                renderValue={(selected) => {
+                  if (!selected) return '선택';
+                  const item = educationTypesFromDB.find(t => t.subcode === selected);
+                  return item ? item.subcode_name : selected;
+                }}
+              >
                 <MenuItem value="">선택</MenuItem>
-                {educationTypeOptions.length > 0
-                  ? educationTypeOptions.map((option) => (
-                      <MenuItem key={option.value} value={option.value} title={option.description}>
-                        {option.label}
-                      </MenuItem>
-                    ))
-                  : // 백업용: 마스터코드 로딩 중이거나 데이터가 없을 때
-                    Education_TYPES.map((type) => (
-                      <MenuItem key={type} value={type}>
-                        {type}
-                      </MenuItem>
-                    ))}
+                {educationTypesFromDB.map((option) => (
+                  <MenuItem key={option.subcode} value={option.subcode}>
+                    {option.subcode_name}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
 
             <FormControl fullWidth>
               <InputLabel shrink>상태</InputLabel>
-              <Select value={educationState.status} label="상태" onChange={handleFieldChange('status')} displayEmpty>
-                {statusOptionsFromMaster.length > 0
-                  ? statusOptionsFromMaster.map((option) => {
-                      let chipColors = { bgcolor: '#F5F5F5', color: '#757575' };
+              <Select
+                value={educationState.status}
+                label="상태"
+                onChange={handleFieldChange('status')}
+                notched
+                renderValue={(selected) => {
+                  if (!selected) return '';
+                  const item = statusTypesFromDB.find(s => s.subcode === selected);
+                  const displayName = item ? item.subcode_name : selected;
 
-                      if (option.value === '대기') {
-                        chipColors = { bgcolor: '#F5F5F5', color: '#757575' };
-                      } else if (option.value === '진행') {
-                        chipColors = { bgcolor: '#E3F2FD', color: '#1976D2' };
-                      } else if (option.value === '완료') {
-                        chipColors = { bgcolor: '#E8F5E9', color: '#388E3C' };
-                      } else if (option.value === '홀딩') {
-                        chipColors = { bgcolor: '#FFEBEE', color: '#D32F2F' };
-                      }
+                  let chipColors = { bgcolor: '#F5F5F5', color: '#757575' };
+                  if (displayName === '대기') {
+                    chipColors = { bgcolor: '#F5F5F5', color: '#757575' };
+                  } else if (displayName === '진행' || displayName === '진행중') {
+                    chipColors = { bgcolor: '#E3F2FD', color: '#1976D2' };
+                  } else if (displayName === '완료') {
+                    chipColors = { bgcolor: '#E8F5E9', color: '#388E3C' };
+                  } else if (displayName === '홀딩' || displayName === '취소') {
+                    chipColors = { bgcolor: '#FFEBEE', color: '#D32F2F' };
+                  }
 
-                      return (
-                        <MenuItem key={option.value} value={option.value}>
-                          <Chip
-                            label={option.label}
-                            size="small"
-                            sx={{
-                              backgroundColor: chipColors.bgcolor,
-                              color: chipColors.color,
-                              fontSize: '13px',
-                              fontWeight: 400
-                            }}
-                          />
-                        </MenuItem>
-                      );
-                    })
-                  : Education_STATUS.map((status) => {
-                      let chipColors = { bgcolor: '#F5F5F5', color: '#757575' };
+                  return (
+                    <Chip
+                      label={displayName}
+                      size="small"
+                      sx={{
+                        backgroundColor: chipColors.bgcolor,
+                        color: chipColors.color,
+                        fontSize: '13px',
+                        fontWeight: 400
+                      }}
+                    />
+                  );
+                }}
+              >
+                {statusTypesFromDB.map((option) => {
+                  let chipColors = { bgcolor: '#F5F5F5', color: '#757575' };
+                  if (option.subcode_name === '대기') {
+                    chipColors = { bgcolor: '#F5F5F5', color: '#757575' };
+                  } else if (option.subcode_name === '진행' || option.subcode_name === '진행중') {
+                    chipColors = { bgcolor: '#E3F2FD', color: '#1976D2' };
+                  } else if (option.subcode_name === '완료') {
+                    chipColors = { bgcolor: '#E8F5E9', color: '#388E3C' };
+                  } else if (option.subcode_name === '홀딩' || option.subcode_name === '취소') {
+                    chipColors = { bgcolor: '#FFEBEE', color: '#D32F2F' };
+                  }
 
-                      if (status === '대기') {
-                        chipColors = { bgcolor: '#F5F5F5', color: '#757575' };
-                      } else if (status === '진행') {
-                        chipColors = { bgcolor: '#E3F2FD', color: '#1976D2' };
-                      } else if (status === '완료') {
-                        chipColors = { bgcolor: '#E8F5E9', color: '#388E3C' };
-                      } else if (status === '홀딩') {
-                        chipColors = { bgcolor: '#FFEBEE', color: '#D32F2F' };
-                      }
-
-                      return (
-                        <MenuItem key={status} value={status}>
-                          <Chip
-                            label={status}
-                            size="small"
-                            sx={{
-                              backgroundColor: chipColors.bgcolor,
-                              color: chipColors.color,
-                              fontSize: '13px',
-                              fontWeight: 400
-                            }}
-                          />
-                        </MenuItem>
-                      );
-                    })}
+                  return (
+                    <MenuItem key={option.subcode} value={option.subcode}>
+                      <Chip
+                        label={option.subcode_name}
+                        size="small"
+                        sx={{
+                          backgroundColor: chipColors.bgcolor,
+                          color: chipColors.color,
+                          fontSize: '13px',
+                          fontWeight: 400
+                        }}
+                      />
+                    </MenuItem>
+                  );
+                })}
               </Select>
             </FormControl>
           </Stack>

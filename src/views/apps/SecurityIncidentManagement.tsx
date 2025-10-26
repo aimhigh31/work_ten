@@ -48,12 +48,12 @@ import SecurityIncidentEditDialog from 'components/SecurityIncidentEditDialog';
 import { SecurityIncidentRecord } from 'types/security-incident';
 import { useSupabaseSecurityAccident } from 'hooks/useSupabaseSecurityAccident';
 import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
-import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
 import { ChangeLogData } from 'types/changelog';
 import { createClient } from '@/lib/supabase/client';
 import { useSession } from 'next-auth/react';
 import useUser from 'hooks/useUser';
+import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 
 // 임시 데이터 매핑
 const teams = ['보안팀', 'IT팀', '운영팀', '관리팀'];
@@ -2062,13 +2062,92 @@ export default function SecurityIncidentManagement() {
 
   // Supabase 연동 (병렬 호출 최적화)
   const { items, error, fetchAccidents } = useSupabaseSecurityAccident();
-  const { users, departments } = useCommonData(); // 🏪 공용 창고에서 가져오기
-  const { getSubCodesByGroup } = useSupabaseMasterCode3();
+  const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 가져오기
 
-  // GROUP002 서브코드 목록 (상태용)
+  // 마스터코드에서 상태 옵션 가져오기 (GROUP002의 서브코드만 필터링)
   const statusTypes = React.useMemo(() => {
-    return getSubCodesByGroup('GROUP002');
-  }, [getSubCodesByGroup]);
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 마스터코드에서 사고유형 옵션 가져오기 (GROUP009의 서브코드만 필터링)
+  const incidentTypesMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP009' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // subcode → subcode_name 변환 헬퍼 함수
+  const getIncidentTypeName = React.useCallback((subcode: string) => {
+    const found = incidentTypesMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [incidentTypesMap]);
+
+  const getStatusName = React.useCallback((subcode: string) => {
+    const found = statusTypes.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [statusTypes]);
+
+  // 마스터코드에서 대응단계 옵션 가져오기 (GROUP010의 서브코드만 필터링)
+  const responseStagesMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP010' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  const getResponseStageName = React.useCallback((subcode: string) => {
+    const found = responseStagesMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [responseStagesMap]);
+
+  // 마스터코드에서 발견방법 옵션 가져오기 (GROUP011)
+  const discoveryMethodsMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP011' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  const getDiscoveryMethodName = React.useCallback((subcode: string) => {
+    const found = discoveryMethodsMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [discoveryMethodsMap]);
+
+  // 마스터코드에서 보고방식 옵션 가져오기 (GROUP014)
+  const reportMethodsMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP014' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  const getReportMethodName = React.useCallback((subcode: string) => {
+    const found = reportMethodsMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [reportMethodsMap]);
+
+  // 마스터코드에서 서비스/비즈니스영향도 옵션 가져오기 (GROUP012)
+  const serviceImpactsMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP012' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  const getServiceImpactName = React.useCallback((subcode: string) => {
+    const found = serviceImpactsMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [serviceImpactsMap]);
+
+  // 마스터코드에서 대응방식 옵션 가져오기 (GROUP013)
+  const responseMethodsMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP013' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  const getResponseMethodName = React.useCallback((subcode: string) => {
+    const found = responseMethodsMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [responseMethodsMap]);
 
   // 사용자 프로필 이미지 매핑 (동적 생성)
   const assigneeAvatars = React.useMemo(() => {

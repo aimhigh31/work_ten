@@ -394,8 +394,8 @@ export default function InvestmentDataTable({
             Excel Down
           </Button>
           <Button
-            variant="outlined"
-            startIcon={<Add />}
+            variant="contained"
+            startIcon={<Add size={16} />}
             size="small"
             onClick={() => {
               console.log('추가 버튼 클릭됨', onAddInvestment);
@@ -405,6 +405,7 @@ export default function InvestmentDataTable({
                 console.warn('onAddInvestment 함수가 정의되지 않음');
               }
             }}
+            sx={{ px: 2 }}
           >
             추가
           </Button>

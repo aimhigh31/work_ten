@@ -45,7 +45,6 @@ import EducationEditDialog from 'components/EducationEditDialog';
 import { educationData, educationStatusColors, assigneeAvatars, assignees, teams, educationStatusOptions } from 'data/education';
 import { EducationTableData, EducationStatus } from 'types/education';
 import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
-import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
 import { useSupabaseEducation } from 'hooks/useSupabaseEducation';
 import { ChangeLogData } from 'types/changelog';
@@ -2377,8 +2376,7 @@ export default function EducationManagement() {
   const userName = user?.name || session?.user?.name || '시스템';
 
   // Supabase 훅 사용 (즉시 렌더링 - loading 상태 제거)
-  const { users, departments } = useCommonData(); // 🏪 공용 창고에서 가져오기
-  const { getSubCodesByGroup } = useSupabaseMasterCode3();
+  const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 가져오기
 
   // 현재 로그인한 사용자 정보
   const currentUser = React.useMemo(() => {
@@ -2415,10 +2413,42 @@ export default function EducationManagement() {
     loadEducations();
   }, [getEducations, convertToEducationData]);
 
-  // 마스터코드에서 상태 옵션 가져오기
+  // 마스터코드에서 상태 옵션 가져오기 (GROUP002의 서브코드만 필터링)
   const statusTypes = React.useMemo(() => {
-    return getSubCodesByGroup('GROUP002');
-  }, [getSubCodesByGroup]);
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 마스터코드에서 교육분야 옵션 가져오기 (GROUP029)
+  const educationFieldsMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP029' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 마스터코드에서 교육유형 옵션 가져오기 (GROUP008)
+  const educationTypesMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP008' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // subcode → subcode_name 변환 함수들
+  const getEducationFieldName = React.useCallback((subcode: string) => {
+    const found = educationFieldsMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [educationFieldsMap]);
+
+  const getEducationTypeName = React.useCallback((subcode: string) => {
+    const found = educationTypesMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [educationTypesMap]);
+
+  const getStatusName = React.useCallback((subcode: string) => {
+    const found = statusTypes.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [statusTypes]);
 
   // 편집 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);

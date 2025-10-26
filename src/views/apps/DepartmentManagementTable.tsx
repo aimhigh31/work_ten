@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 
 // Material-UI
 import {
@@ -25,7 +25,9 @@ import {
   Stack,
   IconButton,
   Tooltip,
-  LinearProgress
+  LinearProgress,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 
@@ -53,6 +55,7 @@ interface DepartmentData {
   status: '활성' | '비활성' | '대기';
   lastModifiedDate: string;
   modifier: string;
+  team?: string;
 }
 
 // 컬럼 너비 정의
@@ -91,7 +94,7 @@ const transformDepartment = (department: Department, index: number, totalCount: 
     departmentDescription: department.description || '',
     status: department.is_active ? ('활성' as const) : ('비활성' as const),
     lastModifiedDate: department.updated_at.split('T')[0],
-    modifier: department.updated_by
+    modifier: department.created_by // 등록자 정보 표시
   };
 };
 
@@ -106,7 +109,8 @@ const mockDepartmentData: DepartmentData[] = [
     departmentDescription: '소프트웨어 개발 및 시스템 구축',
     status: '활성',
     lastModifiedDate: '2025-09-07',
-    modifier: '김부장'
+    modifier: '김부장',
+    team: '기술본부'
   },
   {
     id: 2,
@@ -117,7 +121,8 @@ const mockDepartmentData: DepartmentData[] = [
     departmentDescription: 'UI/UX 디자인 및 브랜딩',
     status: '활성',
     lastModifiedDate: '2025-09-06',
-    modifier: '박과장'
+    modifier: '박과장',
+    team: '기술본부'
   },
   {
     id: 3,
@@ -128,7 +133,8 @@ const mockDepartmentData: DepartmentData[] = [
     departmentDescription: '프로젝트 기획 및 전략 수립',
     status: '활성',
     lastModifiedDate: '2025-09-05',
-    modifier: '이차장'
+    modifier: '이차장',
+    team: '경영지원본부'
   },
   {
     id: 4,
@@ -139,7 +145,8 @@ const mockDepartmentData: DepartmentData[] = [
     departmentDescription: '마케팅 전략 및 홍보 업무',
     status: '활성',
     lastModifiedDate: '2025-09-04',
-    modifier: '최팀장'
+    modifier: '최팀장',
+    team: '영업본부'
   },
   {
     id: 5,
@@ -150,7 +157,8 @@ const mockDepartmentData: DepartmentData[] = [
     departmentDescription: '인사 관리 및 채용 업무',
     status: '대기',
     lastModifiedDate: '2025-09-07',
-    modifier: '홍대리'
+    modifier: '홍대리',
+    team: '경영지원본부'
   }
 ];
 
@@ -169,7 +177,7 @@ export default function DepartmentManagementTable({
   const { canRead, canWrite, canFull, loading: permissionLoading } = useMenuPermission('/admin-panel/user-settings');
 
   // 🏪 공용 창고에서 데이터 가져오기 (중복 로딩 방지!)
-  const { departments: supabaseDepartments, isLoading: commonDataLoading } = useCommonData();
+  const { departments: supabaseDepartments, users, isLoading: commonDataLoading, refreshCommonData } = useCommonData();
 
   // Supabase 훅 사용 (데이터 수정 함수만)
   const { loading, error, clearError, createDepartment, updateDepartment, deleteDepartment, toggleDepartmentStatus } =
@@ -178,9 +186,36 @@ export default function DepartmentManagementTable({
   // 전체 로딩 상태 (CommonData 로딩 중 또는 수정 작업 로딩 중)
   const isLoading = commonDataLoading || loading;
 
+  // 등록자 이름으로 프로필 이미지 찾기
+  const findUserProfileImage = useCallback(
+    (userName: string) => {
+      if (!userName || users.length === 0) return null;
+      const user = users.find((u) => u.user_name === userName);
+      return user?.profile_image_url || user?.avatar_url || null;
+    },
+    [users]
+  );
+
+  // 🔍 디버깅: 부서 데이터 확인
+  useEffect(() => {
+    console.log('🏢 [DepartmentManagementTable] 부서 데이터 상태:', {
+      supabaseDepartmentsCount: supabaseDepartments.length,
+      commonDataLoading,
+      loading,
+      isLoading,
+      firstDepartment: supabaseDepartments[0]
+    });
+  }, [supabaseDepartments, commonDataLoading, loading, isLoading]);
+
   // 변환된 부서 데이터
   const transformedDepartments = useMemo(() => {
-    return supabaseDepartments.map((department, index) => transformDepartment(department, index, supabaseDepartments.length));
+    const transformed = supabaseDepartments.map((department, index) => transformDepartment(department, index, supabaseDepartments.length));
+    console.log('🔄 [DepartmentManagementTable] 부서 데이터 변환 완료:', {
+      원본개수: supabaseDepartments.length,
+      변환개수: transformed.length,
+      첫번째변환데이터: transformed[0]
+    });
+    return transformed;
   }, [supabaseDepartments]);
 
   const [data, setData] = useState<DepartmentData[]>([]);
@@ -188,6 +223,13 @@ export default function DepartmentManagementTable({
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [goToPage, setGoToPage] = useState('');
+
+  // 알림창 상태
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error' | 'warning' | 'info'
+  });
 
   // Edit 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);
@@ -204,7 +246,7 @@ export default function DepartmentManagementTable({
         부서설명: dept.departmentDescription,
         상태: dept.status,
         마지막수정일: dept.lastModifiedDate,
-        수정자: dept.modifier
+        등록자: dept.modifier
       }));
 
       const csvContent = [
@@ -236,10 +278,20 @@ export default function DepartmentManagementTable({
 
   // Supabase 데이터 또는 props 데이터 사용
   useEffect(() => {
+    console.log('📊 [DepartmentManagementTable] setData 실행:', {
+      hasDepartmentsProp: !!(departments && departments.length > 0),
+      departmentsCount: departments?.length || 0,
+      transformedDepartmentsCount: transformedDepartments.length
+    });
+
     if (departments && departments.length > 0) {
+      console.log('✅ [DepartmentManagementTable] props의 departments 사용');
       setData([...departments]);
     } else if (transformedDepartments.length > 0) {
+      console.log('✅ [DepartmentManagementTable] transformedDepartments 사용');
       setData([...transformedDepartments]);
+    } else {
+      console.warn('⚠️ [DepartmentManagementTable] 표시할 부서 데이터 없음');
     }
   }, [departments, transformedDepartments]);
 
@@ -315,21 +367,63 @@ export default function DepartmentManagementTable({
     try {
       // 선택된 각 부서에 대해 DB에서 삭제
       const deletedDepartments = data.filter((dept) => selected.includes(dept.id));
+      let successCount = 0;
+      let failCount = 0;
 
       for (const dept of deletedDepartments) {
         const result = await deleteDepartment(dept.id);
 
-        if (result.success && addChangeLog) {
-          addChangeLog('부서 삭제', dept.code || `DEPT-${dept.id}`, `${dept.departmentName || '부서'} 삭제`);
+        if (result.success) {
+          console.log('✅ 부서 삭제 성공:', dept.departmentName);
+          successCount++;
+
+          if (addChangeLog) {
+            addChangeLog('부서 삭제', dept.code || `DEPT-${dept.id}`, `${dept.departmentName || '부서'} 삭제`);
+          }
         } else if (result.error) {
           console.error('부서 삭제 에러:', result.error);
+          failCount++;
         }
       }
 
+      // ✅ Optimistic Update: 삭제된 부서를 로컬 상태에서 즉시 제거
+      setData((prevData) => prevData.filter((dept) => !selected.includes(dept.id)));
+      console.log('✅ 로컬 상태 즉시 업데이트 완료 (부서 삭제)');
+
+      // ✅ 서버 동기화는 백그라운드에서 처리
+      refreshCommonData();
+      console.log('🔄 CommonData 백그라운드 새로고침 시작');
+
       // 선택 상태 초기화
       setSelected([]);
+
+      // 결과 알림
+      if (failCount === 0) {
+        setSnackbar({
+          open: true,
+          message: `${successCount}개 부서가 성공적으로 삭제되었습니다.`,
+          severity: 'success'
+        });
+      } else if (successCount > 0) {
+        setSnackbar({
+          open: true,
+          message: `삭제 완료: ${successCount}개, 실패: ${failCount}개`,
+          severity: 'warning'
+        });
+      } else {
+        setSnackbar({
+          open: true,
+          message: '부서 삭제에 실패했습니다.',
+          severity: 'error'
+        });
+      }
     } catch (error) {
       console.error('부서 삭제 중 오류:', error);
+      setSnackbar({
+        open: true,
+        message: '부서 삭제 중 오류가 발생했습니다.',
+        severity: 'error'
+      });
     }
   };
 
@@ -356,11 +450,46 @@ export default function DepartmentManagementTable({
 
       const result = await updateDepartment(updateData);
 
-      if (result.success && addChangeLog) {
-        addChangeLog('부서 정보 수정', updatedDept.code || `DEPT-${updatedDept.id}`, `${updatedDept.departmentName || '부서'} 정보 수정`);
+      if (result.success) {
+        console.log('✅ 부서 업데이트 성공');
+
+        // ✅ Optimistic Update: 로컬 상태를 즉시 업데이트 (0ms, 즉각 반영)
+        setData((prevData) =>
+          prevData.map((dept) =>
+            dept.id === updatedDept.id
+              ? {
+                  ...dept,
+                  code: updatedDept.code,
+                  departmentName: updatedDept.departmentName,
+                  departmentDescription: updatedDept.departmentDescription,
+                  modifier: updatedDept.modifier || dept.modifier,
+                  team: updatedDept.team || dept.team
+                }
+              : dept
+          )
+        );
+        console.log('✅ 로컬 상태 즉시 업데이트 완료');
+
+        // ✅ 서버 동기화는 백그라운드에서 처리 (await 제거)
+        refreshCommonData();
+        console.log('🔄 CommonData 백그라운드 새로고침 시작');
+
+        if (addChangeLog) {
+          addChangeLog('부서 정보 수정', updatedDept.code || `DEPT-${updatedDept.id}`, `${updatedDept.departmentName || '부서'} 정보 수정`);
+        }
+
+        setSnackbar({
+          open: true,
+          message: '부서 정보가 성공적으로 수정되었습니다.',
+          severity: 'success'
+        });
       } else if (result.error) {
-        console.error('부서 수정 에러:', result.error);
-        alert(result.error);
+        console.warn('⚠️ 부서 수정 검증 실패:', result.error);
+        setSnackbar({
+          open: true,
+          message: result.error,
+          severity: 'error'
+        });
         return;
       }
     } else {
@@ -382,16 +511,52 @@ export default function DepartmentManagementTable({
         department_name: updatedDept.departmentName,
         description: updatedDept.departmentDescription || '',
         manager_name: updatedDept.modifier || '',
-        display_order: supabaseDepartments.length + 1
+        display_order: supabaseDepartments.length + 1,
+        created_by: updatedDept.modifier || 'system'
       };
 
       const result = await createDepartment(newDepartmentData);
 
-      if (result.success && addChangeLog) {
-        addChangeLog('새 부서 생성', departmentCode, `${updatedDept.departmentName || '새 부서'} 생성`);
+      if (result.success) {
+        console.log('✅ 부서 생성 성공');
+
+        // ✅ Optimistic Update: 새 부서를 로컬 상태에 즉시 추가
+        const newDepartment: DepartmentData = {
+          id: Date.now(), // 임시 ID (백그라운드 동기화 후 실제 ID로 대체됨)
+          no: data.length + 1,
+          registrationDate: new Date().toISOString().split('T')[0],
+          code: departmentCode,
+          departmentName: updatedDept.departmentName,
+          departmentDescription: updatedDept.departmentDescription || '',
+          status: '활성',
+          lastModifiedDate: new Date().toISOString().split('T')[0],
+          modifier: updatedDept.modifier || 'system',
+          team: updatedDept.team || ''
+        };
+
+        setData((prevData) => [newDepartment, ...prevData]);
+        console.log('✅ 로컬 상태 즉시 업데이트 완료 (새 부서 추가)');
+
+        // ✅ 서버 동기화는 백그라운드에서 처리 (await 제거)
+        refreshCommonData();
+        console.log('🔄 CommonData 백그라운드 새로고침 시작');
+
+        if (addChangeLog) {
+          addChangeLog('새 부서 생성', departmentCode, `${updatedDept.departmentName || '새 부서'} 생성`);
+        }
+
+        setSnackbar({
+          open: true,
+          message: '부서가 성공적으로 생성되었습니다.',
+          severity: 'success'
+        });
       } else if (result.error) {
-        console.error('부서 생성 에러:', result.error);
-        alert(result.error);
+        console.warn('⚠️ 부서 생성 검증 실패:', result.error);
+        setSnackbar({
+          open: true,
+          message: result.error,
+          severity: 'error'
+        });
         return;
       }
     }
@@ -414,14 +579,16 @@ export default function DepartmentManagementTable({
   // 상태 색상
   const getStatusColor = (status: string) => {
     switch (status) {
-      case '활성':
-        return { backgroundColor: '#E8F5E8', color: '#333333' };
-      case '비활성':
-        return { backgroundColor: '#FFEBEE', color: '#333333' };
       case '대기':
-        return { backgroundColor: '#FFF3E0', color: '#333333' };
+        return { backgroundColor: '#F5F5F5', color: '#757575' };
+      case '활성':
+        return { backgroundColor: '#E8F5E9', color: '#388E3C' };
+      case '비활성':
+        return { backgroundColor: '#FFEBEE', color: '#D32F2F' };
+      case '취소':
+        return { backgroundColor: '#FFEBEE', color: '#D32F2F' };
       default:
-        return { backgroundColor: '#F5F5F5', color: '#333333' };
+        return { backgroundColor: '#F5F5F5', color: '#757575' };
     }
   };
 
@@ -542,7 +709,7 @@ export default function DepartmentManagementTable({
               <TableCell sx={{ width: columnWidths.departmentDescription, fontWeight: 600 }}>부서설명</TableCell>
               <TableCell sx={{ width: columnWidths.status, fontWeight: 600 }}>상태</TableCell>
               <TableCell sx={{ width: columnWidths.lastModifiedDate, fontWeight: 600 }}>마지막수정일</TableCell>
-              <TableCell sx={{ width: columnWidths.modifier, fontWeight: 600 }}>수정자</TableCell>
+              <TableCell sx={{ width: columnWidths.modifier, fontWeight: 600 }}>등록자</TableCell>
               <TableCell sx={{ width: columnWidths.action, fontWeight: 600 }}>Action</TableCell>
             </TableRow>
           </TableHead>
@@ -636,9 +803,24 @@ export default function DepartmentManagementTable({
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                      {dept.modifier}
-                    </Typography>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Avatar
+                        src={findUserProfileImage(dept.modifier) || ''}
+                        sx={{ width: 24, height: 24, fontSize: '12px' }}
+                      >
+                        {dept.modifier?.charAt(0)}
+                      </Avatar>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontSize: '13px',
+                          color: 'text.primary',
+                          fontWeight: 500
+                        }}
+                      >
+                        {dept.modifier}
+                      </Typography>
+                    </Stack>
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
@@ -827,6 +1009,18 @@ export default function DepartmentManagementTable({
           existingDepartments={data}
         />
       )}
+
+      {/* 알림창 */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

@@ -52,7 +52,6 @@ import { ThemeMode } from 'config';
 // Supabase hook
 import { useSupabaseSoftware, SoftwareData } from 'hooks/useSupabaseSoftware';
 import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
-import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
 import { ChangeLogData } from 'types/changelog';
 import { createClient } from '@/lib/supabase/client';
@@ -2302,7 +2301,6 @@ export default function SoftwareManagement() {
     error
   } = useSupabaseSoftware();
   const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 모두 가져오기
-  const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
   // ⭐ 페이지 레벨 상태 관리
   const [software, setSoftware] = useState<SoftwareData[]>([]);
@@ -2351,10 +2349,54 @@ export default function SoftwareManagement() {
     loadAllData();
   }, [getSoftware]); // ⚡ software만 로딩 (나머지는 CommonData 사용)
 
-  // 마스터코드에서 상태 옵션 가져오기
+  // 마스터코드에서 상태 옵션 가져오기 (GROUP002의 서브코드만 필터링)
   const statusTypes = React.useMemo(() => {
-    return getSubCodesByGroup('GROUP002');
-  }, [getSubCodesByGroup]);
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 마스터코드에서 소프트웨어분류 옵션 가져오기 (GROUP015)
+  const softwareCategoriesMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP015' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 마스터코드에서 라이센스유형 옵션 가져오기 (GROUP016)
+  const licenseTypesMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP016' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 마스터코드에서 유형 옵션 가져오기 (GROUP017)
+  const historyTypesMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP017' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // subcode → subcode_name 변환 함수들
+  const getSoftwareCategoryName = React.useCallback((subcode: string) => {
+    const found = softwareCategoriesMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [softwareCategoriesMap]);
+
+  const getLicenseTypeName = React.useCallback((subcode: string) => {
+    const found = licenseTypesMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [licenseTypesMap]);
+
+  const getStatusName = React.useCallback((subcode: string) => {
+    const found = statusTypes.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [statusTypes]);
+
+  const getHistoryTypeName = React.useCallback((subcode: string) => {
+    const found = historyTypesMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [historyTypesMap]);
 
   // assignees - 활성 사용자 목록
   const assignees = React.useMemo(() => {

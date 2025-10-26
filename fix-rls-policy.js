@@ -1,131 +1,101 @@
-// RLS 정책 수정으로 시스템설정 페이지 DB 저장 문제 해결
+// RLS 정책 수정 스크립트
 const { Client } = require('pg');
-
-const client = new Client({
-  connectionString: 'postgresql://postgres:tg1150ja5%25@db.exxumujwufzqnovhzvif.supabase.co:5432/postgres',
-  ssl: { rejectUnauthorized: false }
-});
+require('dotenv').config({ path: '.env.local' });
 
 async function fixRLSPolicy() {
-  console.log('🔄 RLS 정책 수정으로 시스템설정 DB 저장 문제 해결 시작...');
-  
+  // Supabase PostgreSQL 연결 정보
+  const connectionString = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL;
+
+  if (!connectionString) {
+    console.error('❌ DATABASE_URL 또는 SUPABASE_DB_URL 환경 변수가 설정되지 않았습니다.');
+    console.log('💡 .env.local 파일에 다음 중 하나를 추가하세요:');
+    console.log('   DATABASE_URL=postgresql://postgres:[PASSWORD]@[HOST]:[PORT]/postgres');
+    console.log('   또는');
+    console.log('   SUPABASE_DB_URL=postgresql://postgres:[PASSWORD]@[HOST]:[PORT]/postgres');
+    process.exit(1);
+  }
+
+  const client = new Client({
+    connectionString,
+    ssl: { rejectUnauthorized: false }
+  });
+
   try {
+    console.log('🔗 Supabase 데이터베이스에 연결 중...');
     await client.connect();
-    console.log('✅ PostgreSQL 연결 성공');
+    console.log('✅ 연결 성공!\n');
 
-    // 1단계: 현재 RLS 정책 확인
-    console.log('\n1️⃣ 현재 RLS 정책 확인...');
-    const policiesResult = await client.query(`
-      SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual
-      FROM pg_policies 
-      WHERE tablename = 'admin_systemsetting_system'
-    `);
-    
-    console.log(`현재 RLS 정책 수: ${policiesResult.rows.length}개`);
-    policiesResult.rows.forEach(policy => {
-      console.log(`   - ${policy.policyname}: ${policy.cmd} (${policy.roles})`);
-    });
-
-    // 2단계: 기존 정책 삭제
-    console.log('\n2️⃣ 기존 정책 삭제...');
-    
-    try {
-      await client.query('DROP POLICY IF EXISTS "Allow read access for all users" ON admin_systemsetting_system');
-      console.log('✅ "Allow read access for all users" 정책 삭제');
-    } catch (err) {
-      console.log('⚠️ 읽기 정책 삭제 실패 (무시):', err.message);
-    }
-
-    try {
-      await client.query('DROP POLICY IF EXISTS "Allow all operations for authenticated users" ON admin_systemsetting_system');
-      console.log('✅ "Allow all operations for authenticated users" 정책 삭제');
-    } catch (err) {
-      console.log('⚠️ 인증 사용자 정책 삭제 실패 (무시):', err.message);
-    }
-
-    // 3단계: 새로운 정책 생성 (더 관대한 정책)
-    console.log('\n3️⃣ 새로운 RLS 정책 생성...');
-
-    // 모든 사용자에게 읽기 허용
+    // 1. 기존 정책 삭제
+    console.log('🗑️  기존 RLS 정책 삭제 중...');
     await client.query(`
-      CREATE POLICY "Enable read access for all users" ON admin_systemsetting_system
-        FOR SELECT USING (true)
+      DROP POLICY IF EXISTS "Anyone can submit evaluations" ON hr_evaluation_submissions;
+      DROP POLICY IF EXISTS "Anyone can submit evaluation items" ON hr_evaluation_submission_items;
+      DROP POLICY IF EXISTS "Authenticated users can view all submissions" ON hr_evaluation_submissions;
+      DROP POLICY IF EXISTS "Authenticated users can view all submission items" ON hr_evaluation_submission_items;
     `);
-    console.log('✅ 모든 사용자 읽기 정책 생성');
+    console.log('✅ 기존 정책 삭제 완료\n');
 
-    // 모든 사용자에게 쓰기 허용 (임시 - 추후 인증 시스템 구현 시 변경)
-    await client.query(`
-      CREATE POLICY "Enable insert for all users" ON admin_systemsetting_system
-        FOR INSERT WITH CHECK (true)
-    `);
-    console.log('✅ 모든 사용자 삽입 정책 생성');
+    // 2. 새로운 정책 생성
+    console.log('📝 새로운 RLS 정책 생성 중...');
 
     await client.query(`
-      CREATE POLICY "Enable update for all users" ON admin_systemsetting_system
-        FOR UPDATE USING (true) WITH CHECK (true)
+      CREATE POLICY "Enable insert for anon users"
+      ON hr_evaluation_submissions
+      FOR INSERT
+      TO anon, authenticated
+      WITH CHECK (true);
     `);
-    console.log('✅ 모든 사용자 업데이트 정책 생성');
+    console.log('✅ hr_evaluation_submissions INSERT 정책 생성');
 
     await client.query(`
-      CREATE POLICY "Enable delete for all users" ON admin_systemsetting_system
-        FOR DELETE USING (true)
+      CREATE POLICY "Enable insert for anon users on items"
+      ON hr_evaluation_submission_items
+      FOR INSERT
+      TO anon, authenticated
+      WITH CHECK (true);
     `);
-    console.log('✅ 모든 사용자 삭제 정책 생성');
+    console.log('✅ hr_evaluation_submission_items INSERT 정책 생성');
 
-    // 4단계: 정책 확인
-    console.log('\n4️⃣ 새로운 정책 확인...');
-    const newPoliciesResult = await client.query(`
-      SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual
-      FROM pg_policies 
-      WHERE tablename = 'admin_systemsetting_system'
+    await client.query(`
+      CREATE POLICY "Enable read access for authenticated users"
+      ON hr_evaluation_submissions
+      FOR SELECT
+      TO authenticated
+      USING (true);
     `);
-    
-    console.log(`새로운 RLS 정책 수: ${newPoliciesResult.rows.length}개`);
-    newPoliciesResult.rows.forEach(policy => {
-      console.log(`   - ${policy.policyname}: ${policy.cmd}`);
-    });
+    console.log('✅ hr_evaluation_submissions SELECT 정책 생성');
 
-    // 5단계: 테스트 업데이트
-    console.log('\n5️⃣ 정책 수정 후 테스트 업데이트...');
-    
-    const testUpdate = await client.query(`
-      UPDATE admin_systemsetting_system 
-      SET setting_value = '"RLS_FIXED_TEST"', updated_at = NOW() 
-      WHERE setting_key = 'site_name'
-      RETURNING setting_key, setting_value, updated_at
+    await client.query(`
+      CREATE POLICY "Enable read access for authenticated users on items"
+      ON hr_evaluation_submission_items
+      FOR SELECT
+      TO authenticated
+      USING (true);
     `);
-    
-    if (testUpdate.rows.length > 0) {
-      console.log('✅ DB 업데이트 테스트 성공:', testUpdate.rows[0]);
-      
-      // 원래값으로 복구
-      await client.query(`
-        UPDATE admin_systemsetting_system 
-        SET setting_value = '"NEXWORK2"', updated_at = NOW() 
-        WHERE setting_key = 'site_name'
-      `);
-      console.log('✅ 원래값으로 복구 완료');
-    } else {
-      console.log('❌ DB 업데이트 테스트 실패');
-    }
+    console.log('✅ hr_evaluation_submission_items SELECT 정책 생성\n');
 
-    return true;
+    // 3. 정책 확인
+    console.log('🔍 생성된 정책 확인...\n');
+    const result = await client.query(`
+      SELECT tablename, policyname, cmd, roles
+      FROM pg_policies
+      WHERE tablename IN ('hr_evaluation_submissions', 'hr_evaluation_submission_items')
+      ORDER BY tablename, policyname;
+    `);
+
+    console.log('📋 현재 RLS 정책:');
+    console.table(result.rows);
+
+    console.log('\n✅ RLS 정책 수정 완료!');
+    console.log('💡 이제 평가 제출을 다시 시도해보세요.');
+
   } catch (error) {
-    console.error('❌ RLS 정책 수정 오류:', error);
-    return false;
+    console.error('❌ 오류 발생:', error.message);
+    console.error('상세:', error);
+    process.exit(1);
   } finally {
     await client.end();
-    console.log('\n🔌 PostgreSQL 연결 종료');
   }
 }
 
-fixRLSPolicy().then((success) => {
-  if (success) {
-    console.log('\n🎉 RLS 정책 수정 완료!');
-    console.log('✅ 시스템설정 페이지에서 DB 저장이 가능해졌습니다.');
-    console.log('🌐 브라우저에서 시스템설정 페이지를 새로고침하여 테스트하세요.');
-  } else {
-    console.log('\n❌ RLS 정책 수정 실패');
-  }
-  process.exit(success ? 0 : 1);
-});
+fixRLSPolicy();

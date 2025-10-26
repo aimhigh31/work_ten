@@ -235,19 +235,28 @@ const OverviewTab = memo(
 
           {/* 보안문서유형, 상태 - 좌우 배치 */}
           <Stack direction="row" spacing={2}>
-            <FormControl fullWidth required>
-              <InputLabel shrink>
-                보안문서유형 <span style={{ color: 'red' }}>*</span>
-              </InputLabel>
-              <Select value={taskState.type} label="보안문서유형" onChange={handleFieldChange('type')} displayEmpty>
-                <MenuItem value="">선택</MenuItem>
-                <MenuItem value="보안규정">보안규정</MenuItem>
-                <MenuItem value="보안지침">보안지침</MenuItem>
-                <MenuItem value="보안절차">보안절차</MenuItem>
-                <MenuItem value="보안매뉴얼">보안매뉴얼</MenuItem>
-                <MenuItem value="보안정책">보안정책</MenuItem>
-              </Select>
-            </FormControl>
+            <TextField
+              fullWidth
+              required
+              select
+              label={
+                <span>
+                  보안문서유형 <span style={{ color: 'red' }}>*</span>
+                </span>
+              }
+              value={taskState.type}
+              onChange={handleFieldChange('type')}
+              variant="outlined"
+              InputLabelProps={{ shrink: true }}
+              SelectProps={{ displayEmpty: true }}
+            >
+              <MenuItem value="">선택</MenuItem>
+              <MenuItem value="보안규정">보안규정</MenuItem>
+              <MenuItem value="보안지침">보안지침</MenuItem>
+              <MenuItem value="보안절차">보안절차</MenuItem>
+              <MenuItem value="보안매뉴얼">보안매뉴얼</MenuItem>
+              <MenuItem value="보안정책">보안정책</MenuItem>
+            </TextField>
 
             <FormControl fullWidth>
               <InputLabel shrink>상태</InputLabel>
@@ -1742,21 +1751,7 @@ const folderData = [
 ];
 
 // 폴더 트리 컴포넌트
-const FolderTree = memo(({ data, level = 0 }: any) => {
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['1', '2', '3']));
-
-  const toggleFolder = useCallback((folderId: string) => {
-    setExpandedFolders((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(folderId)) {
-        newSet.delete(folderId);
-      } else {
-        newSet.add(folderId);
-      }
-      return newSet;
-    });
-  }, []);
-
+const FolderTree = memo(({ data, level = 0, expandedFolders, toggleFolder }: any) => {
   return (
     <Box>
       {data.map((item: any) => (
@@ -1799,7 +1794,9 @@ const FolderTree = memo(({ data, level = 0 }: any) => {
               </Typography>
             )}
           </Box>
-          {item.type === 'folder' && expandedFolders.has(item.id) && item.children && <FolderTree data={item.children} level={level + 1} />}
+          {item.type === 'folder' && expandedFolders.has(item.id) && item.children && (
+            <FolderTree data={item.children} level={level + 1} expandedFolders={expandedFolders} toggleFolder={toggleFolder} />
+          )}
         </Box>
       ))}
     </Box>
@@ -1810,6 +1807,21 @@ FolderTree.displayName = 'FolderTree';
 
 // 폴더 탭 컴포넌트
 const FolderTab = memo(() => {
+  // 모든 폴더를 펼친 상태로 초기화
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['1', '2', '3']));
+
+  const toggleFolder = useCallback((folderId: string) => {
+    setExpandedFolders((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(folderId)) {
+        newSet.delete(folderId);
+      } else {
+        newSet.add(folderId);
+      }
+      return newSet;
+    });
+  }, []);
+
   return (
     <Box sx={{ height: '650px', px: '5%' }}>
       <Paper
@@ -1825,7 +1837,7 @@ const FolderTab = memo(() => {
         <Typography variant="h6" gutterBottom>
           보안규정 자료실
         </Typography>
-        <FolderTree data={folderData} />
+        <FolderTree data={folderData} expandedFolders={expandedFolders} toggleFolder={toggleFolder} />
       </Paper>
     </Box>
   );

@@ -1,17 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// PostgreSQL 연결
-const { Pool } = require('pg');
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:tg1150ja5%25@db.exxumujwufzqnovhzvif.supabase.co:5432/postgres'
-});
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { email, password, user_name, department, position, role, user_account_id, phone, country, address, profile_image_url } = body;
+
+    console.log('📥📥📥 [create-auth-user] 받은 body 전체:', body);
+    console.log('📥 [create-auth-user] 추출한 필드:', {
+      email,
+      user_name,
+      department,
+      position,
+      role,
+      user_account_id,
+      phone,
+      country,
+      address,
+      profile_image_url
+    });
 
     if (!email || !password) {
       return NextResponse.json(
@@ -73,52 +80,124 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 트리거에 의해 자동으로 admin_users_userprofiles에도 프로필이 생성됨
     console.log('✅ Auth 사용자 생성 성공:', authData.user.id);
 
-    // 추가 필드들을 프로필 테이블에 업데이트
-    // 트리거가 프로필을 생성할 시간을 주기 위해 약간의 delay
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
+    // 🔥 Supabase SDK로 프로필 INSERT (PostgreSQL 직접 연결 대신)
     try {
-      const updateQuery = `
-        UPDATE admin_users_userprofiles
-        SET
-          user_account_id = $1,
-          phone = $2,
-          country = $3,
-          address = $4,
-          profile_image_url = $5,
-          updated_by = 'system'
-        WHERE auth_user_id = $6
-      `;
+      // 현재 연도 기반 user_code 생성
+      const currentYear = new Date().getFullYear();
+      const yearSuffix = currentYear.toString().slice(-2);
 
-      const updateResult = await pool.query(updateQuery, [
-        user_account_id || null,
-        phone || null,
-        country || null,
-        address || null,
-        profile_image_url || null,
-        authData.user.id
-      ]);
+      // 해당 연도의 마지막 코드 조회
+      const { data: lastCodeData, error: lastCodeError } = await supabaseAdmin
+        .from('admin_users_userprofiles')
+        .select('user_code')
+        .like('user_code', `USER-${yearSuffix}-%`)
+        .order('user_code', { ascending: false })
+        .limit(1);
 
-      console.log('✅ 프로필 추가 정보 업데이트 완료:', {
-        rowsUpdated: updateResult.rowCount,
-        user_account_id,
-        phone,
-        country,
-        address
+      if (lastCodeError) {
+        console.error('❌ 마지막 user_code 조회 실패:', lastCodeError);
+        throw lastCodeError;
+      }
+
+      let newUserCode: string;
+      if (lastCodeData && lastCodeData.length > 0) {
+        const lastCode = lastCodeData[0].user_code;
+        const lastNumber = parseInt(lastCode.split('-')[2], 10);
+        const newNumber = String(lastNumber + 1).padStart(3, '0');
+        newUserCode = `USER-${yearSuffix}-${newNumber}`;
+      } else {
+        newUserCode = `USER-${yearSuffix}-001`;
+      }
+
+      console.log('📝 [create-auth-user] 생성할 user_code:', newUserCode);
+
+      const insertData = {
+        auth_user_id: authData.user.id,
+        user_code: newUserCode,
+        email: email,
+        user_name: user_name || email.split('@')[0],
+        department: department || '미지정',
+        position: position || '미지정',
+        role: role || '일반',
+        user_account_id: user_account_id || null,
+        phone: phone || null,
+        country: country || null,
+        address: address || null,
+        profile_image_url: profile_image_url || null,
+        avatar_url: profile_image_url || null,
+        status: 'active',
+        created_by: 'system',
+        updated_by: 'system'
+      };
+
+      console.log('🔄🔄🔄 [create-auth-user] INSERT 데이터:', {
+        auth_user_id: insertData.auth_user_id,
+        user_code: insertData.user_code,
+        email: insertData.email,
+        user_name: insertData.user_name,
+        department: insertData.department,
+        position: insertData.position,
+        role: insertData.role,
+        user_account_id: insertData.user_account_id,
+        phone: insertData.phone,
+        country: insertData.country,
+        address: insertData.address,
+        profile_image_url: insertData.profile_image_url
       });
-    } catch (updateError) {
-      console.error('⚠️ 프로필 추가 정보 업데이트 실패:', updateError);
-      // 업데이트 실패해도 사용자 생성은 성공했으므로 계속 진행
-    }
 
-    return NextResponse.json({
-      success: true,
-      auth_user_id: authData.user.id,
-      email: authData.user.email
-    });
+      const { data: insertedProfile, error: insertError } = await supabaseAdmin
+        .from('admin_users_userprofiles')
+        .upsert(insertData, {
+          onConflict: 'auth_user_id'
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('❌ 프로필 INSERT 실패:', insertError);
+        console.error('❌ 에러 상세:', {
+          message: insertError.message,
+          details: insertError.details,
+          hint: insertError.hint,
+          code: insertError.code
+        });
+        throw new Error(`프로필 생성 실패: ${insertError.message}`);
+      }
+
+      console.log('✅✅✅ [create-auth-user] 프로필 INSERT 완료:', {
+        user_code: newUserCode,
+        user_name: insertedProfile.user_name,
+        department: insertedProfile.department,
+        position: insertedProfile.position,
+        role: insertedProfile.role,
+        user_account_id: insertedProfile.user_account_id,
+        phone: insertedProfile.phone,
+        country: insertedProfile.country,
+        address: insertedProfile.address,
+        profile_image_url: insertedProfile.profile_image_url
+      });
+
+      // 프로필 조회 성공, insertedProfile 사용
+      const userProfile = insertedProfile;
+
+      return NextResponse.json({
+        success: true,
+        auth_user_id: authData.user.id,
+        email: authData.user.email,
+        user_profile: userProfile
+      });
+    } catch (insertError: any) {
+      console.error('⚠️ 프로필 INSERT 실패:', insertError);
+      console.error('⚠️ 에러 상세:', {
+        message: insertError.message,
+        code: insertError.code,
+        detail: insertError.detail
+      });
+      // INSERT 실패하면 치명적 오류이므로 예외 발생
+      throw new Error(`프로필 생성 실패: ${insertError.message}`);
+    }
   } catch (error: any) {
     console.error('사용자 생성 중 오류:', error);
     return NextResponse.json(

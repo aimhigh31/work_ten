@@ -40,10 +40,6 @@ import TaskEditDialog from 'components/TaskEditDialog';
 import { taskData, teams, assignees, taskStatusOptions, taskStatusColors, assigneeAvatars } from 'data/task';
 import { TaskTableData, TaskStatus } from 'types/task';
 
-// Hooks
-import { useSupabaseTaskManagement } from 'hooks/useSupabaseTaskManagement';
-import { useSupabaseUsers } from 'hooks/useSupabaseUsers';
-
 // Icons
 import { Add, Trash, Edit, DocumentDownload } from '@wandersonalwes/iconsax-react';
 
@@ -72,6 +68,9 @@ interface TaskTableProps {
   tasks?: TaskTableData[];
   setTasks?: React.Dispatch<React.SetStateAction<TaskTableData[]>>;
   kpiData?: any[]; // KPI 데이터 추가
+  users?: any[]; // ✅ 사용자 목록 추가 (KPI 패턴)
+  onDeleteTasks?: (taskIds: number[]) => Promise<void>; // ✅ KPI 패턴: number[] 타입
+  onAddTask?: (taskInput: any) => Promise<boolean>; // ✅ Optimistic Update 패턴
   addChangeLog?: (
     action: string,
     target: string,
@@ -92,37 +91,15 @@ export default function TaskTable({
   tasks,
   setTasks,
   kpiData = [],
+  users = [],
+  onDeleteTasks,
+  onAddTask,
   addChangeLog
 }: TaskTableProps) {
   const theme = useTheme();
 
-  // Supabase 훅 사용 (투자관리 방식)
-  const { getTasks, loading, error, addTask, updateTask, deleteTask, checkCodeExists } = useSupabaseTaskManagement();
-
-  // 사용자 관리
-  const { users } = useSupabaseUsers();
-
-  // 사용자 이름으로 사용자 데이터 찾기
-  const findUserByName = (userName: string) => {
-    return users.find((user) => user.user_name === userName);
-  };
-
-  // 업무 데이터 상태
-  const [supabaseTasks, setSupabaseTasks] = useState<any[]>([]);
-
-  // 업무 데이터 로드
-  useEffect(() => {
-    const loadTasks = async () => {
-      try {
-        const data = await getTasks();
-        setSupabaseTasks(data);
-      } catch (error) {
-        console.error('TaskTable - 업무 데이터 로드 실패:', error);
-      }
-    };
-    loadTasks();
-  }, [getTasks]);
-
+  // ✅ KPI 패턴: props로 받은 tasks만 사용
+  const [data, setData] = useState<TaskTableData[]>(tasks ? tasks : []);
   const [selected, setSelected] = useState<number[]>([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -133,29 +110,13 @@ export default function TaskTable({
   const [editingTask, setEditingTask] = useState<TaskTableData | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
 
-  // Supabase 데이터를 프론트엔드 형식으로 변환
-  const taskData = useMemo(() => {
-    return supabaseTasks.map(
-      (task, index) =>
-        ({
-          id: parseInt(task.id.split('-')[0], 16), // UUID를 숫자로 변환
-          no: supabaseTasks.length - index, // 역순 NO
-          registrationDate: task.registration_date,
-          code: task.code,
-          department: task.department || '',
-          workContent: task.work_content || '',
-          description: task.description || '',
-          team: task.team || '',
-          assignee: task.assignee_name || '',
-          progress: task.progress || 0,
-          status: task.status as TaskStatus,
-          startDate: task.start_date || '',
-          completedDate: task.completed_date || ''
-        }) as any
-    );
-  }, [supabaseTasks]);
-
-  const [data, setData] = useState<TaskTableData[]>(taskData);
+  // ✅ KPI 패턴: props.tasks가 변경되면 data 업데이트 + 첫 페이지로 이동
+  useEffect(() => {
+    if (tasks) {
+      setData(tasks);
+      setPage(0); // ✅ 새 항목 추가 시 헤더 바로 아래(첫 페이지)에서 보이도록
+    }
+  }, [tasks]);
 
   // Excel 다운로드 기능
   const handleExcelDownload = () => {
@@ -215,7 +176,7 @@ export default function TaskTable({
     setData(taskData);
   }, [taskData]);
 
-  // 필터링된 데이터 (역순 정렬 추가)
+  // 필터링된 데이터 (최신 항목이 헤더 바로 아래 표시)
   const filteredData = useMemo(() => {
     const filtered = data.filter((task) => {
       // 연도 필터
@@ -230,7 +191,7 @@ export default function TaskTable({
 
       return teamMatch && statusMatch && assigneeMatch;
     });
-    // NO 기준 역순 정렬
+    // ✅ NO 기준 역순 정렬 (큰 no = 최신 항목이 먼저)
     return filtered.sort((a, b) => (b.no || 0) - (a.no || 0));
   }, [data, selectedYear || '전체', selectedTeam, selectedStatus, selectedAssignee]);
 
@@ -272,7 +233,7 @@ export default function TaskTable({
     setSelected([]);
   };
 
-  // 선택된 행 삭제 (Supabase 연동)
+  // 선택된 행 삭제 (KPI 패턴)
   const handleDeleteSelected = async () => {
     if (selected.length === 0) return;
 
@@ -280,29 +241,15 @@ export default function TaskTable({
     if (!confirmDelete) return;
 
     try {
-      const deletedTasks = data.filter((task) => selected.includes(task.id));
-
-      // 각 선택된 업무를 Supabase에서 삭제 (is_active = false)
-      for (const task of deletedTasks) {
-        const supabaseTask = supabaseTasks.find((t) => parseInt(t.id.split('-')[0], 16) === task.id);
-        if (supabaseTask) {
-          await deleteTask(supabaseTask.id);
-
-          // 변경로그 추가
-          if (addChangeLog) {
-            const taskTitle = task.workContent || '업무';
-            const codeToUse = task.code || `TASK-${task.id}`;
-            await addChangeLog(
-              '삭제',
-              codeToUse,
-              `업무관리 ${taskTitle}(${codeToUse}) 정보의 데이터탭 데이터가 삭제 되었습니다.`,
-              task.team || '시스템',
-              taskTitle,
-              '',
-              '데이터탭',
-              taskTitle
-            );
-          }
+      // ✅ KPI 패턴: onDeleteTasks prop 사용 (TaskManagement에서 처리)
+      if (onDeleteTasks) {
+        await onDeleteTasks(selected);
+      } else {
+        // 로컬 삭제 (fallback)
+        const updatedData = data.filter((task) => !selected.includes(task.id));
+        setData(updatedData);
+        if (setTasks) {
+          setTasks(updatedData);
         }
       }
 
@@ -323,160 +270,201 @@ export default function TaskTable({
 
   // Task 저장 (Supabase 연동)
   const handleEditTaskSave = async (updatedTask: TaskTableData) => {
-    console.log('💾 Task 저장 요청:', updatedTask);
-
-    // Supabase의 task 찾기
-    const supabaseTask = supabaseTasks.find((t) => parseInt(t.id.split('-')[0], 16) === updatedTask.id);
-
-    if (supabaseTask) {
-      // 원본 데이터 찾기 (변경 전 값 확인용)
-      const originalTask = data.find((t) => t.id === updatedTask.id);
-
-      // 기존 Task 업데이트
-      const success = await updateTask(supabaseTask.id, {
-        start_date: updatedTask.startDate || null,
-        completed_date: updatedTask.completedDate || null,
-        department: updatedTask.department,
-        work_content: updatedTask.workContent,
-        description: (updatedTask as any).description || null,
-        team: updatedTask.team,
-        assignee_name: updatedTask.assignee,
-        progress: updatedTask.progress,
-        status: updatedTask.status
+    try {
+      console.log('💾 Task 저장 요청:', updatedTask);
+      console.log('📋 [TaskTable] KPI 필드 확인:', {
+        taskType: (updatedTask as any).taskType,
+        kpiId: (updatedTask as any).kpiId,
+        kpiWorkContent: (updatedTask as any).kpiWorkContent,
+        loadedKpiTitle: (updatedTask as any).loadedKpiTitle,
+        loadedKpiData: (updatedTask as any).loadedKpiData
       });
 
-      if (success && addChangeLog && originalTask) {
-        // 필드별 변경 추적
-        const fieldNameMap: Record<string, string> = {
-          workContent: '제목',
-          status: '상태',
-          assignee: '담당자',
-          completedDate: '완료일',
-          startDate: '시작일',
-          team: '팀',
-          department: '부서',
-          progress: '진행률',
-          description: '설명'
+      // ✅ Use supabaseId from task
+      const originalTask = data.find((t) => t.id === updatedTask.id);
+      const supabaseId = (updatedTask as any).supabaseId || (originalTask as any)?.supabaseId;
+
+      if (supabaseId) {
+        console.log('🔄 [TaskTable] 기존 업무 수정 - Supabase 업데이트 실행');
+        // ✅ Direct Supabase update (simplified)
+        const { error } = await supabase
+          .from('main_task_data')
+          .update({
+            start_date: updatedTask.startDate || null,
+            completed_date: updatedTask.completedDate || null,
+            department: updatedTask.department,
+            work_content: updatedTask.workContent,
+            description: (updatedTask as any).description || null,
+            team: updatedTask.team,
+            assignee_name: updatedTask.assignee,
+            progress: updatedTask.progress,
+            status: updatedTask.status,
+            task_type: (updatedTask as any).taskType || '일반',
+            kpi_id: (updatedTask as any).kpiId || null,
+            kpi_record_id: (updatedTask as any).kpiRecordId || null,
+            kpi_work_content: (updatedTask as any).kpiWorkContent || null
+          })
+          .eq('id', supabaseId);
+
+        if (error) {
+          console.error('❌ [TaskTable] Supabase 업데이트 실패:', error);
+          throw error;
+        }
+
+        console.log('✅ [TaskTable] Supabase 업데이트 성공 - KPI 필드 포함');
+
+        if (addChangeLog && originalTask) {
+          // 필드별 변경 추적
+          const fieldNameMap: Record<string, string> = {
+            workContent: '제목',
+            status: '상태',
+            assignee: '담당자',
+            completedDate: '완료일',
+            startDate: '시작일',
+            team: '팀',
+            department: '부서',
+            progress: '진행률',
+            description: '설명'
+          };
+
+          // 변경된 필드 찾기
+          const changes: Array<{ field: string; fieldKorean: string; before: any; after: any }> = [];
+
+          Object.keys(fieldNameMap).forEach((field) => {
+            const beforeVal = (originalTask as any)[field];
+            const afterVal = (updatedTask as any)[field];
+
+            if (beforeVal !== afterVal) {
+              changes.push({
+                field,
+                fieldKorean: fieldNameMap[field],
+                before: beforeVal || '',
+                after: afterVal || ''
+              });
+            }
+          });
+
+          console.log('🔍 변경 감지된 필드들:', changes);
+
+          const taskTitle = updatedTask.workContent || '업무';
+
+          // 변경된 필드가 있으면 각각 로그 기록
+          if (changes.length > 0) {
+            for (const change of changes) {
+              const description = `업무관리 ${taskTitle}(${updatedTask.code}) 정보의 데이터탭 ${change.fieldKorean}이 ${change.before} → ${change.after} 로 수정 되었습니다.`;
+
+              await addChangeLog(
+                '수정',
+                updatedTask.code,
+                description,
+                updatedTask.team || '시스템',
+                String(change.before),
+                String(change.after),
+                change.fieldKorean,
+                taskTitle
+              );
+            }
+          }
+        }
+
+        console.log('✅ 기존 Task 업데이트 완료');
+      } else {
+        // 새 Task 추가
+        const currentYear = new Date().getFullYear();
+        const yearSuffix = currentYear.toString().slice(-2);
+
+        console.log('📊 코드 생성 시작 - 연도:', yearSuffix);
+        console.log('📊 전체 Tasks:', data.length);
+
+        // ✅ Use data (from props.tasks) instead of supabaseTasks
+        const existingCodes = data
+          .filter((item) => item.code && item.code.startsWith(`MAIN-TASK-${yearSuffix}-`))
+          .map((item) => {
+            const parts = item.code.split('-');
+            return parseInt(parts[3]) || 0;
+          });
+
+        console.log('📊 기존 코드 목록:', existingCodes);
+
+        let maxNumber = existingCodes.length > 0 ? Math.max(...existingCodes) : 0;
+        console.log('📊 최대 번호:', maxNumber);
+
+        let newTaskCode = `MAIN-TASK-${yearSuffix}-${(maxNumber + 1).toString().padStart(3, '0')}`;
+        console.log('📊 생성할 코드:', newTaskCode);
+
+        // ✅ Direct code existence check
+        let attempts = 0;
+        let codeExists = true;
+        while (codeExists && attempts < 100) {
+          const { data: existingTask } = await supabase
+            .from('main_task_data')
+            .select('id')
+            .eq('code', newTaskCode)
+            .eq('is_active', true)
+            .single();
+
+          if (existingTask) {
+            attempts++;
+            console.log(`⚠️ 코드 중복 발견 (시도 ${attempts}):`, newTaskCode);
+            maxNumber++;
+            newTaskCode = `MAIN-TASK-${yearSuffix}-${(maxNumber + 1).toString().padStart(3, '0')}`;
+            console.log('📊 다음 코드 시도:', newTaskCode);
+          } else {
+            codeExists = false;
+          }
+        }
+
+        console.log('✅ 최종 확정 코드:', newTaskCode);
+
+        const taskInput = {
+          code: newTaskCode,
+          registration_date: updatedTask.registrationDate || new Date().toISOString().split('T')[0],
+          start_date: updatedTask.startDate || null,
+          completed_date: updatedTask.completedDate || null,
+          department: updatedTask.department || null,
+          work_content: updatedTask.workContent || null,
+          description: (updatedTask as any).description || null,
+          team: updatedTask.team || null,
+          assignee_name: updatedTask.assignee || null,
+          progress: updatedTask.progress || 0,
+          status: updatedTask.status || '대기',
+          task_type: (updatedTask as any).taskType || '일반',
+          kpi_id: (updatedTask as any).kpiId || null,
+          kpi_record_id: (updatedTask as any).kpiRecordId || null,
+          kpi_work_content: (updatedTask as any).kpiWorkContent || null
         };
 
-        // 변경된 필드 찾기
-        const changes: Array<{ field: string; fieldKorean: string; before: any; after: any }> = [];
-
-        Object.keys(fieldNameMap).forEach((field) => {
-          const beforeVal = (originalTask as any)[field];
-          const afterVal = (updatedTask as any)[field];
-
-          if (beforeVal !== afterVal) {
-            changes.push({
-              field,
-              fieldKorean: fieldNameMap[field],
-              before: beforeVal || '',
-              after: afterVal || ''
-            });
-          }
+        console.log('📤 업무 추가 전송 데이터:', taskInput);
+        console.log('📋 [TaskTable] 새 업무 KPI 필드:', {
+          task_type: taskInput.task_type,
+          kpi_id: taskInput.kpi_id,
+          kpi_record_id: taskInput.kpi_record_id,
+          kpi_work_content: taskInput.kpi_work_content
         });
 
-        console.log('🔍 변경 감지된 필드들:', changes);
-
-        const taskTitle = updatedTask.workContent || '업무';
-
-        // 변경된 필드가 있으면 각각 로그 기록
-        if (changes.length > 0) {
-          for (const change of changes) {
-            const description = `업무관리 ${taskTitle}(${updatedTask.code}) 정보의 데이터탭 ${change.fieldKorean}이 ${change.before} → ${change.after} 로 수정 되었습니다.`;
-
-            await addChangeLog(
-              '수정',
-              updatedTask.code,
-              description,
-              updatedTask.team || '시스템',
-              String(change.before),
-              String(change.after),
-              change.fieldKorean,
-              taskTitle
-            );
+        // ✅ Optimistic Update 패턴: 상위 컴포넌트의 onAddTask 호출
+        if (onAddTask) {
+          const success = await onAddTask(taskInput);
+          if (success) {
+            console.log('✅ 새 Task 추가 완료 (테이블 즉시 반영):', newTaskCode);
+          } else {
+            console.error('❌ 새 Task 추가 실패');
+            alert('업무 추가에 실패했습니다.');
+            return;
           }
+        } else {
+          console.error('❌ onAddTask prop이 없습니다');
+          alert('업무 추가 기능을 사용할 수 없습니다.');
+          return;
         }
       }
 
-      console.log('✅ 기존 Task 업데이트 완료');
-    } else {
-      // 새 Task 추가
-      const currentYear = new Date().getFullYear();
-      const yearSuffix = currentYear.toString().slice(-2);
-
-      console.log('📊 코드 생성 시작 - 연도:', yearSuffix);
-      console.log('📊 전체 Supabase Tasks:', supabaseTasks.length);
-
-      // 기존 코드에서 번호 추출
-      const existingCodes = supabaseTasks
-        .filter((item) => item.code.startsWith(`MAIN-TASK-${yearSuffix}-`))
-        .map((item) => {
-          const parts = item.code.split('-');
-          return parseInt(parts[3]) || 0;
-        });
-
-      console.log('📊 기존 코드 목록:', existingCodes);
-
-      let maxNumber = existingCodes.length > 0 ? Math.max(...existingCodes) : 0;
-      console.log('📊 최대 번호:', maxNumber);
-
-      let newTaskCode = `MAIN-TASK-${yearSuffix}-${(maxNumber + 1).toString().padStart(3, '0')}`;
-      console.log('📊 생성할 코드:', newTaskCode);
-
-      // 중복 체크
-      let attempts = 0;
-      while (await checkCodeExists(newTaskCode)) {
-        attempts++;
-        console.log(`⚠️ 코드 중복 발견 (시도 ${attempts}):`, newTaskCode);
-        maxNumber++;
-        newTaskCode = `MAIN-TASK-${yearSuffix}-${(maxNumber + 1).toString().padStart(3, '0')}`;
-        console.log('📊 다음 코드 시도:', newTaskCode);
-      }
-
-      console.log('✅ 최종 확정 코드:', newTaskCode);
-
-      const taskInput = {
-        code: newTaskCode,
-        registration_date: updatedTask.registrationDate || new Date().toISOString().split('T')[0],
-        start_date: updatedTask.startDate || null,
-        completed_date: updatedTask.completedDate || null,
-        department: updatedTask.department || null,
-        work_content: updatedTask.workContent || null,
-        description: (updatedTask as any).description || null,
-        team: updatedTask.team || null,
-        assignee_name: updatedTask.assignee || null,
-        progress: updatedTask.progress || 0,
-        status: updatedTask.status || '대기'
-      };
-
-      console.log('📤 업무 추가 전송 데이터:', taskInput);
-
-      const result = await addTask(taskInput);
-
-      if (result) {
-        if (addChangeLog) {
-          const taskTitle = updatedTask.workContent || '업무';
-          await addChangeLog(
-            '추가',
-            newTaskCode,
-            `업무관리 ${taskTitle}(${newTaskCode}) 정보의 데이터탭 데이터가 추가 되었습니다.`,
-            updatedTask.team || '시스템',
-            '',
-            taskTitle,
-            '데이터탭',
-            taskTitle
-          );
-        }
-        console.log('✅ 새 Task 추가 완료:', newTaskCode);
-      } else {
-        console.error('❌ 새 Task 추가 실패');
-        alert('업무 추가에 실패했습니다. 콘솔을 확인해주세요.');
-        return;
-      }
+      handleEditDialogClose();
+    } catch (error: any) {
+      console.error('❌ handleEditTaskSave 전체 오류:', error);
+      console.error('❌ 오류 스택:', error.stack);
+      alert(`업무 저장 중 오류가 발생했습니다.\n오류: ${error.message || error}`);
     }
-
-    handleEditDialogClose();
   };
 
   // 새 Task 추가
@@ -626,7 +614,7 @@ export default function TaskTable({
             {paginatedData.length > 0 ? (
               paginatedData.map((task) => (
                 <TableRow
-                  key={task.id}
+                  key={(task as any).supabaseId || task.id}
                   hover
                   sx={{
                     '&:hover': { backgroundColor: 'action.hover' }
@@ -696,7 +684,12 @@ export default function TaskTable({
                   <TableCell>
                     <Stack direction="row" spacing={1} alignItems="center">
                       <Avatar
-                        src={findUserByName(task.assignee)?.avatar_url || findUserByName(task.assignee)?.profile_image_url}
+                        src={
+                          task.assignee
+                            ? users.find((user) => user.user_name === task.assignee)?.profile_image_url ||
+                              users.find((user) => user.user_name === task.assignee)?.avatar_url
+                            : undefined
+                        }
                         alt={task.assignee}
                         sx={{ width: 24, height: 24 }}
                       >
@@ -925,6 +918,7 @@ export default function TaskTable({
           statusColors={taskStatusColors}
           teams={teams}
           kpiData={kpiData}
+          tasks={data}
         />
       )}
     </Box>

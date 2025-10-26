@@ -1,3 +1,11 @@
+'use client';
+
+// react
+import { useMemo } from 'react';
+
+// next-auth
+import { useSession } from 'next-auth/react';
+
 // material-ui
 import { Theme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
@@ -19,6 +27,7 @@ import Avatar from 'components/@extended/Avatar';
 import LinearWithLabel from 'components/@extended/progress/LinearWithLabel';
 import MainCard from 'components/MainCard';
 import { GRID_COMMON_SPACING } from 'config';
+import { useCommonData } from 'contexts/CommonDataContext';
 
 // assets
 import { CallCalling, Gps, Link1, Sms } from '@wandersonalwes/iconsax-react';
@@ -29,6 +38,36 @@ const avatarImage = '/assets/images/users';
 
 export default function TabProfile() {
   const downMD = useMediaQuery((theme: Theme) => theme.breakpoints.down('md'));
+  const { data: session } = useSession();
+  const { users } = useCommonData();
+
+  // 현재 로그인한 사용자 정보 가져오기
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || users.length === 0) return null;
+    const foundUser = users.find((u) => u.email === session.user.email);
+    console.log('👤 [프로필 탭] 현재 로그인 사용자:', {
+      email: session.user.email,
+      user_name: foundUser?.user_name,
+      profile_image_url: foundUser?.profile_image_url,
+      avatar_url: foundUser?.avatar_url
+    });
+    return foundUser;
+  }, [session, users]);
+
+  // 로딩 중이거나 사용자 정보가 없을 때
+  if (!currentUser) {
+    return (
+      <Grid container spacing={GRID_COMMON_SPACING}>
+        <Grid size={12}>
+          <MainCard>
+            <Typography>사용자 정보를 불러오는 중...</Typography>
+          </MainCard>
+        </Grid>
+      </Grid>
+    );
+  }
+
+  const profileImageUrl = currentUser.profile_image_url || currentUser.avatar_url || `${avatarImage}/default.png`;
 
   return (
     <Grid container spacing={GRID_COMMON_SPACING}>
@@ -39,13 +78,13 @@ export default function TabProfile() {
               <Grid container spacing={3}>
                 <Grid size={12}>
                   <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
-                    <Chip label="프로" size="small" color="primary" />
+                    <Chip label={currentUser.role || '직원'} size="small" color="primary" />
                   </Stack>
                   <Stack sx={{ gap: 2.5, alignItems: 'center' }}>
-                    <Avatar alt="Avatar 1" size="xl" src={`${avatarImage}/default.png`} />
+                    <Avatar alt={currentUser.user_name} size="xl" src={profileImageUrl} />
                     <Stack sx={{ gap: 0.5, alignItems: 'center' }}>
-                      <Typography variant="h5">김철수</Typography>
-                      <Typography color="secondary">프로젝트 매니저</Typography>
+                      <Typography variant="h5">{currentUser.user_name || '사용자'}</Typography>
+                      <Typography color="secondary">{currentUser.position || currentUser.role || '직원'}</Typography>
                     </Stack>
                   </Stack>
                 </Grid>
@@ -75,26 +114,30 @@ export default function TabProfile() {
                 </Grid>
                 <Grid size={12}>
                   <List component="nav" aria-label="main mailbox folders" sx={{ py: 0, '& .MuiListItem-root': { p: 0, py: 1 } }}>
-                    <ListItem secondaryAction={<Typography align="right">kimcs@company.co.kr</Typography>}>
+                    <ListItem secondaryAction={<Typography align="right">{currentUser.email || '-'}</Typography>}>
                       <ListItemIcon>
                         <Sms size={18} />
                       </ListItemIcon>
                     </ListItem>
-                    <ListItem secondaryAction={<Typography align="right">(+82) 02-1234-5678</Typography>}>
+                    <ListItem secondaryAction={<Typography align="right">{currentUser.phone || '-'}</Typography>}>
                       <ListItemIcon>
                         <CallCalling size={18} />
                       </ListItemIcon>
                     </ListItem>
-                    <ListItem secondaryAction={<Typography align="right">서울</Typography>}>
+                    <ListItem secondaryAction={<Typography align="right">{currentUser.location || currentUser.department || '-'}</Typography>}>
                       <ListItemIcon>
                         <Gps size={18} />
                       </ListItemIcon>
                     </ListItem>
                     <ListItem
                       secondaryAction={
-                        <Link align="right" href="https://google.com" target="_blank">
-                          https://kimcs.company.co.kr
-                        </Link>
+                        currentUser.website ? (
+                          <Link align="right" href={currentUser.website} target="_blank">
+                            {currentUser.website}
+                          </Link>
+                        ) : (
+                          <Typography align="right">-</Typography>
+                        )
                       }
                     >
                       <ListItemIcon>
@@ -155,8 +198,9 @@ export default function TabProfile() {
           <Grid size={12}>
             <MainCard title="자기소개">
               <Typography color="secondary">
-                안녕하세요. 저는 김철수입니다. 웹사이트 기반의 창의적인 그래픽 디자이너 및 사용자 경험 디자이너입니다. 저는 더 아름답고
-                사용하기 쉬운 디지털 제품을 만들어 더 나은 공간을 창조합니다.
+                {currentUser.bio ||
+                  `안녕하세요. ${currentUser.user_name || '사용자'}입니다. ${currentUser.department || '회사'}에서 ${currentUser.position || currentUser.role || '업무'}를 담당하고 있습니다.`
+                }
               </Typography>
             </MainCard>
           </Grid>
@@ -168,13 +212,13 @@ export default function TabProfile() {
                     <Grid size={{ xs: 12, md: 6 }}>
                       <Stack sx={{ gap: 0.5 }}>
                         <Typography color="secondary">성명</Typography>
-                        <Typography>김철수</Typography>
+                        <Typography>{currentUser.user_name || '-'}</Typography>
                       </Stack>
                     </Grid>
                     <Grid size={{ xs: 12, md: 6 }}>
                       <Stack sx={{ gap: 0.5 }}>
-                        <Typography color="secondary">부친성함</Typography>
-                        <Typography>김영호</Typography>
+                        <Typography color="secondary">부서</Typography>
+                        <Typography>{currentUser.department || '-'}</Typography>
                       </Stack>
                     </Grid>
                   </Grid>
@@ -184,15 +228,13 @@ export default function TabProfile() {
                     <Grid size={{ xs: 12, md: 6 }}>
                       <Stack sx={{ gap: 0.5 }}>
                         <Typography color="secondary">전화번호</Typography>
-                        <Typography>
-                          (+82) <PatternFormat value="0212345678" displayType="text" type="text" format="##-####-####" />
-                        </Typography>
+                        <Typography>{currentUser.phone || '-'}</Typography>
                       </Stack>
                     </Grid>
                     <Grid size={{ xs: 12, md: 6 }}>
                       <Stack sx={{ gap: 0.5 }}>
-                        <Typography color="secondary">국가</Typography>
-                        <Typography>대한민국</Typography>
+                        <Typography color="secondary">직급</Typography>
+                        <Typography>{currentUser.position || '-'}</Typography>
                       </Stack>
                     </Grid>
                   </Grid>
@@ -202,21 +244,21 @@ export default function TabProfile() {
                     <Grid size={{ xs: 12, md: 6 }}>
                       <Stack sx={{ gap: 0.5 }}>
                         <Typography color="secondary">이메일</Typography>
-                        <Typography>kimcs@company.co.kr</Typography>
+                        <Typography>{currentUser.email || '-'}</Typography>
                       </Stack>
                     </Grid>
                     <Grid size={{ xs: 12, md: 6 }}>
                       <Stack sx={{ gap: 0.5 }}>
-                        <Typography color="secondary">우편번호</Typography>
-                        <Typography>06292</Typography>
+                        <Typography color="secondary">직책</Typography>
+                        <Typography>{currentUser.role || '-'}</Typography>
                       </Stack>
                     </Grid>
                   </Grid>
                 </ListItem>
                 <ListItem>
                   <Stack sx={{ gap: 0.5 }}>
-                    <Typography color="secondary">주소</Typography>
-                    <Typography>서울특별시 강남구 테헤란로 123, 456호</Typography>
+                    <Typography color="secondary">사용자 코드</Typography>
+                    <Typography>{currentUser.user_code || '-'}</Typography>
                   </Stack>
                 </ListItem>
               </List>

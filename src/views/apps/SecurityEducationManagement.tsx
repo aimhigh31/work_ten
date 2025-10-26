@@ -49,7 +49,6 @@ import { teams, assignees, securityEducationStatusOptions, securityEducationStat
 import { SecurityEducationTableData, SecurityEducationStatus, SecurityEducationRecord } from 'types/security-education';
 import { ThemeMode } from 'config';
 import { useSupabaseSecurityEducation, SecurityEducationItem } from '../../hooks/useSupabaseSecurityEducation';
-import { useSupabaseMasterCode3 } from '../../hooks/useSupabaseMasterCode3';
 import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
 import { useSupabaseChangeLog } from '../../hooks/useSupabaseChangeLog';
 import { ChangeLogData } from '../../types/changelog';
@@ -2453,7 +2452,7 @@ export default function SecurityEducationManagement() {
   // 현재 사용자 정보
   const user = useUser();
   const { data: session } = useSession();
-  const { users, departments } = useCommonData(); // 🏪 공용 창고에서 가져오기
+  const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 가져오기
 
   // 세션 email로 DB에서 사용자 찾기
   const currentUser = React.useMemo(() => {
@@ -2470,12 +2469,32 @@ export default function SecurityEducationManagement() {
     deleteEducation,
     fetchEducations
   } = useSupabaseSecurityEducation();
-  const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
-  // GROUP002 서브코드 목록 (상태용)
+  // 마스터코드에서 상태 옵션 가져오기 (GROUP002의 서브코드만 필터링)
   const statusTypes = React.useMemo(() => {
-    return getSubCodesByGroup('GROUP002');
-  }, [getSubCodesByGroup]);
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 마스터코드에서 교육 유형 옵션 가져오기 (GROUP008의 서브코드만 필터링)
+  const educationTypes = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP008' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // subcode → subcode_name 변환 헬퍼 함수 (교육유형용)
+  const getEducationTypeName = React.useCallback((subcode: string) => {
+    const found = educationTypes.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [educationTypes]);
+
+  // subcode → subcode_name 변환 헬퍼 함수 (상태용)
+  const getStatusName = React.useCallback((subcode: string) => {
+    const found = statusTypes.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [statusTypes]);
 
   // 공유 Tasks 상태 - 데이터베이스 데이터를 SecurityEducationTableData 형식으로 변환
   const [tasks, setTasks] = useState<SecurityEducationTableData[]>([]);
@@ -2501,13 +2520,13 @@ export default function SecurityEducationManagement() {
         no: education.no || education.id,
         title: education.education_name,
         educationName: education.education_name || '교육명 없음',
-        educationType: education.education_type || '온라인',
+        educationType: getEducationTypeName(education.education_type || '') || '온라인',
         assignee: education.assignee || '미정',
         team: education.team || '보안팀', // DB에서 팀 정보 로드
         executionDate: education.execution_date || new Date().toISOString().split('T')[0],
         attendeeCount: education.participant_count || 0,
         participantCount: education.participant_count || 0,
-        status: (education.status as SecurityEducationStatus) || '계획',
+        status: (getStatusName(education.status || '') as SecurityEducationStatus) || '계획',
         description: education.description || '',
         location: education.location || '',
         code: convertedCode,
@@ -2525,7 +2544,7 @@ export default function SecurityEducationManagement() {
     console.log('🟡 변환된 tasks 개수:', convertedTasks.length);
     console.log('🟡 변환된 첫번째 task.code:', convertedTasks[0]?.code);
     setTasks(convertedTasks);
-  }, [securityEducations]);
+  }, [securityEducations, getEducationTypeName, getStatusName]);
 
   // 강제 데이터 새로고침 함수
   const handleRefreshData = useCallback(async () => {
@@ -3173,8 +3192,8 @@ export default function SecurityEducationManagement() {
                   setTasks={setTasks}
                   addChangeLog={addChangeLog}
                   onSave={handleEditTaskSave}
-                  educationTypes={getSubCodesByGroup('GROUP008').map((code) => code.sub_code_name)}
-                  statusTypes={getSubCodesByGroup('GROUP002').map((code) => code.sub_code_name)}
+                  educationTypes={educationTypes.map((code) => code.subcode_name)}
+                  statusTypes={statusTypes.map((code) => code.subcode_name)}
                   assigneeList={users.filter((user) => user.status === 'active')}
                   assignees={assignees}
                   assigneeAvatars={assigneeAvatars}
@@ -3319,8 +3338,8 @@ export default function SecurityEducationManagement() {
           data={editingTask ? convertTableDataToRecord(editingTask) : null}
           mode={editingTask ? 'edit' : 'add'}
           onSave={handleKanbanEditTaskSave}
-          educationTypes={getSubCodesByGroup('GROUP008').map((code) => code.sub_code_name)}
-          statusTypes={getSubCodesByGroup('GROUP002').map((code) => code.sub_code_name)}
+          educationTypes={educationTypes.map((code) => code.subcode_name)}
+          statusTypes={statusTypes.map((code) => code.subcode_name)}
           assigneeList={users.filter((user) => user.status === 'active')}
           assignees={assignees}
           assigneeAvatars={assigneeAvatars}

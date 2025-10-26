@@ -66,6 +66,12 @@ import { useSupabaseFeedback } from '../hooks/useSupabaseFeedback';
 import { PAGE_IDENTIFIERS, FeedbackData } from '../types/feedback';
 import { useSupabaseFiles } from '../hooks/useSupabaseFiles';
 import { FileData } from '../types/files';
+import { createClient } from '@supabase/supabase-js';
+
+// Supabase 클라이언트 설정
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 // 데이터 변환 유틸리티 함수들
 const convertTableDataToRecord = (tableData: ITEducationTableData): ITEducationRecord => {
@@ -631,6 +637,45 @@ const OverviewTab = memo(
     // 무한 루프 방지를 위한 ref
     const isUpdatingRef = useRef(false);
 
+    // Supabase 클라이언트 생성
+    const supabaseClient = React.useMemo(() => {
+      return createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+    }, []);
+
+    // DB에서 직접 가져온 마스터코드 목록 state
+    const [educationTypesFromDB, setEducationTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+    const [statusTypesFromDB, setStatusTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+
+    // Dialog가 열릴 때 DB에서 직접 조회
+    useEffect(() => {
+      const fetchMasterCodeData = async () => {
+        // GROUP008 교육유형 조회
+        const { data: group008Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP008')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+        setEducationTypesFromDB(group008Data || []);
+
+        // GROUP002 상태 조회
+        const { data: group002Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP002')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+        setStatusTypesFromDB(group002Data || []);
+      };
+
+      fetchMasterCodeData();
+    }, [supabaseClient]);
+
     // 외부 상태 변경시 로컬 상태 동기화
     useEffect(() => {
       setEducationName(educationState.educationName);
@@ -722,11 +767,22 @@ const OverviewTab = memo(
                   교육유형 <span style={{ color: 'red' }}>*</span>
                 </span>
               </InputLabel>
-              <Select value={educationState.educationType} onChange={handleFieldChange('educationType')} label="교육유형" displayEmpty>
+              <Select
+                value={educationState.educationType}
+                onChange={handleFieldChange('educationType')}
+                label="교육유형"
+                displayEmpty
+                notched
+                renderValue={(selected) => {
+                  if (!selected) return '선택';
+                  const item = educationTypesFromDB.find(t => t.subcode === selected);
+                  return item ? item.subcode_name : selected;
+                }}
+              >
                 <MenuItem value="">선택</MenuItem>
-                {getSubCodesByGroup('GROUP008').map((subCode) => (
-                  <MenuItem key={subCode.subcode} value={subCode.subcode_name}>
-                    {subCode.subcode_name}
+                {educationTypesFromDB.map((option) => (
+                  <MenuItem key={option.subcode} value={option.subcode}>
+                    {option.subcode_name}
                   </MenuItem>
                 ))}
               </Select>
@@ -793,14 +849,23 @@ const OverviewTab = memo(
 
             <FormControl fullWidth>
               <InputLabel shrink>상태</InputLabel>
-              <Select value={educationState.status} onChange={handleFieldChange('status')} label="상태">
-                {getSubCodesByGroup('GROUP002').map((subCode) => (
-                  <MenuItem key={subCode.subcode} value={subCode.subcode_name}>
+              <Select
+                value={educationState.status}
+                onChange={handleFieldChange('status')}
+                label="상태"
+                notched
+                renderValue={(selected) => {
+                  const item = statusTypesFromDB.find(s => s.subcode === selected);
+                  return item ? item.subcode_name : selected;
+                }}
+              >
+                {statusTypesFromDB.map((option) => (
+                  <MenuItem key={option.subcode} value={option.subcode}>
                     <Chip
-                      label={subCode.subcode_name}
+                      label={option.subcode_name}
                       size="small"
                       sx={{
-                        ...getStatusColor(subCode.subcode_name),
+                        ...getStatusColor(option.subcode_name),
                         fontSize: '13px',
                         fontWeight: 400,
                         height: 20
@@ -1236,6 +1301,31 @@ const ParticipantsTab = memo(
     };
 
     const [participantItems, setParticipantItems] = useState<ParticipantItem[]>(getInitialParticipants);
+    const [statusFromDB, setStatusFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+
+    // GROUP045 출석점검 데이터 조회 (Dialog가 열릴 때마다)
+    useEffect(() => {
+      const fetchStatusData = async () => {
+        try {
+          const { data: group045Data } = await supabase
+            .from('admin_mastercode_data')
+            .select('subcode, subcode_name, subcode_order')
+            .eq('codetype', 'subcode')
+            .eq('group_code', 'GROUP045')
+            .eq('is_active', true)
+            .order('subcode_order', { ascending: true });
+
+          if (group045Data) {
+            setStatusFromDB(group045Data);
+            console.log('✅ [ParticipantsTab] GROUP045 출석점검 DB 조회 완료:', group045Data.length, '개');
+          }
+        } catch (error) {
+          console.error('❌ [ParticipantsTab] GROUP045 조회 실패:', error);
+        }
+      };
+
+      fetchStatusData();
+    }, []);
 
     // mode와 educationId에 따라 초기 데이터 설정
     useEffect(() => {
@@ -1350,13 +1440,16 @@ const ParticipantsTab = memo(
     };
 
     const handleAddItem = () => {
+      // 기본 출석점검 값을 DB에서 조회한 첫 번째 값으로 설정
+      const defaultStatus = statusFromDB.length > 0 ? statusFromDB[0].subcode : '';
+
       const newItem: ParticipantItem = {
         id: Date.now().toString(),
         no: 1,
         participant: '',
         position: '',
         department: '',
-        attendanceCheck: '예정',
+        attendanceCheck: defaultStatus,
         opinion: '',
         notes: ''
       };
@@ -1408,6 +1501,33 @@ const ParticipantsTab = memo(
       notes: 150
     };
 
+    // 출석점검 상태별 색상 매핑 (동적)
+    const getAttendanceColor = useCallback(
+      (status: string) => {
+        // subcode 또는 subcode_name으로 조회
+        const statusItem = statusFromDB.find((s) => s.subcode === status || s.subcode_name === status);
+        const statusName = statusItem ? statusItem.subcode_name : status;
+
+        switch (statusName) {
+          case '예정':
+          case '대기':
+            return { backgroundColor: '#F5F5F5', color: '#757575' };
+          case '참석':
+          case '출석':
+            return { backgroundColor: '#E3F2FD', color: '#1976D2' };
+          case '불참':
+          case '결석':
+          case '미참석':
+            return { backgroundColor: '#fff8e1', color: '#f57c00' };
+          case '취소':
+            return { backgroundColor: '#FFEBEE', color: '#D32F2F' };
+          default:
+            return { backgroundColor: '#F5F5F5', color: '#757575' };
+        }
+      },
+      [statusFromDB]
+    );
+
     // 편집 가능한 셀 렌더링
     const renderEditableCell = (item: ParticipantItem, field: string, value: string | number) => {
       const isEditing = editingCell?.id === item.id && editingCell?.field === field;
@@ -1420,7 +1540,13 @@ const ParticipantsTab = memo(
               <TextField
                 select
                 value={value || ''}
-                onChange={(e) => handleEditItem(item.id, field as keyof ParticipantItem, e.target.value)}
+                onChange={(e) => {
+                  // subcode_name을 subcode로 변환하여 저장
+                  const selectedName = e.target.value;
+                  const selectedItem = statusFromDB.find((s) => s.subcode_name === selectedName);
+                  const subcodeValue = selectedItem ? selectedItem.subcode : selectedName;
+                  handleEditItem(item.id, field as keyof ParticipantItem, subcodeValue);
+                }}
                 onBlur={handleCellBlur}
                 size="small"
                 sx={{
@@ -1442,10 +1568,29 @@ const ParticipantsTab = memo(
                   }
                 }}
                 autoFocus
+                SelectProps={{
+                  renderValue: (selected) => {
+                    // subcode를 subcode_name으로 변환하여 표시
+                    const statusItem = statusFromDB.find((s) => s.subcode === selected || s.subcode_name === selected);
+                    return statusItem ? statusItem.subcode_name : selected;
+                  }
+                }}
               >
-                <MenuItem value="예정">예정</MenuItem>
-                <MenuItem value="참석">참석</MenuItem>
-                <MenuItem value="불참">불참</MenuItem>
+                {statusFromDB.map((status) => (
+                  <MenuItem key={status.subcode} value={status.subcode_name}>
+                    <Chip
+                      label={status.subcode_name}
+                      size="small"
+                      sx={{
+                        fontSize: '12px',
+                        ...getAttendanceColor(status.subcode_name),
+                        '& .MuiChip-label': {
+                          color: getAttendanceColor(status.subcode_name).color
+                        }
+                      }}
+                    />
+                  </MenuItem>
+                ))}
               </TextField>
             </Box>
           );
@@ -1538,14 +1683,17 @@ const ParticipantsTab = memo(
         >
           {field === 'attendanceCheck' ? (
             <Chip
-              label={value || '-'}
+              label={(() => {
+                // subcode를 subcode_name으로 변환하여 표시
+                const statusItem = statusFromDB.find((s) => s.subcode === value);
+                return statusItem ? statusItem.subcode_name : value || '-';
+              })()}
               size="small"
               sx={{
                 fontSize: '12px',
-                backgroundColor: value === '참석' ? '#e8f5e8' : value === '불참' ? '#ffe8e8' : value === '예정' ? '#f0e8ff' : '#f5f5f5',
-                color: 'black',
+                ...getAttendanceColor(value as string),
                 '& .MuiChip-label': {
-                  color: 'black'
+                  color: getAttendanceColor(value as string).color
                 }
               }}
             />

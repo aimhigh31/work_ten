@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useReducer, memo, useEffect, useRef } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import {
   Dialog,
   DialogTitle,
@@ -36,7 +37,6 @@ import {
 import { TaskTableData, TaskStatus, ChecklistItem } from '../types/kpi';
 import { useOptimizedInput } from '../hooks/useDebounce';
 import { useCommonData } from '../contexts/CommonDataContext';
-import { useSupabaseDepartmentManagement } from '../hooks/useSupabaseDepartmentManagement';
 import { useSupabaseKpiTask } from '../hooks/useSupabaseKpiTask';
 import { useSupabaseKpiRecord } from '../hooks/useSupabaseKpiRecord';
 import { useSession } from 'next-auth/react';
@@ -177,6 +177,68 @@ const OverviewTab = memo(
     departmentOptions: Array<{ subcode: string; subcode_name: string }>;
     users: any[];
   }) => {
+    // Supabase 클라이언트 생성 (DB 직접 조회용)
+    const supabaseClient = React.useMemo(() => {
+      return createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+    }, []);
+
+    // DB 직접 조회 상태
+    const [managementCategoriesFromDB, setManagementCategoriesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+    const [departmentsFromDB, setDepartmentsFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+    const [statusTypesFromDB, setStatusTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+
+    // Dialog 열릴 때마다 DB에서 직접 조회
+    useEffect(() => {
+      const fetchMasterCodeData = async () => {
+        // GROUP040: 관리분류
+        const { data: group040Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP040')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+
+        if (group040Data) {
+          setManagementCategoriesFromDB(group040Data);
+          console.log('✅ [KpiOverviewTab] GROUP040 관리분류 DB 조회 완료:', group040Data.length, '개');
+        }
+
+        // GROUP031: 업무분류
+        const { data: group031Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP031')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+
+        if (group031Data) {
+          setDepartmentsFromDB(group031Data);
+          console.log('✅ [KpiOverviewTab] GROUP031 업무분류 DB 조회 완료:', group031Data.length, '개');
+        }
+
+        // GROUP002: 상태
+        const { data: group002Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP002')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+
+        if (group002Data) {
+          setStatusTypesFromDB(group002Data);
+          console.log('✅ [KpiOverviewTab] GROUP002 상태 DB 조회 완료:', group002Data.length, '개');
+        }
+      };
+
+      fetchMasterCodeData();
+    }, [supabaseClient]);
+
     // users 배열 상태 로그
     console.log('👥 [KPI OverviewTab] users 배열:', {
       count: users?.length || 0,
@@ -536,17 +598,19 @@ const OverviewTab = memo(
                   onFieldChange('managementCategory', e.target.value);
                 }}
                 displayEmpty
+                notched
+                renderValue={(selected) => {
+                  if (!selected) return '선택';
+                  const item = managementCategoriesFromDB.find(m => m.subcode === selected);
+                  return item ? item.subcode_name : selected;
+                }}
               >
                 <MenuItem value="">선택</MenuItem>
-                {managementCategoryOptions.length > 0 ? (
-                  managementCategoryOptions.map((option) => (
-                    <MenuItem key={option.subcode} value={option.subcode_name}>
-                      {option.subcode_name}
-                    </MenuItem>
-                  ))
-                ) : (
-                  <MenuItem value="">관리분류 로딩중...</MenuItem>
-                )}
+                {managementCategoriesFromDB.map((option) => (
+                  <MenuItem key={option.subcode} value={option.subcode}>
+                    {option.subcode_name}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
 
@@ -591,17 +655,19 @@ const OverviewTab = memo(
                   onFieldChange('department', e.target.value);
                 }}
                 displayEmpty
+                notched
+                renderValue={(selected) => {
+                  if (!selected) return '선택';
+                  const item = departmentsFromDB.find(d => d.subcode === selected);
+                  return item ? item.subcode_name : selected;
+                }}
               >
                 <MenuItem value="">선택</MenuItem>
-                {departmentOptions.length > 0 ? (
-                  departmentOptions.map((option) => (
-                    <MenuItem key={option.subcode} value={option.subcode_name}>
-                      {option.subcode_name}
-                    </MenuItem>
-                  ))
-                ) : (
-                  <MenuItem value="">업무분류 로딩중...</MenuItem>
-                )}
+                {departmentsFromDB.map((option) => (
+                  <MenuItem key={option.subcode} value={option.subcode}>
+                    {option.subcode_name}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
 
@@ -628,30 +694,73 @@ const OverviewTab = memo(
 
             <FormControl fullWidth>
               <InputLabel shrink>상태</InputLabel>
-              <Select value={taskState.status} label="상태" onChange={handleFieldChange('status')}>
-                {statusOptions.map((status) => {
+              <Select
+                value={taskState.status}
+                label="상태"
+                onChange={handleFieldChange('status')}
+                notched
+                renderValue={(selected) => {
+                  if (!selected) return '';
+                  const item = statusTypesFromDB.find(s => s.subcode === selected);
+                  const displayName = item ? item.subcode_name : selected;
+
                   const getStatusColor = (statusName: string) => {
                     switch (statusName) {
                       case '대기':
                         return { bgcolor: '#F5F5F5', color: '#757575' };
                       case '진행':
+                      case '진행중':
                         return { bgcolor: '#E3F2FD', color: '#1976D2' };
                       case '완료':
                         return { bgcolor: '#E8F5E9', color: '#388E3C' };
                       case '홀딩':
+                      case '취소':
                         return { bgcolor: '#FFEBEE', color: '#D32F2F' };
                       default:
                         return { bgcolor: '#F5F5F5', color: '#757575' };
                     }
                   };
+
                   return (
-                    <MenuItem key={status} value={status}>
+                    <Chip
+                      label={displayName}
+                      size="small"
+                      sx={{
+                        backgroundColor: getStatusColor(displayName).bgcolor,
+                        color: getStatusColor(displayName).color,
+                        fontSize: '13px',
+                        fontWeight: 400
+                      }}
+                    />
+                  );
+                }}
+              >
+                {statusTypesFromDB.map((option) => {
+                  const getStatusColor = (statusName: string) => {
+                    switch (statusName) {
+                      case '대기':
+                        return { bgcolor: '#F5F5F5', color: '#757575' };
+                      case '진행':
+                      case '진행중':
+                        return { bgcolor: '#E3F2FD', color: '#1976D2' };
+                      case '완료':
+                        return { bgcolor: '#E8F5E9', color: '#388E3C' };
+                      case '홀딩':
+                      case '취소':
+                        return { bgcolor: '#FFEBEE', color: '#D32F2F' };
+                      default:
+                        return { bgcolor: '#F5F5F5', color: '#757575' };
+                    }
+                  };
+
+                  return (
+                    <MenuItem key={option.subcode} value={option.subcode}>
                       <Chip
-                        label={status}
+                        label={option.subcode_name}
                         size="small"
                         sx={{
-                          backgroundColor: getStatusColor(status).bgcolor,
-                          color: getStatusColor(status).color,
+                          backgroundColor: getStatusColor(option.subcode_name).bgcolor,
+                          color: getStatusColor(option.subcode_name).color,
                           fontSize: '13px',
                           fontWeight: 400
                         }}
@@ -2475,56 +2584,6 @@ const PlanTab = memo(
                   )}
                 </Box>
 
-                {/* 영향도 선택 */}
-                <Box sx={{ minWidth: '70px', mr: 1 }}>
-                  {!item.parentId ? (
-                    // Level 0 (최상위 레벨)일 때는 평균값 표시
-                    <Typography
-                      sx={{
-                        fontSize: '12px',
-                        padding: '2px 8px',
-                        color: '#666'
-                      }}
-                    >
-                      {calculateAveragePriority(item)}
-                    </Typography>
-                  ) : (
-                    <Select
-                      value={item.priority || ''}
-                      onChange={(e) => onPriorityChange && onPriorityChange(item.id, e.target.value)}
-                      disabled={false}
-                      size="small"
-                      variant="standard"
-                      disableUnderline
-                      displayEmpty
-                      sx={{
-                        width: '100%',
-                        fontSize: '12px',
-                        backgroundColor: 'transparent',
-                        borderRadius: 0,
-                        '& .MuiSelect-select': {
-                          padding: '2px 8px',
-                          fontSize: '12px',
-                          color: 'inherit'
-                        },
-                        '& .MuiSelect-icon': {
-                          fontSize: '14px',
-                          color: 'inherit'
-                        }
-                      }}
-                    >
-                      <MenuItem value="" sx={{ fontSize: '12px', color: '#999' }}>
-                        선택
-                      </MenuItem>
-                      {priorityOptions.map((option: any) => (
-                        <MenuItem key={option.subcode} value={option.subcode_name} sx={{ fontSize: '12px' }}>
-                          {option.subcode_name}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  )}
-                </Box>
-
                 {/* 비중도 입력 */}
                 <Box sx={{ minWidth: '70px', mr: 1, display: 'flex', alignItems: 'center' }}>
                   <TextField
@@ -2563,47 +2622,6 @@ const PlanTab = memo(
                     }
                   />
                   <Typography sx={{ fontSize: '12px', color: '#666', ml: 0.5 }}>%</Typography>
-                </Box>
-
-                {/* 상태 선택 */}
-                <Box sx={{ minWidth: '80px', mr: 1 }}>
-                  <Select
-                    value={item.status || '대기'}
-                    onChange={(e) => onStatusChange && onStatusChange(item.id, e.target.value)}
-                    disabled={false}
-                    size="small"
-                    variant="standard"
-                    disableUnderline
-                    displayEmpty
-                    sx={{
-                      width: '100%',
-                      fontSize: '12px',
-                      backgroundColor: 'transparent',
-                      borderRadius: 0,
-                      '& .MuiSelect-select': {
-                        padding: '2px 8px',
-                        fontSize: '12px',
-                        color: 'inherit'
-                      },
-                      '& .MuiSelect-icon': {
-                        fontSize: '14px',
-                        color: 'inherit'
-                      }
-                    }}
-                  >
-                    <MenuItem value="대기" sx={{ fontSize: '12px' }}>
-                      대기
-                    </MenuItem>
-                    <MenuItem value="진행" sx={{ fontSize: '12px' }}>
-                      진행
-                    </MenuItem>
-                    <MenuItem value="완료" sx={{ fontSize: '12px' }}>
-                      완료
-                    </MenuItem>
-                    <MenuItem value="취소" sx={{ fontSize: '12px' }}>
-                      취소
-                    </MenuItem>
-                  </Select>
                 </Box>
 
                 {/* 시작일 선택 */}
@@ -3800,14 +3818,11 @@ const TaskEditDialog = memo(
     // const { renderCount, logStats } = usePerformanceMonitor('TaskEditDialog');
 
     // CommonData 훅 - 캐싱된 마스터코드 사용
-    const { masterCodes, users } = useCommonData();
+    const { masterCodes, users, departments } = useCommonData();
 
     // 사용자 정보 가져오기
     const { data: session } = useSession();
     const user = useUser(); // MaterialTab에서 사용할 사용자 정보
-
-    // 부서 정보 가져오기
-    const { departments } = useSupabaseDepartmentManagement();
 
     // 커스텀 getSubCodesByGroup 함수 (빈 값 필터링 포함)
     const getSubCodesByGroup = useCallback((groupCode: string) => {
@@ -3882,14 +3897,14 @@ const TaskEditDialog = memo(
       return group040SubCodes;
     }, [getSubCodesByGroup]);
 
-    // GROUP041의 서브코드들 가져오기 (업무분류)
+    // GROUP031의 서브코드들 가져오기 (업무분류)
     const departmentOptions = useMemo(() => {
-      const group041SubCodes = getSubCodesByGroup('GROUP041');
+      const group031SubCodes = getSubCodesByGroup('GROUP031');
       console.log('📋 [KPI] 업무분류 옵션:', {
-        count: group041SubCodes.length,
-        options: group041SubCodes.map(s => s.subcode_name)
+        count: group031SubCodes.length,
+        options: group031SubCodes.map(s => s.subcode_name)
       });
-      return group041SubCodes;
+      return group031SubCodes;
     }, [getSubCodesByGroup]);
 
     // GROUP012의 서브코드들 가져오기 (영향도)

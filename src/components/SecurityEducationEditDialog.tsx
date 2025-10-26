@@ -245,7 +245,7 @@ const edsecurityEducationReducer = (state: SecurityEducationEditState, action: S
         assignee: action.assignee || assignees[0],
         executionDate: '',
         location: '',
-        status: '대기',
+        status: '', // useEffect에서 "대기" subcode로 설정됨
         participantCount: 0,
         registrationDate: action.registrationDate!,
         code: action.code!,
@@ -259,7 +259,7 @@ const edsecurityEducationReducer = (state: SecurityEducationEditState, action: S
         assignee: action.assignee || assignees[0],
         executionDate: '',
         location: '',
-        status: '대기',
+        status: '', // useEffect에서 "대기" subcode로 설정됨
         participantCount: 0,
         registrationDate: '',
         code: '',
@@ -406,7 +406,7 @@ const OverviewTab = memo(
                   <MenuItem value="">선택</MenuItem>
                   {educationTypes && educationTypes.length > 0
                     ? educationTypes.map((type) => (
-                        <MenuItem key={type.subcode} value={type.subcode_name}>
+                        <MenuItem key={type.subcode} value={type.subcode}>
                           {type.subcode_name}
                         </MenuItem>
                       ))
@@ -475,7 +475,7 @@ const OverviewTab = memo(
               <Select value={educationState.status} onChange={handleFieldChange('status')} label="상태">
                 {statusTypes && statusTypes.length > 0
                   ? statusTypes.map((type) => (
-                      <MenuItem key={type.subcode} value={type.subcode_name}>
+                      <MenuItem key={type.subcode} value={type.subcode}>
                         <Chip
                           label={type.subcode_name}
                           size="small"
@@ -834,17 +834,58 @@ const ParticipantsTab = memo(
       }
     }, [STORAGE_KEY]);
 
-    // 출석점검 색상 정의
-    const getAttendanceColor = (status: string) => {
-      const colors = {
-        예정: { backgroundColor: '#F5F5F5', color: '#757575' }, // 회색
-        참석: { backgroundColor: '#E3F2FD', color: '#1976D2' }, // 파란색
-        완료: { backgroundColor: '#E8F5E9', color: '#388E3C' }, // 녹색
-        불참: { backgroundColor: '#FFF3E0', color: '#F57C00' }, // 주황색
-        취소: { backgroundColor: '#FFEBEE', color: '#D32F2F' } // 빨간색
+    const [statusFromDB, setStatusFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+
+    // GROUP045 출석점검 데이터 조회 (Dialog가 열릴 때마다)
+    useEffect(() => {
+      const fetchStatusData = async () => {
+        try {
+          const { data: group045Data } = await supabase
+            .from('admin_mastercode_data')
+            .select('subcode, subcode_name, subcode_order')
+            .eq('codetype', 'subcode')
+            .eq('group_code', 'GROUP045')
+            .eq('is_active', true)
+            .order('subcode_order', { ascending: true });
+
+          if (group045Data) {
+            setStatusFromDB(group045Data);
+            console.log('✅ [ParticipantsTab] GROUP045 출석점검 DB 조회 완료:', group045Data.length, '개');
+          }
+        } catch (error) {
+          console.error('❌ [ParticipantsTab] GROUP045 조회 실패:', error);
+        }
       };
-      return colors[status as keyof typeof colors] || { backgroundColor: '#F5F5F5', color: '#757575' };
-    };
+
+      fetchStatusData();
+    }, []);
+
+    // 출석점검 색상 정의 (동적)
+    const getAttendanceColor = useCallback(
+      (status: string) => {
+        // subcode 또는 subcode_name으로 조회
+        const statusItem = statusFromDB.find((s) => s.subcode === status || s.subcode_name === status);
+        const statusName = statusItem ? statusItem.subcode_name : status;
+
+        switch (statusName) {
+          case '예정':
+          case '대기':
+            return { backgroundColor: '#F5F5F5', color: '#757575' };
+          case '참석':
+          case '출석':
+            return { backgroundColor: '#E3F2FD', color: '#1976D2' };
+          case '불참':
+          case '결석':
+          case '미참석':
+            return { backgroundColor: '#fff8e1', color: '#f57c00' };
+          case '취소':
+            return { backgroundColor: '#FFEBEE', color: '#D32F2F' };
+          default:
+            return { backgroundColor: '#F5F5F5', color: '#757575' };
+        }
+      },
+      [statusFromDB]
+    );
 
     const [participantItems, setParticipantItems] = useState<SecurityAttendeeItem[]>(() => {
       // 초기값을 SessionStorage에서 복원
@@ -1013,13 +1054,16 @@ const ParticipantsTab = memo(
       const newId = generateNextId(); // PostgreSQL 정수 범위 내 순차 ID 생성
       console.log('🆔 새 참석자 ID 생성:', newId);
 
+      // 기본 출석점검 값을 DB에서 조회한 첫 번째 값으로 설정
+      const defaultStatus = statusFromDB.length > 0 ? statusFromDB[0].subcode : '예정';
+
       const newItem: SecurityAttendeeItem = {
         id: newId,
         education_id: educationId || 999999, // add 모드에서는 임시 ID, 저장 시 실제 education_id로 교체
         user_name: '',
         position: '',
         department: '',
-        attendance_status: '예정',
+        attendance_status: defaultStatus,
         notes: '',
         is_active: true
       };
@@ -1032,7 +1076,7 @@ const ParticipantsTab = memo(
       if (mode === 'add') {
         saveToSessionStorage(updatedItems);
       }
-    }, [educationId, participantItems, generateNextId, mode, saveToSessionStorage]);
+    }, [educationId, participantItems, generateNextId, mode, saveToSessionStorage, statusFromDB]);
 
     // 선택된 참석자 삭제
     const handleDeleteSelected = useCallback(async () => {
@@ -1116,35 +1160,45 @@ const ParticipantsTab = memo(
                   value={value || ''}
                   onChange={(e) => {
                     e.stopPropagation();
+                    // subcode_name을 subcode로 변환하여 저장
+                    const selectedName = e.target.value;
+                    const selectedItem = statusFromDB.find((s) => s.subcode_name === selectedName);
+                    const subcodeValue = selectedItem ? selectedItem.subcode : selectedName;
+
                     // 로컬 상태 업데이트
-                    handleLocalEditItem(item.id, field, e.target.value);
+                    handleLocalEditItem(item.id, field, subcodeValue);
                     // edit 모드일 때만 DB도 업데이트
                     if (mode === 'edit') {
-                      handleEditItem(item.id, field, e.target.value);
+                      handleEditItem(item.id, field, subcodeValue);
                     }
                   }}
                   onBlur={handleCellBlur}
                   onClick={(e) => e.stopPropagation()}
                   autoFocus
-                  renderValue={(selected) => (
-                    <Chip
-                      label={selected}
-                      size="small"
-                      sx={{
-                        ...getAttendanceColor(selected as string),
-                        fontSize: '12px',
-                        height: 20
-                      }}
-                    />
-                  )}
-                >
-                  {attendanceTypes.map((type) => (
-                    <MenuItem key={type.subcode} value={type.subcode_name}>
+                  renderValue={(selected) => {
+                    // subcode를 subcode_name으로 변환하여 표시
+                    const statusItem = statusFromDB.find((s) => s.subcode === selected);
+                    const statusName = statusItem ? statusItem.subcode_name : selected;
+                    return (
                       <Chip
-                        label={type.subcode_name}
+                        label={statusName}
                         size="small"
                         sx={{
-                          ...getAttendanceColor(type.subcode_name),
+                          ...getAttendanceColor(selected as string),
+                          fontSize: '12px',
+                          height: 20
+                        }}
+                      />
+                    );
+                  }}
+                >
+                  {statusFromDB.map((status) => (
+                    <MenuItem key={status.subcode} value={status.subcode_name}>
+                      <Chip
+                        label={status.subcode_name}
+                        size="small"
+                        sx={{
+                          ...getAttendanceColor(status.subcode_name),
                           fontSize: '12px',
                           height: 20
                         }}
@@ -1252,7 +1306,11 @@ const ParticipantsTab = memo(
         >
           {field === 'attendance_status' ? (
             <Chip
-              label={value || '-'}
+              label={(() => {
+                // subcode를 subcode_name으로 변환하여 표시
+                const statusItem = statusFromDB.find((s) => s.subcode === value);
+                return statusItem ? statusItem.subcode_name : value || '-';
+              })()}
               size="small"
               sx={{
                 ...getAttendanceColor(value as string),
@@ -3103,6 +3161,57 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
   // ID 생성기 훅
   const { generateNextId } = useIdGenerator();
 
+  // DB에서 직접 가져온 교육유형 및 상태 목록 state
+  const [educationTypesFromDB, setEducationTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+  const [statusTypesFromDB, setStatusTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+
+  // Dialog가 열릴 때 DB에서 교육유형(GROUP008)과 상태(GROUP002) 직접 조회
+  useEffect(() => {
+    if (!open) return;
+
+    const fetchMasterCodeData = async () => {
+      try {
+        console.log('🔄 [SecurityEducationEditDialog] DB에서 교육유형/상태 직접 조회 시작');
+
+        // GROUP008 교육유형 조회
+        const { data: group008Data, error: group008Error } = await supabase
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP008')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+
+        if (group008Error) {
+          console.error('❌ GROUP008 조회 오류:', group008Error);
+        } else {
+          console.log('✅ GROUP008 교육유형:', group008Data);
+          setEducationTypesFromDB(group008Data || []);
+        }
+
+        // GROUP002 상태 조회
+        const { data: group002Data, error: group002Error } = await supabase
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP002')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+
+        if (group002Error) {
+          console.error('❌ GROUP002 조회 오류:', group002Error);
+        } else {
+          console.log('✅ GROUP002 상태:', group002Data);
+          setStatusTypesFromDB(group002Data || []);
+        }
+      } catch (error) {
+        console.error('❌ 마스터코드 조회 중 오류:', error);
+      }
+    };
+
+    fetchMasterCodeData();
+  }, [open]);
+
   // 피드백/기록 훅
   const {
     feedbacks,
@@ -3116,15 +3225,11 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
 
   // SWR의 revalidateOnMount: true가 자동으로 데이터를 fetch합니다
 
-  // GROUP008 서브코드 목록 (교육유형용)
-  const educationTypes = useMemo(() => {
-    return getSubCodesByGroup('GROUP008');
-  }, [getSubCodesByGroup]);
+  // GROUP008 서브코드 목록 (교육유형용) - DB에서 직접 가져온 데이터 사용
+  const educationTypes = educationTypesFromDB;
 
-  // GROUP002 서브코드 목록 (상태용)
-  const statusTypes = useMemo(() => {
-    return getSubCodesByGroup('GROUP002');
-  }, [getSubCodesByGroup]);
+  // GROUP002 서브코드 목록 (상태용) - DB에서 직접 가져온 데이터 사용
+  const statusTypes = statusTypesFromDB;
 
   // GROUP032 서브코드 목록 (출석점검용)
   const attendanceTypes = useMemo(() => {
@@ -3151,7 +3256,7 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
     assignee: user ? user.name : '',
     executionDate: '',
     location: '',
-    status: '대기',
+    status: '', // 초기값 빈 문자열 (useEffect에서 "대기" subcode로 설정됨)
     participantCount: 0,
     registrationDate: '',
     code: ''
@@ -3264,6 +3369,18 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
       dispatch({ type: 'SET_FIELD', field: 'team', value: currentUser.department });
     }
   }, [currentUser, educationState.team, data, mode]);
+
+  // 상태 초기값을 "대기" subcode로 설정 (add 모드일 때만)
+  React.useEffect(() => {
+    if (open && mode === 'add' && statusTypesFromDB.length > 0 && !educationState.status) {
+      // "대기"에 해당하는 subcode 찾기
+      const defaultStatus = statusTypesFromDB.find(item => item.subcode_name === '대기');
+      if (defaultStatus) {
+        console.log('✅ 상태 초기값 설정:', defaultStatus.subcode, '-', defaultStatus.subcode_name);
+        dispatch({ type: 'SET_FIELD', field: 'status', value: defaultStatus.subcode });
+      }
+    }
+  }, [open, mode, statusTypesFromDB, educationState.status]);
 
   // 다이얼로그 열릴 때 상태 초기화
   useEffect(() => {

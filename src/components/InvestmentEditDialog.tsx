@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, useReducer, memo, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
+import { createClient } from '@supabase/supabase-js';
 import {
   Dialog,
   DialogTitle,
@@ -155,6 +156,53 @@ const InvestmentOverviewTab = memo(
     console.log('🔍 [InvestmentEditDialog OverviewTab] departments:', departments?.length);
     console.log('🔍 [InvestmentEditDialog OverviewTab] users:', users?.length);
 
+    // Supabase 클라이언트 생성 (DB 직접 조회용)
+    const supabaseClient = React.useMemo(() => {
+      return createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+    }, []);
+
+    // DB 직접 조회 상태
+    const [investmentTypesFromDB, setInvestmentTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+    const [statusTypesFromDB, setStatusTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+
+    // Dialog 열릴 때마다 DB에서 직접 조회
+    useEffect(() => {
+      const fetchMasterCodeData = async () => {
+        // GROUP025: 투자유형
+        const { data: group025Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP025')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+
+        if (group025Data) {
+          setInvestmentTypesFromDB(group025Data);
+          console.log('✅ [InvestmentOverviewTab] GROUP025 투자유형 DB 조회 완료:', group025Data.length, '개');
+        }
+
+        // GROUP002: 상태
+        const { data: group002Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP002')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+
+        if (group002Data) {
+          setStatusTypesFromDB(group002Data);
+          console.log('✅ [InvestmentOverviewTab] GROUP002 상태 DB 조회 완료:', group002Data.length, '개');
+        }
+      };
+
+      fetchMasterCodeData();
+    }, [supabaseClient]);
+
     // 세션 정보 가져오기
     const { data: session } = useSession();
 
@@ -163,41 +211,6 @@ const InvestmentOverviewTab = memo(
       if (!session?.user?.email || users.length === 0) return null;
       return users.find((u) => u.email === session.user.email);
     }, [session, users]);
-
-    // 마스터코드에서 서브코드 가져오기 함수
-    const getSubCodesByGroup = React.useCallback((groupCode: string) => {
-      if (!masterCodes || masterCodes.length === 0) {
-        console.log(`⚠️ [InvestmentEditDialog] masterCodes가 아직 로드되지 않음`);
-        return [];
-      }
-      const subCodes = masterCodes
-        .filter(code => code.group_code === groupCode && code.is_active)
-        .filter(code => code.subcode && code.subcode_name); // 빈 값 필터링
-      console.log(`🔍 [InvestmentEditDialog] ${groupCode} 필터링 결과:`, subCodes.length, '개', subCodes);
-      return subCodes;
-    }, [masterCodes]);
-
-    // GROUP025: 투자유형
-    const masterInvestmentTypes = React.useMemo(() => {
-      const investmentSubcodes = getSubCodesByGroup('GROUP025');
-      if (investmentSubcodes && investmentSubcodes.length > 0) {
-        const types = investmentSubcodes.map((subcode) => subcode.subcode_name);
-        console.log('✅ 투자유형 목록:', types);
-        return types;
-      }
-      return [];
-    }, [getSubCodesByGroup]);
-
-    // GROUP002: 상태
-    const masterStatusOptions = React.useMemo(() => {
-      const statusSubcodes = getSubCodesByGroup('GROUP002');
-      if (statusSubcodes && statusSubcodes.length > 0) {
-        const statuses = statusSubcodes.map((subcode) => subcode.subcode_name);
-        console.log('✅ 상태 목록:', statuses);
-        return statuses;
-      }
-      return [];
-    }, [getSubCodesByGroup]);
 
     // 부서 목록
     const departmentNames = React.useMemo(() => {
@@ -229,9 +242,7 @@ const InvestmentOverviewTab = memo(
       return avatarMap;
     }, [users]);
 
-    // 마스터코드 데이터가 있으면 사용, 없으면 기본값 사용
-    const finalInvestmentTypes = masterInvestmentTypes.length > 0 ? masterInvestmentTypes : investmentTypes;
-    const finalStatusOptions = masterStatusOptions.length > 0 ? masterStatusOptions : statusOptions;
+    // 최종 사용할 옵션들
     const finalTeams = departmentNames.length > 0 ? departmentNames : teams;
     const finalAssignees = userNames.length > 0 ? userNames : assignees;
     const finalAssigneeAvatars = Object.keys(userAvatars).length > 0 ? userAvatars : assigneeAvatars;
@@ -360,13 +371,24 @@ const InvestmentOverviewTab = memo(
                   투자유형 <span style={{ color: 'red' }}>*</span>
                 </span>
               </InputLabel>
-              <Select value={investmentState.investmentType} label="투자유형 *" onChange={handleFieldChange('investmentType')} displayEmpty>
+              <Select
+                value={investmentState.investmentType}
+                label="투자유형 *"
+                onChange={handleFieldChange('investmentType')}
+                displayEmpty
+                notched
+                renderValue={(selected) => {
+                  if (!selected) return '선택';
+                  const item = investmentTypesFromDB.find(t => t.subcode === selected);
+                  return item ? item.subcode_name : selected;
+                }}
+              >
                 <MenuItem value="">선택</MenuItem>
-                {finalInvestmentTypes?.map((type) => (
-                  <MenuItem key={type} value={type}>
-                    {type}
+                {investmentTypesFromDB.map((option) => (
+                  <MenuItem key={option.subcode} value={option.subcode}>
+                    {option.subcode_name}
                   </MenuItem>
-                )) || []}
+                ))}
               </Select>
             </FormControl>
 
@@ -384,46 +406,80 @@ const InvestmentOverviewTab = memo(
             />
 
             <FormControl fullWidth>
-              <InputLabel shrink>
-                <span>
-                  상태 <span style={{ color: 'red' }}>*</span>
-                </span>
-              </InputLabel>
+              <InputLabel shrink>상태</InputLabel>
               <Select
-                value={finalStatusOptions?.includes(investmentState.status) ? investmentState.status : ''}
-                label="상태 *"
+                value={investmentState.status}
+                label="상태"
                 onChange={handleFieldChange('status')}
-              >
-                {finalStatusOptions?.map((status) => {
+                notched
+                renderValue={(selected) => {
+                  const item = statusTypesFromDB.find(s => s.subcode === selected);
+                  const displayName = item ? item.subcode_name : selected;
+
                   const getStatusColor = (statusName: string) => {
                     switch (statusName) {
                       case '대기':
                         return { bgcolor: '#F5F5F5', color: '#757575' };
                       case '진행':
+                      case '진행중':
                         return { bgcolor: '#E3F2FD', color: '#1976D2' };
                       case '완료':
                         return { bgcolor: '#E8F5E9', color: '#388E3C' };
                       case '홀딩':
+                      case '취소':
                         return { bgcolor: '#FFEBEE', color: '#D32F2F' };
                       default:
                         return { bgcolor: '#F5F5F5', color: '#757575' };
                     }
                   };
+
                   return (
-                    <MenuItem key={status} value={status}>
+                    <Chip
+                      label={displayName}
+                      size="small"
+                      sx={{
+                        backgroundColor: getStatusColor(displayName).bgcolor,
+                        color: getStatusColor(displayName).color,
+                        fontSize: '13px',
+                        fontWeight: 400
+                      }}
+                    />
+                  );
+                }}
+              >
+                {statusTypesFromDB.map((option) => {
+                  const getStatusColor = (statusName: string) => {
+                    switch (statusName) {
+                      case '대기':
+                        return { bgcolor: '#F5F5F5', color: '#757575' };
+                      case '진행':
+                      case '진행중':
+                        return { bgcolor: '#E3F2FD', color: '#1976D2' };
+                      case '완료':
+                        return { bgcolor: '#E8F5E9', color: '#388E3C' };
+                      case '홀딩':
+                      case '취소':
+                        return { bgcolor: '#FFEBEE', color: '#D32F2F' };
+                      default:
+                        return { bgcolor: '#F5F5F5', color: '#757575' };
+                    }
+                  };
+
+                  return (
+                    <MenuItem key={option.subcode} value={option.subcode}>
                       <Chip
-                        label={status}
+                        label={option.subcode_name}
                         size="small"
                         sx={{
-                          backgroundColor: getStatusColor(status).bgcolor,
-                          color: getStatusColor(status).color,
+                          backgroundColor: getStatusColor(option.subcode_name).bgcolor,
+                          color: getStatusColor(option.subcode_name).color,
                           fontSize: '13px',
                           fontWeight: 400
                         }}
                       />
                     </MenuItem>
                   );
-                }) || []}
+                })}
               </Select>
             </FormControl>
           </Stack>
@@ -1344,18 +1400,37 @@ const InvestmentAmountTab = memo(({ mode, investmentId }: { mode: 'add' | 'edit'
 
   console.log('🔍 [InvestmentAmountTab] masterCodes:', masterCodes?.length);
 
-  // GROUP026 투자세부유형 서브코드 목록
-  const investmentDetailTypes = useMemo(() => {
-    if (!masterCodes || masterCodes.length === 0) {
-      console.log('⚠️ [InvestmentAmountTab] masterCodes가 아직 로드되지 않음');
-      return [];
-    }
-    const group026Codes = masterCodes.filter((code) => code.group_code === 'GROUP026' && code.is_active && code.subcode && code.subcode_name);
-    console.log('📊 GROUP026 투자세부유형 서브코드:', group026Codes);
-    const types = group026Codes.map((code) => code.subcode_name);
-    console.log('✅ 투자세부유형 목록:', types);
-    return types;
-  }, [masterCodes]);
+  // Supabase 클라이언트 생성 (DB 직접 조회용)
+  const supabaseClient = React.useMemo(() => {
+    return createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+  }, []);
+
+  // DB 직접 조회 상태
+  const [investmentDetailTypesFromDB, setInvestmentDetailTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+
+  // Dialog 열릴 때마다 DB에서 직접 조회
+  useEffect(() => {
+    const fetchMasterCodeData = async () => {
+      // GROUP026: 투자세부유형
+      const { data: group026Data } = await supabaseClient
+        .from('admin_mastercode_data')
+        .select('subcode, subcode_name, subcode_order')
+        .eq('codetype', 'subcode')
+        .eq('group_code', 'GROUP026')
+        .eq('is_active', true)
+        .order('subcode_order', { ascending: true });
+
+      if (group026Data) {
+        setInvestmentDetailTypesFromDB(group026Data);
+        console.log('✅ [InvestmentAmountTab] GROUP026 투자세부유형 DB 조회 완료:', group026Data.length, '개');
+      }
+    };
+
+    fetchMasterCodeData();
+  }, [supabaseClient]);
 
   // 투자금액 샘플 데이터
   const mockAmountData = [
@@ -1703,11 +1778,16 @@ const InvestmentAmountTab = memo(({ mode, investmentId }: { mode: 'add' | 'edit'
               autoFocus
               onClose={handleCellBlur}
               displayEmpty
+              renderValue={(selected) => {
+                if (!selected) return '선택';
+                const found = investmentDetailTypesFromDB.find(t => t.subcode === selected);
+                return found ? found.subcode_name : selected;
+              }}
             >
               <MenuItem value="">선택</MenuItem>
-              {investmentDetailTypes.map((option) => (
-                <MenuItem key={option} value={option}>
-                  {option}
+              {investmentDetailTypesFromDB.map((option) => (
+                <MenuItem key={option.subcode} value={option.subcode}>
+                  {option.subcode_name}
                 </MenuItem>
               ))}
             </Select>
@@ -1767,7 +1847,11 @@ const InvestmentAmountTab = memo(({ mode, investmentId }: { mode: 'add' | 'edit'
           {field === 'budgetAmount' || field === 'executionAmount'
             ? `₩${(value != null ? Number(value) : 0).toLocaleString()}`
             : field === 'investmentCategory'
-              ? value || '선택'
+              ? (() => {
+                  if (!value) return '선택';
+                  const found = investmentDetailTypesFromDB.find(t => t.subcode === value);
+                  return found ? found.subcode_name : value;
+                })()
               : value || '-'}
         </Typography>
       </Box>

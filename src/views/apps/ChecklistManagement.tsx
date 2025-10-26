@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 
 // third-party
@@ -42,7 +42,6 @@ import { taskData, taskStatusColors, assigneeAvatars } from 'data/task';
 import { TaskTableData, TaskStatus } from 'types/task';
 import { ThemeMode } from 'config';
 import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
-import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 
 // 변경로그 타입 정의
 interface ChangeLog {
@@ -421,8 +420,7 @@ export default function ChecklistManagement() {
   const [value, setValue] = useState(0);
 
   // Supabase 훅 사용
-  const { users, departments } = useCommonData(); // 🏪 공용 창고에서 가져오기
-  const { getSubCodesByGroup } = useSupabaseMasterCode3();
+  const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 가져오기
 
   // 🔍 디버깅: CommonData에서 받은 users 확인
   React.useEffect(() => {
@@ -437,10 +435,36 @@ export default function ChecklistManagement() {
     }
   }, [users]);
 
-  // 상태 타입 데이터
+  // 마스터코드에서 체크리스트분류 옵션 가져오기 (GROUP006)
+  const categoriesMap = useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP006' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 상태 타입 데이터 (GROUP002의 서브코드만 필터링)
   const statusTypes = React.useMemo(() => {
-    return getSubCodesByGroup('GROUP002');
-  }, [getSubCodesByGroup]);
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // subcode → subcode_name 변환 함수들
+  const getCategoryName = useCallback(
+    (subcode: string) => {
+      const found = categoriesMap.find((item) => item.subcode === subcode);
+      return found ? found.subcode_name : subcode;
+    },
+    [categoriesMap]
+  );
+
+  const getStatusName = useCallback(
+    (subcode: string) => {
+      const found = statusTypes.find((item) => item.subcode === subcode);
+      return found ? found.subcode_name : subcode;
+    },
+    [statusTypes]
+  );
 
   // 공유 Tasks 상태
   const [tasks, setTasks] = useState<TaskTableData[]>(taskData);

@@ -46,7 +46,7 @@ import { useOptimizedInput } from '../hooks/useDebounce';
 import supabase from '../lib/supabaseClient';
 import { useSupabasePlanManagement, PlanItemInput } from '../hooks/useSupabasePlanManagement';
 import useUser from '../hooks/useUser';
-import { useSupabaseUserManagement } from '../hooks/useSupabaseUserManagement';
+import { useCommonData } from '../contexts/CommonDataContext';
 import { useSupabaseFeedback } from '../hooks/useSupabaseFeedback';
 import { PAGE_IDENTIFIERS } from '../types/feedback';
 import { useSupabaseFiles } from '../hooks/useSupabaseFiles';
@@ -91,20 +91,30 @@ const editTaskReducer = (state: EditTaskState, action: EditTaskAction): EditTask
       }
       return { ...state, [action.field]: action.value };
     case 'SET_TASK':
+      // DB의 kpi_id와 kpi_work_content를 loadedKpiData로 재구성
+      const taskAny = action.task as any;
+      let reconstructedKpiData = null;
+      if (taskAny.kpiId || taskAny.kpi_id) {
+        reconstructedKpiData = {
+          kpi_id: taskAny.kpiId || taskAny.kpi_id,
+          kpi_work_content: taskAny.kpiWorkContent || taskAny.kpi_work_content
+        };
+      }
+
       return {
         workContent: action.task.workContent,
-        description: (action.task as any).description || '',
+        description: taskAny.description || '',
         assignee: action.task.assignee,
         status: action.task.status,
         code: action.task.code,
         registrationDate: action.task.registrationDate || '',
         completedDate: action.task.completedDate || '',
-        team: (action.task as any).team || '',
-        department: (action.task as any).department || 'IT',
+        team: taskAny.team || '',
+        department: taskAny.department || 'IT',
         progress: action.task.progress || 0,
-        taskType: (action.task as any).taskType || '일반',
-        loadedKpiTitle: (action.task as any).loadedKpiTitle || '',
-        loadedKpiData: (action.task as any).loadedKpiData || null
+        taskType: taskAny.taskType || '일반',
+        loadedKpiTitle: taskAny.loadedKpiTitle || taskAny.kpi_work_content || '',
+        loadedKpiData: taskAny.loadedKpiData || reconstructedKpiData
       };
     case 'INIT_NEW_TASK':
       return {
@@ -179,6 +189,49 @@ const OverviewTab = memo(
     // TextField 직접 참조를 위한 ref
     const workContentRef = useRef<HTMLInputElement>(null);
     const descriptionRef = useRef<HTMLTextAreaElement>(null);
+
+    // DB에서 직접 조회한 마스터코드 데이터
+    const [departmentsFromDB, setDepartmentsFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+    const [statusTypesFromDB, setStatusTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+
+    // Dialog가 열릴 때마다 DB에서 최신 마스터코드 데이터 조회
+    useEffect(() => {
+      const fetchMasterCodeData = async () => {
+        try {
+          // GROUP031: 업무분류
+          const { data: group031Data } = await supabase
+            .from('admin_mastercode_data')
+            .select('subcode, subcode_name, subcode_order')
+            .eq('codetype', 'subcode')
+            .eq('group_code', 'GROUP031')
+            .eq('is_active', true)
+            .order('subcode_order', { ascending: true });
+
+          if (group031Data) {
+            setDepartmentsFromDB(group031Data);
+            console.log('✅ [TaskOverviewTab] GROUP031 업무분류 DB 조회 완료:', group031Data.length, '개');
+          }
+
+          // GROUP002: 상태
+          const { data: group002Data } = await supabase
+            .from('admin_mastercode_data')
+            .select('subcode, subcode_name, subcode_order')
+            .eq('codetype', 'subcode')
+            .eq('group_code', 'GROUP002')
+            .eq('is_active', true)
+            .order('subcode_order', { ascending: true });
+
+          if (group002Data) {
+            setStatusTypesFromDB(group002Data);
+            console.log('✅ [TaskOverviewTab] GROUP002 상태 DB 조회 완료:', group002Data.length, '개');
+          }
+        } catch (error) {
+          console.error('❌ [TaskOverviewTab] 마스터코드 조회 실패:', error);
+        }
+      };
+
+      fetchMasterCodeData();
+    }, []);
 
     // 텍스트 필드용 최적화된 입력 관리
     const workContentInput = useOptimizedInput(taskState.workContent, 150);
@@ -278,8 +331,18 @@ const OverviewTab = memo(
           {/* 업무유형, 불러온 KPI 타이틀, KPI 불러오기 - 한 줄 배치 */}
           <Stack direction="row" spacing={2}>
             {/* 업무유형 - 업무분류와 정확히 동일한 1/3 크기 */}
-            <FormControl sx={{ width: '30%' }}>
-              <InputLabel shrink>업무유형</InputLabel>
+            <FormControl sx={{ width: '30%' }} required>
+              <InputLabel
+                shrink
+                required
+                sx={{
+                  '& .MuiInputLabel-asterisk': {
+                    color: 'error.main'
+                  }
+                }}
+              >
+                업무유형
+              </InputLabel>
               <Select value={taskState.taskType} label="업무유형" onChange={handleFieldChange('taskType')}>
                 {taskTypeOptions.map((option) => (
                   <MenuItem key={option.code} value={option.name}>
@@ -310,13 +373,12 @@ const OverviewTab = memo(
                 >
                   <Table size="small">
                     <TableHead>
-                      <TableRow sx={{ backgroundColor: 'primary.main' }}>
-                        <TableCell sx={{ color: 'white', fontSize: '0.7rem', fontWeight: 600, py: 0.5, px: 1 }}>개요</TableCell>
-                        <TableCell sx={{ color: 'white', fontSize: '0.7rem', fontWeight: 600, py: 0.5, px: 1 }}>Main</TableCell>
-                        <TableCell sx={{ color: 'white', fontSize: '0.7rem', fontWeight: 600, py: 0.5, px: 1 }}>Sub</TableCell>
-                        <TableCell sx={{ color: 'white', fontSize: '0.7rem', fontWeight: 600, py: 0.5, px: 1 }}>영향도</TableCell>
-                        <TableCell sx={{ color: 'white', fontSize: '0.7rem', fontWeight: 600, py: 0.5, px: 1 }}>팀</TableCell>
-                        <TableCell sx={{ color: 'white', fontSize: '0.7rem', fontWeight: 600, py: 0.5, px: 1 }}>담당자</TableCell>
+                      <TableRow sx={{ backgroundColor: 'primary.lighter' }}>
+                        <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600, py: 0.5, px: 1 }}>개요</TableCell>
+                        <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600, py: 0.5, px: 1 }}>Main</TableCell>
+                        <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600, py: 0.5, px: 1 }}>Sub</TableCell>
+                        <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600, py: 0.5, px: 1 }}>팀</TableCell>
+                        <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600, py: 0.5, px: 1 }}>담당자</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -330,7 +392,6 @@ const OverviewTab = memo(
                         <TableCell sx={{ fontSize: '0.7rem', py: 0.5, px: 1 }}>
                           {taskState.loadedKpiData.level === 1 ? taskState.loadedKpiData.text : '-'}
                         </TableCell>
-                        <TableCell sx={{ fontSize: '0.7rem', py: 0.5, px: 1 }}>{taskState.loadedKpiData.priority || '-'}</TableCell>
                         <TableCell sx={{ fontSize: '0.7rem', py: 0.5, px: 1 }}>{taskState.loadedKpiData.team || '-'}</TableCell>
                         <TableCell sx={{ fontSize: '0.7rem', py: 0.5, px: 1 }}>{taskState.loadedKpiData.assignee || '-'}</TableCell>
                       </TableRow>
@@ -392,12 +453,34 @@ const OverviewTab = memo(
 
           {/* 업무분류, 진행율, 상태 - 3등분 배치 */}
           <Stack direction="row" spacing={2}>
-            <FormControl fullWidth>
-              <InputLabel shrink>업무분류</InputLabel>
-              <Select value={taskState.department} label="업무분류" onChange={handleFieldChange('department')}>
-                {departmentOptions.map((option) => (
-                  <MenuItem key={option.code} value={option.name}>
-                    {option.name}
+            <FormControl fullWidth required>
+              <InputLabel
+                shrink
+                required
+                sx={{
+                  '& .MuiInputLabel-asterisk': {
+                    color: 'error.main'
+                  }
+                }}
+              >
+                업무분류
+              </InputLabel>
+              <Select
+                value={taskState.department}
+                label="업무분류"
+                onChange={handleFieldChange('department')}
+                displayEmpty
+                notched
+                renderValue={(selected) => {
+                  if (!selected) return '선택';
+                  const item = departmentsFromDB.find((t) => t.subcode === selected);
+                  return item ? item.subcode_name : selected;
+                }}
+              >
+                <MenuItem value="">선택</MenuItem>
+                {departmentsFromDB.map((option) => (
+                  <MenuItem key={option.subcode} value={option.subcode}>
+                    {option.subcode_name}
                   </MenuItem>
                 ))}
               </Select>
@@ -422,68 +505,74 @@ const OverviewTab = memo(
 
             <FormControl fullWidth>
               <InputLabel shrink>상태</InputLabel>
-              <Select value={taskState.status} label="상태" onChange={handleFieldChange('status')}>
-                {statusOptionsFromDB.length > 0
-                  ? statusOptionsFromDB.map((option) => {
-                      const getStatusColor = (statusName: string) => {
-                        switch (statusName) {
-                          case '대기':
-                            return { bgcolor: '#F5F5F5', color: '#757575' };
-                          case '진행':
-                            return { bgcolor: '#E3F2FD', color: '#1976D2' };
-                          case '완료':
-                            return { bgcolor: '#E8F5E9', color: '#388E3C' };
-                          case '홀딩':
-                            return { bgcolor: '#FFEBEE', color: '#D32F2F' };
-                          default:
-                            return { bgcolor: '#F5F5F5', color: '#757575' };
-                        }
-                      };
-                      return (
-                        <MenuItem key={option.code} value={option.name}>
-                          <Chip
-                            label={option.name}
-                            size="small"
-                            sx={{
-                              backgroundColor: getStatusColor(option.name).bgcolor,
-                              color: getStatusColor(option.name).color,
-                              fontSize: '13px',
-                              fontWeight: 400
-                            }}
-                          />
-                        </MenuItem>
-                      );
-                    })
-                  : statusOptions.map((status) => {
-                      const getStatusColor = (statusName: string) => {
-                        switch (statusName) {
-                          case '대기':
-                            return { bgcolor: '#F5F5F5', color: '#757575' };
-                          case '진행':
-                            return { bgcolor: '#E3F2FD', color: '#1976D2' };
-                          case '완료':
-                            return { bgcolor: '#E8F5E9', color: '#388E3C' };
-                          case '홀딩':
-                            return { bgcolor: '#FFEBEE', color: '#D32F2F' };
-                          default:
-                            return { bgcolor: '#F5F5F5', color: '#757575' };
-                        }
-                      };
-                      return (
-                        <MenuItem key={status} value={status}>
-                          <Chip
-                            label={status}
-                            size="small"
-                            sx={{
-                              backgroundColor: getStatusColor(status).bgcolor,
-                              color: getStatusColor(status).color,
-                              fontSize: '13px',
-                              fontWeight: 400
-                            }}
-                          />
-                        </MenuItem>
-                      );
-                    })}
+              <Select
+                value={taskState.status}
+                label="상태"
+                onChange={handleFieldChange('status')}
+                displayEmpty
+                notched
+                renderValue={(selected) => {
+                  if (!selected) return '';
+                  const item = statusTypesFromDB.find((t) => t.subcode === selected);
+                  const statusName = item ? item.subcode_name : selected;
+                  const getStatusColor = (statusName: string) => {
+                    switch (statusName) {
+                      case '대기':
+                        return { bgcolor: '#F5F5F5', color: '#757575' };
+                      case '진행':
+                        return { bgcolor: '#E3F2FD', color: '#1976D2' };
+                      case '완료':
+                        return { bgcolor: '#E8F5E9', color: '#388E3C' };
+                      case '홀딩':
+                        return { bgcolor: '#FFEBEE', color: '#D32F2F' };
+                      default:
+                        return { bgcolor: '#F5F5F5', color: '#757575' };
+                    }
+                  };
+                  return (
+                    <Chip
+                      label={statusName}
+                      size="small"
+                      sx={{
+                        backgroundColor: getStatusColor(statusName).bgcolor,
+                        color: getStatusColor(statusName).color,
+                        fontSize: '13px',
+                        fontWeight: 400
+                      }}
+                    />
+                  );
+                }}
+              >
+                {statusTypesFromDB.map((option) => {
+                  const getStatusColor = (statusName: string) => {
+                    switch (statusName) {
+                      case '대기':
+                        return { bgcolor: '#F5F5F5', color: '#757575' };
+                      case '진행':
+                        return { bgcolor: '#E3F2FD', color: '#1976D2' };
+                      case '완료':
+                        return { bgcolor: '#E8F5E9', color: '#388E3C' };
+                      case '홀딩':
+                        return { bgcolor: '#FFEBEE', color: '#D32F2F' };
+                      default:
+                        return { bgcolor: '#F5F5F5', color: '#757575' };
+                    }
+                  };
+                  return (
+                    <MenuItem key={option.subcode} value={option.subcode}>
+                      <Chip
+                        label={option.subcode_name}
+                        size="small"
+                        sx={{
+                          backgroundColor: getStatusColor(option.subcode_name).bgcolor,
+                          color: getStatusColor(option.subcode_name).color,
+                          fontSize: '13px',
+                          fontWeight: 400
+                        }}
+                      />
+                    </MenuItem>
+                  );
+                })}
               </Select>
             </FormControl>
           </Stack>
@@ -560,10 +649,18 @@ const OverviewTab = memo(
               InputProps={{
                 startAdornment: (() => {
                   const assigneeUser = users.find((user) => user.user_name === taskState.assignee);
+                  const avatarUrl = assigneeUser ? (assigneeUser.profile_image_url || assigneeUser.avatar_url) : '';
+                  console.log('👤 [업무관리 담당자 필드] 프로필 이미지:', {
+                    assignee: taskState.assignee,
+                    found: !!assigneeUser,
+                    profile_image_url: assigneeUser?.profile_image_url,
+                    avatar_url: assigneeUser?.avatar_url,
+                    selected: avatarUrl
+                  });
                   return (
                     assigneeUser && (
                       <Avatar
-                        src={assigneeUser.profile_image_url || assigneeUser.avatar_url}
+                        src={avatarUrl}
                         alt={assigneeUser.user_name}
                         sx={{ width: 24, height: 24, mr: 0.25 }}
                       >
@@ -2750,10 +2847,11 @@ interface TaskEditDialogProps {
   statusOptions: TaskStatus[];
   statusColors: Record<TaskStatus, any>;
   kpiData?: any[]; // KPI 데이터 배열 (옵션)
+  tasks?: TaskTableData[]; // 전체 업무 목록 (이미 사용중인 KPI 확인용)
 }
 
 const TaskEditDialog = memo(
-  ({ open, onClose, task, onSave, assignees, assigneeAvatars, statusOptions, statusColors, kpiData = [] }: TaskEditDialogProps) => {
+  ({ open, onClose, task, onSave, assignees, assigneeAvatars, statusOptions, statusColors, kpiData = [], tasks = [] }: TaskEditDialogProps) => {
     // 성능 모니터링
     // const { renderCount, logStats } = usePerformanceMonitor('TaskEditDialog');
 
@@ -2778,7 +2876,7 @@ const TaskEditDialog = memo(
 
     // 현재 로그인한 사용자 정보
     const user = useUser();
-    const { users } = useSupabaseUserManagement();
+    const { users } = useCommonData();
 
     // 계획탭 Supabase 연동
     const { fetchPlanItems, savePlanItems } = useSupabasePlanManagement();
@@ -3057,8 +3155,31 @@ const TaskEditDialog = memo(
     React.useEffect(() => {
       if (task) {
         dispatch({ type: 'SET_TASK', task });
+
+        // DB에서 로드한 kpi_id를 사용해서 실제 KPI 데이터 찾기
+        const taskAny = task as any;
+        const kpiId = taskAny.kpiId || taskAny.kpi_id;
+
+        if (kpiId && kpiData && kpiData.length > 0) {
+          console.log('🔍 DB에서 로드한 kpi_id:', kpiId);
+          console.log('📊 사용 가능한 kpiData 개수:', kpiData.length);
+
+          // kpiData에서 일치하는 KPI 찾기
+          const matchedKpi = kpiData.find((kpi: any) => {
+            // kpi_id 또는 id 필드로 비교 (타입 변환 포함)
+            const kpiDataId = kpi.kpi_id || kpi.id;
+            return kpiDataId === kpiId || String(kpiDataId) === String(kpiId);
+          });
+
+          if (matchedKpi) {
+            console.log('✅ 일치하는 KPI 찾음:', matchedKpi);
+            dispatch({ type: 'SET_LOADED_KPI_DATA', data: matchedKpi });
+          } else {
+            console.warn('⚠️ kpi_id와 일치하는 KPI를 찾을 수 없음:', kpiId);
+          }
+        }
       }
-    }, [task]);
+    }, [task, kpiData]);
 
     // 팝업 열릴 때 계획 항목 DB에서 조회
     useEffect(() => {
@@ -3129,7 +3250,7 @@ const TaskEditDialog = memo(
     // KPI 데이터 선택 시 처리
     const handleSelectKpiData = useCallback((kpiData: any) => {
       // KPI 데이터로 폼 필드 채우기
-      const workContent = kpiData.work_content || kpiData.workContent || kpiData.title || '';
+      const workContent = kpiData.kpi_work_content || kpiData.work_content || kpiData.workContent || kpiData.title || '';
       dispatch({ type: 'SET_FIELD', field: 'workContent', value: workContent });
       dispatch({ type: 'SET_FIELD', field: 'description', value: kpiData.description || '' });
       dispatch({ type: 'SET_FIELD', field: 'assignee', value: kpiData.assignee || '' });
@@ -3172,6 +3293,16 @@ const TaskEditDialog = memo(
         return;
       }
 
+      if (!taskState.taskType || !taskState.taskType.trim()) {
+        setValidationError('업무유형을 선택해주세요.');
+        return;
+      }
+
+      if (!taskState.department || !taskState.department.trim()) {
+        setValidationError('업무분류를 선택해주세요.');
+        return;
+      }
+
       // 에러 초기화
       setValidationError('');
 
@@ -3201,10 +3332,23 @@ const TaskEditDialog = memo(
             team: taskState.team,
             department: taskState.department,
             progress: taskState.progress,
-            attachments: []
+            attachments: [],
+            taskType: taskState.taskType,
+            loadedKpiTitle: taskState.loadedKpiTitle,
+            kpiId: taskState.loadedKpiData?.kpi_id || null,
+            kpiRecordId: taskState.loadedKpiData?.id || null,
+            kpiWorkContent: taskState.loadedKpiData?.kpi_work_content || null
           } as any;
 
           console.log('🚀 새 Task 생성 중:', newTask);
+          console.log('📋 KPI 필드 확인:', {
+            taskType: taskState.taskType,
+            loadedKpiTitle: taskState.loadedKpiTitle,
+            kpiId: taskState.loadedKpiData?.kpi_id || null,
+            kpiRecordId: taskState.loadedKpiData?.id || null,
+            kpiWorkContent: taskState.loadedKpiData?.kpi_work_content || null,
+            loadedKpiData: taskState.loadedKpiData
+          });
           onSave(newTask);
 
           // 계획 항목 저장 (신규 생성)
@@ -3246,10 +3390,23 @@ const TaskEditDialog = memo(
             department: taskState.department,
             code: taskState.code,
             registrationDate: taskState.registrationDate,
-            progress: taskState.progress
+            progress: taskState.progress,
+            taskType: taskState.taskType,
+            loadedKpiTitle: taskState.loadedKpiTitle,
+            kpiId: taskState.loadedKpiData?.kpi_id || null,
+            kpiRecordId: taskState.loadedKpiData?.id || null,
+            kpiWorkContent: taskState.loadedKpiData?.kpi_work_content || null
           } as any;
 
           console.log('📝 기존 Task 수정 중:', updatedTask);
+          console.log('📋 KPI 필드 확인 (수정):', {
+            taskType: taskState.taskType,
+            loadedKpiTitle: taskState.loadedKpiTitle,
+            kpiId: taskState.loadedKpiData?.kpi_id || null,
+            kpiRecordId: taskState.loadedKpiData?.id || null,
+            kpiWorkContent: taskState.loadedKpiData?.kpi_work_content || null,
+            loadedKpiData: taskState.loadedKpiData
+          });
           onSave(updatedTask);
 
           // 계획 항목 저장 (기존 수정)
@@ -3975,24 +4132,70 @@ const TaskEditDialog = memo(
               console.log('🔍 KPI 데이터 소스:', isUsingMockData ? '목업 데이터' : 'Supabase 데이터');
               console.log('📊 사용할 KPI 데이터 개수:', actualKpiData?.length);
 
-              // 로그인한 사용자의 KPI 데이터만 필터링 (Supabase 데이터인 경우에만)
-              let displayKpiData = actualKpiData;
-
-              if (!isUsingMockData) {
-                const userName = user?.korName || user?.name || '';
-                displayKpiData = actualKpiData.filter((item) => {
-                  const itemAssignee = item?.assignee?.trim();
-                  const currentUser = userName?.trim();
-                  return itemAssignee === currentUser;
+              // 이미 사용중인 KPI record ID 목록 생성 (현재 편집중인 task 제외)
+              const usedKpiRecordIds = new Set<number>();
+              if (tasks && tasks.length > 0) {
+                tasks.forEach((t: any) => {
+                  // KPI record ID는 main_kpi_task 테이블의 id (41, 42 등)
+                  const tKpiRecordId = t.kpiRecordId || (t.loadedKpiData?.id);
+                  // 현재 편집중인 task가 아니고, kpi record id가 있으면 추가
+                  if (tKpiRecordId && t.id !== task?.id) {
+                    usedKpiRecordIds.add(Number(tKpiRecordId));
+                  }
                 });
-                console.log('✅ 필터링된 KPI 데이터:', displayKpiData.length);
+                console.log('🚫 이미 사용중인 KPI Record ID 목록:', Array.from(usedKpiRecordIds));
+                console.log('📝 현재 편집중인 task ID:', task?.id);
               }
+
+              // 세 가지 조건으로 필터링:
+              // 1. 현재 사용자의 KPI만
+              // 2. 이미 사용중이지 않은 KPI (recordId 기준)
+              // 3. 또는 현재 task가 사용 중인 KPI (재선택 가능)
+              const userName = user?.korName || user?.name || '';
+              const currentTaskKpiRecordId = Number((task as any)?.kpiRecordId || (task as any)?.loadedKpiData?.id);
+
+              console.log('👤 현재 사용자:', userName);
+              console.log('📝 현재 task의 KPI recordId:', currentTaskKpiRecordId || 'null');
+              console.log('📊 필터링 전 KPI 데이터 개수:', actualKpiData.length);
+
+              // 디버깅: 각 항목이 왜 필터링되는지 확인
+              actualKpiData.forEach((item, idx) => {
+                const itemAssignee = item?.assignee?.trim();
+                const currentUser = userName?.trim();
+                const kpiRecordId = item.id; // main_kpi_task 테이블의 id
+                const userMatch = itemAssignee === currentUser;
+                const isCurrentTaskKpi = currentTaskKpiRecordId && Number(kpiRecordId) === currentTaskKpiRecordId;
+                const notUsed = !usedKpiRecordIds.has(Number(kpiRecordId));
+
+                console.log(`KPI #${idx + 1}:`, JSON.stringify({
+                  recordId: item.id,
+                  kpi_id: item.kpi_id,
+                  assignee: `"${itemAssignee}"`,
+                  currentUser: `"${currentUser}"`,
+                  userMatch,
+                  isCurrentTaskKpi,
+                  notUsed,
+                  willShow: userMatch && (isCurrentTaskKpi || notUsed),
+                  usedKpiRecordIds: Array.from(usedKpiRecordIds)
+                }, null, 2));
+              });
+
+              // 1. 사용자 일치 && (2. 현재 task KPI이거나 3. 아직 사용되지 않은 KPI)
+              const displayKpiData = actualKpiData.filter((item) => {
+                const itemAssignee = item?.assignee?.trim();
+                const currentUser = userName?.trim();
+                const kpiRecordId = item.id;
+                const isCurrentTaskKpi = currentTaskKpiRecordId && Number(kpiRecordId) === currentTaskKpiRecordId;
+
+                return itemAssignee === currentUser && (isCurrentTaskKpi || !usedKpiRecordIds.has(Number(kpiRecordId)));
+              });
+              console.log('✅ 필터링된 KPI 데이터:', displayKpiData.length);
 
               if (displayKpiData.length === 0) {
                 return (
                   <Box sx={{ p: 3 }}>
                     <Typography variant="body2" color="text.secondary" align="center">
-                      {isUsingMockData ? 'KPI 데이터가 없습니다.' : '나의 KPI 항목이 없습니다.'}
+                      사용 가능한 KPI가 없습니다.
                     </Typography>
                   </Box>
                 );
@@ -4023,7 +4226,6 @@ const TaskEditDialog = memo(
                             <TableCell sx={{ fontWeight: 600, minWidth: 150, fontSize: '12px' }}>개요</TableCell>
                             <TableCell sx={{ fontWeight: 600, minWidth: 120, fontSize: '12px' }}>Main</TableCell>
                             <TableCell sx={{ fontWeight: 600, minWidth: 150, fontSize: '12px' }}>Sub</TableCell>
-                            <TableCell sx={{ fontWeight: 600, width: 60, fontSize: '12px' }}>영향도</TableCell>
                             <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>팀</TableCell>
                             <TableCell sx={{ fontWeight: 600, width: 80, fontSize: '12px' }}>담당자</TableCell>
                             <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>시작일</TableCell>
@@ -4036,7 +4238,6 @@ const TaskEditDialog = memo(
                             const overview = (kpi as any).kpi_work_content || '-'; // KPI의 work_content (주요과제)
                             const main = (kpi as any).level === 0 ? (kpi as any).text : (kpi as any).parent_task_text || '-'; // 레벨 0 또는 부모 태스크
                             const sub = (kpi as any).level === 1 ? (kpi as any).text : '-'; // 레벨 1 태스크
-                            const impact = (kpi as any).priority || '-'; // priority를 영향도로 사용
                             const team = kpi.team || '-';
                             const assignee = kpi.assignee || '-';
                             const startDate = kpi.start_date || kpi.registration_date || kpi.registrationDate || '-';
@@ -4080,11 +4281,6 @@ const TaskEditDialog = memo(
                                 <TableCell>
                                   <Typography variant="body2" sx={{ fontSize: '12px' }}>
                                     {sub}
-                                  </Typography>
-                                </TableCell>
-                                <TableCell sx={{ width: 60 }}>
-                                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                                    {impact}
                                   </Typography>
                                 </TableCell>
                                 <TableCell sx={{ width: 100 }}>

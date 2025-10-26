@@ -44,6 +44,7 @@ export interface HardwareData {
 }
 
 export const useSupabaseHardware = () => {
+  const [hardware, setHardware] = useState<HardwareData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,6 +54,7 @@ export const useSupabaseHardware = () => {
     const cachedData = loadFromCache<HardwareData[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
     if (cachedData) {
       console.log('⚡ [Hardware] 캐시 데이터 반환 (깜빡임 방지)');
+      setHardware(cachedData); // ✅ 캐시 데이터로 상태 업데이트 (KPI 패턴)
       return cachedData;
     }
 
@@ -75,7 +77,10 @@ export const useSupabaseHardware = () => {
 
       console.log('✅ getHardware 성공:', data?.length || 0, '개');
 
-      // 3. 캐시에 저장
+      // 3. 상태 업데이트 (KPI 패턴)
+      setHardware(data || []);
+
+      // 4. 캐시에 저장
       saveToCache(CACHE_KEY, data || []);
 
       return data || [];
@@ -110,6 +115,9 @@ export const useSupabaseHardware = () => {
       }
 
       console.log('✅ createHardware 성공:', data);
+
+      // ✅ 로컬 상태 즉시 업데이트 (KPI 패턴)
+      setHardware((prev) => [data, ...prev]);
 
       // 캐시 무효화 (최신 데이터 보장)
       sessionStorage.removeItem(CACHE_KEY);
@@ -167,6 +175,9 @@ export const useSupabaseHardware = () => {
       }
 
       console.log('✅ updateHardware 성공:', data);
+
+      // ✅ 로컬 상태 즉시 업데이트 (KPI 패턴)
+      setHardware((prev) => prev.map((hw) => (hw.id === id ? data : hw)));
 
       // 캐시 무효화 (최신 데이터 보장)
       sessionStorage.removeItem(CACHE_KEY);
@@ -254,6 +265,7 @@ export const useSupabaseHardware = () => {
   }, []);
 
   return {
+    hardware,
     getHardware,
     createHardware,
     updateHardware,

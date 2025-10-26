@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef, useCallback, memo } from 'react';
+import { createClient } from '@supabase/supabase-js';
 
 // Material-UI
 import {
@@ -536,6 +537,70 @@ export default function CostDataTable({
     mode: 'add'
   });
 
+  // Supabase 클라이언트 생성 (DB 직접 조회용)
+  const supabaseClient = React.useMemo(() => {
+    return createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+  }, []);
+
+  // DB 직접 조회 상태
+  const [costTypesFromDB, setCostTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+  const [costDetailTypesFromDB, setCostDetailTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+  const [statusTypesFromDB, setStatusTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+
+  // Dialog 열릴 때마다 DB에서 직접 조회
+  useEffect(() => {
+    if (!dialog.open) return;
+
+    const fetchMasterCodeData = async () => {
+      // GROUP027: 비용유형
+      const { data: group027Data } = await supabaseClient
+        .from('admin_mastercode_data')
+        .select('subcode, subcode_name, subcode_order')
+        .eq('codetype', 'subcode')
+        .eq('group_code', 'GROUP027')
+        .eq('is_active', true)
+        .order('subcode_order', { ascending: true });
+
+      if (group027Data) {
+        setCostTypesFromDB(group027Data);
+        console.log('✅ [CostDataTable] GROUP027 비용유형 DB 조회 완료:', group027Data.length, '개');
+      }
+
+      // GROUP028: 비용세부유형
+      const { data: group028Data } = await supabaseClient
+        .from('admin_mastercode_data')
+        .select('subcode, subcode_name, subcode_order')
+        .eq('codetype', 'subcode')
+        .eq('group_code', 'GROUP028')
+        .eq('is_active', true)
+        .order('subcode_order', { ascending: true });
+
+      if (group028Data) {
+        setCostDetailTypesFromDB(group028Data);
+        console.log('✅ [CostDataTable] GROUP028 비용세부유형 DB 조회 완료:', group028Data.length, '개');
+      }
+
+      // GROUP002: 상태
+      const { data: group002Data } = await supabaseClient
+        .from('admin_mastercode_data')
+        .select('subcode, subcode_name, subcode_order')
+        .eq('codetype', 'subcode')
+        .eq('group_code', 'GROUP002')
+        .eq('is_active', true)
+        .order('subcode_order', { ascending: true });
+
+      if (group002Data) {
+        setStatusTypesFromDB(group002Data);
+        console.log('✅ [CostDataTable] GROUP002 상태 DB 조회 완료:', group002Data.length, '개');
+      }
+    };
+
+    fetchMasterCodeData();
+  }, [supabaseClient, dialog.open]);
+
   // 피드백/기록 훅
   const {
     feedbacks,
@@ -547,19 +612,19 @@ export default function CostDataTable({
     deleteFeedback
   } = useSupabaseFeedback(PAGE_IDENTIFIERS.COST, dialog.recordId);
 
-  // GROUP027 비용유형 목록
+  // GROUP027 비용유형 목록 (기존 호환용)
   const costTypes = useMemo(() => {
     const group027Codes = subCodes.filter((code) => code.group_code === 'GROUP027');
     return group027Codes.map((code) => code.subcode_name);
   }, [subCodes]);
 
-  // GROUP028 비용세부유형 목록 (금액탭용)
+  // GROUP028 비용세부유형 목록 (금액탭용, 기존 호환용)
   const costDetailTypes = useMemo(() => {
     const group028Codes = subCodes.filter((code) => code.group_code === 'GROUP028');
     return group028Codes.map((code) => code.subcode_name);
   }, [subCodes]);
 
-  // GROUP002 상태 목록
+  // GROUP002 상태 목록 (기존 호환용)
   const statusList = useMemo(() => {
     const group002Codes = subCodes.filter((code) => code.group_code === 'GROUP002');
     return group002Codes.map((code) => code.subcode_name);
@@ -2419,19 +2484,19 @@ export default function CostDataTable({
                       value={overviewData.costType || ''}
                       onChange={(e) => setOverviewData((prev) => ({ ...prev, costType: e.target.value }))}
                       displayEmpty
+                      notched
+                      renderValue={(selected) => {
+                        if (!selected) return '선택';
+                        const item = costTypesFromDB.find(t => t.subcode === selected);
+                        return item ? item.subcode_name : selected;
+                      }}
                     >
                       <MenuItem value="">선택</MenuItem>
-                      {costTypes.length > 0
-                        ? costTypes.map((option) => (
-                            <MenuItem key={option} value={option}>
-                              {option}
-                            </MenuItem>
-                          ))
-                        : costTypeOptions.map((option) => (
-                            <MenuItem key={option} value={option}>
-                              {option}
-                            </MenuItem>
-                          ))}
+                      {costTypesFromDB.map((option) => (
+                        <MenuItem key={option.subcode} value={option.subcode}>
+                          {option.subcode_name}
+                        </MenuItem>
+                      ))}
                     </Select>
                   </FormControl>
                 </Grid>
@@ -2466,20 +2531,38 @@ export default function CostDataTable({
                 </Grid>
                 <Grid item xs={12} md={4}>
                   <FormControl fullWidth>
-                    <InputLabel>상태</InputLabel>
+                    <InputLabel shrink>상태</InputLabel>
                     <Select
                       label="상태"
-                      value={overviewData.status || '대기'}
+                      value={overviewData.status || ''}
                       onChange={(e) => setOverviewData((prev) => ({ ...prev, status: e.target.value }))}
-                    >
-                      {(statusList.length > 0 ? statusList : statusOptions).map((option) => (
-                        <MenuItem key={option} value={option}>
+                      notched
+                      renderValue={(selected) => {
+                        if (!selected) return '';
+                        const item = statusTypesFromDB.find(s => s.subcode === selected);
+                        const displayName = item ? item.subcode_name : selected;
+                        return (
                           <Chip
-                            label={option}
+                            label={displayName}
                             size="small"
                             sx={{
-                              backgroundColor: getStatusColor(option).bgcolor,
-                              color: getStatusColor(option).color,
+                              backgroundColor: getStatusColor(displayName).bgcolor,
+                              color: getStatusColor(displayName).color,
+                              fontSize: '13px',
+                              fontWeight: 400
+                            }}
+                          />
+                        );
+                      }}
+                    >
+                      {statusTypesFromDB.map((option) => (
+                        <MenuItem key={option.subcode} value={option.subcode}>
+                          <Chip
+                            label={option.subcode_name}
+                            size="small"
+                            sx={{
+                              backgroundColor: getStatusColor(option.subcode_name).bgcolor,
+                              color: getStatusColor(option.subcode_name).color,
                               fontSize: '13px',
                               fontWeight: 400
                             }}
@@ -2804,12 +2887,17 @@ export default function CostDataTable({
                           <TableCell>
                             <Select
                               size="small"
-                              value={item.costType || '솔루션'}
+                              value={item.costType || ''}
                               onChange={(e) => {
                                 setAmountItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, costType: e.target.value } : i)));
                               }}
                               variant="standard"
                               disableUnderline
+                              renderValue={(selected) => {
+                                if (!selected) return '';
+                                const found = costDetailTypesFromDB.find(t => t.subcode === selected);
+                                return found ? found.subcode_name : selected;
+                              }}
                               sx={{
                                 width: '100%',
                                 fontSize: '13px',
@@ -2833,9 +2921,9 @@ export default function CostDataTable({
                                 }
                               }}
                             >
-                              {(costDetailTypes.length > 0 ? costDetailTypes : costTypeOptions).map((option) => (
-                                <MenuItem key={option} value={option} sx={{ fontSize: '12px' }}>
-                                  {option}
+                              {costDetailTypesFromDB.map((option) => (
+                                <MenuItem key={option.subcode} value={option.subcode} sx={{ fontSize: '12px' }}>
+                                  {option.subcode_name}
                                 </MenuItem>
                               ))}
                             </Select>

@@ -25,7 +25,9 @@ import {
   Stack,
   IconButton,
   Tooltip,
-  LinearProgress
+  LinearProgress,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 
@@ -97,6 +99,18 @@ export default function RoleManagementTable({
   // ✅ 권한 체크
   const { canRead, canWrite, canFull, loading: permissionLoading } = useMenuPermission('/admin-panel/user-settings');
 
+  // 🔍 권한 디버깅 로그
+  useEffect(() => {
+    if (!permissionLoading) {
+      console.log('🔐 [역할관리] 현재 권한 상태:', {
+        canRead,
+        canWrite,
+        canFull,
+        메뉴: '/admin-panel/user-settings'
+      });
+    }
+  }, [canRead, canWrite, canFull, permissionLoading]);
+
   // 로컬 상태
   const [data, setData] = useState<RoleData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,6 +119,13 @@ export default function RoleManagementTable({
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [goToPage, setGoToPage] = useState('');
+
+  // 알림창 상태
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error' | 'warning' | 'info'
+  });
 
   // 역할 편집 다이얼로그 상태
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -304,13 +325,27 @@ export default function RoleManagementTable({
 
         // 선택 상태 초기화
         setSelected([]);
+
+        setSnackbar({
+          open: true,
+          message: `${selected.length}개 역할이 성공적으로 삭제되었습니다.`,
+          severity: 'success'
+        });
       } else {
         console.error('❌ 역할 삭제 실패:', result.error);
-        alert(result.error || '역할 삭제에 실패했습니다.');
+        setSnackbar({
+          open: true,
+          message: result.error || '역할 삭제에 실패했습니다.',
+          severity: 'error'
+        });
       }
     } catch (error) {
       console.error('❌ 역할 삭제 중 오류:', error);
-      alert('삭제 중 오류가 발생했습니다.');
+      setSnackbar({
+        open: true,
+        message: '삭제 중 오류가 발생했습니다.',
+        severity: 'error'
+      });
     } finally {
       setLoading(false);
     }
@@ -324,6 +359,16 @@ export default function RoleManagementTable({
 
   // 역할 편집 완료 핸들러
   const handleSaveRole = async (updatedRole: RoleData) => {
+    // ✅ 권한 체크
+    if (!canWrite) {
+      setSnackbar({
+        open: true,
+        message: '역할을 생성/수정할 권한이 없습니다.',
+        severity: 'error'
+      });
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -360,9 +405,19 @@ export default function RoleManagementTable({
 
           // 데이터 새로고침
           await fetchRoles();
+
+          setSnackbar({
+            open: true,
+            message: '역할 정보가 성공적으로 수정되었습니다.',
+            severity: 'success'
+          });
         } else {
           console.error('❌ 역할 업데이트 실패:', result.error);
-          alert(result.error || '역할 업데이트에 실패했습니다.');
+          setSnackbar({
+            open: true,
+            message: result.error || '역할 업데이트에 실패했습니다.',
+            severity: 'error'
+          });
           return;
         }
       } else {
@@ -403,9 +458,19 @@ export default function RoleManagementTable({
 
           // 데이터 새로고침
           await fetchRoles();
+
+          setSnackbar({
+            open: true,
+            message: '역할이 성공적으로 생성되었습니다.',
+            severity: 'success'
+          });
         } else {
           console.error('❌ 역할 생성 실패:', result.error);
-          alert(result.error || '역할 생성에 실패했습니다.');
+          setSnackbar({
+            open: true,
+            message: result.error || '역할 생성에 실패했습니다.',
+            severity: 'error'
+          });
           return;
         }
       }
@@ -414,7 +479,11 @@ export default function RoleManagementTable({
       setEditingRole(null);
     } catch (error) {
       console.error('❌ 역할 저장 중 오류:', error);
-      alert('저장 중 오류가 발생했습니다.');
+      setSnackbar({
+        open: true,
+        message: '저장 중 오류가 발생했습니다.',
+        severity: 'error'
+      });
     } finally {
       setLoading(false);
     }
@@ -849,6 +918,18 @@ export default function RoleManagementTable({
         role={editingRole}
         onSave={handleSaveRole}
       />
+
+      {/* 알림창 */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

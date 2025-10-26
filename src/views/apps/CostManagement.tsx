@@ -49,7 +49,6 @@ import { useSupabaseCost } from '../../hooks/useSupabaseCost';
 import { costTypeOptions } from 'types/cost';
 import { CostRecord } from 'types/cost';
 import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
-import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
 import { ChangeLogData } from 'types/changelog';
 import { createClient } from '@/lib/supabase/client';
@@ -2116,8 +2115,7 @@ export default function CostManagement() {
 
   // Supabase 비용 데이터 연동
   const { getCosts, createCost, updateCost, deleteCost, checkCodeExists, loading, error } = useSupabaseCost();
-  const { users, departments } = useCommonData(); // 🏪 공용 창고에서 가져오기
-  const { getSubCodesByGroup } = useSupabaseMasterCode3();
+  const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 가져오기
 
   // Supabase 변경로그 연동
   const { data: session } = useSession();
@@ -2126,10 +2124,42 @@ export default function CostManagement() {
   const currentUser = users.find((u) => u.email === session?.user?.email);
   const { logs: changeLogData, fetchChangeLogs } = useSupabaseChangeLog('main_cost');
 
-  // 마스터코드에서 상태 옵션 가져오기
+  // 마스터코드에서 상태 옵션 가져오기 (GROUP002의 서브코드만 필터링)
   const statusTypes = React.useMemo(() => {
-    return getSubCodesByGroup('GROUP002');
-  }, [getSubCodesByGroup]);
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 마스터코드에서 비용유형 옵션 가져오기 (GROUP027)
+  const costTypesMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP027' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 마스터코드에서 비용세부유형 옵션 가져오기 (GROUP028)
+  const costDetailTypesMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP028' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // subcode → subcode_name 변환 함수들
+  const getCostTypeName = React.useCallback((subcode: string) => {
+    const found = costTypesMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [costTypesMap]);
+
+  const getCostDetailTypeName = React.useCallback((subcode: string) => {
+    const found = costDetailTypesMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [costDetailTypesMap]);
+
+  const getStatusName = React.useCallback((subcode: string) => {
+    const found = statusTypes.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [statusTypes]);
 
   const [costRecords, setCostRecords] = useState<CostRecord[]>([]);
 

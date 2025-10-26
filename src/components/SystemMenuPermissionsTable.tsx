@@ -22,7 +22,8 @@ import {
   Select,
   MenuItem,
   IconButton,
-  Tooltip
+  Tooltip,
+  Snackbar
 } from '@mui/material';
 
 // 아이콘 컴포넌트 import
@@ -74,6 +75,13 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
 
   // 선택된 메뉴들
   const [selectedMenus, setSelectedMenus] = useState<number[]>([]);
+
+  // 알림창 상태
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error' | 'warning' | 'info'
+  });
 
   // 메뉴 추가 다이얼로그 상태
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -184,7 +192,11 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
   // 메뉴 추가 저장
   const handleSaveNewMenu = async () => {
     if (!newMenuData.menu_category || !newMenuData.menu_page) {
-      alert('카테고리와 페이지명은 필수입니다.');
+      setSnackbar({
+        open: true,
+        message: '카테고리와 페이지명은 필수입니다.',
+        severity: 'warning'
+      });
       return;
     }
 
@@ -211,16 +223,32 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
       if (success) {
         setAddDialogOpen(false);
 
+        // 성공 알림
+        setSnackbar({
+          open: true,
+          message: '메뉴가 성공적으로 추가되었습니다.',
+          severity: 'success'
+        });
+
         // 사이드바 메뉴 업데이트 이벤트 발생
         setTimeout(() => {
           window.dispatchEvent(new CustomEvent('menuUpdated'));
         }, 100);
       } else {
-        // 에러는 이미 hook에서 처리됨
+        // 실패 알림
+        setSnackbar({
+          open: true,
+          message: '메뉴 추가에 실패했습니다.',
+          severity: 'error'
+        });
       }
     } catch (error) {
       console.error('메뉴 추가 실패:', error);
-      alert('메뉴 추가에 실패했습니다.');
+      setSnackbar({
+        open: true,
+        message: '메뉴 추가 중 오류가 발생했습니다.',
+        severity: 'error'
+      });
     }
   };
 
@@ -264,13 +292,31 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
 
       // 결과 알림
       if (failCount === 0) {
-        console.log(`${successCount}개 메뉴가 성공적으로 삭제되었습니다.`);
+        setSnackbar({
+          open: true,
+          message: `${successCount}개 메뉴가 성공적으로 삭제되었습니다.`,
+          severity: 'success'
+        });
+      } else if (successCount > 0) {
+        setSnackbar({
+          open: true,
+          message: `삭제 완료: ${successCount}개, 실패: ${failCount}개`,
+          severity: 'warning'
+        });
       } else {
-        alert(`삭제 완료: ${successCount}개, 실패: ${failCount}개`);
+        setSnackbar({
+          open: true,
+          message: '메뉴 삭제에 실패했습니다.',
+          severity: 'error'
+        });
       }
     } catch (error) {
       console.error('메뉴 삭제 전체 실패:', error);
-      alert('메뉴 삭제에 실패했습니다.');
+      setSnackbar({
+        open: true,
+        message: '메뉴 삭제 중 오류가 발생했습니다.',
+        severity: 'error'
+      });
     }
   };
 
@@ -293,7 +339,11 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
   // 메뉴 편집 저장
   const handleSaveEditMenu = async () => {
     if (!editingMenu.menu_category || !editingMenu.menu_page) {
-      alert('카테고리와 페이지명은 필수입니다.');
+      setSnackbar({
+        open: true,
+        message: '카테고리와 페이지명은 필수입니다.',
+        severity: 'warning'
+      });
       return;
     }
 
@@ -325,17 +375,28 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
       }, 100);
 
       if (success) {
-        console.log('✅ 메뉴 수정이 완료되었습니다.');
-        // 성공 메시지는 부모 컴포넌트에서 처리하도록 할 수도 있음
+        setSnackbar({
+          open: true,
+          message: '메뉴가 성공적으로 수정되었습니다.',
+          severity: 'success'
+        });
       } else {
-        console.log('⚠️ 메뉴 수정이 완료되었습니다 (폴백 모드).');
+        setSnackbar({
+          open: true,
+          message: '메뉴 수정에 실패했습니다.',
+          severity: 'error'
+        });
       }
     } catch (error) {
       console.error('메뉴 수정 실패:', error);
+      setSnackbar({
+        open: true,
+        message: '메뉴 수정 중 오류가 발생했습니다.',
+        severity: 'error'
+      });
       // 에러가 발생해도 다이얼로그는 닫기
       setEditDialogOpen(false);
       setEditingMenu(null);
-      alert('메뉴 수정에 실패했습니다.');
     }
   };
 
@@ -704,12 +765,9 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
             <FormControl fullWidth>
               <InputLabel
+                shrink
                 sx={{
-                  fontSize: '12px',
-                  '&:not(.MuiInputLabel-shrink)': {
-                    top: '50%',
-                    transform: 'translate(14px, -50%)'
-                  }
+                  fontSize: '12px'
                 }}
               >
                 레벨
@@ -718,6 +776,7 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
                 value={newMenuData.menu_level}
                 label="레벨"
                 onChange={(e) => setNewMenuData({ ...newMenuData, menu_level: Number(e.target.value) })}
+                notched
               >
                 <MenuItem value={0}>0 (상위 메뉴)</MenuItem>
                 <MenuItem value={1}>1 (하위 메뉴)</MenuItem>
@@ -726,19 +785,22 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
 
             {newMenuData.menu_level === 0 ? (
               <TextField
-                label="메뉴 카테고리"
+                label={
+                  <span>
+                    메뉴 카테고리 <span style={{ color: '#d32f2f' }}>*</span>
+                  </span>
+                }
                 value={newMenuData.menu_category}
                 onChange={(e) => setNewMenuData({ ...newMenuData, menu_category: e.target.value })}
                 fullWidth
-                required
                 placeholder="예: 관리자메뉴, 메인메뉴"
+                InputLabelProps={{ shrink: true }}
                 sx={{
                   '& .MuiInputLabel-root': {
-                    fontSize: '12px',
-                    '&:not(.MuiInputLabel-shrink)': {
-                      top: '50%',
-                      transform: 'translate(14px, -50%)'
-                    }
+                    fontSize: '12px'
+                  },
+                  '& .MuiInputLabel-asterisk': {
+                    display: 'none'
                   },
                   '& .MuiInputBase-input': {
                     display: 'flex',
@@ -751,22 +813,23 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
                 }}
               />
             ) : (
-              <FormControl fullWidth required>
+              <FormControl fullWidth>
                 <InputLabel
+                  shrink
                   sx={{
                     fontSize: '12px',
-                    '&:not(.MuiInputLabel-shrink)': {
-                      top: '50%',
-                      transform: 'translate(14px, -50%)'
+                    '& .MuiInputLabel-asterisk': {
+                      display: 'none'
                     }
                   }}
                 >
-                  상위 메뉴 선택
+                  상위 메뉴 선택 <span style={{ color: '#d32f2f' }}>*</span>
                 </InputLabel>
                 <Select
                   value={newMenuData.menu_category}
-                  label="상위 메뉴 선택"
+                  label="상위 메뉴 선택 *"
                   onChange={(e) => setNewMenuData({ ...newMenuData, menu_category: e.target.value })}
+                  notched
                 >
                   {menus
                     .filter((menu) => menu.level === 0)
@@ -781,12 +844,9 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
 
             <FormControl fullWidth>
               <InputLabel
+                shrink
                 sx={{
-                  fontSize: '12px',
-                  '&:not(.MuiInputLabel-shrink)': {
-                    top: '50%',
-                    transform: 'translate(14px, -50%)'
-                  }
+                  fontSize: '12px'
                 }}
               >
                 아이콘
@@ -796,6 +856,7 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
                 label="아이콘"
                 onChange={(e) => setNewMenuData({ ...newMenuData, menu_icon: e.target.value })}
                 disabled={newMenuData.menu_level === 0}
+                notched
                 renderValue={(value) => (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     {newMenuData.menu_level === 0 ? (
@@ -873,19 +934,22 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
             </FormControl>
 
             <TextField
-              label="페이지명"
+              label={
+                <span>
+                  페이지명 <span style={{ color: '#d32f2f' }}>*</span>
+                </span>
+              }
               value={newMenuData.menu_page}
               onChange={(e) => setNewMenuData({ ...newMenuData, menu_page: e.target.value })}
               fullWidth
-              required
               placeholder="예: 시스템설정, 사용자관리"
+              InputLabelProps={{ shrink: true }}
               sx={{
                 '& .MuiInputLabel-root': {
-                  fontSize: '12px',
-                  '&:not(.MuiInputLabel-shrink)': {
-                    top: '50%',
-                    transform: 'translate(14px, -50%)'
-                  }
+                  fontSize: '12px'
+                },
+                '& .MuiInputLabel-asterisk': {
+                  display: 'none'
                 },
                 '& .MuiInputBase-input': {
                   display: 'flex',
@@ -904,13 +968,10 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
               onChange={(e) => setNewMenuData({ ...newMenuData, menu_url: e.target.value })}
               fullWidth
               placeholder="예: /admin-panel/system-settings"
+              InputLabelProps={{ shrink: true }}
               sx={{
                 '& .MuiInputLabel-root': {
-                  fontSize: '12px',
-                  '&:not(.MuiInputLabel-shrink)': {
-                    top: '50%',
-                    transform: 'translate(14px, -50%)'
-                  }
+                  fontSize: '12px'
                 },
                 '& .MuiInputBase-input': {
                   display: 'flex',
@@ -931,13 +992,10 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
               multiline
               rows={3}
               placeholder="메뉴에 대한 설명을 입력하세요"
+              InputLabelProps={{ shrink: true }}
               sx={{
                 '& .MuiInputLabel-root': {
-                  fontSize: '12px',
-                  '&:not(.MuiInputLabel-shrink)': {
-                    top: '50%',
-                    transform: 'translate(14px, -50%)'
-                  }
+                  fontSize: '12px'
                 },
                 '& .MuiInputBase-input': {
                   display: 'flex',
@@ -956,13 +1014,10 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
               onChange={(e) => setNewMenuData({ ...newMenuData, menu_database: e.target.value })}
               fullWidth
               placeholder="예: admin_systemsetting_menu"
+              InputLabelProps={{ shrink: true }}
               sx={{
                 '& .MuiInputLabel-root': {
-                  fontSize: '12px',
-                  '&:not(.MuiInputLabel-shrink)': {
-                    top: '50%',
-                    transform: 'translate(14px, -50%)'
-                  }
+                  fontSize: '12px'
                 },
                 '& .MuiInputBase-input': {
                   display: 'flex',
@@ -987,13 +1042,10 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
               inputProps={{ min: 1 }}
               placeholder={`자동으로 ${newMenuData.display_order}이 설정됩니다`}
               helperText={`현재 최대 순서: ${menus.length > 0 ? Math.max(...menus.map((menu) => menu.displayOrder || 0)) : 0}, 권장 순서: ${newMenuData.display_order}`}
+              InputLabelProps={{ shrink: true }}
               sx={{
                 '& .MuiInputLabel-root': {
-                  fontSize: '12px',
-                  '&:not(.MuiInputLabel-shrink)': {
-                    top: '50%',
-                    transform: 'translate(14px, -50%)'
-                  }
+                  fontSize: '12px'
                 },
                 '& .MuiInputBase-input': {
                   display: 'flex',
@@ -1342,6 +1394,18 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* 알림창 */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 });

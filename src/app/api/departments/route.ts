@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requirePermission } from 'lib/authMiddleware'; // ✅ 추가
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/utils/authOptions';
 
 // Supabase 클라이언트 (Service Role Key 사용)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -16,11 +18,11 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 // GET: 부서 목록 조회
 export async function GET(request: NextRequest) {
   try {
-    // ✅ 권한 체크 추가 (사용자설정 페이지에서도 접근 가능하도록 user-settings 권한 사용)
-    const { hasPermission, error: permError } = await requirePermission(request, '/admin-panel/user-settings', 'read');
+    // ✅ 세션 체크만 수행 (모든 로그인 사용자가 부서 목록 조회 가능)
+    const session = await getServerSession(authOptions);
 
-    if (!hasPermission) {
-      return NextResponse.json({ success: false, error: permError || '권한이 없습니다.' }, { status: 403 });
+    if (!session) {
+      return NextResponse.json({ success: false, error: '로그인이 필요합니다.' }, { status: 401 });
     }
 
     console.log('🔍 부서 목록 조회 시작...');
@@ -76,7 +78,8 @@ export async function POST(request: NextRequest) {
       manager_email: departmentData.manager_email,
       phone: departmentData.phone,
       location: departmentData.location,
-      description: departmentData.description
+      description: departmentData.description,
+      created_by: departmentData.created_by || 'system'
     };
 
     const { data, error } = await supabase.from('admin_users_department').insert([insertData]).select().single();

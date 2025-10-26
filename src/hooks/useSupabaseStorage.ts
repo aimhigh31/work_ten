@@ -130,19 +130,11 @@ export const useSupabaseStorage = () => {
         throw new Error('파일 크기가 너무 작습니다. 유효한 이미지 파일을 선택해주세요.');
       }
 
-      // 파일 크기가 1MB 이상이면 압축
-      let fileToUpload = file;
-      if (file.size > 1 * 1024 * 1024) {
-        console.log(`📦 원본 이미지 크기: ${(file.size / 1024 / 1024).toFixed(2)}MB - 압축 시작...`);
-        setUploadProgress(10);
-        fileToUpload = await compressImage(file, 800, 800, 0.8);
-      }
-
-      // 압축 후에도 2MB를 초과하면 에러 (Supabase Storage 제한 고려)
-      const maxSize = 2 * 1024 * 1024;
-      if (fileToUpload.size > maxSize) {
-        const fileSizeMB = (fileToUpload.size / 1024 / 1024).toFixed(2);
-        throw new Error(`파일 크기가 너무 큽니다. (${fileSizeMB}MB)\n압축 후에도 2MB를 초과합니다. 더 작은 이미지를 선택해주세요.`);
+      // 원본 파일이 너무 크면 미리 경고 (10MB 이상)
+      const maxOriginalSize = 10 * 1024 * 1024;
+      if (file.size > maxOriginalSize) {
+        const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+        throw new Error(`원본 파일이 너무 큽니다. (${fileSizeMB}MB)\n10MB 이하의 이미지를 선택해주세요.`);
       }
 
       // 파일 이름 길이 검사
@@ -150,7 +142,7 @@ export const useSupabaseStorage = () => {
         throw new Error('파일명이 너무 깁니다. 100자 이하의 파일명을 사용해주세요.');
       }
 
-      // 이미지 파일 헤더 검증 (추가 보안)
+      // 이미지 파일 헤더 검증 (압축 전에 먼저 검증)
       const buffer = await file.arrayBuffer();
       const uint8Array = new Uint8Array(buffer);
 
@@ -200,6 +192,51 @@ export const useSupabaseStorage = () => {
 
       if (!isValidImage) {
         throw new Error('유효하지 않은 이미지 파일입니다. 파일이 손상되었거나 이미지가 아닐 수 있습니다.');
+      }
+
+      // 이미지 압축 (검증 통과 후 수행)
+      let fileToUpload = file;
+      console.log(`📦 원본 이미지 크기: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+      setUploadProgress(10);
+
+      // 모든 파일을 공격적으로 압축 (Supabase Storage 2MB 제한)
+      let maxDimension = 500;
+      let quality = 0.5;
+
+      if (file.size > 5 * 1024 * 1024) {
+        // 5MB 이상: 400px, 품질 0.4
+        maxDimension = 400;
+        quality = 0.4;
+      } else if (file.size > 2 * 1024 * 1024) {
+        // 2MB 이상: 450px, 품질 0.45
+        maxDimension = 450;
+        quality = 0.45;
+      } else if (file.size > 1 * 1024 * 1024) {
+        // 1MB 이상: 500px, 품질 0.5
+        maxDimension = 500;
+        quality = 0.5;
+      } else if (file.size > 500 * 1024) {
+        // 500KB 이상: 600px, 품질 0.6
+        maxDimension = 600;
+        quality = 0.6;
+      } else {
+        // 500KB 미만: 압축 안 함
+        maxDimension = 0;
+      }
+
+      if (maxDimension > 0) {
+        console.log(`🎨 압축 설정: 최대 크기 ${maxDimension}px, 품질 ${quality}`);
+        fileToUpload = await compressImage(file, maxDimension, maxDimension, quality);
+        console.log(`✅ 압축 완료: ${(fileToUpload.size / 1024 / 1024).toFixed(2)}MB`);
+      }
+
+      // 압축 후에도 1.8MB를 초과하면 에러 (안전 마진 포함)
+      const maxSize = 1.8 * 1024 * 1024;
+      if (fileToUpload.size > maxSize) {
+        const fileSizeMB = (fileToUpload.size / 1024 / 1024).toFixed(2);
+        throw new Error(
+          `파일 크기가 너무 큽니다. (${fileSizeMB}MB)\n압축 후에도 1.8MB를 초과합니다.\n\n💡 해결 방법:\n1. 더 작은 해상도의 이미지를 사용하세요\n2. 이미지 편집 프로그램으로 미리 압축하세요\n3. JPG 형식으로 저장하면 용량이 더 작아집니다`
+        );
       }
 
       // 파일명 생성 (userId/timestamp-randomstring.extension)

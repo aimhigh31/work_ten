@@ -17,7 +17,10 @@ export async function POST(request: NextRequest) {
   try {
     const { type, value, currentUserId } = await request.json();
 
+    console.log('🔍 [check-duplicate] 중복체크 요청:', { type, value, currentUserId });
+
     if (!type || !value) {
+      console.error('❌ [check-duplicate] 필수 파라미터 누락:', { type, value });
       return NextResponse.json(
         {
           success: false,
@@ -31,39 +34,58 @@ export async function POST(request: NextRequest) {
 
     if (type === 'userAccount') {
       // 사용자계정 중복 체크
+      console.log('🔍 [check-duplicate] userAccount 중복체크 시작:', value);
       let query = supabase.from('admin_users_userprofiles').select('id', { count: 'exact', head: true }).eq('user_account_id', value);
 
       if (currentUserId) {
         // 수정 중인 경우 - 자기 자신은 제외
+        console.log('🔍 [check-duplicate] 현재 사용자 제외:', currentUserId);
         query = query.neq('id', currentUserId);
       }
 
       const { count: resultCount, error } = await query;
 
       if (error) {
-        console.error('사용자계정 중복 체크 실패:', error);
+        console.error('❌ [check-duplicate] 사용자계정 중복 체크 실패:', error);
+        console.error('❌ [check-duplicate] 에러 상세:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
         throw error;
       }
 
       count = resultCount || 0;
+      console.log('✅ [check-duplicate] userAccount 중복체크 결과:', { count, isDuplicate: count > 0 });
     } else if (type === 'email') {
       // 이메일 중복 체크
+      console.log('🔍 [check-duplicate] email 중복체크 시작:', value);
       let query = supabase.from('admin_users_userprofiles').select('id', { count: 'exact', head: true }).eq('email', value);
 
       if (currentUserId) {
         // 수정 중인 경우 - 자기 자신은 제외
+        console.log('🔍 [check-duplicate] 현재 사용자 제외:', currentUserId);
         query = query.neq('id', currentUserId);
       }
 
       const { count: resultCount, error } = await query;
 
       if (error) {
-        console.error('이메일 중복 체크 실패:', error);
+        console.error('❌ [check-duplicate] 이메일 중복 체크 실패:', error);
+        console.error('❌ [check-duplicate] 에러 상세:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
         throw error;
       }
 
       count = resultCount || 0;
+      console.log('✅ [check-duplicate] email 중복체크 결과:', { count, isDuplicate: count > 0 });
     } else {
+      console.error('❌ [check-duplicate] 잘못된 타입:', type);
       return NextResponse.json(
         {
           success: false,

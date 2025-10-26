@@ -38,7 +38,6 @@ import { useTheme } from '@mui/material/styles';
 import SalesDataTable from './SalesDataTable';
 import SalesEditDialog from '../../components/SalesEditDialog';
 import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
-import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseSales } from 'hooks/useSupabaseSales';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
 import { ChangeLogData } from 'types/changelog';
@@ -1673,10 +1672,7 @@ export default function SalesManagement() {
   const [value, setValue] = useState(0);
 
   // 🏪 공용 창고에서 재료 가져오기
-  const { users, departments } = useCommonData();
-
-  // Supabase 훅 사용
-  const { getSubCodesByGroup } = useSupabaseMasterCode3();
+  const { users, departments, masterCodes } = useCommonData();
   const { getSales, createSales, updateSales, loading: salesLoading, error: salesError } = useSupabaseSales();
 
   // Supabase 변경로그 연동
@@ -1686,10 +1682,54 @@ export default function SalesManagement() {
   const currentUser = users.find((u) => u.email === session?.user?.email);
   const { logs: changeLogData, fetchChangeLogs } = useSupabaseChangeLog('plan_sales');
 
-  // 마스터코드에서 상태 옵션 가져오기
+  // 마스터코드에서 상태 옵션 가져오기 (GROUP002의 서브코드만 필터링)
   const statusTypes = React.useMemo(() => {
-    return getSubCodesByGroup('GROUP002');
-  }, [getSubCodesByGroup]);
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 마스터코드에서 사업부 옵션 가져오기 (GROUP035)
+  const businessUnitsMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP035' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 마스터코드에서 고객명 옵션 가져오기 (GROUP039)
+  const customerNamesMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP039' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 마스터코드에서 판매유형 옵션 가져오기 (GROUP036)
+  const salesTypesMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP036' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // subcode → subcode_name 변환 함수들
+  const getBusinessUnitName = React.useCallback((subcode: string) => {
+    const found = businessUnitsMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [businessUnitsMap]);
+
+  const getCustomerName = React.useCallback((subcode: string) => {
+    const found = customerNamesMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [customerNamesMap]);
+
+  const getSalesTypeName = React.useCallback((subcode: string) => {
+    const found = salesTypesMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [salesTypesMap]);
+
+  const getStatusName = React.useCallback((subcode: string) => {
+    const found = statusTypes.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [statusTypes]);
 
   // 공유 Sales 상태 (DB에서 로드)
   const [sales, setSales] = useState<SalesRecord[]>([]);

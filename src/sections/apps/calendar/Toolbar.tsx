@@ -22,8 +22,7 @@ import { format } from 'date-fns';
 
 // project-imports
 import IconButton from 'components/@extended/IconButton';
-import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
-import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
+import { useCommonData } from 'contexts/CommonDataContext';
 
 // assets
 import { ArrowLeft2, ArrowRight2, Calendar1, Category, Grid6, TableDocument, Add } from '@wandersonalwes/iconsax-react';
@@ -90,14 +89,8 @@ export default function Toolbar({
 }: ToolbarProps) {
   const downSM = useMediaQuery((theme: Theme) => theme.breakpoints.down('sm'));
 
-  // Supabase 훅 사용
-  const { users } = useSupabaseUserManagement();
-  const { departments, fetchDepartments } = useSupabaseDepartmentManagement();
-
-  // 부서 데이터 로드
-  useEffect(() => {
-    fetchDepartments();
-  }, [fetchDepartments]);
+  // 공용 데이터 사용 (CommonDataContext)
+  const { users, departments } = useCommonData();
 
   const [viewFilter, setViewFilter] = useState(viewOptions);
 

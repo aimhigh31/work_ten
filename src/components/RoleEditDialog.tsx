@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -27,8 +27,11 @@ import {
   Paper,
   Checkbox,
   CircularProgress,
-  Alert
+  Alert,
+  Avatar
 } from '@mui/material';
+import { useSession } from 'next-auth/react';
+import { useCommonData } from 'contexts/CommonDataContext';
 import {
   CloseSquare,
   Setting2,
@@ -90,6 +93,8 @@ interface RoleEditDialogProps {
 }
 
 export default function RoleEditDialog({ open, onClose, role, onSave }: RoleEditDialogProps) {
+  const { data: session } = useSession();
+  const { users } = useCommonData();
   const [tabValue, setTabValue] = useState(0);
   const [validationError, setValidationError] = useState<string>('');
   const [formData, setFormData] = useState<RoleData>({
@@ -102,10 +107,20 @@ export default function RoleEditDialog({ open, onClose, role, onSave }: RoleEdit
     userCount: 0,
     permissionCount: 0,
     status: '활성',
-    registeredBy: '현재사용자',
+    registeredBy: session?.user?.name || 'system',
     lastModifiedDate: new Date().toISOString().split('T')[0],
-    lastModifiedBy: '현재사용자'
+    lastModifiedBy: session?.user?.name || 'system'
   });
+
+  // 등록자 프로필 이미지 찾기
+  const getUserProfileImage = useCallback(
+    (userName: string) => {
+      if (!userName || users.length === 0) return null;
+      const user = users.find((u) => u.user_name === userName);
+      return user?.profile_image_url || user?.avatar_url || null;
+    },
+    [users]
+  );
 
   // 권한 데이터 상태 관리
   const [permissions, setPermissions] = useState<any[]>([]);
@@ -278,12 +293,12 @@ export default function RoleEditDialog({ open, onClose, role, onSave }: RoleEdit
         userCount: 0,
         permissionCount: 0,
         status: '활성',
-        registeredBy: '현재사용자',
+        registeredBy: session?.user?.name || 'system',
         lastModifiedDate: currentDate,
-        lastModifiedBy: '현재사용자'
+        lastModifiedBy: session?.user?.name || 'system'
       });
     }
-  }, [role]);
+  }, [role, session]);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -559,11 +574,37 @@ export default function RoleEditDialog({ open, onClose, role, onSave }: RoleEdit
               <Stack direction="row" spacing={2}>
                 <TextField
                   fullWidth
+                  disabled
                   label="등록자"
                   value={formData.registeredBy}
-                  onChange={handleInputChange('registeredBy')}
-                  variant="outlined"
-                  InputLabelProps={{ shrink: true }}
+                  InputLabelProps={{
+                    shrink: true
+                  }}
+                  InputProps={{
+                    startAdornment: (
+                      <Avatar
+                        src={getUserProfileImage(formData.registeredBy) || ''}
+                        alt={formData.registeredBy}
+                        sx={{ width: 24, height: 24, mr: 0.25 }}
+                      >
+                        {formData.registeredBy?.charAt(0)}
+                      </Avatar>
+                    )
+                  }}
+                  sx={{
+                    '& .MuiInputBase-root.Mui-disabled': {
+                      backgroundColor: '#f5f5f5'
+                    },
+                    '& .MuiInputBase-input.Mui-disabled': {
+                      WebkitTextFillColor: 'rgba(0, 0, 0, 0.7)'
+                    },
+                    '& .MuiInputLabel-root': {
+                      color: 'rgba(0, 0, 0, 0.7)'
+                    },
+                    '& .MuiInputLabel-root.Mui-disabled': {
+                      color: 'rgba(0, 0, 0, 0.7)'
+                    }
+                  }}
                 />
 
                 <FormControl fullWidth>

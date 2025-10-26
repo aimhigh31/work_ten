@@ -53,6 +53,12 @@ import { useSupabaseFeedback } from '../hooks/useSupabaseFeedback';
 import { PAGE_IDENTIFIERS, FeedbackData } from '../types/feedback';
 import { useSupabaseFiles } from '../hooks/useSupabaseFiles';
 import { FileData } from '../types/files';
+import { createClient } from '@supabase/supabase-js';
+
+// Supabase 클라이언트 설정
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 // 하드웨어 편집 상태 관리
 interface HardwareEditState {
@@ -90,7 +96,7 @@ interface UserHistory {
   startDate: string;
   endDate: string;
   reason: string;
-  status: 'active' | 'inactive';
+  status: string; // GROUP044 subcode 값
 }
 
 // 구매/수리 이력 인터페이스
@@ -102,7 +108,7 @@ interface MaintenanceHistory {
   vendor: string;
   amount: number;
   registrant: string;
-  status: string;
+  status: string; // GROUP002 subcode 값
   startDate: string;
   completionDate: string;
 }
@@ -128,6 +134,12 @@ const editHardwareReducer = (state: HardwareEditState, action: any): HardwareEdi
       return { ...action.data };
     case 'RESET':
       return action.initialState;
+    case 'INIT_NEW_HARDWARE':
+      return {
+        ...state,
+        code: action.code,
+        registrationDate: action.registrationDate
+      };
     default:
       return state;
   }
@@ -194,6 +206,45 @@ const OverviewTab = memo(
     const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
 
     const { uploadImage, uploading, error } = useSupabaseImageUpload();
+
+    // Supabase 클라이언트 생성
+    const supabaseClient = React.useMemo(() => {
+      return createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+    }, []);
+
+    // DB에서 직접 가져온 마스터코드 목록 state
+    const [assetCategoriesFromDB, setAssetCategoriesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+    const [statusTypesFromDB, setStatusTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+
+    // Dialog가 열릴 때 DB에서 직접 조회
+    useEffect(() => {
+      const fetchMasterCodeData = async () => {
+        // GROUP018 자산분류 조회
+        const { data: group018Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP018')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+        setAssetCategoriesFromDB(group018Data || []);
+
+        // GROUP002 상태 조회
+        const { data: group002Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP002')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+        setStatusTypesFromDB(group002Data || []);
+      };
+
+      fetchMasterCodeData();
+    }, [supabaseClient]);
 
     // 기존 이미지 URL 로드
     useEffect(() => {
@@ -333,11 +384,17 @@ const OverviewTab = memo(
                 onChange={(e) => onFieldChange('assetCategory', e.target.value)}
                 label="자산분류"
                 displayEmpty
+                notched
+                renderValue={(selected) => {
+                  if (!selected) return '선택';
+                  const item = assetCategoriesFromDB.find(c => c.subcode === selected);
+                  return item ? item.subcode_name : selected;
+                }}
               >
                 <MenuItem value="">선택</MenuItem>
-                {assetCategories.map((category) => (
-                  <MenuItem key={category} value={category}>
-                    {category}
+                {assetCategoriesFromDB.map((option) => (
+                  <MenuItem key={option.subcode} value={option.subcode}>
+                    {option.subcode_name}
                   </MenuItem>
                 ))}
               </Select>
@@ -352,13 +409,23 @@ const OverviewTab = memo(
             />
             <FormControl fullWidth>
               <InputLabel shrink>상태</InputLabel>
-              <Select value={hardwareState.status} onChange={(e) => onFieldChange('status', e.target.value)} label="상태">
-                {statusOpts.map((status) => {
+              <Select
+                value={hardwareState.status}
+                onChange={(e) => onFieldChange('status', e.target.value)}
+                label="상태"
+                notched
+                renderValue={(selected) => {
+                  const item = statusTypesFromDB.find(s => s.subcode === selected);
+                  return item ? item.subcode_name : selected;
+                }}
+              >
+                {statusTypesFromDB.map((option) => {
                   const getStatusColor = (statusName: string) => {
                     switch (statusName) {
                       case '대기':
                         return { bgcolor: '#F5F5F5', color: '#757575' };
                       case '진행':
+                      case '진행중':
                         return { bgcolor: '#E3F2FD', color: '#1976D2' };
                       case '완료':
                         return { bgcolor: '#E8F5E9', color: '#388E3C' };
@@ -369,13 +436,13 @@ const OverviewTab = memo(
                     }
                   };
                   return (
-                    <MenuItem key={status} value={status}>
+                    <MenuItem key={option.subcode} value={option.subcode}>
                       <Chip
-                        label={status}
+                        label={option.subcode_name}
                         size="small"
                         sx={{
-                          backgroundColor: getStatusColor(status).bgcolor,
-                          color: getStatusColor(status).color,
+                          backgroundColor: getStatusColor(option.subcode_name).bgcolor,
+                          color: getStatusColor(option.subcode_name).color,
                           fontSize: '13px',
                           fontWeight: 400
                         }}
@@ -685,6 +752,9 @@ const UserHistoryTab = memo(
       // 로컬 사용자이력 상태 - DB 연동을 위해 초기값으로 props 사용
       const [userHistories, setUserHistories] = useState<UserHistory[]>(initialUserHistories);
 
+      // DB에서 직접 조회한 마스터코드 데이터
+      const [statusFromDB, setStatusFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+
       // 하드웨어 ID가 변경되면 모든 상태 초기화
       useEffect(() => {
         console.log('🔄 하드웨어 ID 변경됨, 모든 상태 초기화:', hardwareId);
@@ -767,6 +837,30 @@ const UserHistoryTab = memo(
         };
       }, [mode, hardwareId]); // 하드웨어 ID 변경 시 다시 로드
 
+      // GROUP044 상태 데이터 조회 (Dialog가 열릴 때마다)
+      useEffect(() => {
+        const fetchStatusData = async () => {
+          try {
+            const { data: group044Data } = await supabase
+              .from('admin_mastercode_data')
+              .select('subcode, subcode_name, subcode_order')
+              .eq('codetype', 'subcode')
+              .eq('group_code', 'GROUP044')
+              .eq('is_active', true)
+              .order('subcode_order', { ascending: true });
+
+            if (group044Data) {
+              setStatusFromDB(group044Data);
+              console.log('✅ [UserHistoryTab] GROUP044 상태 DB 조회 완료:', group044Data.length, '개');
+            }
+          } catch (error) {
+            console.error('❌ [UserHistoryTab] GROUP044 조회 실패:', error);
+          }
+        };
+
+        fetchStatusData();
+      }, []);
+
       // 이력 변경 시 부모 컴포넌트에 알림 - 사용자 액션에서만
       useEffect(() => {
         // 사용자 액션으로 인한 변경이고, 실제로 데이터가 변경된 경우에만 부모에게 알림
@@ -839,6 +933,10 @@ const UserHistoryTab = memo(
       };
 
       const handleAddHistory = useCallback(() => {
+        // "대기" 상태의 subcode 찾기
+        const daegiStatus = statusFromDB.find((s) => s.subcode_name === '대기');
+        const defaultStatus = daegiStatus ? daegiStatus.subcode : '';
+
         const newHistory: UserHistory = {
           id: Date.now().toString(),
           registrationDate: new Date().toISOString().split('T')[0],
@@ -848,7 +946,7 @@ const UserHistoryTab = memo(
           startDate: new Date().toISOString().split('T')[0],
           endDate: '',
           reason: '',
-          status: 'active'
+          status: defaultStatus
         };
         setUserHistories((prev) => {
           const newList = [newHistory, ...prev];
@@ -856,7 +954,7 @@ const UserHistoryTab = memo(
           userActionRef.current = true; // 사용자 액션 플래그 설정
           return newList;
         });
-      }, []);
+      }, [statusFromDB]);
 
       const handleDeleteSelected = useCallback(() => {
         setUserHistories((prev) => {
@@ -904,11 +1002,44 @@ const UserHistoryTab = memo(
         }
       };
 
-      const statusOptions = ['사용중', '종료'];
-      const statusColors: Record<string, string> = {
-        사용중: 'success',
-        종료: 'default'
-      };
+      // DB에서 가져온 상태 옵션 (subcode_name 목록, "대기"가 먼저 오도록 정렬)
+      const statusOptions = useMemo(() => {
+        const options = statusFromDB.map((s) => s.subcode_name);
+        // "대기"를 맨 앞으로 이동
+        const daegiIndex = options.indexOf('대기');
+        if (daegiIndex > 0) {
+          options.splice(daegiIndex, 1);
+          options.unshift('대기');
+        }
+        return options;
+      }, [statusFromDB]);
+
+      // 상태별 색상 매핑 (동적 생성)
+      const statusColors: Record<string, { bgColor: string; color: string }> = useMemo(() => {
+        const colors: Record<string, { bgColor: string; color: string }> = {};
+        statusFromDB.forEach((s) => {
+          switch (s.subcode_name) {
+            case '대기':
+              colors[s.subcode_name] = { bgColor: '#F5F5F5', color: '#757575' };
+              break;
+            case '활성':
+            case '사용중':
+              colors[s.subcode_name] = { bgColor: '#E3F2FD', color: '#1976D2' };
+              break;
+            case '비활성':
+            case '종료':
+              colors[s.subcode_name] = { bgColor: '#fff8e1', color: '#f57c00' };
+              break;
+            case '취소':
+            case '홀딩':
+              colors[s.subcode_name] = { bgColor: '#FFEBEE', color: '#D32F2F' };
+              break;
+            default:
+              colors[s.subcode_name] = { bgColor: '#F5F5F5', color: '#757575' };
+          }
+        });
+        return colors;
+      }, [statusFromDB]);
 
       // 컬럼 너비 및 높이 정의 (편집/읽기 모드 공통)
       const columnWidths = {
@@ -932,14 +1063,19 @@ const UserHistoryTab = memo(
 
         if (isEditing) {
           if (options) {
+            // 빈 값일 경우 "대기"를 기본값으로 설정
+            const displayValue = value || '대기';
+
             return (
               <Select
-                value={value}
+                value={displayValue}
                 onChange={(e) => {
                   const newValue = e.target.value;
+                  // subcode_name을 subcode로 변환하여 저장
                   if (field === 'status') {
-                    const newStatus = newValue === '사용중' ? 'active' : 'inactive';
-                    handleEditHistory(history.id, 'status', newStatus);
+                    const statusItem = statusFromDB.find((s) => s.subcode_name === newValue);
+                    const subcodeValue = statusItem ? statusItem.subcode : newValue;
+                    handleEditHistory(history.id, 'status', subcodeValue);
                   } else {
                     handleEditHistory(history.id, field as keyof UserHistory, newValue);
                   }
@@ -960,7 +1096,20 @@ const UserHistoryTab = memo(
               >
                 {options.map((option) => (
                   <MenuItem key={option} value={option}>
-                    {field === 'status' ? <Chip label={option} color={statusColors[option] as any} size="small" /> : option}
+                    {field === 'status' ? (
+                      <Chip
+                        label={option}
+                        size="small"
+                        sx={{
+                          bgcolor: statusColors[option]?.bgColor || '#F5F5F5',
+                          color: statusColors[option]?.color || '#757575',
+                          fontWeight: 500,
+                          border: 'none'
+                        }}
+                      />
+                    ) : (
+                      option
+                    )}
                   </MenuItem>
                 ))}
               </Select>
@@ -1019,6 +1168,9 @@ const UserHistoryTab = memo(
 
         // 읽기 모드
         if (field === 'status') {
+          // 빈 값일 경우 "대기" 표시
+          const displayValue = value || '대기';
+
           return (
             <Box
               sx={{
@@ -1029,10 +1181,13 @@ const UserHistoryTab = memo(
               }}
             >
               <Chip
-                label={value}
-                color={statusColors[value] as any}
+                label={displayValue}
                 size="small"
                 sx={{
+                  bgcolor: statusColors[displayValue]?.bgColor || '#F5F5F5',
+                  color: statusColors[displayValue]?.color || '#757575',
+                  fontWeight: 500,
+                  border: 'none',
                   '&:hover': { opacity: 0.8 },
                   fontSize: '12px'
                 }}
@@ -1159,7 +1314,14 @@ const UserHistoryTab = memo(
                       {renderEditableCell(history, 'reason', history.reason)}
                     </TableCell>
                     <TableCell sx={{ width: columnWidths.status }} onClick={() => handleCellClick(history.id, 'status')}>
-                      {renderEditableCell(history, 'status', history.status === 'active' ? '사용중' : '종료', statusOptions)}
+                      {(() => {
+                        // subcode를 subcode_name으로 변환 (빈 값이면 "대기")
+                        let statusName = history.status ? statusFromDB.find((s) => s.subcode === history.status)?.subcode_name : '';
+                        if (!statusName) {
+                          statusName = '대기';
+                        }
+                        return renderEditableCell(history, 'status', statusName, statusOptions);
+                      })()}
                     </TableCell>
                     <TableCell sx={{ width: columnWidths.startDate }} onClick={() => handleCellClick(history.id, 'startDate')}>
                       {renderEditableCell(history, 'startDate', history.startDate)}
@@ -1282,6 +1444,9 @@ const MaintenanceHistoryTab = memo(
     // 로컬 구매/수리이력 상태 - DB 연동을 위해 초기값으로 props 사용
     const [maintenanceHistories, setMaintenanceHistories] = useState<MaintenanceHistory[]>(initialHistories);
 
+    // DB에서 직접 조회한 마스터코드 데이터
+    const [statusFromDB, setStatusFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+
     // 하드웨어 ID가 변경되면 모든 상태 초기화
     useEffect(() => {
       console.log('🔄 하드웨어 ID 변경됨, 모든 상태 초기화:', hardwareId);
@@ -1363,6 +1528,30 @@ const MaintenanceHistoryTab = memo(
       };
     }, [mode, hardwareId]); // 하드웨어 ID 변경 시 다시 로드
 
+    // GROUP002 상태 데이터 조회 (Dialog가 열릴 때마다)
+    useEffect(() => {
+      const fetchStatusData = async () => {
+        try {
+          const { data: group002Data } = await supabase
+            .from('admin_mastercode_data')
+            .select('subcode, subcode_name, subcode_order')
+            .eq('codetype', 'subcode')
+            .eq('group_code', 'GROUP002')
+            .eq('is_active', true)
+            .order('subcode_order', { ascending: true });
+
+          if (group002Data) {
+            setStatusFromDB(group002Data);
+            console.log('✅ [MaintenanceHistoryTab] GROUP002 상태 DB 조회 완료:', group002Data.length, '개');
+          }
+        } catch (error) {
+          console.error('❌ [MaintenanceHistoryTab] GROUP002 조회 실패:', error);
+        }
+      };
+
+      fetchStatusData();
+    }, []);
+
     // 이력 변경 시 부모 컴포넌트에 알림 - 사용자 액션에서만
     useEffect(() => {
       // 사용자 액션으로 인한 변경이고, 실제로 데이터가 변경된 경우에만 부모에게 알림
@@ -1433,6 +1622,10 @@ const MaintenanceHistoryTab = memo(
     };
 
     const handleAddHistory = () => {
+      // 기본 상태로 "대기" 또는 "예비" 찾기
+      const defaultStatusItem = statusFromDB.find((s) => s.subcode_name === '대기' || s.subcode_name === '예비');
+      const defaultStatus = defaultStatusItem ? defaultStatusItem.subcode : '';
+
       const newHistory: MaintenanceHistory = {
         id: Date.now().toString(),
         registrationDate: new Date().toISOString().split('T')[0],
@@ -1441,7 +1634,7 @@ const MaintenanceHistoryTab = memo(
         vendor: '',
         amount: 0,
         registrant: '',
-        status: '진행중',
+        status: defaultStatus,
         startDate: new Date().toISOString().split('T')[0],
         completionDate: ''
       };
@@ -1512,22 +1705,66 @@ const MaintenanceHistoryTab = memo(
     };
 
     const typeOptions = ['구매', '수리', '기타'];
-    const statusOptions = ['대기', '진행', '완료', '취소'];
-    const getStatusColor = (status: string) => {
-      switch (status) {
-        case '대기':
-          return { backgroundColor: '#FFF8E1', color: '#000000' }; // 파스텔 옐로우
-        case '진행':
-        case '진행중':
-          return { backgroundColor: '#E0F2F1', color: '#000000' }; // 파스텔 틸
-        case '완료':
-          return { backgroundColor: '#E8F5E8', color: '#000000' }; // 파스텔 그린
-        case '취소':
-          return { backgroundColor: '#FFEBEE', color: '#000000' }; // 파스텔 레드
-        default:
-          return { backgroundColor: '#F5F5F5', color: '#000000' }; // 연한 그레이
-      }
-    };
+
+    // DB에서 가져온 상태 옵션 (subcode_name 목록)
+    const statusOptions = useMemo(() => statusFromDB.map((s) => s.subcode_name), [statusFromDB]);
+
+    // 상태별 색상 매핑 (동적 생성) - Material-UI color
+    const statusColors: Record<string, string> = useMemo(() => {
+      const colors: Record<string, string> = {};
+      statusFromDB.forEach((s) => {
+        switch (s.subcode_name) {
+          case '대기':
+          case '예비':
+            colors[s.subcode_name] = 'warning';
+            break;
+          case '진행':
+          case '진행중':
+          case '사용중':
+            colors[s.subcode_name] = 'info';
+            break;
+          case '완료':
+          case '보관':
+            colors[s.subcode_name] = 'success';
+            break;
+          case '취소':
+          case '폐기':
+            colors[s.subcode_name] = 'error';
+            break;
+          default:
+            colors[s.subcode_name] = 'default';
+        }
+      });
+      return colors;
+    }, [statusFromDB]);
+
+    // 상태별 배경/글자 색상 (Chip용)
+    const getStatusColor = useCallback(
+      (status: string) => {
+        const statusItem = statusFromDB.find((s) => s.subcode === status || s.subcode_name === status);
+        const statusName = statusItem ? statusItem.subcode_name : status;
+
+        switch (statusName) {
+          case '대기':
+          case '예비':
+            return { backgroundColor: '#F5F5F5', color: '#757575' };
+          case '진행':
+          case '진행중':
+          case '사용중':
+            return { backgroundColor: '#E3F2FD', color: '#1976D2' };
+          case '완료':
+          case '보관':
+            return { backgroundColor: '#E8F5E9', color: '#388E3C' };
+          case '취소':
+          case '폐기':
+          case '홀딩':
+            return { backgroundColor: '#FFEBEE', color: '#D32F2F' };
+          default:
+            return { backgroundColor: '#F5F5F5', color: '#757575' };
+        }
+      },
+      [statusFromDB]
+    );
 
     // 컬럼 너비 및 높이 정의 (편집/읽기 모드 공통)
     const columnWidths = {
@@ -1561,6 +1798,11 @@ const MaintenanceHistoryTab = memo(
                 if (field === 'type') {
                   const newType = newValue === '구매' ? 'purchase' : 'repair';
                   handleEditHistory(history.id, 'type', newType);
+                } else if (field === 'status') {
+                  // subcode_name을 subcode로 변환하여 저장
+                  const statusItem = statusFromDB.find((s) => s.subcode_name === newValue);
+                  const subcodeValue = statusItem ? statusItem.subcode : newValue;
+                  handleEditHistory(history.id, 'status', subcodeValue);
                 } else {
                   handleEditHistory(history.id, field as keyof MaintenanceHistory, newValue);
                 }
@@ -1584,7 +1826,15 @@ const MaintenanceHistoryTab = memo(
                   {field === 'type' ? (
                     <Chip label={option} color={getTypeColor(option === '구매' ? 'purchase' : 'repair') as any} size="small" />
                   ) : field === 'status' ? (
-                    <Chip label={option} color={statusColors[option] as any} size="small" />
+                    <Chip
+                      label={option}
+                      size="small"
+                      sx={{
+                        ...getStatusColor(option),
+                        fontWeight: 500,
+                        border: 'none'
+                      }}
+                    />
                   ) : (
                     option
                   )}
@@ -1873,7 +2123,11 @@ const MaintenanceHistoryTab = memo(
                     {renderEditableCell(history, 'registrant', history.registrant)}
                   </TableCell>
                   <TableCell sx={{ width: columnWidths.status }} onClick={() => handleCellClick(history.id, 'status')}>
-                    {renderEditableCell(history, 'status', history.status, statusOptions)}
+                    {(() => {
+                      // subcode를 subcode_name으로 변환
+                      const statusName = statusFromDB.find((s) => s.subcode === history.status)?.subcode_name || history.status;
+                      return renderEditableCell(history, 'status', statusName, statusOptions);
+                    })()}
                   </TableCell>
                   <TableCell sx={{ width: columnWidths.startDate }} onClick={() => handleCellClick(history.id, 'startDate')}>
                     {renderEditableCell(history, 'startDate', history.startDate)}
@@ -3084,6 +3338,49 @@ export default function HardwareDialog({
     return `hardware_temp_${mode}_${data?.id || 'new'}`;
   }, [mode, data?.id]);
 
+  // 코드 자동 생성 함수 (IT-HW-YY-NNN 형식)
+  const generateHardwareCode = useCallback(async () => {
+    const currentYear = new Date().getFullYear();
+    const currentYearStr = currentYear.toString().slice(-2); // 연도 뒤 2자리
+
+    try {
+      // Supabase에서 현재 연도의 최대 일련번호 조회
+      const { data: codeData, error } = await supabase
+        .from('it_hardware_data')
+        .select('code')
+        .like('code', `IT-HW-${currentYearStr}-%`)
+        .order('code', { ascending: false })
+        .limit(1);
+
+      let nextSequence = 1;
+
+      if (codeData && codeData.length > 0 && codeData[0].code) {
+        // 기존 코드에서 일련번호 추출 (IT-HW-25-001 -> 001)
+        const lastCode = codeData[0].code;
+        const sequencePart = lastCode.split('-')[3];
+        if (sequencePart) {
+          nextSequence = parseInt(sequencePart) + 1;
+        }
+      }
+
+      // 일련번호를 3자리로 포맷 (001, 002, ...)
+      const formattedSequence = nextSequence.toString().padStart(3, '0');
+
+      return `IT-HW-${currentYearStr}-${formattedSequence}`;
+    } catch (error) {
+      console.error('❌ 코드 생성 중 오류:', error);
+      // 오류 시 임시 코드 생성
+      const sequence = String(Date.now()).slice(-3);
+      return `IT-HW-${currentYearStr}-${sequence}`;
+    }
+  }, []);
+
+  // 현재 날짜 생성 함수
+  const getCurrentDate = useCallback(() => {
+    const today = new Date();
+    return today.toISOString().split('T')[0]; // YYYY-MM-DD 형식
+  }, []);
+
   // 초기 상태 (임시저장 데이터 확인)
   const getInitialState = (): HardwareEditState => {
     const baseState = {
@@ -3154,43 +3451,6 @@ export default function HardwareDialog({
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
   };
-
-  // 팀을 로그인한 사용자의 부서로 자동 설정
-  React.useEffect(() => {
-    console.log('🔍 팀 자동설정 useEffect 실행:', {
-      department: currentUser?.department,
-      currentTeam: hardwareState.team,
-      hasData: !!data,
-      usersCount: users.length,
-      willSet: currentUser?.department && !hardwareState.team && !data
-    });
-    if (currentUser?.department && !hardwareState.team && !data) {
-      console.log('✅ 팀 설정:', currentUser.department);
-      dispatchHardware({ type: 'SET_FIELD', field: 'team', value: currentUser.department });
-    }
-  }, [currentUser, hardwareState.team, data, users]);
-
-  // 담당자를 로그인한 사용자로 자동 설정
-  React.useEffect(() => {
-    console.log('🔍 담당자 자동설정 useEffect 실행:', {
-      hasCurrentUser: !!currentUser,
-      currentAssignee: hardwareState.assignee,
-      hasData: !!data,
-      activeUsersCount: activeUsers.length,
-      currentUserCode,
-      usersCount: users.length
-    });
-    if (currentUser && !hardwareState.assignee && !data && activeUsers.length > 0) {
-      // activeUsers에서 현재 로그인한 사용자 찾기
-      const currentActiveUser = activeUsers.find((user) => user.user_code === currentUserCode);
-      console.log('🔍 찾은 currentActiveUser:', currentActiveUser);
-
-      if (currentActiveUser) {
-        console.log('✅ 담당자 설정:', currentActiveUser.user_name);
-        dispatchHardware({ type: 'SET_FIELD', field: 'assignee', value: currentActiveUser.user_name });
-      }
-    }
-  }, [currentUser, currentUserCode, hardwareState.assignee, data, activeUsers, users]);
 
   // 🔄 기록탭 핸들러 함수들 - 로컬 state만 변경 (임시 저장)
   const handleAddComment = useCallback(() => {
@@ -3413,7 +3673,44 @@ export default function HardwareDialog({
     if (data) {
       dispatchHardware({ type: 'SET_ALL', data });
     } else {
-      dispatchHardware({ type: 'RESET', initialState: getInitialState() });
+      const initialState = getInitialState();
+      // 신규 생성 시 팀과 담당자 자동 설정
+      if (currentUser && open) {
+        if (currentUser.department) {
+          initialState.team = currentUser.department;
+        }
+        if (currentUser.user_name) {
+          initialState.assignee = currentUser.user_name;
+        }
+      }
+      dispatchHardware({ type: 'RESET', initialState });
+    }
+  }, [data, open, currentUser]);
+
+  // 하드웨어 변경 시 상태 업데이트
+  React.useEffect(() => {
+    if (data) {
+      dispatchHardware({ type: 'SET_ALL', data });
+    } else if (open) {
+      // 새 하드웨어 생성 시 자동으로 코드와 등록일 설정
+      const initializeNewHardware = async () => {
+        try {
+          console.log('🆕 새 하드웨어 코드 생성 시작...');
+          const newCode = await generateHardwareCode();
+          const newRegistrationDate = getCurrentDate();
+          console.log('✅ 생성된 하드웨어 코드:', newCode);
+          dispatchHardware({ type: 'INIT_NEW_HARDWARE', code: newCode, registrationDate: newRegistrationDate });
+        } catch (error) {
+          console.error('❌ 하드웨어 코드 생성 실패:', error);
+          // 실패 시 임시 코드 사용
+          const currentYear = new Date().getFullYear().toString().slice(-2);
+          const tempCode = `IT-HW-${currentYear}-TMP`;
+          const newRegistrationDate = getCurrentDate();
+          dispatchHardware({ type: 'INIT_NEW_HARDWARE', code: tempCode, registrationDate: newRegistrationDate });
+        }
+      };
+
+      initializeNewHardware();
     }
   }, [data, open]);
 

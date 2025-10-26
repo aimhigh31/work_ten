@@ -503,12 +503,12 @@ export default function ChangeLogPage() {
                     <TableCell sx={{ fontWeight: 600, width: 150 }}>변경시간</TableCell>
                     <TableCell sx={{ fontWeight: 600, width: 120 }}>페이지</TableCell>
                     <TableCell sx={{ fontWeight: 600, width: 150 }}>제목</TableCell>
-                    <TableCell sx={{ fontWeight: 600, width: 150 }}>코드</TableCell>
-                    <TableCell sx={{ fontWeight: 600, width: 70 }}>변경분류</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 100 }}>코드</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 100 }}>변경분류</TableCell>
                     <TableCell sx={{ fontWeight: 600, width: 70 }}>변경필드</TableCell>
                     <TableCell sx={{ fontWeight: 600, width: 120 }}>변경전</TableCell>
                     <TableCell sx={{ fontWeight: 600, width: 120 }}>변경후</TableCell>
-                    <TableCell sx={{ fontWeight: 600, width: 330 }}>변경세부내용</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 360 }}>변경세부내용</TableCell>
                     <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
                     <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
                   </TableRow>

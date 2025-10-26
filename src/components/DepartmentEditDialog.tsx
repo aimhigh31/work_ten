@@ -18,9 +18,12 @@ import {
   IconButton,
   Stack,
   Chip,
-  Alert
+  Alert,
+  Avatar
 } from '@mui/material';
 import { CloseSquare } from '@wandersonalwes/iconsax-react';
+import { useSession } from 'next-auth/react';
+import { useCommonData } from 'contexts/CommonDataContext';
 
 // 부서 데이터 타입
 interface DepartmentData {
@@ -33,6 +36,7 @@ interface DepartmentData {
   status: '활성' | '비활성' | '대기' | '취소';
   lastModifiedDate: string;
   modifier: string;
+  team?: string;
 }
 
 // TabPanel 컴포넌트
@@ -74,6 +78,8 @@ interface DepartmentEditDialogProps {
 }
 
 export default function DepartmentEditDialog({ open, onClose, department, onSave, existingDepartments }: DepartmentEditDialogProps) {
+  const { data: session } = useSession();
+  const { users } = useCommonData();
   const [tabValue, setTabValue] = useState(0);
   const [validationError, setValidationError] = useState<string>('');
   const [formData, setFormData] = useState<DepartmentData>({
@@ -85,8 +91,19 @@ export default function DepartmentEditDialog({ open, onClose, department, onSave
     departmentDescription: '',
     status: '활성',
     lastModifiedDate: new Date().toISOString().split('T')[0],
-    modifier: '현재사용자'
+    modifier: session?.user?.name || 'system',
+    team: ''
   });
+
+  // 등록자 프로필 이미지 찾기
+  const getUserProfileImage = useCallback(
+    (userName: string) => {
+      if (!userName || users.length === 0) return null;
+      const user = users.find((u) => u.user_name === userName);
+      return user?.profile_image_url || user?.avatar_url || null;
+    },
+    [users]
+  );
 
   // 중복되지 않는 부서 코드 생성
   const generateUniqueCode = useCallback(() => {
@@ -137,10 +154,11 @@ export default function DepartmentEditDialog({ open, onClose, department, onSave
         departmentDescription: '',
         status: '활성',
         lastModifiedDate: currentDate,
-        modifier: '현재사용자'
+        modifier: session?.user?.name || 'system',
+        team: ''
       });
     }
-  }, [department, generateUniqueCode]);
+  }, [department, generateUniqueCode, session]);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -253,15 +271,52 @@ export default function DepartmentEditDialog({ open, onClose, department, onSave
               InputLabelProps={{ shrink: true }}
             />
 
-            {/* 등록자, 상태, 마지막수정일 - 3등분 배치 */}
+            {/* 마지막수정일, 등록자, 상태 - 3등분 배치 */}
             <Stack direction="row" spacing={2}>
               <TextField
                 fullWidth
+                label="마지막수정일"
+                value={formData.lastModifiedDate}
+                onChange={handleInputChange('lastModifiedDate')}
+                variant="outlined"
+                type="date"
+                InputLabelProps={{ shrink: true }}
+                disabled
+              />
+
+              <TextField
+                fullWidth
+                disabled
                 label="등록자"
                 value={formData.modifier}
-                onChange={handleInputChange('modifier')}
-                variant="outlined"
-                InputLabelProps={{ shrink: true }}
+                InputLabelProps={{
+                  shrink: true
+                }}
+                InputProps={{
+                  startAdornment: (
+                    <Avatar
+                      src={getUserProfileImage(formData.modifier) || ''}
+                      alt={formData.modifier}
+                      sx={{ width: 24, height: 24, mr: 0.25 }}
+                    >
+                      {formData.modifier?.charAt(0)}
+                    </Avatar>
+                  )
+                }}
+                sx={{
+                  '& .MuiInputBase-root.Mui-disabled': {
+                    backgroundColor: '#f5f5f5'
+                  },
+                  '& .MuiInputBase-input.Mui-disabled': {
+                    WebkitTextFillColor: 'rgba(0, 0, 0, 0.7)'
+                  },
+                  '& .MuiInputLabel-root': {
+                    color: 'rgba(0, 0, 0, 0.7)'
+                  },
+                  '& .MuiInputLabel-root.Mui-disabled': {
+                    color: 'rgba(0, 0, 0, 0.7)'
+                  }
+                }}
               />
 
               <FormControl fullWidth>
@@ -272,10 +327,10 @@ export default function DepartmentEditDialog({ open, onClose, department, onSave
                   onChange={handleSelectChange('status')}
                   renderValue={(selected) => {
                     const statusConfig = {
-                      대기: { bgColor: '#f5f5f5', color: '#616161' },
-                      활성: { bgColor: '#e3f2fd', color: '#1565c0' },
-                      비활성: { bgColor: '#fff8e1', color: '#f57c00' },
-                      취소: { bgColor: '#ffebee', color: '#c62828' }
+                      대기: { bgColor: '#F5F5F5', color: '#757575' },
+                      활성: { bgColor: '#E8F5E9', color: '#388E3C' },
+                      비활성: { bgColor: '#FFEBEE', color: '#D32F2F' },
+                      취소: { bgColor: '#FFEBEE', color: '#D32F2F' }
                     };
                     const config = statusConfig[selected as keyof typeof statusConfig];
                     return (
@@ -297,8 +352,8 @@ export default function DepartmentEditDialog({ open, onClose, department, onSave
                       label="대기"
                       size="small"
                       sx={{
-                        bgcolor: '#f5f5f5',
-                        color: '#616161',
+                        bgcolor: '#F5F5F5',
+                        color: '#757575',
                         fontWeight: 500,
                         border: 'none'
                       }}
@@ -309,8 +364,8 @@ export default function DepartmentEditDialog({ open, onClose, department, onSave
                       label="활성"
                       size="small"
                       sx={{
-                        bgcolor: '#e3f2fd',
-                        color: '#1565c0',
+                        bgcolor: '#E8F5E9',
+                        color: '#388E3C',
                         fontWeight: 500,
                         border: 'none'
                       }}
@@ -321,8 +376,8 @@ export default function DepartmentEditDialog({ open, onClose, department, onSave
                       label="비활성"
                       size="small"
                       sx={{
-                        bgcolor: '#fff8e1',
-                        color: '#f57c00',
+                        bgcolor: '#FFEBEE',
+                        color: '#D32F2F',
                         fontWeight: 500,
                         border: 'none'
                       }}
@@ -333,8 +388,8 @@ export default function DepartmentEditDialog({ open, onClose, department, onSave
                       label="취소"
                       size="small"
                       sx={{
-                        bgcolor: '#ffebee',
-                        color: '#c62828',
+                        bgcolor: '#FFEBEE',
+                        color: '#D32F2F',
                         fontWeight: 500,
                         border: 'none'
                       }}
@@ -342,17 +397,6 @@ export default function DepartmentEditDialog({ open, onClose, department, onSave
                   </MenuItem>
                 </Select>
               </FormControl>
-
-              <TextField
-                fullWidth
-                label="마지막수정일"
-                value={formData.lastModifiedDate}
-                onChange={handleInputChange('lastModifiedDate')}
-                variant="outlined"
-                type="date"
-                InputLabelProps={{ shrink: true }}
-                disabled
-              />
             </Stack>
 
             {/* 등록일, 코드 - 2등분 배치 */}

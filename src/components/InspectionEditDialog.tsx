@@ -36,6 +36,12 @@ import { Add, Trash, AttachSquare } from '@wandersonalwes/iconsax-react';
 import { useSupabaseSecurityInspectionOpl, OPLItem } from '../hooks/useSupabaseSecurityInspectionOpl';
 import { useDepartmentNames } from '../hooks/useDepartmentNames';
 import { useCommonData } from '../contexts/CommonDataContext'; // ✅ 공용 창고
+import { createClient } from '@supabase/supabase-js';
+
+// Supabase 클라이언트 설정
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 import { useSupabaseChecklistManagement } from '../hooks/useSupabaseChecklistManagement';
 import { useSupabaseChecklistEditor } from '../hooks/useSupabaseChecklistEditor';
 import { useSupabaseSecurityInspectionChecksheet } from '../hooks/useSupabaseSecurityInspectionChecksheet';
@@ -760,6 +766,7 @@ export default function InspectionEditDialog({
   const [editingOplField, setEditingOplField] = useState<string | null>(null);
   const [editingOplText, setEditingOplText] = useState('');
   const [selectedOplItems, setSelectedOplItems] = useState<Set<number>>(new Set());
+  const [statusFromDB, setStatusFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
 
   // Supabase OPL 훅
   const {
@@ -978,33 +985,49 @@ export default function InspectionEditDialog({
     }
   }, [currentUser, currentUserCode, formData.assignee, inspection, activeUsers]);
 
-  // GROUP002 상태 옵션 로드
+  // GROUP002 상태 옵션 로드 (Dialog 열 때마다 DB에서 직접 조회)
   useEffect(() => {
-    try {
-      console.log('🔍 [InspectionEditDialog] GROUP002 상태 로딩 시작...');
-      const subcodes = getSubCodesByGroup('GROUP002');
-      console.log('🔍 [InspectionEditDialog] GROUP002 서브코드:', subcodes?.length, '개');
-      console.log('🔍 [InspectionEditDialog] GROUP002 전체 데이터:', subcodes);
-      const options = subcodes
-        .map((item) => ({
-          code: item.subcode,
-          name: item.subcode_name
-        }))
-        .filter((option) => option.code && option.name); // 빈 값 필터링
-      console.log('✅ [InspectionEditDialog] GROUP002 상태 옵션 (필터링 후):', options?.length, '개', options);
-      setStatusOptions(options);
-    } catch (error) {
-      console.error('❌ [InspectionEditDialog] 상태 옵션 로드 실패:', error);
-      // 기본값 설정
-      const fallbackOptions = [
-        { code: 'WAIT', name: '대기' },
-        { code: 'PROGRESS', name: '진행' },
-        { code: 'COMPLETE', name: '완료' }
-      ];
-      console.log('⚠️ [InspectionEditDialog] 기본 상태 옵션 사용:', fallbackOptions);
-      setStatusOptions(fallbackOptions);
-    }
-  }, [getSubCodesByGroup]);
+    if (!open) return;
+
+    const fetchStatusData = async () => {
+      try {
+        console.log('🔍 [InspectionEditDialog] GROUP002 상태 DB 직접 조회 시작...');
+        const { data: group002Data } = await supabase
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP002')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+
+        if (group002Data) {
+          setStatusFromDB(group002Data);
+          console.log('✅ [InspectionEditDialog] GROUP002 상태 DB 조회 완료:', group002Data.length, '개');
+
+          // statusOptions도 함께 업데이트 (기존 코드와 호환성 유지)
+          const options = group002Data
+            .map((item) => ({
+              code: item.subcode,
+              name: item.subcode_name
+            }))
+            .filter((option) => option.code && option.name);
+          setStatusOptions(options);
+        }
+      } catch (error) {
+        console.error('❌ [InspectionEditDialog] GROUP002 조회 실패:', error);
+        // 기본값 설정
+        const fallbackOptions = [
+          { code: 'WAIT', name: '대기' },
+          { code: 'PROGRESS', name: '진행' },
+          { code: 'COMPLETE', name: '완료' }
+        ];
+        console.log('⚠️ [InspectionEditDialog] 기본 상태 옵션 사용:', fallbackOptions);
+        setStatusOptions(fallbackOptions);
+      }
+    };
+
+    fetchStatusData();
+  }, [open]);
 
   // inspection prop 변경시 formData 업데이트
   useEffect(() => {
@@ -1365,6 +1388,9 @@ export default function InspectionEditDialog({
 
     try {
       const newCode = await generateOplCode();
+      // 기본 상태 값을 DB에서 조회한 첫 번째 subcode로 설정
+      const defaultStatus = statusFromDB.length > 0 ? statusFromDB[0].subcode : '대기';
+
       const newOplItem: Omit<OPLItem, 'id' | 'created_at' | 'updated_at'> = {
         inspection_id: inspection.id,
         registration_date: new Date().toISOString().split('T')[0],
@@ -1375,7 +1401,7 @@ export default function InspectionEditDialog({
         after_image: null,
         completion_date: null,
         assignee: '',
-        status: statusOptions.length > 0 ? statusOptions[0].name : '대기'
+        status: defaultStatus
       };
 
       const addedItem = await addOplItem(newOplItem);
@@ -1386,7 +1412,7 @@ export default function InspectionEditDialog({
       console.error('OPL 항목 추가 실패:', error);
       alert('OPL 항목 추가에 실패했습니다.');
     }
-  }, [inspection?.id, generateOplCode, addOplItem, statusOptions]);
+  }, [inspection?.id, generateOplCode, addOplItem, statusFromDB]);
 
   const handleDeleteOplItem = useCallback(
     async (itemId: number) => {
@@ -1496,6 +1522,35 @@ export default function InspectionEditDialog({
   const handleOPLItemChange = useCallback((itemId: number, field: string, value: any) => {
     setOplItems((prev) => prev.map((item) => (item.id === itemId ? { ...item, [field]: value } : item)));
   }, []);
+
+  // OPL 상태별 색상 매핑 (동적)
+  const getStatusColor = useCallback(
+    (status: string) => {
+      // subcode 또는 subcode_name으로 조회
+      const statusItem = statusFromDB.find((s) => s.subcode === status || s.subcode_name === status);
+      const statusName = statusItem ? statusItem.subcode_name : status;
+
+      switch (statusName) {
+        case '대기':
+        case '예비':
+          return { backgroundColor: '#F5F5F5', color: '#757575' };
+        case '진행':
+        case '진행중':
+        case '사용중':
+          return { backgroundColor: '#E3F2FD', color: '#1976D2' };
+        case '완료':
+        case '보관':
+          return { backgroundColor: '#E8F5E9', color: '#388E3C' };
+        case '취소':
+        case '폐기':
+        case '홀딩':
+          return { backgroundColor: '#FFEBEE', color: '#D32F2F' };
+        default:
+          return { backgroundColor: '#F5F5F5', color: '#757575' };
+      }
+    },
+    [statusFromDB]
+  );
 
   // 이미지 파일 업로드 핸들러
   const handleImageUpload = useCallback((itemId: number, field: 'issuePhoto' | 'improvementPhoto', file: File) => {
@@ -2720,15 +2775,58 @@ export default function InspectionEditDialog({
                           <TableCell>
                             <Select
                               size="small"
-                              value={item.status || (statusOptions.length > 0 ? statusOptions[0].name : '대기')}
+                              value={item.status || (statusFromDB.length > 0 ? statusFromDB[0].subcode : '대기')}
                               onChange={(e) => {
-                                handleEditOplField(item.id, 'status', e.target.value);
+                                // subcode_name을 subcode로 변환하여 저장
+                                const selectedName = e.target.value;
+                                const selectedItem = statusFromDB.find((s) => s.subcode_name === selectedName);
+                                const subcodeValue = selectedItem ? selectedItem.subcode : selectedName;
+                                handleEditOplField(item.id, 'status', subcodeValue);
                               }}
-                              sx={{ minWidth: 120 }}
+                              sx={{
+                                minWidth: 120,
+                                '& .MuiOutlinedInput-notchedOutline': {
+                                  border: 'none'
+                                },
+                                '&:hover .MuiOutlinedInput-notchedOutline': {
+                                  border: 'none'
+                                },
+                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                  border: 'none'
+                                }
+                              }}
+                              renderValue={(selected) => {
+                                // subcode를 subcode_name으로 변환하여 표시 (Chip으로 색상 적용)
+                                const statusItem = statusFromDB.find((s) => s.subcode === selected);
+                                const statusName = statusItem ? statusItem.subcode_name : selected;
+                                return (
+                                  <Chip
+                                    label={statusName}
+                                    size="small"
+                                    sx={{
+                                      fontSize: '12px',
+                                      ...getStatusColor(selected),
+                                      '& .MuiChip-label': {
+                                        color: getStatusColor(selected).color
+                                      }
+                                    }}
+                                  />
+                                );
+                              }}
                             >
-                              {statusOptions.map((option) => (
-                                <MenuItem key={option.code} value={option.name}>
-                                  {option.name}
+                              {statusFromDB.map((status) => (
+                                <MenuItem key={status.subcode} value={status.subcode_name}>
+                                  <Chip
+                                    label={status.subcode_name}
+                                    size="small"
+                                    sx={{
+                                      fontSize: '12px',
+                                      ...getStatusColor(status.subcode_name),
+                                      '& .MuiChip-label': {
+                                        color: getStatusColor(status.subcode_name).color
+                                      }
+                                    }}
+                                  />
                                 </MenuItem>
                               ))}
                             </Select>

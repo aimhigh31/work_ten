@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -24,7 +24,7 @@ import {
   Chip,
   Alert
 } from '@mui/material';
-import { CloseSquare } from '@wandersonalwes/iconsax-react';
+import { CloseSquare, TickCircle } from '@wandersonalwes/iconsax-react';
 
 // 프로필 설정 탭들을 import
 import TabProfile from 'sections/apps/profiles/account/TabProfile';
@@ -35,6 +35,9 @@ import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 
 // Supabase Storage 훅 import
 import { useSupabaseStorage } from 'hooks/useSupabaseStorage';
+
+// Supabase 클라이언트 import
+import supabase from '../lib/supabaseClient';
 
 // 현재 로그인 사용자 훅 import
 import useUser from '../hooks/useUser';
@@ -67,6 +70,7 @@ interface UserData {
   profile_image_url?: string; // Supabase Storage URL
   assignedRole?: string[]; // 할당된 역할 목록
   rule?: string; // 역할 코드 (RULE-25-002 형식)
+  role_id?: number | null; // 역할 ID (admin_users_rules.id)
   auth_user_id?: string; // Supabase Auth users.id (UUID)
 }
 
@@ -125,6 +129,9 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
   } | null>(null);
   const [checking, setChecking] = useState(false);
 
+  // 이메일 자동 중복체크를 위한 타이머
+  const emailCheckTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // 비밀번호 관련 상태
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [newPasswordInput, setNewPasswordInput] = useState('');
@@ -139,10 +146,94 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
   // Supabase Storage 훅 사용
   const { uploadProfileImage, deleteProfileImage, uploading, uploadProgress } = useSupabaseStorage();
 
+  // DB에서 직접 조회한 마스터코드 데이터
+  const [positionsFromDB, setPositionsFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+  const [rolesFromDB, setRolesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+  const [countriesFromDB, setCountriesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+  const [statusFromDB, setStatusFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+
+  // Dialog가 열릴 때마다 DB에서 최신 마스터코드 데이터 조회
+  useEffect(() => {
+    if (!open) return;
+
+    const fetchMasterCodeData = async () => {
+      try {
+        // GROUP003: 직급
+        const { data: group003Data } = await supabase
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP003')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+
+        if (group003Data) {
+          setPositionsFromDB(group003Data);
+          console.log('✅ [UserEditDialog] GROUP003 직급 DB 조회 완료:', group003Data.length, '개');
+        }
+
+        // GROUP004: 직책
+        const { data: group004Data } = await supabase
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP004')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+
+        if (group004Data) {
+          setRolesFromDB(group004Data);
+          console.log('✅ [UserEditDialog] GROUP004 직책 DB 조회 완료:', group004Data.length, '개');
+        }
+
+        // GROUP005: 국가
+        const { data: group005Data } = await supabase
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP005')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+
+        if (group005Data) {
+          setCountriesFromDB(group005Data);
+          console.log('✅ [UserEditDialog] GROUP005 국가 DB 조회 완료:', group005Data.length, '개');
+        }
+
+        // GROUP044: 상태
+        const { data: group044Data } = await supabase
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP044')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+
+        if (group044Data) {
+          setStatusFromDB(group044Data);
+          console.log('✅ [UserEditDialog] GROUP044 상태 DB 조회 완료:', group044Data.length, '개');
+        }
+      } catch (error) {
+        console.error('❌ [UserEditDialog] 마스터코드 조회 실패:', error);
+      }
+    };
+
+    fetchMasterCodeData();
+  }, [open]);
+
   // 마스터코드 데이터 로드
   useEffect(() => {
     refreshMasterCodes();
   }, [refreshMasterCodes]);
+
+  // 이메일 자동 중복체크 타이머 정리
+  useEffect(() => {
+    return () => {
+      if (emailCheckTimerRef.current) {
+        clearTimeout(emailCheckTimerRef.current);
+      }
+    };
+  }, []);
 
   // 역할별 권한 데이터 상태
   const [rolePermissions, setRolePermissions] = useState<any[]>([]);
@@ -201,7 +292,7 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
         setRoles(formattedRoles);
       }
     } catch (error) {
-      console.error('역할 데이터 로드 실패:', error);
+      console.warn('⚠️ 역할 데이터 로드 실패:', error);
     } finally {
       setRolesLoading(false);
       setLoadingPermissions(false);
@@ -314,9 +405,16 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
     department: departments && departments.length > 0 ? departments[0].department_name : '개발팀',
     position: '사원',
     role: '프로',
-    status: '활성',
+    status: '',
     lastLogin: '',
-    registrant: ''
+    registrant: '',
+    assignedRole: [],
+    phone: '',
+    country: '',
+    address: '',
+    email: '',
+    profileImage: undefined,
+    profile_image_url: undefined
   });
 
   // formData 변경 추적 (디버깅용)
@@ -331,22 +429,17 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
     });
   }, [formData]);
 
-  // user가 변경될 때 formData 업데이트
+  // 다이얼로그가 열릴 때만 formData 초기화 (불필요한 재실행 방지)
   useEffect(() => {
+    // 다이얼로그가 닫혀있으면 실행하지 않음
+    if (!open) return;
+
     if (user) {
-      console.log('📋📋📋 UserEditDialog - 받은 user 전체 데이터:', user);
-      console.log('📋 UserEditDialog - 받은 user 주요 필드:', {
-        id: user.id,
-        userName: user.userName,
-        userAccount: user.userAccount,
-        department: user.department,
-        position: user.position,
-        role: user.role,
-        phone: user.phone,
-        country: user.country,
-        address: user.address,
-        email: user.email
-      });
+      console.log('📋📋📋 UserEditDialog - 다이얼로그 열림: user 데이터 로드');
+      console.log('🆔🆔🆔 UserEditDialog - userAccount:', user.userAccount);
+      console.log('📞 UserEditDialog - phone:', user.phone);
+      console.log('🌏 UserEditDialog - country:', user.country);
+      console.log('📍 UserEditDialog - address:', user.address);
 
       const updatedFormData = {
         ...user,
@@ -357,26 +450,19 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
         phone: user.phone || '',
         country: user.country || '',
         address: user.address || '',
-        email: user.email || ''
+        email: user.email || '',
+        assignedRole: user.assignedRole || []
       };
 
-      console.log('✅✅✅ updatedFormData 전체:', updatedFormData);
-      console.log('✅ formData 설정할 주요 필드:', {
+      console.log('✅ formData 초기화:', {
         userAccount: updatedFormData.userAccount,
-        department: updatedFormData.department,
-        position: updatedFormData.position,
-        role: updatedFormData.role,
         phone: updatedFormData.phone,
         country: updatedFormData.country,
-        address: updatedFormData.address,
-        email: updatedFormData.email
+        address: updatedFormData.address
       });
 
       setFormData(updatedFormData);
 
-      // setFormData 직후 즉시 확인
-      console.log('🔍 setFormData 호출 직후 updatedFormData.phone:', updatedFormData.phone);
-      console.log('🔍 setFormData 호출 직후 updatedFormData.country:', updatedFormData.country);
       // 에러 상태 초기화
       setEmailError('');
       setPhoneError('');
@@ -385,6 +471,7 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
       setEmailCheckResult(null);
     } else {
       // 새 사용자 생성시 초기값
+      console.log('📋📋📋 UserEditDialog - 다이얼로그 열림: 새 사용자 생성');
       const currentDate = new Date().toISOString().split('T')[0];
       const currentYear = new Date().getFullYear();
       const yearSuffix = currentYear.toString().slice(-2);
@@ -399,9 +486,18 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
         department: departments && departments.length > 0 ? departments[0].department_name : '개발팀',
         position: '사원',
         role: '프로',
-        status: '활성',
+        status: '',
         lastLogin: '',
-        registrant: currentUser && typeof currentUser !== 'boolean' ? currentUser.name || '' : ''
+        registrant: currentUser && typeof currentUser !== 'boolean' ? currentUser.name || '' : '',
+        assignedRole: [],
+        rule: 'ROLE-25-003',
+        role_id: null,
+        phone: '',
+        country: '',
+        address: '',
+        email: '',
+        profileImage: undefined,
+        profile_image_url: undefined
       });
       // 에러 상태 초기화
       setEmailError('');
@@ -411,11 +507,9 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
       setEmailCheckResult(null);
     }
   }, [
-    user,
-    departments?.length,
-    actualUserLevels?.length,
-    actualUserPositions?.length,
-    currentUser && typeof currentUser !== 'boolean' ? currentUser.name : null
+    open,  // ← 핵심! 다이얼로그가 열릴 때만 실행
+    user?.id  // ← user의 id만 체크 (다른 사용자로 변경될 때만 재실행)
+    // departments, actualUserLevels 등은 제거 (불필요한 재실행 방지)
   ]);
 
   // formData 변경 시 디버깅 로그
@@ -432,6 +526,17 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
     });
   }, [formData]);
 
+  // 신규 사용자 생성 시 상태를 "대기"로 자동 설정
+  useEffect(() => {
+    if (!user && statusFromDB.length > 0 && !formData.status) {
+      const daegiStatus = statusFromDB.find((s) => s.subcode_name === '대기');
+      if (daegiStatus) {
+        console.log('✅ [UserEditDialog] 상태 기본값을 "대기"로 설정:', daegiStatus.subcode);
+        setFormData((prev) => ({ ...prev, status: daegiStatus.subcode }));
+      }
+    }
+  }, [statusFromDB, user, formData.status]);
+
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     // 탭이 2개만 있으므로 최대값을 1로 제한
     const safeValue = Math.min(newValue, 1);
@@ -439,6 +544,7 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
   };
 
   const handleInputChange = (field: keyof UserData) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    console.log(`📝 ${field} 변경:`, event.target.value);
     setFormData((prev) => ({
       ...prev,
       [field]: event.target.value
@@ -490,16 +596,87 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
   // 사용자계정 입력 핸들러
   const handleUserAccountChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const userAccount = event.target.value;
+    console.log('🆔 사용자계정(ID) 변경:', userAccount);
     setFormData((prev) => ({ ...prev, userAccount }));
     // 입력값 변경 시 중복체크 결과 초기화
     setUserAccountCheckResult(null);
   };
 
-  // 이메일 입력 핸들러 (중복체크 결과 초기화 추가)
+  // 이메일 입력 핸들러 (자동 중복체크 추가)
   const handleEmailChangeWithCheck = (event: React.ChangeEvent<HTMLInputElement>) => {
-    handleEmailChange(event);
+    const email = event.target.value;
+
     // 입력값 변경 시 중복체크 결과 초기화
     setEmailCheckResult(null);
+    handleEmailChange(event);
+
+    // 기존 타이머 취소
+    if (emailCheckTimerRef.current) {
+      clearTimeout(emailCheckTimerRef.current);
+    }
+
+    // 이메일이 비어있으면 중복체크 안 함
+    if (!email || !email.trim()) {
+      return;
+    }
+
+    // 이메일 형식이 유효하지 않으면 중복체크 안 함
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return;
+    }
+
+    // 수정 모드이고 이메일이 변경되지 않았으면 중복체크 안 함
+    if (user && email === user.email) {
+      setEmailCheckResult({
+        checked: true,
+        isDuplicate: false,
+        message: '기존 이메일과 동일합니다.'
+      });
+      return;
+    }
+
+    // 0.8초 후 자동 중복체크
+    emailCheckTimerRef.current = setTimeout(async () => {
+      console.log('🔍 이메일 자동 중복체크 시작:', email);
+      setChecking(true);
+      try {
+        const response = await fetch('/api/check-duplicate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            type: 'email',
+            value: email,
+            currentUserId: user?.id
+          })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          setEmailCheckResult({
+            checked: true,
+            isDuplicate: result.isDuplicate,
+            message: result.message
+          });
+
+          if (result.isDuplicate) {
+            console.log('❌ 이메일 중복:', result.message);
+            alert('이메일 중복: ' + result.message);
+          } else {
+            console.log('✅ 이메일 사용 가능:', result.message);
+          }
+        } else {
+          console.error('중복체크 실패:', result.error);
+        }
+      } catch (error) {
+        console.warn('⚠️ 중복체크 오류:', error);
+      } finally {
+        setChecking(false);
+      }
+    }, 800);
   };
 
   // 사용자계정 중복체크
@@ -536,7 +713,7 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
         alert('중복체크 실패: ' + result.error);
       }
     } catch (error) {
-      console.error('중복체크 오류:', error);
+      console.warn('⚠️ 중복체크 오류:', error);
       alert('중복체크 중 오류가 발생했습니다.');
     } finally {
       setChecking(false);
@@ -582,7 +759,7 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
         alert('중복체크 실패: ' + result.error);
       }
     } catch (error) {
-      console.error('중복체크 오류:', error);
+      console.warn('⚠️ 중복체크 오류:', error);
       alert('중복체크 중 오류가 발생했습니다.');
     } finally {
       setChecking(false);
@@ -591,6 +768,16 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
 
   const handleSave = async () => {
     // 필수값 검증
+    if (!formData.userAccount || !formData.userAccount.trim()) {
+      setValidationError('사용자계정(ID)은 필수 입력 항목입니다.');
+      return;
+    }
+
+    if (!formData.userName || !formData.userName.trim()) {
+      setValidationError('사용자명은 필수 입력 항목입니다.');
+      return;
+    }
+
     if (!formData.email || !formData.email.trim()) {
       setValidationError('이메일은 필수 입력 항목입니다.');
       return;
@@ -708,13 +895,30 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
       profile_image_url: finalImageUrl // Supabase Storage URL을 별도 필드에도 저장
     };
 
-    console.log('💾 저장할 finalData:', {
+    console.log('💾💾💾 [UserEditDialog] 저장 버튼 클릭 - 현재 formData 상태:');
+    console.log('  ✅ userAccount:', formData.userAccount, '| 타입:', typeof formData.userAccount);
+    console.log('  ✅ userName:', formData.userName);
+    console.log('  ✅ email:', formData.email);
+    console.log('  ✅ phone:', formData.phone, '| 타입:', typeof formData.phone);
+    console.log('  ✅ country:', formData.country, '| 타입:', typeof formData.country);
+    console.log('  ✅ address:', formData.address, '| 타입:', typeof formData.address);
+    console.log('  ✅ department:', formData.department);
+    console.log('  ✅ position:', formData.position);
+    console.log('  ✅ role:', formData.role);
+
+    console.log('💾 [UserEditDialog] finalData (formData + 이미지):', {
+      userAccount: finalData.userAccount,
+      userName: finalData.userName,
+      email: finalData.email,
       phone: finalData.phone,
       country: finalData.country,
       address: finalData.address,
       department: finalData.department,
       position: finalData.position,
-      role: finalData.role
+      role: finalData.role,
+      profileImage: finalData.profileImage ? '있음' : '없음',
+      profile_image_url: finalData.profile_image_url ? '있음' : '없음',
+      assignedRole: finalData.assignedRole
     });
 
     onSave(finalData);
@@ -750,14 +954,14 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        console.error('비밀번호 초기화 오류:', result.error);
+        console.warn('⚠️ 비밀번호 초기화 오류:', result.error);
         alert(`비밀번호 초기화 실패: ${result.error}`);
         return;
       }
 
       alert('비밀번호가 "123456"으로 초기화되었습니다.');
     } catch (error) {
-      console.error('비밀번호 초기화 예외:', error);
+      console.warn('⚠️ 비밀번호 초기화 예외:', error);
       alert('비밀번호 초기화 중 오류가 발생했습니다.');
     }
   };
@@ -813,7 +1017,7 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        console.error('비밀번호 변경 오류:', result.error);
+        console.warn('⚠️ 비밀번호 변경 오류:', result.error);
         alert(`비밀번호 변경 실패: ${result.error}`);
         return;
       }
@@ -821,7 +1025,7 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
       alert('비밀번호가 성공적으로 변경되었습니다.');
       handlePasswordChangeClose();
     } catch (error) {
-      console.error('비밀번호 변경 예외:', error);
+      console.warn('⚠️ 비밀번호 변경 예외:', error);
       alert('비밀번호 변경 중 오류가 발생했습니다.');
     }
   };
@@ -1234,30 +1438,24 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
                           <InputLabel shrink>
                             직급 <span style={{ color: 'red' }}>*</span>
                           </InputLabel>
-                          <Select value={formData.position || ''} label="직급 *" onChange={handleSelectChange('position')}>
-                            {actualUserLevels && actualUserLevels.length > 0
-                              ? actualUserLevels.map((level) => (
-                                  <MenuItem key={level.id} value={level.code_name}>
-                                    {level.code_name}
-                                  </MenuItem>
-                                ))
-                              : [
-                                  <MenuItem key="1" value="CL1">
-                                    CL1
-                                  </MenuItem>,
-                                  <MenuItem key="2" value="CL2">
-                                    CL2
-                                  </MenuItem>,
-                                  <MenuItem key="3" value="CL3">
-                                    CL3
-                                  </MenuItem>,
-                                  <MenuItem key="4" value="CL4">
-                                    CL4
-                                  </MenuItem>,
-                                  <MenuItem key="5" value="CL5">
-                                    CL5
-                                  </MenuItem>
-                                ]}
+                          <Select
+                            value={formData.position || ''}
+                            label="직급 *"
+                            onChange={handleSelectChange('position')}
+                            displayEmpty
+                            notched
+                            renderValue={(selected) => {
+                              if (!selected) return '선택';
+                              const item = positionsFromDB.find((p) => p.subcode === selected);
+                              return item ? item.subcode_name : selected;
+                            }}
+                          >
+                            <MenuItem value="">선택</MenuItem>
+                            {positionsFromDB.map((option) => (
+                              <MenuItem key={option.subcode} value={option.subcode}>
+                                {option.subcode_name}
+                              </MenuItem>
+                            ))}
                           </Select>
                         </FormControl>
 
@@ -1265,33 +1463,24 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
                           <InputLabel shrink>
                             직책 <span style={{ color: 'red' }}>*</span>
                           </InputLabel>
-                          <Select value={formData.role || ''} label="직책 *" onChange={handleSelectChange('role')}>
-                            {actualUserPositions && actualUserPositions.length > 0
-                              ? actualUserPositions.map((position) => (
-                                  <MenuItem key={position.id} value={position.code_name} disabled={position.disabled}>
-                                    {position.code_name}
-                                  </MenuItem>
-                                ))
-                              : [
-                                  <MenuItem key="1" value="경영진">
-                                    경영진
-                                  </MenuItem>,
-                                  <MenuItem key="2" value="본부장">
-                                    본부장
-                                  </MenuItem>,
-                                  <MenuItem key="3" value="팀장">
-                                    팀장
-                                  </MenuItem>,
-                                  <MenuItem key="4" value="파트장">
-                                    파트장
-                                  </MenuItem>,
-                                  <MenuItem key="5" value="프로">
-                                    프로
-                                  </MenuItem>,
-                                  <MenuItem key="6" value="관리자">
-                                    관리자
-                                  </MenuItem>
-                                ]}
+                          <Select
+                            value={formData.role || ''}
+                            label="직책 *"
+                            onChange={handleSelectChange('role')}
+                            displayEmpty
+                            notched
+                            renderValue={(selected) => {
+                              if (!selected) return '선택';
+                              const item = rolesFromDB.find((r) => r.subcode === selected);
+                              return item ? item.subcode_name : selected;
+                            }}
+                          >
+                            <MenuItem value="">선택</MenuItem>
+                            {rolesFromDB.map((option) => (
+                              <MenuItem key={option.subcode} value={option.subcode}>
+                                {option.subcode_name}
+                              </MenuItem>
+                            ))}
                           </Select>
                         </FormControl>
                       </Stack>
@@ -1317,33 +1506,19 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
                             onChange={handleSelectChange('country')}
                             label="국가"
                             displayEmpty
+                            notched
+                            renderValue={(selected) => {
+                              if (!selected) return '선택';
+                              const item = countriesFromDB.find((c) => c.subcode === selected);
+                              return item ? item.subcode_name : selected;
+                            }}
                           >
-                            <MenuItem value="">
-                              <em>선택</em>
-                            </MenuItem>
-                            {nationalOptions.length > 0
-                              ? nationalOptions.map((option) => (
-                                  <MenuItem key={option.id} value={option.code_name} disabled={option.disabled}>
-                                    {option.code_name}
-                                  </MenuItem>
-                                ))
-                              : [
-                                  <MenuItem key="kr" value="대한민국">
-                                    대한민국
-                                  </MenuItem>,
-                                  <MenuItem key="vn" value="베트남">
-                                    베트남
-                                  </MenuItem>,
-                                  <MenuItem key="us" value="미국">
-                                    미국
-                                  </MenuItem>,
-                                  <MenuItem key="cn" value="중국">
-                                    중국
-                                  </MenuItem>,
-                                  <MenuItem key="jp" value="일본">
-                                    일본
-                                  </MenuItem>
-                                ]}
+                            <MenuItem value="">선택</MenuItem>
+                            {countriesFromDB.map((option) => (
+                              <MenuItem key={option.subcode} value={option.subcode}>
+                                {option.subcode_name}
+                              </MenuItem>
+                            ))}
                           </Select>
                         </FormControl>
                       </Stack>
@@ -1373,24 +1548,34 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
                         <FormControl fullWidth>
                           <InputLabel shrink>상태</InputLabel>
                           <Select
-                            value={formData.status || '활성'}
+                            value={formData.status || ''}
                             label="상태"
                             onChange={handleSelectChange('status')}
+                            displayEmpty
+                            notched
                             renderValue={(selected) => {
+                              if (!selected) {
+                                // 기본값으로 "대기" 표시
+                                const daegiStatus = statusFromDB.find((s) => s.subcode_name === '대기');
+                                return daegiStatus ? daegiStatus.subcode_name : '';
+                              }
+                              const item = statusFromDB.find((s) => s.subcode === selected);
+                              const statusName = item ? item.subcode_name : selected;
                               const statusConfig = {
                                 대기: { bgColor: '#f5f5f5', color: '#616161' },
                                 활성: { bgColor: '#e3f2fd', color: '#1565c0' },
                                 비활성: { bgColor: '#fff8e1', color: '#f57c00' },
-                                취소: { bgColor: '#ffebee', color: '#c62828' }
+                                취소: { bgColor: '#ffebee', color: '#c62828' },
+                                홀딩: { bgColor: '#FFEBEE', color: '#D32F2F' }
                               };
-                              const config = statusConfig[selected as keyof typeof statusConfig];
+                              const config = statusConfig[statusName as keyof typeof statusConfig];
                               return (
                                 <Chip
-                                  label={selected}
+                                  label={statusName}
                                   size="small"
                                   sx={{
-                                    bgcolor: config?.bgColor,
-                                    color: config?.color,
+                                    bgcolor: config?.bgColor || '#f5f5f5',
+                                    color: config?.color || '#616161',
                                     fontWeight: 500,
                                     border: 'none'
                                   }}
@@ -1398,34 +1583,30 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
                               );
                             }}
                           >
-                            <MenuItem value="대기">
-                              <Chip
-                                label="대기"
-                                size="small"
-                                sx={{ bgcolor: '#f5f5f5', color: '#616161', fontWeight: 500, border: 'none' }}
-                              />
-                            </MenuItem>
-                            <MenuItem value="활성">
-                              <Chip
-                                label="활성"
-                                size="small"
-                                sx={{ bgcolor: '#e3f2fd', color: '#1565c0', fontWeight: 500, border: 'none' }}
-                              />
-                            </MenuItem>
-                            <MenuItem value="비활성">
-                              <Chip
-                                label="비활성"
-                                size="small"
-                                sx={{ bgcolor: '#fff8e1', color: '#f57c00', fontWeight: 500, border: 'none' }}
-                              />
-                            </MenuItem>
-                            <MenuItem value="취소">
-                              <Chip
-                                label="취소"
-                                size="small"
-                                sx={{ bgcolor: '#ffebee', color: '#c62828', fontWeight: 500, border: 'none' }}
-                              />
-                            </MenuItem>
+                            {statusFromDB.map((option) => {
+                              const statusConfig = {
+                                대기: { bgColor: '#f5f5f5', color: '#616161' },
+                                활성: { bgColor: '#e3f2fd', color: '#1565c0' },
+                                비활성: { bgColor: '#fff8e1', color: '#f57c00' },
+                                취소: { bgColor: '#ffebee', color: '#c62828' },
+                                홀딩: { bgColor: '#FFEBEE', color: '#D32F2F' }
+                              };
+                              const config = statusConfig[option.subcode_name as keyof typeof statusConfig];
+                              return (
+                                <MenuItem key={option.subcode} value={option.subcode}>
+                                  <Chip
+                                    label={option.subcode_name}
+                                    size="small"
+                                    sx={{
+                                      bgcolor: config?.bgColor || '#f5f5f5',
+                                      color: config?.color || '#616161',
+                                      fontWeight: 500,
+                                      border: 'none'
+                                    }}
+                                  />
+                                </MenuItem>
+                              );
+                            })}
                           </Select>
                         </FormControl>
                       </Stack>
@@ -1469,31 +1650,37 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
 
                     {/* 역할 리스트 */}
                     <Stack spacing={2}>
-                      {roles.map((role) => (
-                        <Box
-                          key={role.id}
-                          sx={{
-                            p: 2,
-                            border: '1px solid #e0e0e0',
-                            borderRadius: 2,
-                            bgcolor: (formData.assignedRole || []).includes(role.code) ? '#e3f2fd' : 'white',
-                            transition: 'all 0.2s',
-                            cursor: 'pointer',
-                            '&:hover': {
-                              borderColor: '#1976d2',
-                              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                            }
-                          }}
-                          onClick={() => setSelectedRoleForPermission(role.code)}
-                        >
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2 }}>
-                            <Box sx={{ flex: 1 }}>
-                              {/* 첫 번째 줄: 제목, 상태, 코드 */}
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                  <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                                    {role.role}
-                                  </Typography>
+                      {roles.map((role) => {
+                        const isAssigned = (formData.assignedRole || []).includes(role.code);
+                        return (
+                          <Box
+                            key={role.id}
+                            sx={{
+                              p: 2,
+                              border: isAssigned ? '2px solid #1976d2' : '1px solid #e0e0e0',
+                              borderRadius: 2,
+                              bgcolor: isAssigned ? '#e3f2fd' : 'white',
+                              transition: 'all 0.2s',
+                              cursor: 'pointer',
+                              boxShadow: isAssigned ? '0 2px 8px rgba(25,118,210,0.15)' : 'none',
+                              '&:hover': {
+                                borderColor: '#1976d2',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                              }
+                            }}
+                            onClick={() => setSelectedRoleForPermission(role.code)}
+                          >
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2 }}>
+                              <Box sx={{ flex: 1 }}>
+                                {/* 첫 번째 줄: 제목, 상태, 코드 */}
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    {isAssigned && (
+                                      <TickCircle size={20} color="#1976d2" variant="Bold" />
+                                    )}
+                                    <Typography variant="subtitle1" sx={{ fontWeight: 600, color: isAssigned ? '#1976d2' : 'inherit' }}>
+                                      {role.role}
+                                    </Typography>
                                   <Chip
                                     label={role.status}
                                     size="small"
@@ -1539,20 +1726,24 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
                                   const hasRole = currentRoles.includes(role.code);
                                   const newRoles = hasRole ? currentRoles.filter((r) => r !== role.code) : [...currentRoles, role.code];
 
+                                  console.log('🔄🔄🔄 역할 설정/해제 버튼 클릭');
+                                  console.log('  현재 역할:', currentRoles);
+                                  console.log('  새 역할:', newRoles);
+
                                   return {
                                     ...prev,
-                                    assignedRole: newRoles,
-                                    rule: newRoles.length > 0 ? newRoles[0] : 'RULE-25-003'
+                                    assignedRole: newRoles
                                   };
                                 });
                               }}
                               sx={{ minWidth: '60px' }}
                             >
-                              {role.status !== '활성' ? '비활성' : (formData.assignedRole || []).includes(role.code) ? '해제' : '설정'}
+                              {role.status !== '활성' ? '비활성' : isAssigned ? '해제' : '설정'}
                             </Button>
                           </Box>
                         </Box>
-                      ))}
+                        );
+                      })}
                     </Stack>
                   </Box>
 
@@ -1682,14 +1873,14 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
                           </Box>
                         );
                       })()
-                    ) : (formData.assignedRole || []).length === 0 ? (
+                    ) : (
                       <Box sx={{ textAlign: 'center', py: 8 }}>
                         <Typography variant="h6" color="textSecondary" sx={{ mb: 1 }}>
                           역할을 선택하세요
                         </Typography>
                         <Typography color="textSecondary">왼쪽에서 역할을 클릭하면 해당 역할의 메뉴 권한을 확인할 수 있습니다.</Typography>
                       </Box>
-                    ) : null}
+                    )}
                   </Box>
                 </Stack>
               </Box>

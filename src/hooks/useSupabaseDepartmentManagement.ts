@@ -35,6 +35,7 @@ export interface CreateDepartmentRequest {
   phone?: string;
   location?: string;
   description?: string;
+  created_by?: string;
 }
 
 // 부서 수정 요청 타입
@@ -57,13 +58,6 @@ export function useSupabaseDepartmentManagement() {
 
   // 부서 목록 조회 (Investment 패턴 - 데이터 직접 반환)
   const getDepartments = useCallback(async (): Promise<Department[]> => {
-    // 1. 캐시 확인 (캐시가 있으면 즉시 반환)
-    const cachedData = loadFromCache<Department[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
-    if (cachedData) {
-      console.log('⚡ [DepartmentManagement] 캐시 데이터 반환 (깜빡임 방지)');
-      return cachedData;
-    }
-
     try {
       setLoading(true);
       setError(null);
@@ -72,6 +66,7 @@ export function useSupabaseDepartmentManagement() {
       const result = await response.json();
 
       if (result.success) {
+        console.log('✅ [DepartmentManagement] API에서 최신 데이터 가져옴:', result.data?.length || 0);
         saveToCache(CACHE_KEY, result.data); // 캐시에 저장
         return result.data || [];
       } else {
@@ -94,120 +89,101 @@ export function useSupabaseDepartmentManagement() {
   }, [getDepartments]);
 
   // 부서 생성
-  const createDepartment = useCallback(
-    async (departmentData: CreateDepartmentRequest): Promise<{ success: boolean; error?: string }> => {
-      try {
-        const response = await fetch('/api/departments', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(departmentData)
-        });
+  const createDepartment = useCallback(async (departmentData: CreateDepartmentRequest): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const response = await fetch('/api/departments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(departmentData)
+      });
 
-        const result = await response.json();
+      const result = await response.json();
 
-        if (result.success) {
-          // 목록 새로고침
-          await fetchDepartments();
-          return { success: true };
-        } else {
-          console.error('부서 생성 실패:', result.error);
-          return { success: false, error: result.error || '부서 생성에 실패했습니다.' };
-        }
-      } catch (err) {
-        console.error('부서 생성 실패:', err);
-        return { success: false, error: '부서 생성에 실패했습니다.' };
+      if (result.success) {
+        return { success: true };
+      } else {
+        // 정상적인 검증 오류 (중복 등)는 warn으로 표시
+        console.warn('⚠️ 부서 생성 검증 실패:', result.error);
+        return { success: false, error: result.error || '부서 생성에 실패했습니다.' };
       }
-    },
-    [fetchDepartments]
-  );
+    } catch (err) {
+      console.error('🔴 부서 생성 예외 발생:', err);
+      return { success: false, error: '부서 생성에 실패했습니다.' };
+    }
+  }, []);
 
   // 부서 수정
-  const updateDepartment = useCallback(
-    async (departmentData: UpdateDepartmentRequest): Promise<{ success: boolean; error?: string }> => {
-      try {
-        const response = await fetch('/api/departments', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(departmentData)
-        });
+  const updateDepartment = useCallback(async (departmentData: UpdateDepartmentRequest): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const response = await fetch('/api/departments', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(departmentData)
+      });
 
-        const result = await response.json();
+      const result = await response.json();
 
-        if (result.success) {
-          // 목록 새로고침
-          await fetchDepartments();
-          return { success: true };
-        } else {
-          console.error('부서 수정 실패:', result.error);
-          return { success: false, error: result.error || '부서 수정에 실패했습니다.' };
-        }
-      } catch (err) {
-        console.error('부서 수정 실패:', err);
-        return { success: false, error: '부서 수정에 실패했습니다.' };
+      if (result.success) {
+        return { success: true };
+      } else {
+        console.error('부서 수정 실패:', result.error);
+        return { success: false, error: result.error || '부서 수정에 실패했습니다.' };
       }
-    },
-    [fetchDepartments]
-  );
+    } catch (err) {
+      console.error('부서 수정 실패:', err);
+      return { success: false, error: '부서 수정에 실패했습니다.' };
+    }
+  }, []);
 
   // 부서 삭제
-  const deleteDepartment = useCallback(
-    async (id: number): Promise<{ success: boolean; error?: string }> => {
-      try {
-        const response = await fetch(`/api/departments?id=${id}`, {
-          method: 'DELETE'
-        });
+  const deleteDepartment = useCallback(async (id: number): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const response = await fetch(`/api/departments?id=${id}`, {
+        method: 'DELETE'
+      });
 
-        const result = await response.json();
+      const result = await response.json();
 
-        if (result.success) {
-          // 목록 새로고침
-          await fetchDepartments();
-          return { success: true };
-        } else {
-          console.error('부서 삭제 실패:', result.error);
-          return { success: false, error: result.error || '부서 삭제에 실패했습니다.' };
-        }
-      } catch (err) {
-        console.error('부서 삭제 실패:', err);
-        return { success: false, error: '부서 삭제에 실패했습니다.' };
+      if (result.success) {
+        return { success: true };
+      } else {
+        console.error('부서 삭제 실패:', result.error);
+        return { success: false, error: result.error || '부서 삭제에 실패했습니다.' };
       }
-    },
-    [fetchDepartments]
-  );
+    } catch (err) {
+      console.error('부서 삭제 실패:', err);
+      return { success: false, error: '부서 삭제에 실패했습니다.' };
+    }
+  }, []);
 
   // 부서 상태 토글
-  const toggleDepartmentStatus = useCallback(
-    async (id: number): Promise<{ success: boolean; error?: string }> => {
-      try {
-        const response = await fetch('/api/departments/toggle-status', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ id })
-        });
+  const toggleDepartmentStatus = useCallback(async (id: number): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const response = await fetch('/api/departments/toggle-status', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ id })
+      });
 
-        const result = await response.json();
+      const result = await response.json();
 
-        if (result.success) {
-          // 목록 새로고침
-          await fetchDepartments();
-          return { success: true };
-        } else {
-          console.error('부서 상태 변경 실패:', result.error);
-          return { success: false, error: result.error || '부서 상태 변경에 실패했습니다.' };
-        }
-      } catch (err) {
-        console.error('부서 상태 변경 실패:', err);
-        return { success: false, error: '부서 상태 변경에 실패했습니다.' };
+      if (result.success) {
+        return { success: true };
+      } else {
+        console.error('부서 상태 변경 실패:', result.error);
+        return { success: false, error: result.error || '부서 상태 변경에 실패했습니다.' };
       }
-    },
-    [fetchDepartments]
-  );
+    } catch (err) {
+      console.error('부서 상태 변경 실패:', err);
+      return { success: false, error: '부서 상태 변경에 실패했습니다.' };
+    }
+  }, []);
 
   // Investment 패턴: 자동 로딩 제거 (페이지에서 수동 호출)
   // useEffect 제거로 병렬 로딩 가능

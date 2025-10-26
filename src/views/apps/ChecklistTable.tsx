@@ -25,7 +25,9 @@ import {
   Stack,
   IconButton,
   Tooltip,
-  LinearProgress
+  LinearProgress,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 
@@ -167,6 +169,13 @@ export default function ChecklistTable({
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [goToPage, setGoToPage] = useState('');
 
+  // 알림창 상태
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error' | 'warning' | 'info'
+  });
+
   // Edit 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskTableData | null>(null);
@@ -293,18 +302,22 @@ export default function ChecklistTable({
 
     try {
       const deletedTasks = data.filter((task) => selected.includes(task.id));
+      let successCount = 0;
+      let failCount = 0;
 
       // Supabase에서 삭제
       for (const task of deletedTasks) {
         const success = await deleteChecklist(task.code);
         if (!success) {
           console.error(`체크리스트 삭제 실패: ${task.code}`);
-          return;
+          failCount++;
+        } else {
+          successCount++;
         }
       }
 
       // 삭제될 업무들의 정보를 변경로그에 추가
-      if (addChangeLog) {
+      if (addChangeLog && successCount > 0) {
         deletedTasks.forEach((task) => {
           addChangeLog('업무 삭제', task.code || `TASK-${task.id}`, `${task.workContent || '업무'} 삭제`, task.team || '미분류');
         });
@@ -318,8 +331,34 @@ export default function ChecklistTable({
       if (setTasks) {
         setTasks(updatedData);
       }
+
+      // 결과 알림
+      if (failCount === 0) {
+        setSnackbar({
+          open: true,
+          message: `${successCount}개 체크리스트가 성공적으로 삭제되었습니다.`,
+          severity: 'success'
+        });
+      } else if (successCount > 0) {
+        setSnackbar({
+          open: true,
+          message: `삭제 완료: ${successCount}개, 실패: ${failCount}개`,
+          severity: 'warning'
+        });
+      } else {
+        setSnackbar({
+          open: true,
+          message: '체크리스트 삭제에 실패했습니다.',
+          severity: 'error'
+        });
+      }
     } catch (error) {
       console.error('체크리스트 삭제 중 오류:', error);
+      setSnackbar({
+        open: true,
+        message: '체크리스트 삭제 중 오류가 발생했습니다.',
+        severity: 'error'
+      });
     }
   };
 
@@ -359,12 +398,22 @@ export default function ChecklistTable({
 
       if (!success) {
         console.error('체크리스트 저장 실패');
+        setSnackbar({
+          open: true,
+          message: '체크리스트 저장에 실패했습니다.',
+          severity: 'error'
+        });
         return createdId; // 실패해도 생성된 ID가 있으면 반환
       }
 
       if (existingIndex === -1 && createdId) {
         // 새로 생성된 체크리스트의 경우 목록 새로고침
         await fetchChecklists();
+        setSnackbar({
+          open: true,
+          message: '체크리스트가 성공적으로 생성되었습니다.',
+          severity: 'success'
+        });
         return createdId; // 생성된 ID 반환
       } else if (existingIndex !== -1) {
         // 기존 Task 업데이트
@@ -408,6 +457,12 @@ export default function ChecklistTable({
             );
           }
         }
+
+        setSnackbar({
+          open: true,
+          message: '체크리스트가 성공적으로 수정되었습니다.',
+          severity: 'success'
+        });
 
         console.log('✅ 기존 Task 업데이트 완료');
       } else {
@@ -908,6 +963,18 @@ export default function ChecklistTable({
           teams={teams}
         />
       )}
+
+      {/* 알림창 */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

@@ -50,7 +50,6 @@ import { solutionData, solutionStatusColors, assigneeAvatars, assignees, teams, 
 import { SolutionTableData, SolutionStatus, DbSolutionData } from 'types/solution';
 import { useSupabaseSolution } from '../../hooks/useSupabaseSolution';
 import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
-import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
 import { ChangeLogData } from 'types/changelog';
 import { createClient } from '@/lib/supabase/client';
@@ -2335,18 +2334,49 @@ export default function SolutionManagement() {
   // DB 연동 훅
   const { getSolutions, convertToSolutionData, createSolution, updateSolution, deleteSolution, convertToDbSolutionData } =
     useSupabaseSolution();
-  const { users, departments } = useCommonData(); // 🏪 공용 창고에서 가져오기
-  const { getSubCodesByGroup } = useSupabaseMasterCode3();
+  const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 가져오기
 
   // 변경로그 Supabase 훅
   const { logs: changeLogData, loading: changeLogLoading, error: changeLogError, fetchChangeLogs } = useSupabaseChangeLog('it_solution');
   const { data: session } = useSession();
   const { user } = useUser();
 
-  // 마스터코드에서 상태 옵션 가져오기
+  // 마스터코드에서 상태 옵션 가져오기 (GROUP002의 서브코드만 필터링)
   const statusTypes = React.useMemo(() => {
-    return getSubCodesByGroup('GROUP002');
-  }, [getSubCodesByGroup]);
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 마스터코드에서 솔루션유형 옵션 가져오기 (GROUP021)
+  const solutionTypesMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP021' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 마스터코드에서 개발유형 옵션 가져오기 (GROUP022)
+  const developmentTypesMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP022' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // subcode → subcode_name 변환 함수들
+  const getSolutionTypeName = React.useCallback((subcode: string) => {
+    const found = solutionTypesMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [solutionTypesMap]);
+
+  const getDevelopmentTypeName = React.useCallback((subcode: string) => {
+    const found = developmentTypesMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [developmentTypesMap]);
+
+  const getStatusName = React.useCallback((subcode: string) => {
+    const found = statusTypes.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [statusTypes]);
 
   // currentUser 찾기 (email 기반)
   const currentUser = React.useMemo(() => {

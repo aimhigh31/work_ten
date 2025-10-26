@@ -44,7 +44,22 @@ export default function Locales({ children }: Props) {
   return (
     <>
       {messages && (
-        <IntlProvider locale={i18n} defaultLocale="ko" messages={messages}>
+        <IntlProvider
+          locale={i18n}
+          defaultLocale="ko"
+          messages={messages}
+          onError={(err) => {
+            // ✅ MISSING_TRANSLATION 에러는 조용히 처리 (개발 환경에서만 경고)
+            if (err.code === 'MISSING_TRANSLATION') {
+              if (process.env.NODE_ENV === 'development') {
+                console.warn(`[i18n] 누락된 번역: "${err.descriptor?.id}" (fallback 사용)`);
+              }
+              return; // 에러를 throw하지 않음
+            }
+            // 다른 에러는 콘솔에 표시
+            console.error('[i18n] 에러:', err);
+          }}
+        >
           {children}
         </IntlProvider>
       )}

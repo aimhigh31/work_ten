@@ -48,7 +48,6 @@ import InspectionEditDialog from 'components/InspectionEditDialog';
 import { inspectionData, teams, assignees, inspectionStatusOptions, inspectionStatusColors } from 'data/inspection';
 import { InspectionTableData, InspectionStatus } from 'types/inspection';
 import { useSupabaseSecurityInspection, SecurityInspectionData } from 'hooks/useSupabaseSecurityInspection';
-import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
 import { ThemeMode } from 'config';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
@@ -2014,23 +2013,25 @@ export default function InspectionManagement() {
     generateInspectionCode
   } = useSupabaseSecurityInspection();
 
-  // 마스터코드 훅 (점검유형 가져오기)
-  const { getSubCodesByGroup, subCodes } = useSupabaseMasterCode3();
-
   // 사용자 및 부서 데이터
-  const { users, departments } = useCommonData(); // 🏪 공용 창고에서 가져오기
+  const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 가져오기
 
   // 점검유형 목록 가져오기 (GROUP033) - useMemo로 감싸서 마스터코드 로드 후 자동 업데이트
   const inspectionTypesList = React.useMemo(() => {
-    const types = getSubCodesByGroup('GROUP033').map((code) => code.subcode_name);
+    const types = masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP033' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order)
+      .map((code) => code.subcode_name);
     console.log('🔍 InspectionManagement - GROUP033 점검유형 목록:', types);
     return types;
-  }, [subCodes, getSubCodesByGroup]);
+  }, [masterCodes]);
 
-  // GROUP002 서브코드 목록 (상태용)
+  // 마스터코드에서 상태 옵션 가져오기 (GROUP002의 서브코드만 필터링)
   const statusTypes = React.useMemo(() => {
-    return getSubCodesByGroup('GROUP002');
-  }, [getSubCodesByGroup]);
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
 
   // 공유 Inspections 상태
   const [inspections, setInspections] = useState<InspectionTableData[]>([]);

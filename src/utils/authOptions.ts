@@ -64,7 +64,7 @@ export const authOptions: NextAuthOptions = {
               email, user_name, status, is_active, auth_user_id,
               position, department, avatar_url, profile_image_url,
               role_id,
-              admin_users_rules!inner(id, role_name)
+              admin_users_rules(id, role_name)
             `)
             .or(`user_code.eq.${credentials.email},user_account_id.eq.${credentials.email}`)
             .limit(1);

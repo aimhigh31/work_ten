@@ -1,4 +1,4 @@
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -23,6 +23,7 @@ import {
   Divider
 } from '@mui/material';
 import { ShieldSearch, Chart21, Setting4, TickCircle, ShieldTick, Clock, Calendar, User } from '@wandersonalwes/iconsax-react';
+import { createClient } from '@supabase/supabase-js';
 
 // 대응 단계 정의
 const responseStages = [
@@ -119,10 +120,42 @@ function ColorlibStepIcon(props: StepIconProps) {
 // 사고현황탭 컴포넌트
 const SecurityIncidentStatusTab = memo(
   ({ taskState, onFieldChange }: { taskState: any; onFieldChange: (field: string, value: string) => void }) => {
+    // Supabase 클라이언트 생성
+    const supabase = React.useMemo(() => {
+      return createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+    }, []);
+
+    // DB에서 직접 가져온 대응단계 목록 state
+    const [responseStagesFromDB, setResponseStagesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+
+    // Dialog가 열릴 때 DB에서 직접 조회
+    useEffect(() => {
+      const fetchResponseStages = async () => {
+        const { data: group010Data } = await supabase
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP010')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+
+        setResponseStagesFromDB(group010Data || []);
+      };
+
+      fetchResponseStages();
+    }, [supabase]);
+
     // 현재 대응 단계의 인덱스 계산
     const getActiveStep = () => {
       const stage = taskState.responseStage;
-      const index = responseStages.findIndex((s) => s.label === stage);
+      // DB 데이터가 있으면 DB 데이터 기준으로, 없으면 기본 배열 기준으로
+      const stages = responseStagesFromDB.length > 0
+        ? responseStagesFromDB.map(s => s.subcode)
+        : responseStages.map(s => s.label);
+      const index = stages.findIndex((s) => s === stage);
       return index >= 0 ? index : 0;
     };
 
@@ -136,13 +169,20 @@ const SecurityIncidentStatusTab = memo(
     // 진행률 계산 (대응 단계 기준)
     const calculateProgress = () => {
       const currentStep = getActiveStep();
-      return ((currentStep + 1) / responseStages.length) * 100;
+      const totalSteps = responseStagesFromDB.length > 0 ? responseStagesFromDB.length : responseStages.length;
+      return ((currentStep + 1) / totalSteps) * 100;
     };
 
     // 현재 단계 정보 가져오기
     const getCurrentStageInfo = () => {
       const index = getActiveStep();
       return responseStages[index] || responseStages[0];
+    };
+
+    // subcode → subcode_name 변환 함수
+    const getResponseStageName = (subcode: string) => {
+      const found = responseStagesFromDB.find(item => item.subcode === subcode);
+      return found ? found.subcode_name : subcode;
     };
 
     const currentStageInfo = getCurrentStageInfo();
@@ -174,45 +214,55 @@ const SecurityIncidentStatusTab = memo(
                 </InputLabel>
                 <Select
                   size="small"
-                  value={taskState.responseStage || '사고 탐지'}
+                  value={taskState.responseStage}
                   label="대응 단계 변경"
                   onChange={handleStageChange}
+                  renderValue={(selected) => {
+                    const item = responseStagesFromDB.find(s => s.subcode === selected);
+                    return item ? item.subcode_name : selected;
+                  }}
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       borderRadius: 2
                     }
                   }}
                 >
-                  {responseStages.map((stage) => (
-                    <MenuItem key={stage.label} value={stage.label}>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        {React.createElement(stage.icon, { size: 18 })}
-                        <Typography variant="body2">{stage.label}</Typography>
-                      </Stack>
-                    </MenuItem>
-                  ))}
+                  {responseStagesFromDB.map((stage, index) => {
+                    const iconComponent = responseStages[index]?.icon || ShieldSearch;
+                    return (
+                      <MenuItem key={stage.subcode} value={stage.subcode}>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          {React.createElement(iconComponent, { size: 18 })}
+                          <Typography variant="body2">{stage.subcode_name}</Typography>
+                        </Stack>
+                      </MenuItem>
+                    );
+                  })}
                 </Select>
               </FormControl>
             </Box>
 
             {/* 스테퍼 */}
             <Stepper alternativeLabel activeStep={getActiveStep()} connector={<ColorlibConnector />}>
-              {responseStages.map((stage, index) => (
-                <Step key={stage.label}>
-                  <StepLabel StepIconComponent={ColorlibStepIcon}>
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        fontWeight: index === getActiveStep() ? 600 : 400,
-                        color: index <= getActiveStep() ? 'primary.main' : 'text.secondary',
-                        fontSize: '0.875rem'
-                      }}
-                    >
-                      {stage.label}
-                    </Typography>
-                  </StepLabel>
-                </Step>
-              ))}
+              {(responseStagesFromDB.length > 0 ? responseStagesFromDB : responseStages).map((stage, index) => {
+                const label = 'subcode_name' in stage ? stage.subcode_name : stage.label;
+                return (
+                  <Step key={'subcode' in stage ? stage.subcode : stage.label}>
+                    <StepLabel StepIconComponent={ColorlibStepIcon}>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontWeight: index === getActiveStep() ? 600 : 400,
+                          color: index <= getActiveStep() ? 'primary.main' : 'text.secondary',
+                          fontSize: '0.875rem'
+                        }}
+                      >
+                        {label}
+                      </Typography>
+                    </StepLabel>
+                  </Step>
+                );
+              })}
             </Stepper>
 
             {/* 진행률 표시 */}

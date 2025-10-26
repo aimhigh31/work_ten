@@ -45,10 +45,16 @@ export default function Calendar() {
   const calendarRef = useRef<FullCalendar>(null);
   const {
     events: supabaseEvents,
+    fetchEvents,
     createEvent: supabaseCreateEvent,
     updateEvent: supabaseUpdateEvent,
     deleteEvent: supabaseDeleteEvent
   } = useSupabaseCalendar();
+
+  // 초기 데이터 로딩
+  useEffect(() => {
+    fetchEvents();
+  }, [fetchEvents]);
 
   // Supabase 이벤트를 FullCalendar 형식으로 변환
   const events = useMemo(() => {

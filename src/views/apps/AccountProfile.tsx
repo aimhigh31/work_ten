@@ -23,6 +23,7 @@ import DialogActions from '@mui/material/DialogActions';
 // project-imports
 import { handlerActiveItem, useGetMenuMaster } from 'api/menu';
 import { GRID_COMMON_SPACING } from 'config';
+import { useCommonData } from 'contexts/CommonDataContext';
 import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
 import { useSupabaseStorage } from 'hooks/useSupabaseStorage';
 
@@ -40,7 +41,8 @@ export default function AccountProfile({ tab }: Props) {
   const { menuMaster } = useGetMenuMaster();
   const { data: session } = useSession();
 
-  const { users, updateUser } = useSupabaseUserManagement();
+  const { users } = useCommonData(); // 캐싱된 사용자 목록
+  const { updateUser } = useSupabaseUserManagement(); // 사용자 업데이트 함수
   const { uploadProfileImage, deleteProfileImage } = useSupabaseStorage();
 
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -74,8 +76,19 @@ export default function AccountProfile({ tab }: Props) {
   }, [pathname]);
 
   useEffect(() => {
+    console.log('👤 [AccountProfile] 사용자 찾기:', {
+      sessionEmail: session?.user?.email,
+      usersCount: users.length
+    });
+
     if (session?.user?.email && users.length > 0) {
       const user = users.find((u) => u.email === session.user.email);
+      console.log('👤 [AccountProfile] 찾은 사용자:', {
+        found: !!user,
+        user_name: user?.user_name,
+        email: user?.email
+      });
+
       if (user) {
         // 모든 필드를 확실하게 정의된 값으로 설정
         const normalizedUser = {
@@ -96,9 +109,17 @@ export default function AccountProfile({ tab }: Props) {
           profile_image_url: user.profile_image_url ?? null,
           avatar_url: user.avatar_url ?? null
         };
+        console.log('✅ [AccountProfile] currentUser 설정 완료:', normalizedUser.user_name);
         setCurrentUser(normalizedUser);
         setIsUserLoaded(true);
+      } else {
+        console.warn('⚠️ [AccountProfile] 사용자를 찾을 수 없음');
       }
+    } else {
+      console.log('⚠️ [AccountProfile] 세션 또는 users 미로드:', {
+        hasSession: !!session?.user?.email,
+        usersLength: users.length
+      });
     }
   }, [session, users]);
 

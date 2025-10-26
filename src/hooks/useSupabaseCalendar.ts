@@ -51,6 +51,7 @@ export function useSupabaseCalendar() {
     const cachedData = loadFromCache<CalendarEvent[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
     if (cachedData) {
       console.log('⚡ [Calendar] 캐시 데이터 반환');
+      setEvents(cachedData); // ✅ 캐시 데이터로 상태 업데이트 (KPI 패턴)
       return cachedData;
     }
 
@@ -66,7 +67,10 @@ export function useSupabaseCalendar() {
         return [];
       }
 
-      // 2. 캐시에 저장
+      // 2. 상태 업데이트 (KPI 패턴)
+      setEvents(data || []);
+
+      // 3. 캐시에 저장
       saveToCache(CACHE_KEY, data || []);
 
       return data || [];
@@ -156,14 +160,20 @@ export function useSupabaseCalendar() {
         }
 
         console.log('이벤트 생성 성공:', data);
-        await fetchEvents(); // 목록 새로고침
+
+        // ✅ 로컬 상태 즉시 업데이트 (KPI 패턴)
+        setEvents((prev) => [data, ...prev]);
+
+        // 캐시 무효화 (최신 데이터 보장)
+        sessionStorage.removeItem(CACHE_KEY);
+
         return data;
       } catch (err: any) {
         console.error('이벤트 생성 예외:', err);
         throw err;
       }
     },
-    [fetchEvents, generateNextEventCode]
+    [generateNextEventCode]
   );
 
   // 이벤트 수정
@@ -198,14 +208,20 @@ export function useSupabaseCalendar() {
         }
 
         console.log('이벤트 수정 성공:', data);
-        await fetchEvents(); // 목록 새로고침
+
+        // ✅ 로컬 상태 즉시 업데이트 (KPI 패턴)
+        setEvents((prev) => prev.map((event) => (event.event_id === event_id ? data : event)));
+
+        // 캐시 무효화 (최신 데이터 보장)
+        sessionStorage.removeItem(CACHE_KEY);
+
         return data;
       } catch (err: any) {
         console.error('이벤트 수정 예외:', err);
         throw err;
       }
     },
-    [fetchEvents]
+    []
   );
 
   // 이벤트 삭제
@@ -220,13 +236,18 @@ export function useSupabaseCalendar() {
         }
 
         console.log('이벤트 삭제 성공:', event_id);
-        await fetchEvents(); // 목록 새로고침
+
+        // ✅ 로컬 상태 즉시 업데이트 (KPI 패턴)
+        setEvents((prev) => prev.filter((event) => event.event_id !== event_id));
+
+        // 캐시 무효화 (최신 데이터 보장)
+        sessionStorage.removeItem(CACHE_KEY);
       } catch (err: any) {
         console.error('이벤트 삭제 예외:', err);
         throw err;
       }
     },
-    [fetchEvents]
+    []
   );
 
   // Investment 패턴: 자동 로딩 제거 (페이지에서 수동 호출)

@@ -36,6 +36,7 @@ import { useSupabaseFeedback } from '../hooks/useSupabaseFeedback';
 import { PAGE_IDENTIFIERS, FeedbackData } from '../types/feedback';
 import { useSupabaseFiles } from '../hooks/useSupabaseFiles';
 import { FileData } from '../types/files';
+import { createClient } from '@supabase/supabase-js';
 // import { usePerformanceMonitor } from '../utils/performance';
 
 // Icons
@@ -142,30 +143,58 @@ const OverviewTab = memo(
     const workContentRef = useRef<HTMLInputElement>(null);
     const descriptionRef = useRef<HTMLTextAreaElement>(null);
 
-    // ✅ 공용 창고에서 마스터코드, 부서, 사용자 데이터 가져오기
-    const { masterCodes, departments, users } = useCommonData();
+    // Supabase 클라이언트 생성
+    const supabaseClient = React.useMemo(() => {
+      return createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+    }, []);
 
-    console.log('🔍 [SolutionEditDialog OverviewTab] masterCodes:', masterCodes?.length);
-    console.log('🔍 [SolutionEditDialog OverviewTab] departments:', departments?.length);
-    console.log('🔍 [SolutionEditDialog OverviewTab] users:', users?.length);
+    // DB에서 직접 가져온 마스터코드 목록 state
+    const [solutionTypesFromDB, setSolutionTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+    const [developmentTypesFromDB, setDevelopmentTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+    const [statusTypesFromDB, setStatusTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
 
-    // 마스터코드에서 서브코드 가져오기 함수
-    const getSubCodesByGroup = React.useCallback((groupCode: string) => {
-      if (!masterCodes || masterCodes.length === 0) {
-        console.log(`⚠️ [SolutionEditDialog] masterCodes가 아직 로드되지 않음`);
-        return [];
-      }
-      const subCodes = masterCodes
-        .filter(code => code.group_code === groupCode && code.is_active)
-        .filter(code => code.subcode && code.subcode_name); // 빈 값 필터링
-      console.log(`🔍 [SolutionEditDialog] ${groupCode} 필터링 결과:`, subCodes.length, '개', subCodes);
-      return subCodes;
-    }, [masterCodes]);
+    // Dialog가 열릴 때 DB에서 직접 조회
+    useEffect(() => {
+      const fetchMasterCodeData = async () => {
+        // GROUP021 솔루션유형 조회
+        const { data: group021Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP021')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+        setSolutionTypesFromDB(group021Data || []);
 
-    // GROUP021 솔루션유형, GROUP022 개발유형, GROUP002 상태 조회
-    const solutionTypeOptions = getSubCodesByGroup('GROUP021');
-    const developmentTypeOptions = getSubCodesByGroup('GROUP022');
-    const masterCodeStatusOptions = getSubCodesByGroup('GROUP002');
+        // GROUP022 개발유형 조회
+        const { data: group022Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP022')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+        setDevelopmentTypesFromDB(group022Data || []);
+
+        // GROUP002 상태 조회
+        const { data: group002Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP002')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+        setStatusTypesFromDB(group002Data || []);
+      };
+
+      fetchMasterCodeData();
+    }, [supabaseClient]);
+
+    // ✅ 공용 창고에서 부서, 사용자 데이터 가져오기
+    const { departments, users } = useCommonData();
 
     // 텍스트 필드용 최적화된 입력 관리
     const titleInput = useOptimizedInput(solutionState.title, 150);
@@ -274,10 +303,21 @@ const OverviewTab = memo(
                   솔루션유형 <span style={{ color: 'red' }}>*</span>
                 </span>
               </InputLabel>
-              <Select value={solutionState.solutionType} label="솔루션유형 *" onChange={handleFieldChange('solutionType')} displayEmpty>
+              <Select
+                value={solutionState.solutionType}
+                label="솔루션유형 *"
+                onChange={handleFieldChange('solutionType')}
+                displayEmpty
+                notched
+                renderValue={(selected) => {
+                  if (!selected) return '선택';
+                  const item = solutionTypesFromDB.find(t => t.subcode === selected);
+                  return item ? item.subcode_name : selected;
+                }}
+              >
                 <MenuItem value="">선택</MenuItem>
-                {solutionTypeOptions.map((option) => (
-                  <MenuItem key={option.subcode} value={option.subcode_name}>
+                {solutionTypesFromDB.map((option) => (
+                  <MenuItem key={option.subcode} value={option.subcode}>
                     {option.subcode_name}
                   </MenuItem>
                 ))}
@@ -290,10 +330,21 @@ const OverviewTab = memo(
                   개발유형 <span style={{ color: 'red' }}>*</span>
                 </span>
               </InputLabel>
-              <Select value={solutionState.developmentType} label="개발유형 *" onChange={handleFieldChange('developmentType')} displayEmpty>
+              <Select
+                value={solutionState.developmentType}
+                label="개발유형 *"
+                onChange={handleFieldChange('developmentType')}
+                displayEmpty
+                notched
+                renderValue={(selected) => {
+                  if (!selected) return '선택';
+                  const item = developmentTypesFromDB.find(t => t.subcode === selected);
+                  return item ? item.subcode_name : selected;
+                }}
+              >
                 <MenuItem value="">선택</MenuItem>
-                {developmentTypeOptions.map((option) => (
-                  <MenuItem key={option.subcode} value={option.subcode_name}>
+                {developmentTypesFromDB.map((option) => (
+                  <MenuItem key={option.subcode} value={option.subcode}>
                     {option.subcode_name}
                   </MenuItem>
                 ))}
@@ -322,7 +373,11 @@ const OverviewTab = memo(
                 value={solutionState.status}
                 label="상태"
                 onChange={handleFieldChange('status')}
-                renderValue={(value) => {
+                notched
+                renderValue={(selected) => {
+                  const item = statusTypesFromDB.find(s => s.subcode === selected);
+                  const displayName = item ? item.subcode_name : selected;
+
                   const getStatusStyle = (status: string) => {
                     switch (status) {
                       case '대기':
@@ -362,10 +417,10 @@ const OverviewTab = memo(
                   };
                   return (
                     <Chip
-                      label={value}
+                      label={displayName}
                       size="small"
                       sx={{
-                        ...getStatusStyle(value),
+                        ...getStatusStyle(displayName),
                         fontSize: '13px',
                         fontWeight: 400
                       }}
@@ -373,7 +428,7 @@ const OverviewTab = memo(
                   );
                 }}
               >
-                {masterCodeStatusOptions.map((option) => {
+                {statusTypesFromDB.map((option) => {
                   const getStatusColor = (statusName: string) => {
                     switch (statusName) {
                       case '대기':
@@ -392,7 +447,7 @@ const OverviewTab = memo(
                     }
                   };
                   return (
-                    <MenuItem key={option.subcode} value={option.subcode_name}>
+                    <MenuItem key={option.subcode} value={option.subcode}>
                       <Chip
                         label={option.subcode_name}
                         size="small"

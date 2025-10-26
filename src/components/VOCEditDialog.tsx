@@ -35,6 +35,7 @@ import { useSupabaseFeedback } from '../hooks/useSupabaseFeedback';
 import { PAGE_IDENTIFIERS, FeedbackData } from '../types/feedback';
 import { useSupabaseFiles } from '../hooks/useSupabaseFiles';
 import { FileData } from '../types/files';
+import { createClient } from '@supabase/supabase-js';
 // import { usePerformanceMonitor } from '../utils/performance';
 
 // Icons
@@ -147,52 +148,64 @@ const OverviewTab = memo(
     const requestContentRef = useRef<HTMLInputElement>(null);
     const actionContentRef = useRef<HTMLTextAreaElement>(null);
 
-    // ✅ 공용 창고에서 마스터코드 및 사용자 데이터 가져오기
-    const { masterCodes, users } = useCommonData();
+    // Supabase 클라이언트 생성
+    const supabaseClient = React.useMemo(() => {
+      return createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+    }, []);
 
-    console.log('🔍 [VOCEditDialog OverviewTab] masterCodes:', masterCodes?.length);
-    console.log('🔍 [VOCEditDialog OverviewTab] users:', users?.length);
+    // DB에서 직접 가져온 마스터코드 목록 state
+    const [vocTypesFromDB, setVocTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+    const [priorityTypesFromDB, setPriorityTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+    const [statusTypesFromDB, setStatusTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
 
-    // 마스터코드에서 서브코드 가져오기 함수
-    const getSubCodesByGroup = React.useCallback((groupCode: string) => {
-      if (!masterCodes || masterCodes.length === 0) {
-        console.log(`⚠️ [VOCEditDialog] masterCodes가 아직 로드되지 않음`);
-        return [];
-      }
-      const subCodes = masterCodes
-        .filter(code => code.group_code === groupCode && code.is_active)
-        .filter(code => code.subcode && code.subcode_name); // 빈 값 필터링
-      console.log(`🔍 [VOCEditDialog] ${groupCode} 필터링 결과:`, subCodes.length, '개', subCodes);
-      return subCodes;
-    }, [masterCodes]);
+    // Dialog가 열릴 때 DB에서 직접 조회
+    useEffect(() => {
+      const fetchMasterCodeData = async () => {
+        // GROUP023 VOC유형 조회
+        const { data: group023Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP023')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+        setVocTypesFromDB(group023Data || []);
 
-    // GROUP023의 서브코드 목록 가져오기 (VOC 유형)
-    const vocTypeOptions = getSubCodesByGroup('GROUP023').map((subCode) => ({
-      value: subCode.subcode_name,
-      label: subCode.subcode_name,
-      description: subCode.subcode_description
-    }));
+        // GROUP024 우선순위 조회
+        const { data: group024Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP024')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+        setPriorityTypesFromDB(group024Data || []);
 
-    // GROUP024의 서브코드 목록 가져오기 (우선순위)
-    const priorityOptions = getSubCodesByGroup('GROUP024').map((subCode) => ({
-      value: subCode.subcode_name,
-      label: subCode.subcode_name,
-      description: subCode.subcode_description
-    }));
+        // GROUP002 상태 조회
+        const { data: group002Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP002')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+        setStatusTypesFromDB(group002Data || []);
+      };
 
-    // GROUP002의 서브코드 목록 가져오기 (상태)
-    const statusOptionsFromMaster = getSubCodesByGroup('GROUP002').map((subCode) => ({
-      value: subCode.subcode_name,
-      label: subCode.subcode_name,
-      description: subCode.subcode_description
-    }));
+      fetchMasterCodeData();
+    }, [supabaseClient]);
+
+    // ✅ 공용 창고에서 사용자 데이터 가져오기
+    const { users } = useCommonData();
 
     // 사용자 목록 옵션 생성 (등록자)
     const userOptions = users
       .filter((user) => user.is_active && user.status === 'active')
       .map((user) => {
         const avatarUrl = user.profile_image_url || user.avatar_url || '';
-        console.log('🔍 [VOC 사용자 옵션] user:', user.user_name, 'avatar:', avatarUrl);
         return {
           value: user.user_name,
           label: user.user_name,
@@ -200,8 +213,6 @@ const OverviewTab = memo(
           avatar: avatarUrl
         };
       });
-
-    console.log('🔍 [VOC 사용자 옵션] 총 userOptions:', userOptions.length, '개');
 
     // 텍스트 필드용 최적화된 입력 관리
     const contentInput = useOptimizedInput(vocState.content, 150);
@@ -311,20 +322,24 @@ const OverviewTab = memo(
                   VOC유형 <span style={{ color: 'red' }}>*</span>
                 </span>
               </InputLabel>
-              <Select value={vocState.vocType} label="VOC유형 *" onChange={handleFieldChange('vocType')} displayEmpty>
+              <Select
+                value={vocState.vocType}
+                label="VOC유형 *"
+                onChange={handleFieldChange('vocType')}
+                displayEmpty
+                notched
+                renderValue={(selected) => {
+                  if (!selected) return '선택';
+                  const item = vocTypesFromDB.find(t => t.subcode === selected);
+                  return item ? item.subcode_name : selected;
+                }}
+              >
                 <MenuItem value="">선택</MenuItem>
-                {vocTypeOptions.length > 0
-                  ? vocTypeOptions.map((option) => (
-                      <MenuItem key={option.value} value={option.value} title={option.description}>
-                        {option.label}
-                      </MenuItem>
-                    ))
-                  : // 백업용: 마스터코드 로딩 중이거나 데이터가 없을 때
-                    VOC_TYPES.map((type) => (
-                      <MenuItem key={type} value={type}>
-                        {type}
-                      </MenuItem>
-                    ))}
+                {vocTypesFromDB.map((option) => (
+                  <MenuItem key={option.subcode} value={option.subcode}>
+                    {option.subcode_name}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
 
@@ -347,17 +362,24 @@ const OverviewTab = memo(
                   우선순위 <span style={{ color: 'red' }}>*</span>
                 </span>
               </InputLabel>
-              <Select value={vocState.priority} label="우선순위 *" onChange={handleFieldChange('priority')} displayEmpty>
+              <Select
+                value={vocState.priority}
+                label="우선순위 *"
+                onChange={handleFieldChange('priority')}
+                displayEmpty
+                notched
+                renderValue={(selected) => {
+                  if (!selected) return '선택';
+                  const item = priorityTypesFromDB.find(p => p.subcode === selected);
+                  return item ? item.subcode_name : selected;
+                }}
+              >
                 <MenuItem value="">선택</MenuItem>
-                {priorityOptions.length > 0 ? (
-                  priorityOptions.map((priority) => (
-                    <MenuItem key={priority.value} value={priority.value} title={priority.description}>
-                      {priority.label}
-                    </MenuItem>
-                  ))
-                ) : (
-                  <MenuItem value="보통">보통</MenuItem>
-                )}
+                {priorityTypesFromDB.map((option) => (
+                  <MenuItem key={option.subcode} value={option.subcode}>
+                    {option.subcode_name}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
           </Stack>
@@ -370,7 +392,11 @@ const OverviewTab = memo(
                 value={vocState.status}
                 label="상태"
                 onChange={handleFieldChange('status')}
-                renderValue={(value) => {
+                notched
+                renderValue={(selected) => {
+                  const item = statusTypesFromDB.find(s => s.subcode === selected);
+                  const displayName = item ? item.subcode_name : selected;
+
                   const getStatusStyle = (status: string) => {
                     switch (status) {
                       case '접수':
@@ -410,10 +436,10 @@ const OverviewTab = memo(
                   };
                   return (
                     <Chip
-                      label={value}
+                      label={displayName}
                       size="small"
                       sx={{
-                        ...getStatusStyle(value),
+                        ...getStatusStyle(displayName),
                         fontSize: '13px',
                         fontWeight: 400
                       }}
@@ -421,54 +447,39 @@ const OverviewTab = memo(
                   );
                 }}
               >
-                {statusOptionsFromMaster.length > 0 ? (
-                  statusOptionsFromMaster.map((status) => {
-                    const getStatusColor = (statusName: string) => {
-                      switch (statusName) {
-                        case '접수':
-                        case '대기':
-                          return { bgcolor: '#F5F5F5', color: '#757575' };
-                        case '진행중':
-                        case '진행':
-                          return { bgcolor: '#E3F2FD', color: '#1976D2' };
-                        case '완료':
-                          return { bgcolor: '#E8F5E9', color: '#388E3C' };
-                        case '보류':
-                        case '홀딩':
-                          return { bgcolor: '#FFEBEE', color: '#D32F2F' };
-                        default:
-                          return { bgcolor: '#F5F5F5', color: '#757575' };
-                      }
-                    };
-                    return (
-                      <MenuItem key={status.value} value={status.value} title={status.description}>
-                        <Chip
-                          label={status.label}
-                          size="small"
-                          sx={{
-                            backgroundColor: getStatusColor(status.label).bgcolor,
-                            color: getStatusColor(status.label).color,
-                            fontSize: '13px',
-                            fontWeight: 400
-                          }}
-                        />
-                      </MenuItem>
-                    );
-                  })
-                ) : (
-                  <MenuItem value="대기">
-                    <Chip
-                      label="대기"
-                      size="small"
-                      sx={{
-                        backgroundColor: '#F5F5F5',
-                        color: '#757575',
-                        fontSize: '13px',
-                        fontWeight: 400
-                      }}
-                    />
-                  </MenuItem>
-                )}
+                {statusTypesFromDB.map((option) => {
+                  const getStatusColor = (statusName: string) => {
+                    switch (statusName) {
+                      case '접수':
+                      case '대기':
+                        return { bgcolor: '#F5F5F5', color: '#757575' };
+                      case '진행중':
+                      case '진행':
+                        return { bgcolor: '#E3F2FD', color: '#1976D2' };
+                      case '완료':
+                        return { bgcolor: '#E8F5E9', color: '#388E3C' };
+                      case '보류':
+                      case '홀딩':
+                        return { bgcolor: '#FFEBEE', color: '#D32F2F' };
+                      default:
+                        return { bgcolor: '#F5F5F5', color: '#757575' };
+                    }
+                  };
+                  return (
+                    <MenuItem key={option.subcode} value={option.subcode}>
+                      <Chip
+                        label={option.subcode_name}
+                        size="small"
+                        sx={{
+                          backgroundColor: getStatusColor(option.subcode_name).bgcolor,
+                          color: getStatusColor(option.subcode_name).color,
+                          fontSize: '13px',
+                          fontWeight: 400
+                        }}
+                      />
+                    </MenuItem>
+                  );
+                })}
               </Select>
             </FormControl>
 

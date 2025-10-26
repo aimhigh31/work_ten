@@ -45,7 +45,6 @@ import VOCEditDialog from 'components/VOCEditDialog';
 import { vocData, vocStatusColors, assigneeAvatars, assignees, teams, vocStatusOptions } from 'data/voc';
 import { VOCTableData, VOCStatus } from 'types/voc';
 import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
-import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
 import { ChangeLogData } from 'types/changelog';
 import { createClient } from '@/lib/supabase/client';
@@ -2313,8 +2312,7 @@ export default function VOCManagement() {
   const userName = user?.name || session?.user?.name || '시스템';
 
   // Supabase 훅 사용 (즉시 렌더링 - loading 상태 제거)
-  const { users, departments } = useCommonData(); // 🏪 공용 창고에서 가져오기
-  const { getSubCodesByGroup } = useSupabaseMasterCode3();
+  const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 가져오기
 
   // 현재 로그인한 사용자 정보
   const currentUser = React.useMemo(() => {
@@ -2322,10 +2320,42 @@ export default function VOCManagement() {
     return users.find((u) => u.email === session.user.email);
   }, [session, users]);
 
-  // 마스터코드에서 상태 옵션 가져오기
+  // 마스터코드에서 상태 옵션 가져오기 (GROUP002의 서브코드만 필터링)
   const statusTypes = React.useMemo(() => {
-    return getSubCodesByGroup('GROUP002');
-  }, [getSubCodesByGroup]);
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 마스터코드에서 VOC유형 옵션 가져오기 (GROUP023)
+  const vocTypesMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP023' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 마스터코드에서 우선순위 옵션 가져오기 (GROUP024)
+  const priorityTypesMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP024' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // subcode → subcode_name 변환 함수들
+  const getVocTypeName = React.useCallback((subcode: string) => {
+    const found = vocTypesMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [vocTypesMap]);
+
+  const getPriorityName = React.useCallback((subcode: string) => {
+    const found = priorityTypesMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [priorityTypesMap]);
+
+  const getStatusName = React.useCallback((subcode: string) => {
+    const found = statusTypes.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [statusTypes]);
 
   // 공유 VOCs 상태
   const [vocs, setVOCs] = useState<VOCTableData[]>(vocData);

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
+import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS, clearCache } from '../utils/cacheUtils';
 
 // Supabase 클라이언트 설정
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -121,12 +121,16 @@ export const useSupabaseMasterCode3 = () => {
   }, []);
 
   // 전체 데이터 로드 (Investment 패턴 - 데이터 직접 반환)
-  const getAllMasterCodes = useCallback(async (): Promise<MasterCodeFlat[]> => {
-    // 1. 캐시 확인 (캐시가 있으면 즉시 반환)
-    const cachedData = loadFromCache<MasterCodeFlat[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
-    if (cachedData) {
-      console.log('⚡ [MasterCode3] 캐시 데이터 반환 (깜빡임 방지)');
-      return cachedData;
+  const getAllMasterCodes = useCallback(async (skipCache: boolean = false): Promise<MasterCodeFlat[]> => {
+    // 1. 캐시 확인 (skipCache가 false일 때만)
+    if (!skipCache) {
+      const cachedData = loadFromCache<MasterCodeFlat[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
+      if (cachedData) {
+        console.log('⚡ [MasterCode3] 캐시 데이터 반환 (깜빡임 방지)');
+        return cachedData;
+      }
+    } else {
+      console.log('🔄 [MasterCode3] 캐시 우회 - 강제 새로고침 모드');
     }
 
     setLoading(true);
@@ -162,7 +166,10 @@ export const useSupabaseMasterCode3 = () => {
 
   // 전체 데이터 로드 (내부 상태 업데이트용 - 후방 호환성)
   const fetchAllData = useCallback(async () => {
-    const data = await getAllMasterCodes();
+    // 캐시 무효화 - 항상 최신 데이터 가져오기
+    console.log('🔄 캐시 삭제 후 데이터 새로고침');
+    clearCache(CACHE_KEY);
+    const data = await getAllMasterCodes(true); // skipCache=true로 캐시 우회
     processAllData(data);
   }, [getAllMasterCodes, processAllData]);
 

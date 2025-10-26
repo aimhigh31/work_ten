@@ -27,7 +27,9 @@ import {
   Stack,
   IconButton,
   Tooltip,
-  LinearProgress
+  LinearProgress,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 
@@ -48,6 +50,7 @@ import { useMenuPermission } from 'hooks/usePermissions'; // ✅ 권한 체크 �
 // 사용자 데이터 타입 정의 (기존 호환성 유지)
 interface UserData {
   id: number;
+  auth_user_id?: string; // Supabase Auth UUID
   no: number;
   registrationDate: string;
   code: string;
@@ -67,6 +70,7 @@ interface UserData {
   address?: string;
   assignedRole?: string[];
   rule?: string;
+  role_id?: number | null;
 }
 
 // 컬럼 너비 정의
@@ -104,8 +108,27 @@ const transformUserProfile = (profile: UserProfile, index: number, totalCount: n
     pending: '대기' as const
   };
 
+  // assigned_roles를 assignedRole로 변환 (raw DB 데이터 처리)
+  let assignedRole = profile.assignedRole || [];
+  if (!assignedRole || assignedRole.length === 0) {
+    // assignedRole이 없으면 assigned_roles에서 변환 시도
+    const rawAssignedRoles = (profile as any).assigned_roles;
+    if (rawAssignedRoles) {
+      if (Array.isArray(rawAssignedRoles)) {
+        assignedRole = rawAssignedRoles;
+      } else if (typeof rawAssignedRoles === 'string') {
+        try {
+          assignedRole = JSON.parse(rawAssignedRoles);
+        } catch {
+          assignedRole = [];
+        }
+      }
+    }
+  }
+
   const transformed = {
     id: profile.id,
+    auth_user_id: profile.auth_user_id, // Supabase Auth UUID
     no: totalCount - index, // 역순 번호 (최신이 더 큰 번호)
     registrationDate: profile.created_at ? profile.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
     code: profile.user_code || '',
@@ -135,31 +158,11 @@ const transformUserProfile = (profile: UserProfile, index: number, totalCount: n
     address: profile.address,
     profileImage: profile.profile_image_url || profile.avatar_url,
     profile_image_url: profile.profile_image_url,
-    assignedRole: profile.assignedRole || [],
-    rule: profile.rule || 'RULE-25-003'
+    assignedRole: Array.isArray(assignedRole) ? assignedRole : []
   };
 
-  // 디버깅: 변환된 데이터 확인 (모든 사용자에 대해 로그 출력)
-  console.log(`📞 transformUserProfile [${profile.user_name}]:`, {
-    id: profile.id,
-    userAccountId: profile.user_account_id,
-    department: profile.department,
-    position: profile.position,
-    role: profile.role,
-    phone: profile.phone,
-    country: profile.country,
-    address: profile.address
-  });
-
-  console.log(`📤 transformed 결과 [${profile.user_name}]:`, {
-    userAccount: transformed.userAccount,
-    department: transformed.department,
-    position: transformed.position,
-    role: transformed.role,
-    phone: transformed.phone,
-    country: transformed.country,
-    address: transformed.address
-  });
+  // 변환 완료 로그 (간소화)
+  // console.log(`✅ transformUserProfile: ${profile.user_code} → ${transformed.code}`);
 
   return transformed;
 };
@@ -182,15 +185,13 @@ export default function UserManagementTable({
   const { canRead, canWrite, canFull, loading: permissionLoading } = useMenuPermission('/admin-panel/user-settings');
 
   // 🏪 공용 창고에서 데이터 가져오기 (중복 로딩 방지!)
-  const { users: supabaseUsers, departments: supabaseDepartments, refreshCommonData } = useCommonData();
+  const { users: supabaseUsers, departments: supabaseDepartments, masterCodes, refreshCommonData } = useCommonData();
 
   // Supabase 훅 사용 (데이터 수정 함수만)
   const { loading, error, clearError, fetchUsers, createUser, updateUser, toggleUserStatus, deleteUser } = useSupabaseUserManagement();
 
   // 마스터코드3 Supabase 훅 사용 (플랫 구조)
   const { subCodes: allSubCodes } = useSupabaseMasterCode3();
-
-  console.log('🔍 전체 서브코드 데이터:', allSubCodes);
 
   // USER_LEVEL 서브코드만 필터링 (GROUP003)
   const userLevelOptions = useMemo(() => {
@@ -206,7 +207,6 @@ export default function UserManagementTable({
         disabled: !sub.is_active
       }));
 
-    console.log('🎯 UserManagementTable USER_LEVEL 옵션들:', userLevelSubs);
     return userLevelSubs.sort((a, b) => a.subcode_order - b.subcode_order);
   }, [allSubCodes]);
 
@@ -220,18 +220,96 @@ export default function UserManagementTable({
     { id: 6, code_name: '부장', code_value: 'E6' }
   ];
 
+  // 마스터코드에서 직급 옵션 가져오기 (GROUP003)
+  const positionsMap = useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP003' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 마스터코드에서 직책 옵션 가져오기 (GROUP004)
+  const rolesMap = useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP004' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 마스터코드에서 국가 옵션 가져오기 (GROUP005)
+  const countriesMap = useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP005' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 마스터코드에서 상태 옵션 가져오기 (GROUP044)
+  const statusMap = useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP044' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // subcode → subcode_name 변환 함수들
+  const getPositionName = useCallback(
+    (subcode: string) => {
+      const found = positionsMap.find((item) => item.subcode === subcode);
+      return found ? found.subcode_name : subcode;
+    },
+    [positionsMap]
+  );
+
+  const getRoleName = useCallback(
+    (subcode: string) => {
+      const found = rolesMap.find((item) => item.subcode === subcode);
+      return found ? found.subcode_name : subcode;
+    },
+    [rolesMap]
+  );
+
+  const getCountryName = useCallback(
+    (subcode: string) => {
+      const found = countriesMap.find((item) => item.subcode === subcode);
+      return found ? found.subcode_name : subcode;
+    },
+    [countriesMap]
+  );
+
+  const getStatusName = useCallback(
+    (subcode: string) => {
+      const found = statusMap.find((item) => item.subcode === subcode);
+      return found ? found.subcode_name : subcode;
+    },
+    [statusMap]
+  );
+
   // 실제 사용할 직급 데이터는 더 이상 필요하지 않음 (UserEditDialog에서 직접 처리)
 
   // 변환된 사용자 데이터
   const transformedUsers = useMemo(() => {
-    return supabaseUsers.map((profile, index) => transformUserProfile(profile, index, supabaseUsers.length));
-  }, [supabaseUsers]);
+    return supabaseUsers.map((profile, index) => {
+      const user = transformUserProfile(profile, index, supabaseUsers.length);
+      // subcode → subcode_name 변환 적용
+      return {
+        ...user,
+        position: getPositionName(user.position),
+        role: getRoleName(user.role),
+        country: user.country ? getCountryName(user.country) : user.country,
+        status: getStatusName(user.status)
+      };
+    });
+  }, [supabaseUsers, getPositionName, getRoleName, getCountryName, getStatusName]);
 
   const [data, setData] = useState<UserData[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [goToPage, setGoToPage] = useState('');
+
+  // 알림창 상태
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error' | 'warning' | 'info'
+  });
 
   // Edit 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);
@@ -275,10 +353,15 @@ export default function UserManagementTable({
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Excel 다운로드 중 오류 발생:', error);
+      console.warn('⚠️ Excel 다운로드 중 오류 발생:', error);
       alert('Excel 다운로드 중 오류가 발생했습니다.');
     }
   };
+
+  // 컴포넌트 마운트 시 에러 클리어
+  useEffect(() => {
+    clearError();
+  }, [clearError]);
 
   // Supabase 데이터 또는 props 데이터 사용
   useEffect(() => {
@@ -292,11 +375,12 @@ export default function UserManagementTable({
   // 에러 처리 (로딩 완료 후에만 에러 표시)
   useEffect(() => {
     if (error && !loading) {
-      console.error('사용자 데이터 에러:', error);
+      console.warn('⚠️ 사용자 데이터 에러:', error);
       // 에러를 일정 시간 후 자동 클리어
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         clearError();
-      }, 5000);
+      }, 3000);
+      return () => clearTimeout(timer);
     }
   }, [error, loading, clearError]);
 
@@ -311,8 +395,10 @@ export default function UserManagementTable({
 
       const statusMatch = selectedStatus === '전체' || user.status === selectedStatus;
       const teamMatch = selectedTeam === '전체' || user.department === selectedTeam;
+
       return statusMatch && teamMatch;
     });
+
     // 원본 순서 유지 (API에서 이미 created_at DESC로 정렬됨)
     return filtered;
   }, [data, selectedYear || '전체', selectedStatus, selectedTeam]);
@@ -401,13 +487,53 @@ export default function UserManagementTable({
 
       // Supabase에서 삭제
       const deletePromises = selected.map((id) => deleteUser(id));
-      await Promise.all(deletePromises);
+      const results = await Promise.all(deletePromises);
 
-      // 🔄 CommonData 새로고침 (화면에 삭제 반영)
-      await refreshCommonData();
-      console.log('✅ CommonData 새로고침 완료');
+      // 모든 삭제가 성공했는지 확인
+      const allSuccess = results.every((result) => result === true);
+      const successCount = results.filter((r) => r === true).length;
+      const failCount = results.length - successCount;
 
-      setSelected([]);
+      if (allSuccess) {
+        console.log('✅ 사용자 삭제 성공');
+
+        // 🔥 즉시 로컬 상태 업데이트 (깜빡임 없이 즉시 반영)
+        setData((prevData) => prevData.filter((user) => !selected.includes(user.id)));
+        console.log('✅ 로컬 상태에서 삭제된 사용자 즉시 제거');
+
+        // 🔄 CommonData 백그라운드 새로고침 (await 제거로 즉시 진행)
+        refreshCommonData();
+        console.log('🔄 CommonData 백그라운드 새로고침 시작');
+
+        setSelected([]);
+
+        setSnackbar({
+          open: true,
+          message: `${successCount}개 사용자가 성공적으로 삭제되었습니다.`,
+          severity: 'success'
+        });
+      } else if (successCount > 0) {
+        console.warn('⚠️ 일부 사용자 삭제 실패');
+
+        // 성공한 사용자만 로컬 상태에서 제거
+        const successIds = selected.filter((id, index) => results[index] === true);
+        setData((prevData) => prevData.filter((user) => !successIds.includes(user.id)));
+        refreshCommonData();
+        setSelected([]);
+
+        setSnackbar({
+          open: true,
+          message: `삭제 완료: ${successCount}개, 실패: ${failCount}개`,
+          severity: 'warning'
+        });
+      } else {
+        console.error('❌ 사용자 삭제 전체 실패');
+        setSnackbar({
+          open: true,
+          message: '사용자 삭제에 실패했습니다.',
+          severity: 'error'
+        });
+      }
     }
   };
 
@@ -443,17 +569,19 @@ export default function UserManagementTable({
         address: updatedUser.address,
         user_account_id: updatedUser.userAccount,
         profile_image_url: updatedUser.profile_image_url || updatedUser.profileImage,
-        assignedRole: updatedUser.assignedRole || [],
-        rule: updatedUser.rule || 'RULE-25-003'
+        assignedRole: updatedUser.assignedRole || []
       };
 
       console.log('📝 사용자 업데이트 데이터:', {
+        userAccount: updatedUser.userAccount,
+        user_account_id: updateData.user_account_id,
         phone: updateData.phone,
         country: updateData.country,
         address: updateData.address,
         department: updateData.department,
         position: updateData.position,
-        role: updateData.role
+        role: updateData.role,
+        assignedRole: updateData.assignedRole
       });
       console.log('📝 전체 updateData:', updateData);
 
@@ -468,6 +596,7 @@ export default function UserManagementTable({
             user.id === updatedUser.id
               ? {
                   ...user,
+                  userAccount: updatedUser.userAccount,
                   userName: updatedUser.userName,
                   department: updatedUser.department,
                   position: updatedUser.position,
@@ -478,12 +607,13 @@ export default function UserManagementTable({
                   address: updatedUser.address,
                   status: updatedUser.status,
                   profileImage: updatedUser.profileImage || updatedUser.profile_image_url,
-                  profile_image_url: updatedUser.profile_image_url || updatedUser.profileImage
+                  profile_image_url: updatedUser.profile_image_url || updatedUser.profileImage,
+                  assignedRole: updatedUser.assignedRole || []
                 }
               : user
           )
         );
-        console.log('✅ 로컬 상태 즉시 업데이트 완료');
+        console.log('✅ 로컬 상태 즉시 업데이트 완료 (userAccount, assignedRole 포함)');
 
         // 🔄 CommonData 백그라운드 새로고침 (await 제거로 즉시 진행)
         refreshCommonData();
@@ -500,9 +630,19 @@ export default function UserManagementTable({
             updatedUser.department
           );
         }
+
+        setSnackbar({
+          open: true,
+          message: '사용자 정보가 성공적으로 수정되었습니다.',
+          severity: 'success'
+        });
       } else {
-        console.error('❌ 사용자 업데이트 실패');
-        alert('사용자 정보 수정에 실패했습니다.');
+        console.warn('⚠️ 사용자 업데이트 실패');
+        setSnackbar({
+          open: true,
+          message: '사용자 정보 수정에 실패했습니다.',
+          severity: 'error'
+        });
       }
     } else {
       // 새 사용자 추가 - Supabase Auth로 생성
@@ -517,60 +657,95 @@ export default function UserManagementTable({
         // 기본 비밀번호 설정 (나중에 변경하도록 안내)
         const defaultPassword = '123456';
 
+        // 전송할 데이터 준비
+        const requestBody = {
+          email: baseEmail,
+          password: defaultPassword,
+          user_name: updatedUser.userName,
+          department: updatedUser.department,
+          position: updatedUser.position,
+          role: updatedUser.role,
+          user_account_id: updatedUser.userAccount,
+          phone: updatedUser.phone,
+          country: updatedUser.country,
+          address: updatedUser.address,
+          profile_image_url: updatedUser.profile_image_url || updatedUser.profileImage
+        };
+
+        console.log('🚀🚀🚀 [UserManagementTable] API로 전송할 데이터:', requestBody);
+        console.log('🚀 [UserManagementTable] updatedUser 원본:', {
+          userName: updatedUser.userName,
+          userAccount: updatedUser.userAccount,
+          phone: updatedUser.phone,
+          country: updatedUser.country,
+          address: updatedUser.address,
+          email: updatedUser.email
+        });
+
         // Supabase Auth에 사용자 생성 (API 호출)
         const response = await fetch('/api/create-auth-user', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({
-            email: baseEmail,
-            password: defaultPassword,
-            user_name: updatedUser.userName,
-            department: updatedUser.department,
-            position: updatedUser.position,
-            role: updatedUser.role,
-            user_account_id: updatedUser.userAccount,
-            phone: updatedUser.phone,
-            country: updatedUser.country,
-            address: updatedUser.address,
-            profile_image_url: updatedUser.profile_image_url || updatedUser.profileImage
-          })
+          body: JSON.stringify(requestBody)
         });
 
         const result = await response.json();
 
         if (!response.ok || !result.success) {
-          console.error('Auth 사용자 생성 실패:', result.error);
+          console.warn('⚠️ Auth 사용자 생성 실패:', result.error);
 
           // 이메일 중복 오류인 경우 특별 처리
           if (result.error && result.error.includes('already been registered')) {
-            alert(
-              `이메일 중복 오류: 이미 사용 중인 이메일입니다.\n이메일: ${baseEmail}\n\n다른 이메일 주소를 입력하거나, 이메일을 비워두면 자동으로 생성됩니다.`
-            );
+            setSnackbar({
+              open: true,
+              message: `이메일 중복 오류: 이미 사용 중인 이메일입니다. (${baseEmail})`,
+              severity: 'error'
+            });
           } else {
-            alert(`사용자 생성 실패: ${result.error}`);
+            setSnackbar({
+              open: true,
+              message: `사용자 생성 실패: ${result.error}`,
+              severity: 'error'
+            });
           }
           return;
         }
 
         console.log('✅ Auth 사용자 생성 성공, 트리거에 의해 프로필도 자동 생성됨');
+        console.log('📋 생성된 사용자 정보:', result);
 
-        // 🔄 CommonData 새로고침 (화면에 새 사용자 반영)
-        await refreshCommonData();
-        console.log('✅ CommonData 새로고침 완료');
+        // 🔥 즉시 로컬 상태에 새 사용자 추가 (깜빡임 없이 즉시 반영)
+        if (result.user_profile) {
+          const newUser = transformUserProfile(result.user_profile, 0, data.length + 1);
+          setData((prevData) => [newUser, ...prevData]);
+          console.log('✅ 로컬 상태에 새 사용자 즉시 추가');
+        }
+
+        // 🔄 CommonData 백그라운드 새로고침 (await 제거로 즉시 진행)
+        refreshCommonData();
+        console.log('🔄 CommonData 백그라운드 새로고침 시작');
 
         if (addChangeLog) {
           addChangeLog('새 사용자 생성', result.auth_user_id, `${updatedUser.userName || '새 사용자'} 생성`, updatedUser.department);
         }
 
-        alert(`사용자가 생성되었습니다.\n이메일: ${baseEmail}\n초기 비밀번호: ${defaultPassword}\n(로그인 후 비밀번호를 변경해주세요)`);
+        setSnackbar({
+          open: true,
+          message: `사용자가 성공적으로 생성되었습니다. (초기 비밀번호: ${defaultPassword})`,
+          severity: 'success'
+        });
 
         // 다이얼로그 닫기
         handleEditDialogClose();
       } catch (error: any) {
-        console.error('사용자 생성 중 오류:', error);
-        alert('사용자 생성 중 오류가 발생했습니다.');
+        console.warn('⚠️ 사용자 생성 중 오류:', error);
+        setSnackbar({
+          open: true,
+          message: '사용자 생성 중 오류가 발생했습니다.',
+          severity: 'error'
+        });
       }
     }
   };
@@ -592,6 +767,13 @@ export default function UserManagementTable({
     console.log('✏️ country:', user.country);
     console.log('✏️ address:', user.address);
     console.log('✏️ email:', user.email);
+    console.log('✏️🔴🔴🔴 assignedRole:', user.assignedRole);
+    console.log('✏️🔴 assignedRole 타입:', typeof user.assignedRole);
+    console.log('✏️🔴 assignedRole 배열 여부:', Array.isArray(user.assignedRole));
+    console.log('✏️🔴 assignedRole 길이:', Array.isArray(user.assignedRole) ? user.assignedRole.length : 'N/A');
+    if (Array.isArray(user.assignedRole) && user.assignedRole.length > 0) {
+      console.log('✏️🔴 assignedRole 내용:', user.assignedRole);
+    }
     setEditingUser(user);
     setEditDialog(true);
   };
@@ -599,14 +781,16 @@ export default function UserManagementTable({
   // 상태 색상
   const getStatusColor = (status: string) => {
     switch (status) {
-      case '활성':
-        return { backgroundColor: '#E8F5E8', color: '#333333' };
-      case '비활성':
-        return { backgroundColor: '#FFEBEE', color: '#333333' };
       case '대기':
-        return { backgroundColor: '#FFF3E0', color: '#333333' };
+        return { backgroundColor: '#F5F5F5', color: '#757575' };
+      case '활성':
+        return { backgroundColor: '#E3F2FD', color: '#1976D2' };
+      case '비활성':
+        return { backgroundColor: '#fff8e1', color: '#f57c00' };
+      case '홀딩':
+        return { backgroundColor: '#FFEBEE', color: '#D32F2F' };
       default:
-        return { backgroundColor: '#F5F5F5', color: '#333333' };
+        return { backgroundColor: '#F5F5F5', color: '#757575' };
     }
   };
 
@@ -1032,6 +1216,18 @@ export default function UserManagementTable({
           departments={supabaseDepartments}
         />
       )}
+
+      {/* 알림창 */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

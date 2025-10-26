@@ -88,7 +88,12 @@ export async function GET(request: NextRequest) {
         phone: processedData[0].phone,
         country: processedData[0].country,
         address: processedData[0].address,
-        email: processedData[0].email
+        email: processedData[0].email,
+        assignedRole: processedData[0].assignedRole
+      });
+      console.log('🔍 역할 필드 상세:', {
+        '원본 assigned_roles': processedData[0].assigned_roles,
+        '변환된 assignedRole': processedData[0].assignedRole
       });
     }
 
@@ -133,11 +138,12 @@ export async function POST(request: NextRequest) {
       country: userData.country || null,
       address: userData.address || null,
       user_account_id: userData.user_account_id || null,
-      rule: userData.rule || 'RULE-25-003'
+      assigned_roles: userData.assignedRole || []
     };
 
     if (userData.profile_image_url !== undefined) {
       insertData.profile_image_url = userData.profile_image_url || null;
+      insertData.avatar_url = userData.profile_image_url || null; // avatar_url에도 동일한 이미지 저장
     }
 
     const { data, error: insertError } = await supabase.from('admin_users_userprofiles').insert([insertData]).select().single();
@@ -183,12 +189,15 @@ export async function PUT(request: NextRequest) {
     const userData = await request.json();
 
     console.log('📝 받은 사용자 데이터:', {
+      userAccount: userData.userAccount,
+      user_account_id: userData.user_account_id,
       phone: userData.phone,
       country: userData.country,
       address: userData.address,
       department: userData.department,
       position: userData.position,
-      role: userData.role
+      role: userData.role,
+      assignedRole: userData.assignedRole
     });
 
     const updateData: any = {
@@ -205,21 +214,23 @@ export async function PUT(request: NextRequest) {
       address: userData.address || null,
       user_account_id: userData.user_account_id || null,
       assigned_roles: userData.assignedRole || [],
-      rule: userData.rule || 'RULE-25-003',
       updated_by: 'system'
     };
 
     if (userData.profile_image_url !== undefined) {
       updateData.profile_image_url = userData.profile_image_url || null;
+      updateData.avatar_url = userData.profile_image_url || null; // avatar_url에도 동일한 이미지 저장
     }
 
     console.log('🔄 Supabase 업데이트 데이터:', {
+      user_account_id: updateData.user_account_id,
       phone: updateData.phone,
       country: updateData.country,
       address: updateData.address,
       department: updateData.department,
       position: updateData.position,
-      role: updateData.role
+      role: updateData.role,
+      assigned_roles: updateData.assigned_roles
     });
 
     const { data, error: updateError } = await supabase.from('admin_users_userprofiles').update(updateData).eq('id', userData.id).select().single();
@@ -251,12 +262,14 @@ export async function PUT(request: NextRequest) {
     }
 
     console.log('✅ 사용자 수정 성공:', {
+      user_account_id: data.user_account_id,
       phone: data.phone,
       country: data.country,
       address: data.address,
       department: data.department,
       position: data.position,
-      role: data.role
+      role: data.role,
+      assigned_roles: data.assigned_roles
     });
     console.log('✅ DB에 저장된 전체 데이터:', data);
 

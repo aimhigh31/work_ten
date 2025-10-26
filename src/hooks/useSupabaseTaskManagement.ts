@@ -20,6 +20,10 @@ export interface TaskRecord {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  task_type: string | null;
+  kpi_id: string | null;
+  kpi_record_id: number | null;
+  kpi_work_content: string | null;
 }
 
 // 업무 생성 입력 타입
@@ -36,6 +40,10 @@ export interface TaskInput {
   assignee_name?: string | null;
   progress?: number;
   status?: string;
+  task_type?: string | null;
+  kpi_id?: string | null;
+  kpi_record_id?: number | null;
+  kpi_work_content?: string | null;
 }
 
 // 업무 수정 입력 타입
@@ -50,30 +58,35 @@ export interface TaskUpdate {
   assignee_name?: string | null;
   progress?: number;
   status?: string;
+  task_type?: string | null;
+  kpi_id?: string | null;
+  kpi_record_id?: number | null;
+  kpi_work_content?: string | null;
 }
 
 // 캐시 키
 const CACHE_KEY = createCacheKey('task_management', 'tasks');
 
 export const useSupabaseTaskManagement = () => {
+  const [tasks, setTasks] = useState<TaskRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 업무 목록 조회 (투자관리 방식: 캐시 우선 전략)
+  // 업무 목록 조회 (KPI 방식: 캐시 표시 후 항상 DB 조회)
   const getTasks = useCallback(async (): Promise<TaskRecord[]> => {
-    // 1. 캐시 확인 (캐시가 있으면 즉시 반환)
-    const cachedData = loadFromCache<TaskRecord[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
-    if (cachedData) {
-      console.log('⚡ [TaskManagement] 캐시 데이터 반환 (깜빡임 방지)');
-      return cachedData;
-    }
-
-    // 2. 캐시 없으면 DB 조회
     try {
       console.log('📞 getTasks 호출');
       setLoading(true);
       setError(null);
 
+      // 1. 캐시가 있으면 먼저 표시 (깜빡임 방지)
+      const cachedData = loadFromCache<TaskRecord[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
+      if (cachedData) {
+        console.log('⚡ [TaskManagement] 캐시 데이터 먼저 표시 (깜빡임 방지)');
+        setTasks(cachedData); // ✅ 캐시 데이터로 즉시 표시
+      }
+
+      // 2. 항상 DB 조회 (최신 데이터 보장)
       const { data, error: fetchError } = await supabase
         .from('main_task_data')
         .select('*')
@@ -87,7 +100,10 @@ export const useSupabaseTaskManagement = () => {
 
       console.log('✅ getTasks 성공:', data?.length || 0, '개');
 
-      // 3. 캐시에 저장
+      // 3. 최신 데이터로 상태 업데이트 (KPI 패턴)
+      setTasks(data || []);
+
+      // 4. 캐시에 저장
       saveToCache(CACHE_KEY, data || []);
 
       return data || [];
@@ -131,6 +147,9 @@ export const useSupabaseTaskManagement = () => {
 
       console.log('✅ addTask 성공:', data);
 
+      // ✅ 로컬 상태 즉시 업데이트 (KPI 패턴)
+      setTasks((prev) => [data, ...prev]);
+
       // 캐시 무효화 (최신 데이터 보장)
       sessionStorage.removeItem(CACHE_KEY);
 
@@ -173,6 +192,9 @@ export const useSupabaseTaskManagement = () => {
 
       console.log('✅ updateTask 성공:', data);
 
+      // ✅ 로컬 상태 즉시 업데이트 (KPI 패턴)
+      setTasks((prev) => prev.map((task) => (task.id === id ? data : task)));
+
       // 캐시 무효화 (최신 데이터 보장)
       sessionStorage.removeItem(CACHE_KEY);
 
@@ -203,6 +225,9 @@ export const useSupabaseTaskManagement = () => {
 
       console.log('✅ deleteTask 성공:', data);
 
+      // ✅ 로컬 상태 즉시 업데이트 (KPI 패턴)
+      setTasks((prev) => prev.filter((task) => task.id !== id));
+
       // 캐시 무효화 (최신 데이터 보장)
       sessionStorage.removeItem(CACHE_KEY);
 
@@ -210,6 +235,40 @@ export const useSupabaseTaskManagement = () => {
     } catch (err: any) {
       console.log('❌ deleteTask 실패:', err);
       setError(err.message || '업무 삭제 실패');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // 여러 업무 삭제 (soft delete - KPI 패턴)
+  const deleteTasks = useCallback(async (ids: string[]): Promise<boolean> => {
+    console.log('🗑️ 여러 업무 삭제 시작:', ids);
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // ✅ KPI 패턴: .in()으로 여러 개 한 번에 삭제
+      const { error } = await supabase.from('main_task_data').update({ is_active: false }).in('id', ids);
+
+      if (error) {
+        console.log('❌ Supabase 일괄 삭제 오류:', error);
+        throw error;
+      }
+
+      console.log('✅ deleteTasks 성공:', ids.length, '개');
+
+      // ✅ 로컬 상태 즉시 업데이트 (KPI 패턴)
+      setTasks((prev) => prev.filter((task) => !ids.includes(task.id)));
+
+      // 캐시 무효화 (최신 데이터 보장)
+      sessionStorage.removeItem(CACHE_KEY);
+
+      return true;
+    } catch (err: any) {
+      console.log('❌ deleteTasks 실패:', err);
+      setError(err.message || '업무 일괄 삭제 실패');
       return false;
     } finally {
       setLoading(false);
@@ -234,12 +293,14 @@ export const useSupabaseTaskManagement = () => {
   }, []);
 
   return {
+    tasks,
     getTasks,
     loading,
     error,
     addTask,
     updateTask,
     deleteTask,
+    deleteTasks,
     checkCodeExists
   };
 };

@@ -5,6 +5,7 @@ import { useOptimizedInput } from '../hooks/useDebounce';
 import { useSupabaseMasterCode3 } from '../hooks/useSupabaseMasterCode3';
 import { useSupabaseDepartments } from '../hooks/useSupabaseDepartments';
 import { useCommonData } from '../contexts/CommonDataContext'; // ✅ 공용 창고
+import { createClient } from '@supabase/supabase-js';
 
 // 보안사고 전용 개요 탭 컴포넌트
 const SecurityIncidentOverviewTab = memo(
@@ -29,6 +30,14 @@ const SecurityIncidentOverviewTab = memo(
       props: { assignees, assigneeAvatars, statusOptions, statusColors }
     });
 
+    // Supabase 클라이언트 생성
+    const supabase = React.useMemo(() => {
+      return createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+    }, []);
+
     // 마스터코드 훅 사용
     const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
@@ -41,7 +50,41 @@ const SecurityIncidentOverviewTab = memo(
     console.log('🔍 [SecurityIncidentOverviewTab] users 개수:', users?.length);
     console.log('🔍 [SecurityIncidentOverviewTab] taskState.assignee:', taskState?.assignee);
 
-    // GROUP009의 서브코드들 가져오기 (사고유형)
+    // DB에서 직접 가져온 사고유형 목록 state
+    const [incidentTypesFromDB, setIncidentTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+    // DB에서 직접 가져온 상태 목록 state
+    const [statusTypesFromDB, setStatusTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+
+    // Dialog가 열릴 때 DB에서 직접 조회
+    useEffect(() => {
+      const fetchMasterCodeData = async () => {
+        // GROUP009 사고유형 조회
+        const { data: group009Data } = await supabase
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP009')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+
+        setIncidentTypesFromDB(group009Data || []);
+
+        // GROUP002 상태 조회
+        const { data: group002Data } = await supabase
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP002')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+
+        setStatusTypesFromDB(group002Data || []);
+      };
+
+      fetchMasterCodeData();
+    }, [supabase]);
+
+    // GROUP009의 서브코드들 가져오기 (사고유형) - 폴백용
     const incidentTypeOptions = useMemo(() => {
       const group009SubCodes = getSubCodesByGroup('GROUP009');
       console.log('🔍 GROUP009 서브코드:', group009SubCodes);
@@ -60,6 +103,16 @@ const SecurityIncidentOverviewTab = memo(
       console.log('🏢 부서 목록:', departments);
       return departments.filter((dept) => dept.is_active);
     }, [departments]);
+
+    // 상태 초기값을 "대기" subcode로 설정
+    React.useEffect(() => {
+      if (statusTypesFromDB.length > 0 && !taskState.status) {
+        const defaultStatus = statusTypesFromDB.find(item => item.subcode_name === '대기');
+        if (defaultStatus) {
+          onFieldChange('status', defaultStatus.subcode);
+        }
+      }
+    }, [statusTypesFromDB, taskState.status, onFieldChange]);
 
     // 담당자 정보 찾기
     const assigneeInfo = useMemo(() => {
@@ -209,43 +262,25 @@ const SecurityIncidentOverviewTab = memo(
               </InputLabel>
               <Select value={taskState.incidentType} label="사고유형 *" onChange={handleFieldChange('incidentType')} displayEmpty>
                 <MenuItem value="">선택</MenuItem>
-                {incidentTypeOptions.length > 0
-                  ? incidentTypeOptions.map((option) => (
-                      <MenuItem key={option.subcode} value={option.subcode_name}>
-                        {option.subcode_name}
-                      </MenuItem>
-                    ))
-                  : // 마스터코드 로딩 중이거나 없을 때 기본 옵션들 (배열 형태)
-                    [
-                      <MenuItem key="malware" value="악성코드">
-                        악성코드
-                      </MenuItem>,
-                      <MenuItem key="ransomware" value="랜섬웨어">
-                        랜섬웨어
-                      </MenuItem>,
-                      <MenuItem key="data-leak" value="정보유출">
-                        정보유출
-                      </MenuItem>,
-                      <MenuItem key="account-hijack" value="계정탈취">
-                        계정탈취
-                      </MenuItem>,
-                      <MenuItem key="ddos" value="디도스">
-                        디도스
-                      </MenuItem>,
-                      <MenuItem key="db-damage" value="DB손상">
-                        DB손상
-                      </MenuItem>
-                    ]}
+                {incidentTypesFromDB.map((type) => (
+                  <MenuItem key={type.subcode} value={type.subcode}>
+                    {type.subcode_name}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
 
             <FormControl fullWidth>
               <InputLabel shrink>상태</InputLabel>
               <Select
-                value={taskState.status || (statusOptionsFromMasterCode.length > 0 ? statusOptionsFromMasterCode[0].subcode_name : '대기')}
+                value={taskState.status}
                 label="상태"
                 onChange={handleFieldChange('status')}
                 renderValue={(selected) => {
+                  // subcode로부터 subcode_name 찾기
+                  const statusItem = statusTypesFromDB.find(item => item.subcode === selected);
+                  const statusName = statusItem ? statusItem.subcode_name : selected;
+
                   const getStatusStyle = (status: string) => {
                     switch (status) {
                       case '대기':
@@ -260,7 +295,7 @@ const SecurityIncidentOverviewTab = memo(
                         return { color: '#757575', backgroundColor: '#F5F5F5' };
                     }
                   };
-                  const style = getStatusStyle(selected as string);
+                  const style = getStatusStyle(statusName);
                   return (
                     <span
                       style={{
@@ -273,109 +308,45 @@ const SecurityIncidentOverviewTab = memo(
                         display: 'inline-block'
                       }}
                     >
-                      {selected}
+                      {statusName}
                     </span>
                   );
                 }}
               >
-                {statusOptionsFromMasterCode.length > 0
-                  ? statusOptionsFromMasterCode.map((option) => {
-                      const getStatusStyle = (status: string) => {
-                        switch (status) {
-                          case '대기':
-                            return { color: '#757575', backgroundColor: '#F5F5F5' };
-                          case '진행':
-                            return { color: '#1976D2', backgroundColor: '#E3F2FD' };
-                          case '완료':
-                            return { color: '#388E3C', backgroundColor: '#E8F5E9' };
-                          case '홀딩':
-                            return { color: '#D32F2F', backgroundColor: '#FFEBEE' };
-                          default:
-                            return { color: '#757575', backgroundColor: '#F5F5F5' };
-                        }
-                      };
-                      const style = getStatusStyle(option.subcode_name);
-                      return (
-                        <MenuItem key={option.subcode} value={option.subcode_name}>
-                          <span
-                            style={{
-                              color: style.color,
-                              backgroundColor: style.backgroundColor,
-                              fontWeight: 400,
-                              fontSize: '13px',
-                              padding: '2px 10px',
-                              borderRadius: '16px',
-                              display: 'inline-block'
-                            }}
-                          >
-                            {option.subcode_name}
-                          </span>
-                        </MenuItem>
-                      );
-                    })
-                  : // 마스터코드 로딩 중이거나 없을 때 기본 옵션들 (배열 형태)
-                    [
-                      <MenuItem key="wait" value="대기">
-                        <span
-                          style={{
-                            color: '#757575',
-                            backgroundColor: '#F5F5F5',
-                            fontWeight: 400,
-                            fontSize: '13px',
-                            padding: '2px 10px',
-                            borderRadius: '16px',
-                            display: 'inline-block'
-                          }}
-                        >
-                          대기
-                        </span>
-                      </MenuItem>,
-                      <MenuItem key="progress" value="진행">
-                        <span
-                          style={{
-                            color: '#1976D2',
-                            backgroundColor: '#E3F2FD',
-                            fontWeight: 400,
-                            fontSize: '13px',
-                            padding: '2px 10px',
-                            borderRadius: '16px',
-                            display: 'inline-block'
-                          }}
-                        >
-                          진행
-                        </span>
-                      </MenuItem>,
-                      <MenuItem key="complete" value="완료">
-                        <span
-                          style={{
-                            color: '#388E3C',
-                            backgroundColor: '#E8F5E9',
-                            fontWeight: 400,
-                            fontSize: '13px',
-                            padding: '2px 10px',
-                            borderRadius: '16px',
-                            display: 'inline-block'
-                          }}
-                        >
-                          완료
-                        </span>
-                      </MenuItem>,
-                      <MenuItem key="hold" value="홀딩">
-                        <span
-                          style={{
-                            color: '#D32F2F',
-                            backgroundColor: '#FFEBEE',
-                            fontWeight: 400,
-                            fontSize: '13px',
-                            padding: '2px 10px',
-                            borderRadius: '16px',
-                            display: 'inline-block'
-                          }}
-                        >
-                          홀딩
-                        </span>
-                      </MenuItem>
-                    ]}
+                {statusTypesFromDB.map((option) => {
+                  const getStatusStyle = (status: string) => {
+                    switch (status) {
+                      case '대기':
+                        return { color: '#757575', backgroundColor: '#F5F5F5' };
+                      case '진행':
+                        return { color: '#1976D2', backgroundColor: '#E3F2FD' };
+                      case '완료':
+                        return { color: '#388E3C', backgroundColor: '#E8F5E9' };
+                      case '홀딩':
+                        return { color: '#D32F2F', backgroundColor: '#FFEBEE' };
+                      default:
+                        return { color: '#757575', backgroundColor: '#F5F5F5' };
+                    }
+                  };
+                  const style = getStatusStyle(option.subcode_name);
+                  return (
+                    <MenuItem key={option.subcode} value={option.subcode}>
+                      <span
+                        style={{
+                          color: style.color,
+                          backgroundColor: style.backgroundColor,
+                          fontWeight: 400,
+                          fontSize: '13px',
+                          padding: '2px 10px',
+                          borderRadius: '16px',
+                          display: 'inline-block'
+                        }}
+                      >
+                        {option.subcode_name}
+                      </span>
+                    </MenuItem>
+                  );
+                })}
               </Select>
             </FormControl>
           </Stack>

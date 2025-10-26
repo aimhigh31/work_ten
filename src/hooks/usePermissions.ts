@@ -89,12 +89,24 @@ export function usePermissions() {
 
         // ✅ 응답 상태 체크 추가
         if (!response || !response.ok) {
-          console.error('❌ [usePermissions] API 응답 실패:', response?.status);
-          setState((prev) => ({
-            ...prev,
-            loading: false,
-            error: `권한 조회 실패 (${response?.status || 'Network Error'})`
-          }));
+          // 401은 인증 오류 (정상적인 로그아웃 상태일 수 있음)
+          if (response?.status === 401) {
+            console.log('⚠️ [usePermissions] 인증되지 않은 상태입니다.');
+            setState({
+              loading: false,
+              error: null, // 에러로 표시하지 않음
+              roleId: null,
+              roleName: null,
+              permissions: {}
+            });
+          } else {
+            console.error('❌ [usePermissions] API 응답 실패:', response?.status);
+            setState((prev) => ({
+              ...prev,
+              loading: false,
+              error: `권한 조회 실패 (${response?.status || 'Network Error'})`
+            }));
+          }
           return;
         }
 

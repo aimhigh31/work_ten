@@ -560,6 +560,56 @@ const OverviewTab = memo(
     const workContentRef = useRef<HTMLInputElement>(null);
     const descriptionRef = useRef<HTMLTextAreaElement>(null);
 
+    // Supabase 클라이언트 생성
+    const supabaseClient = React.useMemo(() => {
+      return createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+    }, []);
+
+    // DB에서 직접 가져온 마스터코드 목록 state
+    const [softwareCategoriesFromDB, setSoftwareCategoriesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+    const [licenseTypesFromDB, setLicenseTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+    const [statusTypesFromDB, setStatusTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+
+    // Dialog가 열릴 때 DB에서 직접 조회
+    useEffect(() => {
+      const fetchMasterCodeData = async () => {
+        // GROUP015 소프트웨어분류 조회
+        const { data: group015Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP015')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+        setSoftwareCategoriesFromDB(group015Data || []);
+
+        // GROUP016 라이센스유형 조회
+        const { data: group016Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP016')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+        setLicenseTypesFromDB(group016Data || []);
+
+        // GROUP002 상태 조회
+        const { data: group002Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP002')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+        setStatusTypesFromDB(group002Data || []);
+      };
+
+      fetchMasterCodeData();
+    }, [supabaseClient]);
+
     // 텍스트 필드용 최적화된 입력 관리
     const softwareNameInput = useOptimizedInput(softwareState.softwareName, 150);
     const descriptionInput = useOptimizedInput(softwareState.description, 200);
@@ -673,39 +723,21 @@ const OverviewTab = memo(
                 value={softwareState.softwareCategory}
                 label="소프트웨어분류"
                 onChange={handleFieldChange('softwareCategory')}
-                disabled={categoriesLoading}
                 displayEmpty
+                notched
+                renderValue={(selected) => {
+                  if (!selected) return '선택';
+                  const item = softwareCategoriesFromDB.find(c => c.subcode === selected);
+                  return item ? item.subcode_name : selected;
+                }}
               >
-                {categoriesLoading ? (
-                  <MenuItem disabled>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      로딩 중...
-                    </Typography>
+                <MenuItem value="">선택</MenuItem>
+                {softwareCategoriesFromDB.map((option) => (
+                  <MenuItem key={option.subcode} value={option.subcode}>
+                    {option.subcode_name}
                   </MenuItem>
-                ) : categoriesError ? (
-                  <MenuItem disabled>
-                    <Typography variant="body2" sx={{ color: 'error.main' }}>
-                      데이터 로드 실패
-                    </Typography>
-                  </MenuItem>
-                ) : (
-                  [
-                    <MenuItem key="empty" value="">
-                      선택
-                    </MenuItem>,
-                    ...softwareCategories.map((category) => (
-                      <MenuItem key={category} value={category}>
-                        {category}
-                      </MenuItem>
-                    ))
-                  ]
-                )}
+                ))}
               </Select>
-              {categoriesError && (
-                <Typography variant="caption" sx={{ color: 'error.main', mt: 0.5 }}>
-                  GROUP015 마스터코드 로드에 실패했습니다.
-                </Typography>
-              )}
             </FormControl>
 
             <TextField
@@ -719,60 +751,50 @@ const OverviewTab = memo(
 
             <FormControl fullWidth>
               <InputLabel shrink>상태</InputLabel>
-              <Select value={softwareState.status} label="상태" onChange={handleFieldChange('status')} disabled={statusLoading}>
-                {statusLoading ? (
-                  <MenuItem disabled>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      로딩 중...
-                    </Typography>
-                  </MenuItem>
-                ) : statusError ? (
-                  <MenuItem disabled>
-                    <Typography variant="body2" sx={{ color: 'error.main' }}>
-                      데이터 로드 실패
-                    </Typography>
-                  </MenuItem>
-                ) : (
-                  masterStatusOptions.map((status) => {
-                    const getStatusColor = (statusName: string) => {
-                      switch (statusName) {
-                        case '대기':
-                          return { bgcolor: '#F5F5F5', color: '#757575' };
-                        case '진행':
-                          return { bgcolor: '#E3F2FD', color: '#1976D2' };
-                        case '사용중':
-                        case '완료':
-                          return { bgcolor: '#E8F5E9', color: '#388E3C' };
-                        case '홀딩':
-                        case '홀딩22':
-                          return { bgcolor: '#FFEBEE', color: '#D32F2F' };
-                        default:
-                          return { bgcolor: '#F5F5F5', color: '#757575' };
-                      }
-                    };
+              <Select
+                value={softwareState.status}
+                label="상태"
+                onChange={handleFieldChange('status')}
+                notched
+                renderValue={(selected) => {
+                  const item = statusTypesFromDB.find(s => s.subcode === selected);
+                  return item ? item.subcode_name : selected;
+                }}
+              >
+                {statusTypesFromDB.map((option) => {
+                  const getStatusColor = (statusName: string) => {
+                    switch (statusName) {
+                      case '대기':
+                        return { bgcolor: '#F5F5F5', color: '#757575' };
+                      case '진행':
+                      case '진행중':
+                        return { bgcolor: '#E3F2FD', color: '#1976D2' };
+                      case '사용중':
+                      case '완료':
+                        return { bgcolor: '#E8F5E9', color: '#388E3C' };
+                      case '홀딩':
+                        return { bgcolor: '#FFEBEE', color: '#D32F2F' };
+                      default:
+                        return { bgcolor: '#F5F5F5', color: '#757575' };
+                    }
+                  };
 
-                    return (
-                      <MenuItem key={status} value={status}>
-                        <Chip
-                          label={status}
-                          size="small"
-                          sx={{
-                            backgroundColor: getStatusColor(status).bgcolor,
-                            color: getStatusColor(status).color,
-                            fontSize: '13px',
-                            fontWeight: 400
-                          }}
-                        />
-                      </MenuItem>
-                    );
-                  })
-                )}
+                  return (
+                    <MenuItem key={option.subcode} value={option.subcode}>
+                      <Chip
+                        label={option.subcode_name}
+                        size="small"
+                        sx={{
+                          backgroundColor: getStatusColor(option.subcode_name).bgcolor,
+                          color: getStatusColor(option.subcode_name).color,
+                          fontSize: '13px',
+                          fontWeight: 400
+                        }}
+                      />
+                    </MenuItem>
+                  );
+                })}
               </Select>
-              {statusError && (
-                <Typography variant="caption" sx={{ color: 'error.main', mt: 0.5 }}>
-                  GROUP002 마스터코드 로드에 실패했습니다.
-                </Typography>
-              )}
             </FormControl>
           </Stack>
 
@@ -824,39 +846,21 @@ const OverviewTab = memo(
                 value={softwareState.licenseType}
                 label="라이센스유형"
                 onChange={handleFieldChange('licenseType')}
-                disabled={licenseLoading}
                 displayEmpty
+                notched
+                renderValue={(selected) => {
+                  if (!selected) return '선택';
+                  const item = licenseTypesFromDB.find(l => l.subcode === selected);
+                  return item ? item.subcode_name : selected;
+                }}
               >
-                {licenseLoading ? (
-                  <MenuItem disabled>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      로딩 중...
-                    </Typography>
+                <MenuItem value="">선택</MenuItem>
+                {licenseTypesFromDB.map((option) => (
+                  <MenuItem key={option.subcode} value={option.subcode}>
+                    {option.subcode_name}
                   </MenuItem>
-                ) : licenseError ? (
-                  <MenuItem disabled>
-                    <Typography variant="body2" sx={{ color: 'error.main' }}>
-                      데이터 로드 실패
-                    </Typography>
-                  </MenuItem>
-                ) : (
-                  [
-                    <MenuItem key="empty" value="">
-                      선택
-                    </MenuItem>,
-                    ...masterLicenseTypes.map((licenseType) => (
-                      <MenuItem key={licenseType} value={licenseType}>
-                        {licenseType}
-                      </MenuItem>
-                    ))
-                  ]
-                )}
+                ))}
               </Select>
-              {licenseError && (
-                <Typography variant="caption" sx={{ color: 'error.main', mt: 0.5 }}>
-                  GROUP016 마스터코드 로드에 실패했습니다.
-                </Typography>
-              )}
             </FormControl>
 
             <TextField
@@ -1380,6 +1384,9 @@ const UserHistoryTab = memo(
     // 로컬 사용자이력 상태
     const [userHistories, setUserHistories] = useState<UserHistory[]>(initialUserHistories);
 
+    // DB에서 직접 조회한 마스터코드 데이터
+    const [statusFromDB, setStatusFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+
     // DB에서 사용자이력 로드 (편집 모드인 경우)
     useEffect(() => {
       const loadUserHistories = async () => {
@@ -1400,6 +1407,30 @@ const UserHistoryTab = memo(
 
       loadUserHistories();
     }, [mode, softwareId]);
+
+    // GROUP044 상태 데이터 조회 (Dialog가 열릴 때마다)
+    useEffect(() => {
+      const fetchStatusData = async () => {
+        try {
+          const { data: group044Data } = await supabase
+            .from('admin_mastercode_data')
+            .select('subcode, subcode_name, subcode_order')
+            .eq('codetype', 'subcode')
+            .eq('group_code', 'GROUP044')
+            .eq('is_active', true)
+            .order('subcode_order', { ascending: true });
+
+          if (group044Data) {
+            setStatusFromDB(group044Data);
+            console.log('✅ [UserHistoryTab] GROUP044 상태 DB 조회 완료:', group044Data.length, '개');
+          }
+        } catch (error) {
+          console.error('❌ [UserHistoryTab] GROUP044 조회 실패:', error);
+        }
+      };
+
+      fetchStatusData();
+    }, []);
 
     // 사용자이력 변경 시 부모 컴포넌트에 알림
     useEffect(() => {
@@ -1546,6 +1577,10 @@ const UserHistoryTab = memo(
     };
 
     const handleAddHistory = () => {
+      // "대기" 상태의 subcode 찾기
+      const daegiStatus = statusFromDB.find((s) => s.subcode_name === '대기');
+      const defaultStatus = daegiStatus ? daegiStatus.subcode : '';
+
       const newHistory: UserHistory = {
         id: Date.now().toString(),
         registrationDate: new Date().toISOString().split('T')[0],
@@ -1556,7 +1591,7 @@ const UserHistoryTab = memo(
         startDate: new Date().toISOString().split('T')[0],
         endDate: '',
         reason: '',
-        status: 'active'
+        status: defaultStatus
       };
       setUserHistories([newHistory, ...userHistories]);
     };
@@ -1588,14 +1623,44 @@ const UserHistoryTab = memo(
       }
     };
 
-    const statusOptions = useMemo(() => ['사용중', '종료'], []);
-    const statusColors: Record<string, string> = useMemo(
-      () => ({
-        사용중: 'success',
-        종료: 'default'
-      }),
-      []
-    );
+    // DB에서 가져온 상태 옵션 (subcode_name 목록, "대기"가 먼저 오도록 정렬)
+    const statusOptions = useMemo(() => {
+      const options = statusFromDB.map((s) => s.subcode_name);
+      // "대기"를 맨 앞으로 이동
+      const daegiIndex = options.indexOf('대기');
+      if (daegiIndex > 0) {
+        options.splice(daegiIndex, 1);
+        options.unshift('대기');
+      }
+      return options;
+    }, [statusFromDB]);
+
+    // 상태별 색상 매핑 (동적 생성)
+    const statusColors: Record<string, { bgColor: string; color: string }> = useMemo(() => {
+      const colors: Record<string, { bgColor: string; color: string }> = {};
+      statusFromDB.forEach((s) => {
+        switch (s.subcode_name) {
+          case '대기':
+            colors[s.subcode_name] = { bgColor: '#F5F5F5', color: '#757575' };
+            break;
+          case '활성':
+          case '사용중':
+            colors[s.subcode_name] = { bgColor: '#E3F2FD', color: '#1976D2' };
+            break;
+          case '비활성':
+          case '종료':
+            colors[s.subcode_name] = { bgColor: '#fff8e1', color: '#f57c00' };
+            break;
+          case '취소':
+          case '홀딩':
+            colors[s.subcode_name] = { bgColor: '#FFEBEE', color: '#D32F2F' };
+            break;
+          default:
+            colors[s.subcode_name] = { bgColor: '#F5F5F5', color: '#757575' };
+        }
+      });
+      return colors;
+    }, [statusFromDB]);
 
     // 컬럼 너비 및 높이 정의 (편집/읽기 모드 공통)
     const columnWidths = useMemo(
@@ -1623,14 +1688,19 @@ const UserHistoryTab = memo(
 
       if (isEditing) {
         if (options) {
+          // 빈 값일 경우 "대기"를 기본값으로 설정
+          const displayValue = value || '대기';
+
           return (
             <Select
-              value={value}
+              value={displayValue}
               onChange={(e) => {
                 const newValue = e.target.value;
+                // subcode_name을 subcode로 변환하여 저장
                 if (field === 'status') {
-                  const newStatus = newValue === '사용중' ? 'active' : 'inactive';
-                  handleEditHistory(history.id, 'status', newStatus);
+                  const statusItem = statusFromDB.find((s) => s.subcode_name === newValue);
+                  const subcodeValue = statusItem ? statusItem.subcode : newValue;
+                  handleEditHistory(history.id, 'status', subcodeValue);
                 } else {
                   handleEditHistory(history.id, field as keyof UserHistory, newValue);
                 }
@@ -1651,7 +1721,20 @@ const UserHistoryTab = memo(
             >
               {options.map((option) => (
                 <MenuItem key={option} value={option}>
-                  {field === 'status' ? <Chip label={option} color={statusColors[option] as any} size="small" /> : option}
+                  {field === 'status' ? (
+                    <Chip
+                      label={option}
+                      size="small"
+                      sx={{
+                        bgcolor: statusColors[option]?.bgColor || '#F5F5F5',
+                        color: statusColors[option]?.color || '#757575',
+                        fontWeight: 500,
+                        border: 'none'
+                      }}
+                    />
+                  ) : (
+                    option
+                  )}
                 </MenuItem>
               ))}
             </Select>
@@ -1710,6 +1793,9 @@ const UserHistoryTab = memo(
 
       // 읽기 모드
       if (field === 'status') {
+        // 빈 값일 경우 "대기" 표시
+        const displayValue = value || '대기';
+
         return (
           <Box
             sx={{
@@ -1720,10 +1806,13 @@ const UserHistoryTab = memo(
             }}
           >
             <Chip
-              label={value}
-              color={statusColors[value] as any}
+              label={displayValue}
               size="small"
               sx={{
+                bgcolor: statusColors[displayValue]?.bgColor || '#F5F5F5',
+                color: statusColors[displayValue]?.color || '#757575',
+                fontWeight: 500,
+                border: 'none',
                 '&:hover': { opacity: 0.8 },
                 fontSize: '12px'
               }}
@@ -1851,7 +1940,14 @@ const UserHistoryTab = memo(
                     {renderEditableCell(history, 'reason', history.reason)}
                   </TableCell>
                   <TableCell sx={{ width: columnWidths.status }} onClick={() => handleCellClick(history.id, 'status')}>
-                    {renderEditableCell(history, 'status', history.status === 'active' ? '사용중' : '종료', statusOptions)}
+                    {(() => {
+                      // subcode를 subcode_name으로 변환 (빈 값이면 "대기")
+                      let statusName = history.status ? statusFromDB.find((s) => s.subcode === history.status)?.subcode_name : '';
+                      if (!statusName) {
+                        statusName = '대기';
+                      }
+                      return renderEditableCell(history, 'status', statusName, statusOptions);
+                    })()}
                   </TableCell>
                   <TableCell sx={{ width: columnWidths.startDate }} onClick={() => handleCellClick(history.id, 'startDate')}>
                     {renderEditableCell(history, 'startDate', history.startDate)}
@@ -1983,6 +2079,34 @@ const PurchaseMaintenanceTab = memo(
     onDeletePurchaseHistory: (id: number) => void;
     onEditPurchaseHistoryDataChange: (data: any) => void;
   }) => {
+    // Supabase 클라이언트 생성
+    const supabaseClient = React.useMemo(() => {
+      return createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+    }, []);
+
+    // DB에서 직접 가져온 유형 목록 state
+    const [historyTypesFromDB, setHistoryTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+
+    // Dialog가 열릴 때 DB에서 직접 조회
+    useEffect(() => {
+      const fetchMasterCodeData = async () => {
+        // GROUP017 유형 조회
+        const { data: group017Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP017')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+        setHistoryTypesFromDB(group017Data || []);
+      };
+
+      fetchMasterCodeData();
+    }, [supabaseClient]);
+
     // 설명을 기반으로 이력 타입 결정
     const getHistoryType = (description: string): 'purchase' | 'maintenance' | 'upgrade' | 'renewal' => {
       if (description.includes('유지보수')) return 'maintenance';
@@ -2354,23 +2478,38 @@ const PurchaseMaintenanceTab = memo(
       const fieldWidth = columnWidths[field as keyof typeof columnWidths] || 100;
 
       if (isEditing) {
-        if (options) {
+        if (field === 'type') {
+          // 유형 필드는 DB에서 가져온 데이터 사용
           return (
             <Select
               value={value}
               onChange={(e) => {
                 const newValue = e.target.value;
-                if (field === 'type') {
-                  const typeMapping: Record<string, string> = {
-                    구매: 'purchase',
-                    유지보수: 'maintenance',
-                    업그레이드: 'upgrade',
-                    갱신: 'renewal'
-                  };
-                  handleEditHistory(history.id, 'type', typeMapping[newValue] || newValue);
-                } else {
-                  handleEditHistory(history.id, field as keyof MaintenanceHistory, newValue);
-                }
+                handleEditHistory(history.id, 'type', newValue);
+              }}
+              onBlur={handleCellBlur}
+              size="small"
+              sx={{ width: '100%', minWidth: fieldWidth }}
+              autoFocus
+              renderValue={(selected) => {
+                const item = historyTypesFromDB.find(t => t.subcode === selected);
+                return item ? item.subcode_name : selected;
+              }}
+            >
+              {historyTypesFromDB.map((option) => (
+                <MenuItem key={option.subcode} value={option.subcode}>
+                  {option.subcode_name}
+                </MenuItem>
+              ))}
+            </Select>
+          );
+        } else if (options) {
+          return (
+            <Select
+              value={value}
+              onChange={(e) => {
+                const newValue = e.target.value;
+                handleEditHistory(history.id, field as keyof MaintenanceHistory, newValue);
               }}
               onBlur={handleCellBlur}
               size="small"

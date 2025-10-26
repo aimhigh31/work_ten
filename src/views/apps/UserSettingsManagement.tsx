@@ -53,7 +53,6 @@ import { taskData, taskStatusColors, assigneeAvatars } from 'data/task';
 import { TaskTableData, TaskStatus } from 'types/task';
 import { ThemeMode } from 'config';
 import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
-import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 
 // 변경로그 타입 정의
 interface ChangeLog {
@@ -2638,13 +2637,14 @@ export default function TaskManagement() {
   const [value, setValue] = useState(0);
 
   // Supabase 훅 사용
-  const { users, departments } = useCommonData(); // 🏪 공용 창고에서 가져오기
-  const { getSubCodesByGroup } = useSupabaseMasterCode3();
+  const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 가져오기
 
-  // 상태 타입 데이터
+  // 상태 타입 데이터 (GROUP042 - 사용자 상태: 대기, 활성, 비활성, 취소)
   const statusTypes = React.useMemo(() => {
-    return getSubCodesByGroup('GROUP002');
-  }, [getSubCodesByGroup]);
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP042' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
 
   // 공유 Tasks 상태
   const [tasks, setTasks] = useState<TaskTableData[]>(taskData);

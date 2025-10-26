@@ -49,7 +49,6 @@ import { itEducationData, itEducationStatusColors, itEducationStatusOptions, ass
 import { ITEducationTableData, ITEducationStatus } from 'types/it-education';
 import { useSupabaseItEducation, ItEducationData } from 'hooks/useSupabaseItEducation';
 import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
-import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { ThemeMode } from 'config';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
 import { ChangeLogData } from 'types/changelog';
@@ -1920,8 +1919,7 @@ export default function ITEducationManagement() {
 
   // Supabase 훅 사용
   const { loading, error, getItEducationData } = useSupabaseItEducation();
-  const { users, departments } = useCommonData(); // 🏪 공용 창고에서 가져오기
-  const { getSubCodesByGroup } = useSupabaseMasterCode3();
+  const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 가져오기
 
   // 🔍 디버깅: CommonData에서 받은 users 확인
   React.useEffect(() => {
@@ -1935,10 +1933,31 @@ export default function ITEducationManagement() {
     }
   }, [users]);
 
-  // 마스터코드에서 상태 옵션 가져오기
+  // 마스터코드에서 상태 옵션 가져오기 (GROUP002의 서브코드만 필터링)
   const statusTypes = React.useMemo(() => {
-    return getSubCodesByGroup('GROUP002');
-  }, [getSubCodesByGroup]);
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 마스터코드에서 교육유형 옵션 가져오기 (GROUP008의 서브코드만 필터링)
+  const educationTypesMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP008' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // subcode → subcode_name 변환 함수 (교육유형)
+  const getEducationTypeName = React.useCallback((subcode: string) => {
+    const found = educationTypesMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [educationTypesMap]);
+
+  // subcode → subcode_name 변환 함수 (상태)
+  const getStatusName = React.useCallback((subcode: string) => {
+    const found = statusTypes.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [statusTypes]);
 
   // 공유 Tasks 상태
   const [tasks, setTasks] = useState<ITEducationTableData[]>([]);

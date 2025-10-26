@@ -29,6 +29,7 @@ import { AddCircle, Trash } from '@wandersonalwes/iconsax-react';
 import { useSupabaseMasterCode3 } from '../hooks/useSupabaseMasterCode3';
 import { useSupabaseImprovements, CreateImprovementRequest } from '../hooks/useSupabaseImprovements';
 import { supabase } from '../lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 interface SecurityIncidentReportTabProps {
   incidentReport?: any;
@@ -269,7 +270,79 @@ const SecurityIncidentReportTab = memo(
       }
     }, [localImprovements, accidentId]);
 
-    // GROUP010의 서브코드들 가져오기 (대응단계)
+    // Supabase 클라이언트 생성
+    const supabaseClient = React.useMemo(() => {
+      return createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+    }, []);
+
+    // DB에서 직접 가져온 마스터코드 목록 state
+    const [responseStagesFromDB, setResponseStagesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+    const [discoveryMethodsFromDB, setDiscoveryMethodsFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+    const [reportMethodsFromDB, setReportMethodsFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+    const [serviceImpactsFromDB, setServiceImpactsFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+    const [responseMethodsFromDB, setResponseMethodsFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+
+    // Dialog가 열릴 때 DB에서 직접 조회
+    useEffect(() => {
+      const fetchMasterCodeData = async () => {
+        // GROUP010 대응단계 조회
+        const { data: group010Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP010')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+        setResponseStagesFromDB(group010Data || []);
+
+        // GROUP011 발견방법 조회
+        const { data: group011Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP011')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+        setDiscoveryMethodsFromDB(group011Data || []);
+
+        // GROUP014 보고방식 조회
+        const { data: group014Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP014')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+        setReportMethodsFromDB(group014Data || []);
+
+        // GROUP012 서비스/비즈니스영향도 조회
+        const { data: group012Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP012')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+        setServiceImpactsFromDB(group012Data || []);
+
+        // GROUP013 대응방식 조회
+        const { data: group013Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP013')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+        setResponseMethodsFromDB(group013Data || []);
+      };
+
+      fetchMasterCodeData();
+    }, [supabaseClient]);
+
+    // GROUP010의 서브코드들 가져오기 (대응단계) - 폴백용
     const responseStageOptions = useMemo(() => {
       const group010SubCodes = getSubCodesByGroup('GROUP010');
       console.log('🔍 GROUP010 서브코드 (대응단계):', group010SubCodes);
@@ -304,9 +377,14 @@ const SecurityIncidentReportTab = memo(
       return group014SubCodes.filter((subCode) => subCode.subcode_status === 'active');
     }, [getSubCodesByGroup]);
 
-    // 동적으로 생성된 stages 배열
+    // 동적으로 생성된 stages 배열 (DB 데이터 사용)
     const stages = useMemo(() => {
-      if (responseStageOptions.length > 0) {
+      if (responseStagesFromDB.length > 0) {
+        return responseStagesFromDB.map((option) => ({
+          key: option.subcode,
+          label: option.subcode_name
+        }));
+      } else if (responseStageOptions.length > 0) {
         return responseStageOptions.map((option) => ({
           key: option.subcode_name,
           label: option.subcode_name
@@ -321,7 +399,7 @@ const SecurityIncidentReportTab = memo(
           { key: '근본개선2', label: '근본개선2' }
         ];
       }
-    }, [responseStageOptions]);
+    }, [responseStagesFromDB, responseStageOptions]);
 
     // 단계별 정보 (동적으로 생성)
     const stageInfo = useMemo(() => {
@@ -846,7 +924,16 @@ const SecurityIncidentReportTab = memo(
             </Typography>
             <FormControl sx={{ minWidth: 120 }}>
               <InputLabel size="small">대응 단계 변경</InputLabel>
-              <Select size="small" value={currentStage} label="대응 단계 변경" onChange={(e) => handleStageChange(e.target.value)}>
+              <Select
+                size="small"
+                value={currentStage}
+                label="대응 단계 변경"
+                onChange={(e) => handleStageChange(e.target.value)}
+                renderValue={(selected) => {
+                  const stage = stages.find(s => s.key === selected);
+                  return stage ? stage.label : selected;
+                }}
+              >
                 {stages.map((stage) => (
                   <MenuItem key={stage.key} value={stage.key}>
                     {stage.label}
@@ -967,6 +1054,7 @@ const SecurityIncidentReportTab = memo(
                       value={incidentReport.discoverer || ''}
                       onChange={handleFieldChange('discoverer')}
                       size="small"
+                      InputLabelProps={{ shrink: true }}
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           backgroundColor: '#ffffff'
@@ -976,29 +1064,25 @@ const SecurityIncidentReportTab = memo(
                   </Grid>
                   <Grid item xs={6}>
                     <FormControl fullWidth size="small">
-                      <InputLabel>발견방법</InputLabel>
-                      <Select value={incidentReport.discoveryMethod || ''} onChange={handleFieldChange('discoveryMethod')} label="발견방법">
-                        {discoveryMethodOptions.length > 0
-                          ? discoveryMethodOptions.map((option) => (
-                              <MenuItem key={option.subcode} value={option.subcode_name}>
-                                {option.subcode_name}
-                              </MenuItem>
-                            ))
-                          : // 마스터코드 로딩 중 기본값
-                            [
-                              <MenuItem key="auto" value="시스템 자동탐지">
-                                시스템 자동탐지
-                              </MenuItem>,
-                              <MenuItem key="user" value="사용자신고">
-                                사용자신고
-                              </MenuItem>,
-                              <MenuItem key="external" value="외부제보">
-                                외부제보
-                              </MenuItem>,
-                              <MenuItem key="regular" value="정기모니터링">
-                                정기모니터링
-                              </MenuItem>
-                            ]}
+                      <InputLabel shrink>발견방법</InputLabel>
+                      <Select
+                        value={incidentReport.discoveryMethod || ''}
+                        onChange={handleFieldChange('discoveryMethod')}
+                        label="발견방법"
+                        notched
+                        displayEmpty
+                        renderValue={(selected) => {
+                          if (!selected) return '선택';
+                          const item = discoveryMethodsFromDB.find(m => m.subcode === selected);
+                          return item ? item.subcode_name : selected;
+                        }}
+                      >
+                        <MenuItem value="">선택</MenuItem>
+                        {discoveryMethodsFromDB.map((option) => (
+                          <MenuItem key={option.subcode} value={option.subcode}>
+                            {option.subcode_name}
+                          </MenuItem>
+                        ))}
                       </Select>
                     </FormControl>
                   </Grid>
@@ -1020,6 +1104,7 @@ const SecurityIncidentReportTab = memo(
                       value={incidentReport.reporter || ''}
                       onChange={handleFieldChange('reporter')}
                       size="small"
+                      InputLabelProps={{ shrink: true }}
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           backgroundColor: '#ffffff'
@@ -1029,32 +1114,25 @@ const SecurityIncidentReportTab = memo(
                   </Grid>
                   <Grid item xs={6}>
                     <FormControl fullWidth size="small">
-                      <InputLabel>보고방식</InputLabel>
-                      <Select value={incidentReport.reportMethod || ''} onChange={handleFieldChange('reportMethod')} label="보고방식">
-                        {reportMethodOptions.length > 0
-                          ? reportMethodOptions.map((option) => (
-                              <MenuItem key={option.subcode} value={option.subcode_name}>
-                                {option.subcode_name}
-                              </MenuItem>
-                            ))
-                          : // 마스터코드 로딩 중 기본값
-                            [
-                              <MenuItem key="verbal" value="구두">
-                                구두
-                              </MenuItem>,
-                              <MenuItem key="written" value="서면">
-                                서면
-                              </MenuItem>,
-                              <MenuItem key="approval" value="품의">
-                                품의
-                              </MenuItem>,
-                              <MenuItem key="system" value="전산시스템">
-                                전산시스템
-                              </MenuItem>,
-                              <MenuItem key="email" value="이메일2">
-                                이메일2
-                              </MenuItem>
-                            ]}
+                      <InputLabel shrink>보고방식</InputLabel>
+                      <Select
+                        value={incidentReport.reportMethod || ''}
+                        onChange={handleFieldChange('reportMethod')}
+                        label="보고방식"
+                        notched
+                        displayEmpty
+                        renderValue={(selected) => {
+                          if (!selected) return '선택';
+                          const item = reportMethodsFromDB.find(m => m.subcode === selected);
+                          return item ? item.subcode_name : selected;
+                        }}
+                      >
+                        <MenuItem value="">선택</MenuItem>
+                        {reportMethodsFromDB.map((option) => (
+                          <MenuItem key={option.subcode} value={option.subcode}>
+                            {option.subcode_name}
+                          </MenuItem>
+                        ))}
                       </Select>
                     </FormControl>
                   </Grid>
@@ -1080,6 +1158,7 @@ const SecurityIncidentReportTab = memo(
                       value={incidentReport.incidentTarget || ''}
                       onChange={handleFieldChange('incidentTarget')}
                       size="small"
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
                   <Grid item xs={6}>
@@ -1089,6 +1168,7 @@ const SecurityIncidentReportTab = memo(
                       value={incidentReport.incidentCause || ''}
                       onChange={handleFieldChange('incidentCause')}
                       size="small"
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
                   <Grid item xs={6}>
@@ -1099,6 +1179,7 @@ const SecurityIncidentReportTab = memo(
                       onChange={handleFieldChange('affectedSystems')}
                       multiline
                       rows={2}
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
                   <Grid item xs={6}>
@@ -1109,75 +1190,54 @@ const SecurityIncidentReportTab = memo(
                       onChange={handleFieldChange('affectedData')}
                       multiline
                       rows={2}
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
                   <Grid item xs={6}>
                     <FormControl fullWidth size="small">
-                      <InputLabel>서비스 영향도</InputLabel>
+                      <InputLabel shrink>서비스 영향도</InputLabel>
                       <Select
                         value={incidentReport.serviceImpact || ''}
                         onChange={handleFieldChange('serviceImpact')}
                         label="서비스 영향도"
+                        notched
+                        displayEmpty
+                        renderValue={(selected) => {
+                          if (!selected) return '선택';
+                          const item = serviceImpactsFromDB.find(m => m.subcode === selected);
+                          return item ? item.subcode_name : selected;
+                        }}
                       >
-                        {serviceImpactOptions.length > 0
-                          ? serviceImpactOptions.map((option) => (
-                              <MenuItem key={option.subcode} value={option.subcode_name}>
-                                {option.subcode_name}
-                              </MenuItem>
-                            ))
-                          : // 마스터코드 로딩 중 기본값
-                            [
-                              <MenuItem key="none" value="없음">
-                                없음
-                              </MenuItem>,
-                              <MenuItem key="low" value="낮음">
-                                낮음
-                              </MenuItem>,
-                              <MenuItem key="medium" value="중간">
-                                중간
-                              </MenuItem>,
-                              <MenuItem key="high" value="높음">
-                                높음
-                              </MenuItem>,
-                              <MenuItem key="critical" value="심각2">
-                                심각2
-                              </MenuItem>
-                            ]}
+                        <MenuItem value="">선택</MenuItem>
+                        {serviceImpactsFromDB.map((option) => (
+                          <MenuItem key={option.subcode} value={option.subcode}>
+                            {option.subcode_name}
+                          </MenuItem>
+                        ))}
                       </Select>
                     </FormControl>
                   </Grid>
                   <Grid item xs={6}>
                     <FormControl fullWidth size="small">
-                      <InputLabel>비즈니스 영향도</InputLabel>
+                      <InputLabel shrink>비즈니스 영향도</InputLabel>
                       <Select
                         value={incidentReport.businessImpact || ''}
                         onChange={handleFieldChange('businessImpact')}
                         label="비즈니스 영향도"
+                        notched
+                        displayEmpty
+                        renderValue={(selected) => {
+                          if (!selected) return '선택';
+                          const item = serviceImpactsFromDB.find(m => m.subcode === selected);
+                          return item ? item.subcode_name : selected;
+                        }}
                       >
-                        {serviceImpactOptions.length > 0
-                          ? serviceImpactOptions.map((option) => (
-                              <MenuItem key={option.subcode} value={option.subcode_name}>
-                                {option.subcode_name}
-                              </MenuItem>
-                            ))
-                          : // 마스터코드 로딩 중 기본값
-                            [
-                              <MenuItem key="none" value="없음">
-                                없음
-                              </MenuItem>,
-                              <MenuItem key="low" value="낮음">
-                                낮음
-                              </MenuItem>,
-                              <MenuItem key="medium" value="중간">
-                                중간
-                              </MenuItem>,
-                              <MenuItem key="high" value="높음">
-                                높음
-                              </MenuItem>,
-                              <MenuItem key="critical" value="심각2">
-                                심각2
-                              </MenuItem>
-                            ]}
+                        <MenuItem value="">선택</MenuItem>
+                        {serviceImpactsFromDB.map((option) => (
+                          <MenuItem key={option.subcode} value={option.subcode}>
+                            {option.subcode_name}
+                          </MenuItem>
+                        ))}
                       </Select>
                     </FormControl>
                   </Grid>
@@ -1190,6 +1250,7 @@ const SecurityIncidentReportTab = memo(
                       multiline
                       rows={3}
                       placeholder="현재 상황에 대한 상세 설명을 입력하세요"
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
                 </Grid>
@@ -1209,32 +1270,25 @@ const SecurityIncidentReportTab = memo(
                 <Grid container spacing={2}>
                   <Grid item xs={4}>
                     <FormControl fullWidth size="small">
-                      <InputLabel>대응방식</InputLabel>
-                      <Select value={incidentReport.responseMethod || ''} onChange={handleFieldChange('responseMethod')} label="대응방식">
-                        {responseMethodOptions.length > 0
-                          ? responseMethodOptions.map((option) => (
-                              <MenuItem key={option.subcode} value={option.subcode_name}>
-                                {option.subcode_name}
-                              </MenuItem>
-                            ))
-                          : // 마스터코드 로딩 중 기본값
-                            [
-                              <MenuItem key="isolation" value="격리">
-                                격리
-                              </MenuItem>,
-                              <MenuItem key="block" value="차단">
-                                차단
-                              </MenuItem>,
-                              <MenuItem key="restore" value="복구">
-                                복구
-                              </MenuItem>,
-                              <MenuItem key="monitor" value="모니터링2">
-                                모니터링2
-                              </MenuItem>,
-                              <MenuItem key="patch" value="패치">
-                                패치
-                              </MenuItem>
-                            ]}
+                      <InputLabel shrink>대응방식</InputLabel>
+                      <Select
+                        value={incidentReport.responseMethod || ''}
+                        onChange={handleFieldChange('responseMethod')}
+                        label="대응방식"
+                        notched
+                        displayEmpty
+                        renderValue={(selected) => {
+                          if (!selected) return '선택';
+                          const item = responseMethodsFromDB.find(m => m.subcode === selected);
+                          return item ? item.subcode_name : selected;
+                        }}
+                      >
+                        <MenuItem value="">선택</MenuItem>
+                        {responseMethodsFromDB.map((option) => (
+                          <MenuItem key={option.subcode} value={option.subcode}>
+                            {option.subcode_name}
+                          </MenuItem>
+                        ))}
                       </Select>
                     </FormControl>
                   </Grid>
@@ -1245,6 +1299,7 @@ const SecurityIncidentReportTab = memo(
                       value={incidentReport.improvementExecutor || ''}
                       onChange={handleFieldChange('improvementExecutor')}
                       size="small"
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
                   <Grid item xs={4}>
@@ -1267,6 +1322,7 @@ const SecurityIncidentReportTab = memo(
                       multiline
                       rows={3}
                       placeholder="개선 조치 계획에 대한 상세 설명을 입력하세요"
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
                 </Grid>
@@ -1302,6 +1358,7 @@ const SecurityIncidentReportTab = memo(
                       value={incidentReport.completionApprover || ''}
                       onChange={handleFieldChange('completionApprover')}
                       size="small"
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
                   <Grid item xs={12}>
@@ -1313,6 +1370,7 @@ const SecurityIncidentReportTab = memo(
                       multiline
                       rows={3}
                       placeholder="문제 해결 방법에 대한 상세 설명을 입력하세요"
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
                 </Grid>
@@ -1468,6 +1526,7 @@ const SecurityIncidentReportTab = memo(
                     multiline
                     rows={3}
                     placeholder="재발 방지를 위한 종합적인 대책을 상세히 입력하세요"
+                    InputLabelProps={{ shrink: true }}
                   />
                 </Box>
               </Paper>

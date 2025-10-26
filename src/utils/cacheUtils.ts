@@ -14,10 +14,22 @@ export const DEFAULT_CACHE_EXPIRY_MS = 30 * 60 * 1000;
 const MAX_CACHE_SIZE_BYTES = 2 * 1024 * 1024;
 
 /**
- * 캐시 키 생성 (접두사 추가로 충돌 방지)
+ * 🔢 캐시 버전 관리
+ *
+ * 스키마 변경, 데이터 구조 변경 시 이 버전을 1 증가시키면
+ * 모든 기존 캐시가 자동으로 무효화됩니다.
+ *
+ * 변경 이력:
+ * - v1: 초기 버전
+ * - v2: assigned_roles → assignedRole 필드 변경 (2025-10-21)
+ */
+const CACHE_VERSION = 2;
+
+/**
+ * 캐시 키 생성 (접두사 + 버전 추가로 충돌 방지 및 자동 무효화)
  */
 export function createCacheKey(hookName: string, suffix: string = 'data'): string {
-  return `nexwork_cache_${hookName}_${suffix}`;
+  return `nexwork_cache_v${CACHE_VERSION}_${hookName}_${suffix}`;
 }
 
 /**
@@ -249,15 +261,29 @@ export function logCacheStats(): void {
 }
 
 /**
- * 만료된 캐시 자동 정리 (앱 시작 시 호출 권장)
+ * 만료된 캐시 및 오래된 버전 캐시 자동 정리 (앱 시작 시 호출 권장)
  */
 export function cleanupExpiredCache(): void {
   try {
     const keys = Object.keys(sessionStorage);
-    const timestampKeys = keys.filter((key) => key.startsWith('nexwork_cache_') && key.endsWith('_timestamp'));
+    const allNexworkKeys = keys.filter((key) => key.startsWith('nexwork_cache_'));
 
-    let cleanedCount = 0;
+    let expiredCount = 0;
+    let oldVersionCount = 0;
     const now = Date.now();
+
+    // 1️⃣ 오래된 버전 캐시 삭제 (v1, v0 등)
+    const currentVersionPrefix = `nexwork_cache_v${CACHE_VERSION}_`;
+    allNexworkKeys.forEach((key) => {
+      // 현재 버전이 아닌 캐시 삭제
+      if (!key.startsWith(currentVersionPrefix)) {
+        sessionStorage.removeItem(key);
+        oldVersionCount++;
+      }
+    });
+
+    // 2️⃣ 만료된 캐시 삭제 (현재 버전만)
+    const timestampKeys = keys.filter((key) => key.startsWith(currentVersionPrefix) && key.endsWith('_timestamp'));
 
     timestampKeys.forEach((timestampKey) => {
       const cacheKey = timestampKey.replace('_timestamp', '');
@@ -266,14 +292,18 @@ export function cleanupExpiredCache(): void {
       // 30분 초과된 캐시 삭제
       if (now - timestamp > DEFAULT_CACHE_EXPIRY_MS) {
         clearCache(cacheKey);
-        cleanedCount++;
+        expiredCount++;
       }
     });
 
-    if (cleanedCount > 0) {
-      console.log(`🧹 [Cache] 만료된 캐시 ${cleanedCount}개 정리 완료`);
+    if (oldVersionCount > 0 || expiredCount > 0) {
+      console.log(`🧹 [Cache] 캐시 정리 완료`, {
+        오래된_버전: `${oldVersionCount}개`,
+        만료된_캐시: `${expiredCount}개`,
+        현재_버전: `v${CACHE_VERSION}`
+      });
     }
   } catch (err) {
-    console.error('❌ [Cache] 만료 캐시 정리 실패', err);
+    console.error('❌ [Cache] 캐시 정리 실패', err);
   }
 }

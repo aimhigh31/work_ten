@@ -48,6 +48,7 @@ interface ChecklistEditorItem {
 }
 import { useOptimizedInput } from '../hooks/useDebounce';
 import { useSupabaseMasterCode3 } from '../hooks/useSupabaseMasterCode3';
+import supabase from '../lib/supabaseClient';
 import useUser from '../hooks/useUser';
 import { useCommonData } from '../contexts/CommonDataContext';
 import { useSupabaseChecklistEditor } from '../hooks/useSupabaseChecklistEditor';
@@ -173,6 +174,49 @@ const OverviewTab = memo(
     // TextField 직접 참조를 위한 ref
     const workContentRef = useRef<HTMLInputElement>(null);
     const descriptionRef = useRef<HTMLTextAreaElement>(null);
+
+    // DB에서 직접 조회한 마스터코드 데이터
+    const [categoriesFromDB, setCategoriesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+    const [statusTypesFromDB, setStatusTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+
+    // Dialog가 열릴 때마다 DB에서 최신 마스터코드 데이터 조회
+    useEffect(() => {
+      const fetchMasterCodeData = async () => {
+        try {
+          // GROUP006: 체크리스트분류
+          const { data: group006Data } = await supabase
+            .from('admin_mastercode_data')
+            .select('subcode, subcode_name, subcode_order')
+            .eq('codetype', 'subcode')
+            .eq('group_code', 'GROUP006')
+            .eq('is_active', true)
+            .order('subcode_order', { ascending: true });
+
+          if (group006Data) {
+            setCategoriesFromDB(group006Data);
+            console.log('✅ [ChecklistOverviewTab] GROUP006 체크리스트분류 DB 조회 완료:', group006Data.length, '개');
+          }
+
+          // GROUP002: 상태
+          const { data: group002Data } = await supabase
+            .from('admin_mastercode_data')
+            .select('subcode, subcode_name, subcode_order')
+            .eq('codetype', 'subcode')
+            .eq('group_code', 'GROUP002')
+            .eq('is_active', true)
+            .order('subcode_order', { ascending: true });
+
+          if (group002Data) {
+            setStatusTypesFromDB(group002Data);
+            console.log('✅ [ChecklistOverviewTab] GROUP002 상태 DB 조회 완료:', group002Data.length, '개');
+          }
+        } catch (error) {
+          console.error('❌ [ChecklistOverviewTab] 마스터코드 조회 실패:', error);
+        }
+      };
+
+      fetchMasterCodeData();
+    }, []);
 
     // 텍스트 필드용 최적화된 입력 관리
     const workContentInput = useOptimizedInput(taskState.workContent, 300);
@@ -301,26 +345,35 @@ const OverviewTab = memo(
                 value={taskState.department}
                 label="체크리스트분류"
                 onChange={handleFieldChange('department')}
-                disabled={masterCodeLoading}
+                displayEmpty
+                notched
+                renderValue={(selected) => {
+                  if (!selected) return '선택';
+                  const item = categoriesFromDB.find((c) => c.subcode === selected);
+                  return item ? item.subcode_name : selected;
+                }}
               >
-                {masterCodeLoading ? (
-                  <MenuItem value="">로딩 중...</MenuItem>
-                ) : checklistCategories.length === 0 ? (
-                  <MenuItem value="">옵션 없음</MenuItem>
-                ) : (
-                  checklistCategories.map((category) => (
-                    <MenuItem key={category.value} value={category.value}>
-                      {category.label}
-                    </MenuItem>
-                  ))
-                )}
+                <MenuItem value="">선택</MenuItem>
+                {categoriesFromDB.map((option) => (
+                  <MenuItem key={option.subcode} value={option.subcode}>
+                    {option.subcode_name}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
 
             <FormControl fullWidth>
               <InputLabel shrink>상태</InputLabel>
-              <Select value={taskState.status} label="상태" onChange={handleFieldChange('status')}>
-                {statusOptions.map((status) => {
+              <Select
+                value={taskState.status}
+                label="상태"
+                onChange={handleFieldChange('status')}
+                displayEmpty
+                notched
+                renderValue={(selected) => {
+                  if (!selected) return '';
+                  const item = statusTypesFromDB.find((s) => s.subcode === selected);
+                  const statusName = item ? item.subcode_name : selected;
                   const getStatusStyle = (statusName: string) => {
                     switch (statusName) {
                       case '완료':
@@ -337,11 +390,45 @@ const OverviewTab = memo(
                         return { color: '#000000', backgroundColor: '#F5F5F5' };
                     }
                   };
-
-                  const statusStyle = getStatusStyle(status);
-
+                  const statusStyle = getStatusStyle(statusName);
                   return (
-                    <MenuItem key={status} value={status}>
+                    <Box
+                      sx={{
+                        px: 2,
+                        py: 0.5,
+                        borderRadius: 2,
+                        backgroundColor: statusStyle.backgroundColor,
+                        color: statusStyle.color,
+                        fontWeight: 500,
+                        fontSize: '12px',
+                        display: 'inline-block'
+                      }}
+                    >
+                      {statusName}
+                    </Box>
+                  );
+                }}
+              >
+                {statusTypesFromDB.map((option) => {
+                  const getStatusStyle = (statusName: string) => {
+                    switch (statusName) {
+                      case '완료':
+                        return { color: '#4CAF50', backgroundColor: '#E8F5E9' };
+                      case '대기':
+                        return { color: '#9E9E9E', backgroundColor: '#F5F5F5' };
+                      case '진행':
+                        return { color: '#2196F3', backgroundColor: '#E3F2FD' };
+                      case '홀딩':
+                        return { color: '#F44336', backgroundColor: '#FFEBEE' };
+                      case '취소':
+                        return { color: '#F44336', backgroundColor: '#FFEBEE' };
+                      default:
+                        return { color: '#000000', backgroundColor: '#F5F5F5' };
+                    }
+                  };
+                  const statusStyle = getStatusStyle(option.subcode_name);
+                  return (
+                    <MenuItem key={option.subcode} value={option.subcode}>
                       <Box
                         sx={{
                           px: 2,
@@ -354,7 +441,7 @@ const OverviewTab = memo(
                           display: 'inline-block'
                         }}
                       >
-                        {status}
+                        {option.subcode_name}
                       </Box>
                     </MenuItem>
                   );

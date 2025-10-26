@@ -70,7 +70,6 @@ import { Folder, DocumentText, Element, Calendar } from '@wandersonalwes/iconsax
 // hooks
 import { useSupabaseSecurityRegulation } from 'hooks/useSupabaseSecurityRegulation';
 import { useSupabaseSecurityRevision } from 'hooks/useSupabaseSecurityRevision';
-import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
 import useUser from 'hooks/useUser';
 import { useSupabaseFeedback } from 'hooks/useSupabaseFeedback';
@@ -267,7 +266,15 @@ interface FolderTreeProps {
 
 const FolderTree = React.memo(({ data, level = 0, selectedItem, onSelectItem, onDeleteItem }: FolderTreeProps) => {
   const theme = useTheme();
-  const [expandedFolders, setExpandedFolders] = React.useState<Set<string>>(new Set([]));
+  const [expandedFolders, setExpandedFolders] = React.useState<Set<string>>(new Set());
+
+  // 최상위 레벨 폴더들을 자동으로 펼침
+  React.useEffect(() => {
+    if (level === 0 && data.length > 0) {
+      const allFolderIds = data.filter(item => item.type === 'folder').map(item => item.id);
+      setExpandedFolders(new Set(allFolderIds));
+    }
+  }, [data, level]);
 
   const toggleFolder = React.useCallback((folderId: string) => {
     setExpandedFolders((prev) => {
@@ -545,15 +552,16 @@ const OverviewTab = React.memo(
           {/* 보안문서유형-상태 - 2등분 배치 */}
           <Stack direction="row" spacing={2}>
             <FormControl fullWidth variant="outlined">
-              <InputLabel id="document-type-label">
+              <InputLabel id="document-type-label" shrink>
                 보안문서유형 <span style={{ color: 'red' }}>*</span>
               </InputLabel>
               <Select
                 labelId="document-type-label"
                 value={documentType}
                 onChange={handleDocumentTypeChange}
-                label="보안문서유형"
+                label="보안문서유형 *"
                 displayEmpty
+                notched
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     '&:hover fieldset': {
@@ -2149,7 +2157,7 @@ function FolderView({
         description: '',
         code: secDocCode,
         status: '대기',
-        document_type: '보안규정',
+        document_type: '',
         team: user ? user.department : '', // 로그인한 사용자의 부서를 팀으로 설정
         assignee: user ? user.name : '' // 로그인한 사용자의 이름을 담당자로 설정
       };
@@ -4828,11 +4836,8 @@ export default function TaskManagement() {
   // Supabase Security Revision 훅 (칸반 팝업창용)
   const { revisions, fetchRevisions } = useSupabaseSecurityRevision();
 
-  // 마스터코드 훅 (GROUP007 서브코드 가져오기)
-  const { getSubCodesByGroup } = useSupabaseMasterCode3();
-
   // 사용자 및 부서 데이터
-  const { users, departments } = useCommonData(); // 🏪 공용 창고에서 가져오기
+  const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 가져오기
 
   // 로그인한 사용자 정보
   const user = useUser();
@@ -4844,15 +4849,19 @@ export default function TaskManagement() {
     return users.find((u) => u.email === session.user.email);
   }, [session, users]);
 
-  // GROUP007 서브코드 목록 (문서유형용)
+  // GROUP007 서브코드 목록 (문서유형용) - masterCodes에서 필터링
   const documentTypes = React.useMemo(() => {
-    return getSubCodesByGroup('GROUP007');
-  }, [getSubCodesByGroup]);
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP007' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
 
-  // GROUP002 서브코드 목록 (상태용)
+  // GROUP002 서브코드 목록 (상태용) - masterCodes에서 필터링
   const statusTypes = React.useMemo(() => {
-    return getSubCodesByGroup('GROUP002');
-  }, [getSubCodesByGroup]);
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
 
   // 활성 사용자 목록 (담당자용)
   const assigneeList = React.useMemo(() => {

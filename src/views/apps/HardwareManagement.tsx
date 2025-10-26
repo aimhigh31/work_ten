@@ -52,7 +52,6 @@ import { ThemeMode } from 'config';
 // Supabase hook
 import { useSupabaseHardware, HardwareData } from 'hooks/useSupabaseHardware';
 import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
-import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
 import { ChangeLogData } from 'types/changelog';
 import { createClient } from '@/lib/supabase/client';
@@ -1988,8 +1987,9 @@ export default function HardwareManagement() {
   const theme = useTheme();
   const [value, setValue] = useState(0);
 
-  // ⭐ Investment 패턴: 데이터 로딩 함수만 가져오기
+  // ⭐ Investment 패턴: 데이터 로딩 함수만 가져오기 (KPI 패턴 적용)
   const {
+    hardware: hardwareFromHook,
     getHardware,
     createHardware,
     updateHardware,
@@ -1999,10 +1999,7 @@ export default function HardwareManagement() {
     error
   } = useSupabaseHardware();
   const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 모두 가져오기
-  const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
-  // ⭐ 페이지 레벨 상태 관리
-  const [hardware, setHardware] = useState<HardwareData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // 변경로그 Supabase 훅
@@ -2018,18 +2015,14 @@ export default function HardwareManagement() {
         setIsLoading(true);
 
         // ⚡ hardware만 로딩! (users, departments, masterCodes는 CommonData에 이미 있음)
-        const hardwareData = await getHardware();
+        await getHardware(); // ✅ 훅 내부에서 setHardware 호출됨 (KPI 패턴)
 
         console.timeEnd('⚡ HardwareManagement - 페이지 데이터 로딩');
-
-        // 상태 업데이트
-        setHardware(hardwareData);
 
         console.log('✅ HardwareManagement 로딩 완료', {
           users: users.length,
           departments: departments.length,
-          masterCodes: masterCodes.length,
-          hardware: hardwareData.length
+          masterCodes: masterCodes.length
         });
       } catch (error) {
         console.error('❌ 데이터 로딩 실패:', error);
@@ -2041,10 +2034,31 @@ export default function HardwareManagement() {
     loadAllData();
   }, [getHardware]); // ⚡ hardware만 로딩 (나머지는 CommonData 사용)
 
-  // 마스터코드에서 상태 옵션 가져오기
+  // 마스터코드에서 상태 옵션 가져오기 (GROUP002의 서브코드만 필터링)
   const statusTypes = React.useMemo(() => {
-    return getSubCodesByGroup('GROUP002');
-  }, [getSubCodesByGroup]);
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 마스터코드에서 자산분류 옵션 가져오기 (GROUP018의 서브코드만 필터링)
+  const assetCategoriesMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP018' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // subcode → subcode_name 변환 함수 (자산분류)
+  const getAssetCategoryName = React.useCallback((subcode: string) => {
+    const found = assetCategoriesMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [assetCategoriesMap]);
+
+  // subcode → subcode_name 변환 함수 (상태)
+  const getStatusName = React.useCallback((subcode: string) => {
+    const found = statusTypes.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [statusTypes]);
 
   // 공유 Tasks 상태 - Supabase 데이터를 HardwareTableData 형식으로 변환
   const [tasks, setTasks] = useState<HardwareTableData[]>([]);
@@ -2100,15 +2114,15 @@ export default function HardwareManagement() {
   // Supabase 데이터가 변경되면 tasks 상태 업데이트 (즉시 렌더링)
   useEffect(() => {
     console.log('🔍 Supabase 하드웨어 데이터 상태:', {
-      length: hardware.length,
+      length: hardwareFromHook.length,
       error,
-      sampleData: hardware.slice(0, 2)
+      sampleData: hardwareFromHook.slice(0, 2)
     });
 
-    const convertedTasks = hardware.map(convertHardwareToTask);
+    const convertedTasks = hardwareFromHook.map(convertHardwareToTask);
     setTasks(convertedTasks);
     console.log('🔄 Supabase 하드웨어 데이터를 HardwareTableData로 변환 완료:', convertedTasks.length + '개');
-  }, [hardware, error]);
+  }, [hardwareFromHook, error]);
 
   // currentUser 찾기 (email 기반)
   const currentUser = React.useMemo(() => {
@@ -2273,14 +2287,12 @@ export default function HardwareManagement() {
 
         await updateHardware(Number(updatedHardware.id), hardwareData);
 
-        // Supabase에서 최신 데이터 다시 불러오기
-        await fetchHardware();
-
+        // ✅ updateHardware가 내부에서 setHardware 호출 (KPI 패턴)
         console.log('✅ 하드웨어 업데이트 성공');
       } else {
         // 새로 생성 - HardwareRecord를 Supabase 형식으로 변환
         const hardwareData: any = {
-          code: updatedHardware.code || `HW-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9999)).padStart(4, '0')}`,
+          code: updatedHardware.code, // 다이얼로그에서 생성된 코드 사용
           team: updatedHardware.team || '개발팀', // 팀 필드 매핑
           department: 'IT', // 기본값
           work_content: updatedHardware.assetName || '신규 하드웨어',
@@ -2321,11 +2333,7 @@ export default function HardwareManagement() {
         const createdHardware = await createHardware(hardwareData);
         console.log('🚀 createHardware 함수 호출 완료:', createdHardware);
 
-        // Supabase에서 최신 데이터 다시 불러오기
-        console.log('🔄 fetchHardware 호출 시작...');
-        await fetchHardware();
-        console.log('🔄 fetchHardware 호출 완료');
-
+        // ✅ createHardware가 내부에서 setHardware 호출 (KPI 패턴)
         console.log('✅ 하드웨어 생성 성공');
         addChangeLog('하드웨어 생성', hardwareData.code, `새로운 하드웨어가 생성되었습니다: ${updatedHardware.assetName}`, '개발팀');
       }

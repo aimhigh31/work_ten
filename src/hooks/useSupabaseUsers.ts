@@ -32,7 +32,6 @@ export interface SimpleUser {
   metadata?: any;
   assignedRole?: string[];
   assigned_roles?: any;
-  rule?: string;
 }
 
 export function useSupabaseUsers() {
@@ -40,13 +39,11 @@ export function useSupabaseUsers() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 사용자 목록 조회 (활성화된 사용자만)
+  // 사용자 목록 조회
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-
-      console.log('👥 사용자 목록 조회 시작');
 
       const { data, error: fetchError } = await supabase
         .from('admin_users_userprofiles')
@@ -54,32 +51,47 @@ export function useSupabaseUsers() {
         .order('created_at', { ascending: false });
 
       if (fetchError) {
-        console.error('🔴 사용자 조회 오류:', {
-          message: fetchError.message,
-          details: fetchError.details,
-          hint: fetchError.hint,
-          code: fetchError.code,
-          full: fetchError
-        });
+        console.warn('⚠️ 사용자 조회 오류:', fetchError.message);
         throw fetchError;
       }
 
-      console.log('👥 사용자 목록 조회 성공:', data);
-      if (data && data.length > 0) {
-        console.log('👥 첫 번째 사용자 샘플 데이터:', {
-          user_name: data[0].user_name,
-          user_account_id: data[0].user_account_id,
-          department: data[0].department,
-          position: data[0].position,
-          phone: data[0].phone,
-          country: data[0].country,
-          address: data[0].address
-        });
-      }
-      setUsers(data || []);
-      saveToCache(CACHE_KEY, data || []); // 캐시에 저장
+      // assigned_roles를 assignedRole로 변환
+      const processedData = (data || []).map((row) => {
+        let assignedRole = [];
+        try {
+          if (row.assigned_roles) {
+            // 이미 배열인 경우 그대로 사용
+            if (Array.isArray(row.assigned_roles)) {
+              assignedRole = row.assigned_roles;
+            }
+            // 문자열인 경우 JSON 파싱 시도
+            else if (typeof row.assigned_roles === 'string') {
+              if (row.assigned_roles.startsWith('[') || row.assigned_roles.startsWith('{')) {
+                assignedRole = JSON.parse(row.assigned_roles);
+              } else {
+                assignedRole = [row.assigned_roles];
+              }
+            }
+            // 기타 타입인 경우 배열로 변환
+            else {
+              assignedRole = [row.assigned_roles];
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ assigned_roles 파싱 오류:', error);
+          assignedRole = [];
+        }
+
+        return {
+          ...row,
+          assignedRole: Array.isArray(assignedRole) ? assignedRole : []
+        };
+      });
+
+      setUsers(processedData);
+      saveToCache(CACHE_KEY, processedData); // 변환된 데이터를 캐시에 저장
     } catch (err) {
-      console.error('🔴 사용자 목록 조회 실패:', err);
+      console.warn('⚠️ 사용자 목록 조회 실패:', err);
       setError(err instanceof Error ? err.message : '사용자 목록을 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
@@ -102,17 +114,8 @@ export function useSupabaseUsers() {
     return avatarMap;
   }, [users]);
 
-  // 컴포넌트 마운트 시 데이터 로드 (캐시 우선 전략)
+  // 컴포넌트 마운트 시 데이터 로드
   useEffect(() => {
-    // 1. 캐시에서 먼저 로드 (즉시 표시)
-    const cachedData = loadFromCache<SimpleUser[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
-    if (cachedData) {
-      setUsers(cachedData);
-      setLoading(false);
-      console.log('⚡ [Users] 캐시 데이터 즉시 표시 (깜빡임 방지)');
-    }
-
-    // 2. 백그라운드에서 최신 데이터 가져오기 (항상 실행)
     fetchUsers();
   }, [fetchUsers]);
 

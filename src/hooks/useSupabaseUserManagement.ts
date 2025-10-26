@@ -4,6 +4,7 @@ import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS, cl
 // 사용자 데이터 타입
 export interface UserProfile {
   id: number;
+  auth_user_id?: string; // Supabase Auth UUID
   created_at: string;
   updated_at: string;
   user_code: string;
@@ -27,7 +28,6 @@ export interface UserProfile {
   updated_by: string;
   metadata?: any;
   assignedRole?: string[];
-  rule?: string;
 }
 
 // 사용자 생성 요청 타입
@@ -152,6 +152,9 @@ export function useSupabaseUserManagement() {
         setError(null);
 
         console.log('🔄 사용자 수정 요청 데이터:', userData);
+        console.log('🔄 역할 관련 필드:', {
+          assignedRole: userData.assignedRole
+        });
 
         const response = await fetch('/api/users', {
           method: 'PUT',
