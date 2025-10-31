@@ -999,7 +999,7 @@ const RecordTab = memo(
 RecordTab.displayName = 'RecordTab';
 
 // 자료 탭 컴포넌트 - DB 기반 파일 관리
-const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | string; currentUser?: any }) => {
+const MaterialTab = memo(({ recordId, currentUser, canEditOwn = true, canEditOthers = true, voc }: { recordId?: number | string; currentUser?: any; canEditOwn?: boolean; canEditOthers?: boolean; voc?: VocData | null }) => {
   const {
     files,
     loading: filesLoading,
@@ -1010,6 +1010,18 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
     isDeleting
   } = useSupabaseFiles(PAGE_IDENTIFIERS.IT_VOC, recordId);
 
+  // VOC 소유자 확인
+  const isOwner = useMemo(() => {
+    if (!voc) return true; // 신규 생성 모드
+    if (!currentUser) return false;
+    const isCreator = voc.createdBy === currentUser.user_name;
+    const isAssignee = voc.assignee === currentUser.user_name;
+    return isCreator || isAssignee;
+  }, [voc, currentUser]);
+
+  // 최종 편집 권한
+  const canEdit = canEditOthers || (canEditOwn && isOwner);
+
   const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
   const [editingMaterialText, setEditingMaterialText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1017,7 +1029,7 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
   const handleFileUpload = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
       if (!recordId) {
-        alert('파일을 업로드하려면 먼저 VOC를 저장해주세요.');
+        setValidationError('파일을 업로드하려면 먼저 VOC를 저장해주세요.');
         return;
       }
 
@@ -1034,7 +1046,7 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
         });
 
         if (!result.success) {
-          alert(`파일 업로드 실패: ${result.error}`);
+          setValidationError(`파일 업로드 실패: ${result.error}`);
         }
       });
 
@@ -1064,7 +1076,7 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
       setEditingMaterialText('');
     } catch (error) {
       console.error('파일명 수정 실패:', error);
-      alert('파일명 수정에 실패했습니다.');
+      setValidationError('파일명 수정에 실패했습니다.');
     }
   }, [editingMaterialText, editingMaterialId, updateFile]);
 
@@ -1081,7 +1093,7 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
         await deleteFile(fileId);
       } catch (error) {
         console.error('파일 삭제 실패:', error);
-        alert('파일 삭제에 실패했습니다.');
+        setValidationError('파일 삭제에 실패했습니다.');
       }
     },
     [deleteFile]
@@ -1101,13 +1113,13 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('파일 다운로드 실패:', error);
-      alert('파일 다운로드에 실패했습니다.');
+      setValidationError('파일 다운로드에 실패했습니다.');
     }
   }, []);
 
   const handleUploadClick = useCallback(() => {
     if (!recordId) {
-      alert('파일을 업로드하려면 먼저 VOC를 저장해주세요.');
+      setValidationError('파일을 업로드하려면 먼저 VOC를 저장해주세요.');
       return;
     }
     fileInputRef.current?.click();
@@ -1147,26 +1159,37 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
             p: 3,
             textAlign: 'center',
             borderStyle: 'dashed',
-            borderColor: 'primary.main',
-            backgroundColor: 'primary.50',
-            cursor: 'pointer',
+            borderColor: canEdit ? 'primary.main' : 'grey.300',
+            backgroundColor: canEdit ? 'primary.50' : 'grey.100',
+            cursor: canEdit ? 'pointer' : 'not-allowed',
             transition: 'all 0.2s ease-in-out',
             '&:hover': {
-              borderColor: 'primary.dark',
-              backgroundColor: 'primary.100'
+              borderColor: canEdit ? 'primary.dark' : 'grey.300',
+              backgroundColor: canEdit ? 'primary.100' : 'grey.100'
             }
           }}
-          onClick={handleUploadClick}
+          onClick={canEdit ? handleUploadClick : undefined}
         >
           <Stack spacing={2} alignItems="center">
             <Typography fontSize="48px">📁</Typography>
-            <Typography variant="h6" color="primary.main">
+            <Typography variant="h6" color={canEdit ? 'primary.main' : 'grey.500'}>
               {isUploading ? '파일 업로드 중...' : '파일을 업로드하세요'}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               클릭하거나 파일을 여기로 드래그하세요
             </Typography>
-            <Button variant="contained" size="small" startIcon={<Typography>📤</Typography>} disabled={isUploading || !recordId}>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<Typography>📤</Typography>}
+              disabled={isUploading || !recordId || !canEdit}
+              sx={{
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               파일 선택
             </Button>
           </Stack>
@@ -1281,8 +1304,14 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                           size="small"
                           onClick={() => handleEditMaterial(file.id, file.file_name)}
                           color="primary"
-                          sx={{ p: 0.5 }}
+                          sx={{
+                            p: 0.5,
+                            '&.Mui-disabled': {
+                              color: 'grey.500'
+                            }
+                          }}
                           title="수정"
+                          disabled={!canEdit}
                         >
                           <Typography fontSize="14px">✏️</Typography>
                         </IconButton>
@@ -1290,9 +1319,14 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                           size="small"
                           onClick={() => handleDeleteMaterial(file.id)}
                           color="error"
-                          sx={{ p: 0.5 }}
+                          sx={{
+                            p: 0.5,
+                            '&.Mui-disabled': {
+                              color: 'grey.500'
+                            }
+                          }}
                           title="삭제"
-                          disabled={isDeleting}
+                          disabled={isDeleting || !canEdit}
                         >
                           <Typography fontSize="14px">🗑️</Typography>
                         </IconButton>
@@ -1349,10 +1383,13 @@ interface VOCEditDialogProps {
   statusOptions: string[];
   statusColors: Record<string, any>;
   teams?: string[];
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 const VOCEditDialog = memo(
-  ({ open, onClose, voc, onSave, assignees, assigneeAvatars, statusOptions, statusColors, teams }: VOCEditDialogProps) => {
+  ({ open, onClose, voc, onSave, assignees, assigneeAvatars, statusOptions, statusColors, teams, canCreateData = true, canEditOwn = true, canEditOthers = true }: VOCEditDialogProps) => {
     // 성능 모니터링
     // const { renderCount, logStats } = usePerformanceMonitor('VOCEditDialog');
 
@@ -1371,6 +1408,38 @@ const VOCEditDialog = memo(
       console.log('🔍 [VOCEditDialog] currentUser:', found ? found.user_name : '없음');
       return found;
     }, [session, users]);
+
+    // 데이터 소유자 확인 (createdBy 또는 assignee)
+    const isOwner = useMemo(() => {
+      if (!voc) {
+        console.log('🔐 VOCEditDialog - 신규 생성 모드: isOwner = true');
+        return true;
+      }
+      if (!currentUser) {
+        console.log('🔐 VOCEditDialog - 현재 사용자 없음: isOwner = false');
+        return false;
+      }
+
+      const currentUserName = currentUser?.user_name;
+      const isCreator = voc.createdBy === currentUserName;
+      const isAssignee = voc.assignee === currentUserName;
+      const isOwnerResult = isCreator || isAssignee;
+
+      console.log('🔐 VOCEditDialog - 소유자 확인:', {
+        vocId: voc.id,
+        currentUserName,
+        createdBy: voc.createdBy,
+        assignee: voc.assignee,
+        isCreator,
+        isAssignee,
+        isOwner: isOwnerResult,
+        canEditOwn,
+        canEditOthers,
+        finalCanEdit: canEditOthers || (canEditOwn && isOwnerResult)
+      });
+
+      return isOwnerResult;
+    }, [voc, currentUser, canEditOwn, canEditOthers]);
 
     // 피드백 훅 사용 (DB 연동)
     const {
@@ -1805,10 +1874,34 @@ const VOCEditDialog = memo(
 
           {/* 취소, 저장 버튼을 오른쪽 상단으로 이동 */}
           <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-            <Button onClick={handleClose} variant="outlined" size="small" sx={{ minWidth: '60px' }}>
+            <Button
+              onClick={handleClose}
+              variant="outlined"
+              size="small"
+              disabled={!voc ? !(canCreateData || canEditOwn) : !(canEditOthers || (canEditOwn && isOwner))}
+              sx={{
+                minWidth: '60px',
+                '&.Mui-disabled': {
+                  borderColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               취소
             </Button>
-            <Button onClick={handleSave} variant="contained" size="small" sx={{ minWidth: '60px' }}>
+            <Button
+              onClick={handleSave}
+              variant="contained"
+              size="small"
+              disabled={!voc ? !(canCreateData || canEditOwn) : !(canEditOthers || (canEditOwn && isOwner))}
+              sx={{
+                minWidth: '60px',
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               저장
             </Button>
           </Box>
@@ -1825,7 +1918,7 @@ const VOCEditDialog = memo(
         <DialogContent sx={{ p: 1, pt: 1 }}>
           {editTab === 0 && <OverviewTab {...overviewTabProps} />}
           {editTab === 1 && <RecordTab {...recordTabProps} />}
-          {editTab === 2 && <MaterialTab recordId={voc?.id} currentUser={currentUser} />}
+          {editTab === 2 && <MaterialTab recordId={voc?.id} currentUser={currentUser} canEditOwn={canEditOwn} canEditOthers={canEditOthers} voc={voc} />}
         </DialogContent>
 
         {/* 에러 메시지 표시 */}

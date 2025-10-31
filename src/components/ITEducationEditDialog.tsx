@@ -775,13 +775,12 @@ const OverviewTab = memo(
                 notched
                 renderValue={(selected) => {
                   if (!selected) return '선택';
-                  const item = educationTypesFromDB.find(t => t.subcode === selected);
-                  return item ? item.subcode_name : selected;
+                  return selected;
                 }}
               >
                 <MenuItem value="">선택</MenuItem>
                 {educationTypesFromDB.map((option) => (
-                  <MenuItem key={option.subcode} value={option.subcode}>
+                  <MenuItem key={option.subcode} value={option.subcode_name}>
                     {option.subcode_name}
                   </MenuItem>
                 ))}
@@ -855,12 +854,11 @@ const OverviewTab = memo(
                 label="상태"
                 notched
                 renderValue={(selected) => {
-                  const item = statusTypesFromDB.find(s => s.subcode === selected);
-                  return item ? item.subcode_name : selected;
+                  return selected;
                 }}
               >
                 {statusTypesFromDB.map((option) => (
-                  <MenuItem key={option.subcode} value={option.subcode}>
+                  <MenuItem key={option.subcode} value={option.subcode_name}>
                     <Chip
                       label={option.subcode_name}
                       size="small"
@@ -1170,11 +1168,15 @@ const ParticipantsTab = memo(
   ({
     mode,
     educationId,
-    onParticipantCountChange
+    onParticipantCountChange,
+    canEditOwn = true,
+    canEditOthers = true
   }: {
     mode: 'add' | 'edit';
     educationId?: number;
     onParticipantCountChange?: (count: number) => void;
+    canEditOwn?: boolean;
+    canEditOthers?: boolean;
   }) => {
     // 참석자 관리 훅 사용
     const { getAttendeesByEducationId, convertSupabaseToParticipantItem, convertParticipantItemToSupabase } =
@@ -1726,10 +1728,34 @@ const ParticipantsTab = memo(
             참석자 관리
           </Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button variant="outlined" color="error" onClick={handleDeleteSelected} disabled={selectedRows.length === 0} size="small">
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={handleDeleteSelected}
+              disabled={selectedRows.length === 0 || !(canEditOwn || canEditOthers)}
+              size="small"
+              sx={{
+                '&.Mui-disabled': {
+                  borderColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               삭제({selectedRows.length})
             </Button>
-            <Button variant="contained" onClick={handleAddItem} size="small" sx={{ fontSize: '12px' }}>
+            <Button
+              variant="contained"
+              onClick={handleAddItem}
+              disabled={!(canEditOwn || canEditOthers)}
+              size="small"
+              sx={{
+                fontSize: '12px',
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               추가
             </Button>
           </Box>
@@ -1907,7 +1933,7 @@ const ParticipantsTab = memo(
 );
 
 // 커리큘럼 탭 컴포넌트
-const CurriculumTab = memo(({ mode, educationId }: { mode: 'add' | 'edit'; educationId?: number }) => {
+const CurriculumTab = memo(({ mode, educationId, canEditOwn = true, canEditOthers = true }: { mode: 'add' | 'edit'; educationId?: number; canEditOwn?: boolean; canEditOthers?: boolean }) => {
   // Supabase 커리큘럼 훅 사용
   const {
     loading: curriculumLoading,
@@ -2284,10 +2310,34 @@ const CurriculumTab = memo(({ mode, educationId }: { mode: 'add' | 'edit'; educa
           커리큘럼 관리
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button variant="outlined" color="error" onClick={handleDeleteSelected} disabled={selectedRows.length === 0} size="small">
+          <Button
+            variant="outlined"
+            color="error"
+            onClick={handleDeleteSelected}
+            disabled={selectedRows.length === 0 || !(canEditOwn || canEditOthers)}
+            size="small"
+            sx={{
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             삭제({selectedRows.length})
           </Button>
-          <Button variant="contained" onClick={handleAddItem} size="small" sx={{ fontSize: '12px' }}>
+          <Button
+            variant="contained"
+            onClick={handleAddItem}
+            disabled={!(canEditOwn || canEditOthers)}
+            size="small"
+            sx={{
+              fontSize: '12px',
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             추가
           </Button>
         </Box>
@@ -2659,7 +2709,7 @@ const ReportsTab = memo(
 );
 
 // 자료 탭 컴포넌트 - DB 기반 (보안교육관리와 동일 패턴)
-const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | string; currentUser?: any }) => {
+const MaterialTab = memo(({ recordId, currentUser, canEditOwn = true, canEditOthers = true }: { recordId?: number | string; currentUser?: any; canEditOwn?: boolean; canEditOthers?: boolean }) => {
   // 파일 관리 훅
   const {
     files,
@@ -2683,7 +2733,7 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
 
       // recordId가 없으면 업로드 불가
       if (!recordId) {
-        alert('파일을 업로드하려면 먼저 교육을 저장해주세요.');
+        setValidationError('파일을 업로드하려면 먼저 교육을 저장해주세요.');
         return;
       }
 
@@ -2699,7 +2749,7 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
         });
 
         if (!result.success) {
-          alert(`파일 업로드 실패: ${result.error}`);
+          setValidationError(`파일 업로드 실패: ${result.error}`);
         }
       }
 
@@ -2750,7 +2800,7 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
         setEditingMaterialId(null);
         setEditingMaterialText('');
       } else {
-        alert(`파일명 수정 실패: ${result.error}`);
+        setValidationError(`파일명 수정 실패: ${result.error}`);
       }
     }
   }, [editingMaterialId, editingMaterialText, updateFile]);
@@ -2766,7 +2816,7 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
 
       const result = await deleteFile(materialId);
       if (!result.success) {
-        alert(`파일 삭제 실패: ${result.error}`);
+        setValidationError(`파일 삭제 실패: ${result.error}`);
       }
     },
     [deleteFile]
@@ -2794,26 +2844,37 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
             p: 3,
             textAlign: 'center',
             borderStyle: 'dashed',
-            borderColor: 'primary.main',
-            backgroundColor: 'primary.50',
-            cursor: 'pointer',
+            borderColor: (canEditOwn || canEditOthers) ? 'primary.main' : 'grey.300',
+            backgroundColor: (canEditOwn || canEditOthers) ? 'primary.50' : 'grey.100',
+            cursor: (canEditOwn || canEditOthers) ? 'pointer' : 'not-allowed',
             transition: 'all 0.2s ease-in-out',
-            '&:hover': {
+            '&:hover': (canEditOwn || canEditOthers) ? {
               borderColor: 'primary.dark',
               backgroundColor: 'primary.100'
-            }
+            } : {}
           }}
-          onClick={handleUploadClick}
+          onClick={(canEditOwn || canEditOthers) ? handleUploadClick : undefined}
         >
           <Stack spacing={2} alignItems="center">
             <Typography fontSize="48px">📁</Typography>
-            <Typography variant="h6" color="primary.main">
+            <Typography variant="h6" color={(canEditOwn || canEditOthers) ? 'primary.main' : 'grey.500'}>
               파일을 업로드하세요
             </Typography>
             <Typography variant="body2" color="text.secondary">
               클릭하거나 파일을 여기로 드래그하세요
             </Typography>
-            <Button variant="contained" size="small" startIcon={<Typography>📤</Typography>}>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<Typography>📤</Typography>}
+              disabled={!(canEditOwn || canEditOthers)}
+              sx={{
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               파일 선택
             </Button>
           </Stack>
@@ -2926,8 +2987,14 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                         size="small"
                         onClick={() => handleEditMaterial(fileData.id, fileData.file_name)}
                         color="primary"
-                        sx={{ p: 0.5 }}
+                        sx={{
+                          p: 0.5,
+                          '&.Mui-disabled': {
+                            color: 'grey.300'
+                          }
+                        }}
                         title="수정"
+                        disabled={!(canEditOwn || canEditOthers)}
                       >
                         <Typography fontSize="14px">✏️</Typography>
                       </IconButton>
@@ -2935,9 +3002,14 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                         size="small"
                         onClick={() => handleDeleteMaterial(fileData.id)}
                         color="error"
-                        sx={{ p: 0.5 }}
+                        sx={{
+                          p: 0.5,
+                          '&.Mui-disabled': {
+                            color: 'grey.300'
+                          }
+                        }}
                         title="삭제"
-                        disabled={isDeleting}
+                        disabled={isDeleting || !(canEditOwn || canEditOthers)}
                       >
                         <Typography fontSize="14px">🗑️</Typography>
                       </IconButton>
@@ -3009,9 +3081,22 @@ interface ITEducationDialogProps {
   onSave: (data: ITEducationRecord) => void;
   recordId?: number;
   tasks?: ITEducationRecord[]; // 전체 tasks 배열
+  // 🔐 권한 관리
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
-export default function ITEducationDialog({ open, onClose, onSave, recordId, tasks = [] }: ITEducationDialogProps) {
+export default function ITEducationDialog({
+  open,
+  onClose,
+  onSave,
+  recordId,
+  tasks = [],
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
+}: ITEducationDialogProps) {
   // recordId 유무로 모드 판단
   const mode = recordId ? 'edit' : 'add';
 
@@ -3077,6 +3162,16 @@ export default function ITEducationDialog({ open, onClose, onSave, recordId, tas
     console.log('🔍 [ITEducationEditDialog] currentUser:', found ? found.user_name : '없음');
     return found;
   }, [session, allUsers]);
+
+  // 🔐 권한 체크: 데이터 소유자 확인
+  const isOwner = useMemo(() => {
+    if (!data || !recordId) return true; // 신규 생성인 경우 true
+    const currentUserName = currentUser?.user_name;
+    const isOwnerResult =
+      data.createdBy === currentUserName ||
+      data.assignee === currentUserName;
+    return isOwnerResult;
+  }, [data, recordId, currentUser]);
 
   // 커리큘럼 관리 훅 사용
   const { saveCurriculumByEducationId } = useSupabaseItEducationCurriculum();
@@ -3649,11 +3744,34 @@ export default function ITEducationDialog({ open, onClose, onSave, recordId, tas
             </Typography>
           )}
         </Box>
+        {/* 🔐 권한 체크: 새 교육(recordId 없음)은 canCreateData 또는 canEditOwn, 기존 교육은 isOwner 확인 */}
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button onClick={handleClose} variant="outlined" size="small">
+          <Button
+            onClick={handleClose}
+            variant="outlined"
+            size="small"
+            disabled={(!data || !recordId) ? !(canCreateData || canEditOwn) : !(canEditOthers || (canEditOwn && isOwner))}
+            sx={{
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             취소
           </Button>
-          <Button onClick={handleSave} variant="contained" size="small" disabled={loading}>
+          <Button
+            onClick={handleSave}
+            variant="contained"
+            size="small"
+            disabled={loading || ((!data || !recordId) ? !(canCreateData || canEditOwn) : !(canEditOthers || (canEditOwn && isOwner)))}
+            sx={{
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             {loading ? '저장 중...' : '저장'}
           </Button>
         </Box>
@@ -3694,11 +3812,11 @@ export default function ITEducationDialog({ open, onClose, onSave, recordId, tas
             </TabPanel>
 
             <TabPanel value={value} index={1}>
-              <CurriculumTab mode={mode} educationId={data?.id} />
+              <CurriculumTab mode={mode} educationId={data?.id} canEditOwn={canEditOwn && isOwner} canEditOthers={canEditOthers} />
             </TabPanel>
 
             <TabPanel value={value} index={2}>
-              <ParticipantsTab mode={mode} educationId={data?.id} onParticipantCountChange={handleParticipantCountChange} />
+              <ParticipantsTab mode={mode} educationId={data?.id} onParticipantCountChange={handleParticipantCountChange} canEditOwn={canEditOwn && isOwner} canEditOthers={canEditOthers} />
             </TabPanel>
 
             <TabPanel value={value} index={3}>
@@ -3726,7 +3844,7 @@ export default function ITEducationDialog({ open, onClose, onSave, recordId, tas
             </TabPanel>
 
             <TabPanel value={value} index={5}>
-              <MaterialTab recordId={recordId} currentUser={currentUser} />
+              <MaterialTab recordId={recordId} currentUser={currentUser} canEditOwn={canEditOwn && isOwner} canEditOthers={canEditOthers} />
             </TabPanel>
           </>
         )}

@@ -46,6 +46,8 @@ import { InvestmentTableData, InvestmentStatus, InvestmentTeam, InvestmentType, 
 // hooks
 import { useSupabaseInvestment } from 'hooks/useSupabaseInvestment';
 import { useSupabaseUsers } from 'hooks/useSupabaseUsers';
+import { useSession } from 'next-auth/react';
+import { useCommonData } from 'contexts/CommonDataContext';
 
 // ==============================|| 투자 데이터 테이블 ||============================== //
 
@@ -70,6 +72,10 @@ interface InvestmentDataTableProps {
     changedField?: string,
     title?: string
   ) => void;
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
+  users?: any[];
 }
 
 // 컬럼 너비 정의
@@ -100,16 +106,64 @@ export default function InvestmentDataTable({
   onEditInvestment,
   onAddInvestment,
   onDeleteInvestments,
-  addChangeLog
+  addChangeLog,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true,
+  users = []
 }: InvestmentDataTableProps) {
   const theme = useTheme();
+
+  // 세션 정보 가져오기
+  const { data: session } = useSession();
 
   // 사용자 프로필 정보 가져오기
   const { getUserAvatars } = useSupabaseUsers();
   const userAvatars = getUserAvatars();
 
+  // CommonData에서 masterCodes 가져오기
+  const { masterCodes } = useCommonData();
+
+  // 투자유형 서브코드를 서브코드명으로 변환하는 함수
+  const getInvestmentTypeName = React.useCallback((subcode: string) => {
+    if (!subcode) return '';
+    const found = masterCodes.find(
+      (item) => item.codetype === 'subcode' && item.group_code === 'GROUP025' && item.subcode === subcode && item.is_active
+    );
+    return found ? found.subcode_name : subcode;
+  }, [masterCodes]);
+
   // props로 받은 investments를 사용
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
+
+  // 권한 체크 - 현재 사용자 확인
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || !users || users.length === 0) return null;
+    const found = users.find((u) => u.email === session.user.email);
+    return found;
+  }, [session, users]);
+
+  // 데이터 소유자 확인 (createdBy 또는 assignee)
+  const isDataOwner = (investment: InvestmentTableData) => {
+    if (!currentUser) return false;
+    const isCreator = investment.createdBy === currentUser.user_name;
+    const isAssignee = investment.assignee === currentUser.user_name;
+    return isCreator || isAssignee;
+  };
+
+  // 개별 데이터 편집 가능 여부
+  const canEditData = (investment: InvestmentTableData) => {
+    return canEditOthers || (canEditOwn && isDataOwner(investment));
+  };
+
+  // 선택된 모든 데이터 편집 가능 여부
+  const canEditAllSelected = useMemo(() => {
+    if (selectedItems.length === 0) return false;
+    return selectedItems.every((id) => {
+      const investment = investments.find((item) => item.id === id);
+      return investment && canEditData(investment);
+    });
+  }, [selectedItems, investments]);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [page, setPage] = useState(0);
   const [goToPage, setGoToPage] = useState<string>('');
@@ -405,7 +459,14 @@ export default function InvestmentDataTable({
                 console.warn('onAddInvestment 함수가 정의되지 않음');
               }
             }}
-            sx={{ px: 2 }}
+            disabled={!canCreateData}
+            sx={{
+              px: 2,
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
           >
             추가
           </Button>
@@ -414,7 +475,7 @@ export default function InvestmentDataTable({
             color="error"
             startIcon={<Trash />}
             size="small"
-            disabled={selectedItems.length === 0}
+            disabled={!canEditAllSelected}
             onClick={() => {
               if (onDeleteInvestments && selectedItems.length > 0) {
                 const selectedInvestments = investments.filter((inv) => selectedItems.includes(inv.id));
@@ -438,6 +499,12 @@ export default function InvestmentDataTable({
                   });
                   setSelectedItems([]);
                 }
+              }
+            }}
+            sx={{
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
               }
             }}
           >
@@ -518,6 +585,7 @@ export default function InvestmentDataTable({
                 <TableCell padding="checkbox">
                   <Checkbox
                     checked={selectedItems.includes(investment.id)}
+                    disabled={!canEditData(investment)}
                     onChange={(e) => handleSelectItem(investment.id, e.target.checked)}
                     size="small"
                   />
@@ -539,7 +607,7 @@ export default function InvestmentDataTable({
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                    {investment.investmentType}
+                    {getInvestmentTypeName(investment.investmentType)}
                   </Typography>
                 </TableCell>
                 <TableCell>

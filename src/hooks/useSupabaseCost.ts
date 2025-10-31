@@ -41,7 +41,7 @@ function convertToFrontendData(dbData: DbCostData, isNew = false): CostRecord {
     code: dbData.code,
     team: dbData.team,
     assignee_id: null,
-    assignee: dbData.assignee,
+    assignee: dbData.assignee || '', // null을 빈 문자열로 처리
     costType: dbData.cost_type as any,
     title: dbData.title,
     content: dbData.content,

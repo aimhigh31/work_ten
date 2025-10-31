@@ -51,7 +51,6 @@ import { Add, Minus, AttachSquare, DocumentUpload, DocumentDownload, Trash, Eye,
 import { CostRecord, AttachmentFile, costTypeOptions, statusOptions, teamOptions } from 'types/cost';
 import { costData } from 'data/cost';
 import { useSupabaseCostFinance } from '../../hooks/useSupabaseCostFinance';
-import { useSupabaseMasterCode3 } from '../../hooks/useSupabaseMasterCode3';
 import { useSupabaseDepartments } from '../../hooks/useSupabaseDepartments';
 import { useSupabaseUsers } from '../../hooks/useSupabaseUsers';
 import { useSupabaseFeedback } from '../../hooks/useSupabaseFeedback';
@@ -59,6 +58,8 @@ import { PAGE_IDENTIFIERS } from '../../types/feedback';
 import useUser from '../../hooks/useUser';
 import { useSupabaseFiles } from '../../hooks/useSupabaseFiles';
 import { FileData } from '../../types/files';
+import { useSession } from 'next-auth/react';
+import { useCommonData } from 'contexts/CommonDataContext';
 
 // ==============================|| 비용관리 데이터 테이블 ||============================== //
 
@@ -485,6 +486,9 @@ interface CostDataTableProps {
     recordId?: number;
     onClose: () => void;
   };
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 export default function CostDataTable({
@@ -501,15 +505,27 @@ export default function CostDataTable({
   addChangeLog,
   editRequest,
   onEditComplete,
-  externalDialogControl
+  externalDialogControl,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: CostDataTableProps) {
   const theme = useTheme();
 
+  // 공통 데이터 가져오기
+  const { masterCodes, getSubCodesByGroup } = useCommonData();
+
+  // 비용유형 서브코드명 변환 함수
+  const getCostTypeName = useCallback((subcode: string) => {
+    if (!subcode) return '';
+    const found = masterCodes.find(
+      (item) => item.codetype === 'subcode' && item.group_code === 'GROUP027' && item.subcode === subcode && item.is_active
+    );
+    return found ? found.subcode_name : subcode;
+  }, [masterCodes]);
+
   // Supabase 금액 데이터 연동
   const { getFinanceItems, saveFinanceItems, deleteFinanceItem } = useSupabaseCostFinance();
-
-  // 마스터코드 연동 (GROUP027 비용유형)
-  const { subCodes } = useSupabaseMasterCode3();
 
   // 부서 데이터 연동
   const { departments } = useSupabaseDepartments();
@@ -517,19 +533,41 @@ export default function CostDataTable({
   // 사용자 데이터 연동
   const { users } = useSupabaseUsers();
 
+  // 현재 로그인한 사용자 정보 (권한 체크용)
+  const { data: session } = useSession();
+  const sessionUser = useUser();
+
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || !users || users.length === 0) {
+      // 세션 없을 때 기본 사용자 정보 반환
+      return {
+        user_name: sessionUser ? sessionUser.name : '사용자',
+        department: sessionUser ? sessionUser.department || '부서' : '부서',
+        avatar: sessionUser ? sessionUser.avatar : '/assets/images/users/avatar-1.png',
+        role: sessionUser ? sessionUser.role : '',
+        email: session?.user?.email || ''
+      };
+    }
+    const found = users.find((u) => u.email === session.user.email);
+    return found || null;
+  }, [session, users, sessionUser]);
+
   // 사용자 이름으로 사용자 데이터 찾기
   const findUserByName = (userName: string) => {
     return users.find((user) => user.user_name === userName);
   };
 
-  // 로그인된 사용자 정보
-  const user = useUser();
-  const currentUser = {
-    name: user ? user.name : '사용자',
-    department: user ? user.department || '부서' : '부서',
-    profileImage: user ? user.avatar : '/assets/images/users/avatar-1.png',
-    role: user ? user.role : ''
-  };
+  // 데이터 소유자 확인 함수
+  const isDataOwner = useCallback((cost: CostRecord) => {
+    if (!currentUser) return false;
+    const dataOwner = cost.createdBy || cost.assignee;
+    return dataOwner === currentUser.user_name;
+  }, [currentUser]);
+
+  // 편집 가능 여부 확인 함수
+  const canEditData = useCallback((cost: CostRecord) => {
+    return canEditOthers || (canEditOwn && isDataOwner(cost));
+  }, [canEditOthers, canEditOwn, isDataOwner]);
 
   // 팝업창 상태 (useSupabaseFeedback 훅보다 먼저 선언)
   const [dialog, setDialog] = useState<{ open: boolean; mode: 'add' | 'edit' | 'view'; recordId?: number }>({
@@ -614,21 +652,31 @@ export default function CostDataTable({
 
   // GROUP027 비용유형 목록 (기존 호환용)
   const costTypes = useMemo(() => {
-    const group027Codes = subCodes.filter((code) => code.group_code === 'GROUP027');
+    const group027Codes = masterCodes.filter((code) => code.codetype === 'subcode' && code.group_code === 'GROUP027');
     return group027Codes.map((code) => code.subcode_name);
-  }, [subCodes]);
+  }, [masterCodes]);
 
   // GROUP028 비용세부유형 목록 (금액탭용, 기존 호환용)
   const costDetailTypes = useMemo(() => {
-    const group028Codes = subCodes.filter((code) => code.group_code === 'GROUP028');
+    const group028Codes = masterCodes.filter((code) => code.codetype === 'subcode' && code.group_code === 'GROUP028');
     return group028Codes.map((code) => code.subcode_name);
-  }, [subCodes]);
+  }, [masterCodes]);
 
   // GROUP002 상태 목록 (기존 호환용)
   const statusList = useMemo(() => {
-    const group002Codes = subCodes.filter((code) => code.group_code === 'GROUP002');
+    const group002Codes = masterCodes.filter((code) => code.codetype === 'subcode' && code.group_code === 'GROUP002');
     return group002Codes.map((code) => code.subcode_name);
-  }, [subCodes]);
+  }, [masterCodes]);
+
+  // 상태 코드를 이름으로 변환하는 함수
+  const getStatusName = useCallback((statusCode: string) => {
+    if (!statusCode) return '대기';
+    // "GROUP002-SUB001" 형태에서 서브코드명 찾기
+    const status = masterCodes.find(
+      (code) => code.codetype === 'subcode' && code.group_code === 'GROUP002' && (code.subcode === statusCode || `${code.group_code}-${code.subcode}` === statusCode)
+    );
+    return status?.subcode_name || statusCode;
+  }, [masterCodes]);
 
   // 부서명 목록
   const teamList = useMemo(() => {
@@ -649,6 +697,15 @@ export default function CostDataTable({
   const [selectedRecords, setSelectedRecords] = useState<number[]>([]);
   const [tabValue, setTabValue] = useState(0);
   const [validationError, setValidationError] = useState<string>('');
+
+  // 선택된 항목들이 모두 편집 가능한지 확인
+  const canEditAllSelected = useMemo(() => {
+    if (selectedRecords.length === 0) return false;
+    return selectedRecords.every((id) => {
+      const cost = costs.find((item) => item.id === id);
+      return cost && canEditData(cost);
+    });
+  }, [selectedRecords, costs, canEditData]);
 
   // 기록 탭을 위한 상태
   const [newComment, setNewComment] = useState<string>('');
@@ -705,6 +762,29 @@ export default function CostDataTable({
   const totalAmount = useMemo(() => {
     return amountItems.reduce((sum, item) => sum + item.amount, 0);
   }, [amountItems]);
+
+  // 현재 편집 중인 레코드의 소유자 확인
+  const isOwner = useMemo(() => {
+    if (!dialog.recordId) return true; // 신규 생성
+    const cost = costs.find((r) => r.id === dialog.recordId);
+    if (!cost) return true;
+    return isDataOwner(cost);
+  }, [dialog.recordId, costs, isDataOwner]);
+
+  // 현재 편집 중인 레코드의 편집 가능 여부
+  const canEdit = useMemo(() => {
+    return canEditOthers || (canEditOwn && isOwner);
+  }, [canEditOthers, canEditOwn, isOwner]);
+
+  // RecordTab에서 사용할 현재 사용자 정보 (기존 구조 유지)
+  const currentUserForRecord = useMemo(() => {
+    return {
+      name: currentUser?.user_name || sessionUser?.name || '사용자',
+      department: currentUser?.department || sessionUser?.department || '부서',
+      profileImage: currentUser?.avatar || sessionUser?.avatar || '/assets/images/users/avatar-1.png',
+      role: currentUser?.role || sessionUser?.role || ''
+    };
+  }, [currentUser, sessionUser]);
 
   // Supabase feedbacks를 RecordTab 형식으로 변환하고 pendingComments와 합치기
   const comments = useMemo(() => {
@@ -860,8 +940,8 @@ export default function CostDataTable({
           title: '',
           content: '',
           costType: '',
-          team: currentUser.department,
-          assignee: currentUser.name,
+          team: currentUser?.department || '',
+          assignee: currentUser?.user_name || '',
           status: '대기',
           startDate: today,
           completionDate: '',
@@ -955,7 +1035,7 @@ export default function CostDataTable({
         금액: record.amount.toLocaleString('ko-KR'),
         팀: record.team,
         담당자: record.assignee,
-        상태: record.status,
+        상태: getStatusName(record.status),
         완료일: record.completionDate || '미정',
         첨부파일: record.attachment ? '있음' : '없음'
       }));
@@ -1070,6 +1150,10 @@ export default function CostDataTable({
     }
     if (!overviewData.costType) {
       setValidationError('비용유형을 선택해주세요.');
+      return;
+    }
+    if (!overviewData.assignee?.trim()) {
+      setValidationError('담당자를 지정해주세요.');
       return;
     }
     if (!overviewData.startDate) {
@@ -1562,9 +1646,9 @@ export default function CostDataTable({
     if (!newComment.trim()) return;
 
     // 현재 사용자 정보 가져오기
-    const feedbackUser = users.find((u) => u.user_name === user?.name);
-    const currentUserName = feedbackUser?.user_name || user?.name || '현재 사용자';
-    const currentTeam = feedbackUser?.department || user?.department || '';
+    const feedbackUser = users.find((u) => u.user_name === sessionUser?.name);
+    const currentUserName = feedbackUser?.user_name || sessionUser?.name || '현재 사용자';
+    const currentTeam = feedbackUser?.department || sessionUser?.department || '';
     const currentPosition = feedbackUser?.position || '';
     const currentProfileImage = feedbackUser?.profile_image_url || '';
     const currentRole = feedbackUser?.role || '';
@@ -1584,7 +1668,7 @@ export default function CostDataTable({
 
     setPendingComments((prev) => [tempComment, ...prev]);
     setNewComment('');
-  }, [newComment, users, user]);
+  }, [newComment, users, sessionUser]);
 
   const handleEditComment = useCallback((commentId: string, content: string) => {
     setEditingCommentId(commentId);
@@ -1629,7 +1713,7 @@ export default function CostDataTable({
   }, []);
 
   // 자료 탭 컴포넌트 - DB 기반 파일 관리
-  const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | string; currentUser?: any }) => {
+  const MaterialTab = memo(({ recordId, currentUser, canEditOwn = true, canEditOthers = true }: { recordId?: number | string; currentUser?: any; canEditOwn?: boolean; canEditOthers?: boolean }) => {
     const {
       files,
       loading: filesLoading,
@@ -1776,26 +1860,37 @@ export default function CostDataTable({
               p: 3,
               textAlign: 'center',
               borderStyle: 'dashed',
-              borderColor: 'primary.main',
-              backgroundColor: 'primary.50',
-              cursor: 'pointer',
+              borderColor: canEditOwn || canEditOthers ? 'primary.main' : 'grey.300',
+              backgroundColor: canEditOwn || canEditOthers ? 'primary.50' : 'grey.100',
+              cursor: canEditOwn || canEditOthers ? 'pointer' : 'not-allowed',
               transition: 'all 0.2s ease-in-out',
-              '&:hover': {
+              '&:hover': canEditOwn || canEditOthers ? {
                 borderColor: 'primary.dark',
                 backgroundColor: 'primary.100'
-              }
+              } : {}
             }}
-            onClick={handleUploadClick}
+            onClick={canEditOwn || canEditOthers ? handleUploadClick : undefined}
           >
             <Stack spacing={2} alignItems="center">
               <Typography fontSize="48px">📁</Typography>
-              <Typography variant="h6" color="primary.main">
+              <Typography variant="h6" color={canEditOwn || canEditOthers ? 'primary.main' : 'grey.500'}>
                 {isUploading ? '파일 업로드 중...' : '파일을 업로드하세요'}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 클릭하거나 파일을 여기로 드래그하세요
               </Typography>
-              <Button variant="contained" size="small" startIcon={<Typography>📤</Typography>} disabled={isUploading || !recordId}>
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<Typography>📤</Typography>}
+                disabled={isUploading || !recordId || !(canEditOwn || canEditOthers)}
+                sx={{
+                  '&.Mui-disabled': {
+                    backgroundColor: 'grey.300',
+                    color: 'grey.500'
+                  }
+                }}
+              >
                 파일 선택
               </Button>
             </Stack>
@@ -1910,7 +2005,13 @@ export default function CostDataTable({
                             size="small"
                             onClick={() => handleEditMaterial(file.id, file.file_name)}
                             color="primary"
-                            sx={{ p: 0.5 }}
+                            disabled={!(canEditOwn || canEditOthers)}
+                            sx={{
+                              p: 0.5,
+                              '&.Mui-disabled': {
+                                color: 'grey.400'
+                              }
+                            }}
                             title="수정"
                           >
                             <Typography fontSize="14px">✏️</Typography>
@@ -1919,9 +2020,14 @@ export default function CostDataTable({
                             size="small"
                             onClick={() => handleDeleteMaterial(file.id)}
                             color="error"
-                            sx={{ p: 0.5 }}
+                            disabled={isDeleting || !(canEditOwn || canEditOthers)}
+                            sx={{
+                              p: 0.5,
+                              '&.Mui-disabled': {
+                                color: 'grey.400'
+                              }
+                            }}
                             title="삭제"
-                            disabled={isDeleting}
                           >
                             <Typography fontSize="14px">🗑️</Typography>
                           </IconButton>
@@ -1992,7 +2098,20 @@ export default function CostDataTable({
           >
             Excel Down
           </Button>
-          <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={handleAddRecord} sx={{ px: 2 }}>
+          <Button
+            variant="contained"
+            startIcon={<Add size={16} />}
+            size="small"
+            onClick={handleAddRecord}
+            disabled={!canCreateData}
+            sx={{
+              px: 2,
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             추가
           </Button>
           <Button
@@ -2000,12 +2119,16 @@ export default function CostDataTable({
             startIcon={<Minus size={16} />}
             size="small"
             color="error"
-            disabled={selectedRecords.length === 0}
+            disabled={!canEditAllSelected}
             onClick={handleDeleteRecords}
             sx={{
               px: 2,
-              borderColor: selectedRecords.length > 0 ? 'error.main' : 'grey.300',
-              color: selectedRecords.length > 0 ? 'error.main' : 'grey.500'
+              borderColor: canEditAllSelected ? 'error.main' : 'grey.300',
+              color: canEditAllSelected ? 'error.main' : 'grey.500',
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
             }}
           >
             삭제 {selectedRecords.length > 0 && `(${selectedRecords.length})`}
@@ -2082,7 +2205,11 @@ export default function CostDataTable({
                 }}
               >
                 <TableCell padding="checkbox">
-                  <Checkbox checked={selectedRecords.includes(record.id)} onChange={() => handleSelectRecord(record.id)} />
+                  <Checkbox
+                    checked={selectedRecords.includes(record.id)}
+                    onChange={() => handleSelectRecord(record.id)}
+                    disabled={!canEditData(record)}
+                  />
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
@@ -2101,7 +2228,7 @@ export default function CostDataTable({
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
-                    {record.costType}
+                    {getCostTypeName(record.costType)}
                   </Typography>
                 </TableCell>
                 <TableCell>
@@ -2140,11 +2267,11 @@ export default function CostDataTable({
                 </TableCell>
                 <TableCell>
                   <Chip
-                    label={record.status}
+                    label={getStatusName(record.status)}
                     size="small"
                     sx={{
-                      backgroundColor: getStatusColor(record.status).bgcolor,
-                      color: getStatusColor(record.status).color,
+                      backgroundColor: getStatusColor(getStatusName(record.status)).bgcolor,
+                      color: getStatusColor(getStatusName(record.status)).color,
                       fontSize: '13px',
                       fontWeight: 500
                     }}
@@ -2401,10 +2528,32 @@ export default function CostDataTable({
               )}
             </Box>
             <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button variant="outlined" size="small" onClick={handleCloseDialog}>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={handleCloseDialog}
+                disabled={!canEdit}
+                sx={{
+                  '&.Mui-disabled': {
+                    borderColor: 'grey.300',
+                    color: 'grey.500'
+                  }
+                }}
+              >
                 취소
               </Button>
-              <Button variant="contained" size="small" onClick={handleSaveRecord}>
+              <Button
+                variant="contained"
+                size="small"
+                onClick={handleSaveRecord}
+                disabled={!canEdit}
+                sx={{
+                  '&.Mui-disabled': {
+                    backgroundColor: 'grey.300',
+                    color: 'grey.500'
+                  }
+                }}
+              >
                 저장
               </Button>
             </Box>
@@ -2653,8 +2802,8 @@ export default function CostDataTable({
                     InputProps={{
                       readOnly: true,
                       startAdornment: (
-                        <Avatar src={currentUser.profileImage} sx={{ width: 24, height: 24, mr: 0 }}>
-                          {currentUser.name[0]}
+                        <Avatar src={currentUserForRecord.profileImage} sx={{ width: 24, height: 24, mr: 0 }}>
+                          {currentUserForRecord.name[0]}
                         </Avatar>
                       )
                     }}
@@ -2754,6 +2903,7 @@ export default function CostDataTable({
                   <Button
                     variant="contained"
                     size="small"
+                    disabled={!canEdit}
                     onClick={() => {
                       const newItem = {
                         id: Date.now(),
@@ -2766,6 +2916,12 @@ export default function CostDataTable({
                       };
                       setAmountItems((prev) => [newItem, ...prev]);
                     }}
+                    sx={{
+                      '&.Mui-disabled': {
+                        backgroundColor: 'grey.300',
+                        color: 'grey.500'
+                      }
+                    }}
                   >
                     추가
                   </Button>
@@ -2773,10 +2929,16 @@ export default function CostDataTable({
                     variant="outlined"
                     size="small"
                     color="error"
-                    disabled={selectedAmountItems.length === 0}
+                    disabled={selectedAmountItems.length === 0 || !canEdit}
                     onClick={() => {
                       setAmountItems((prev) => prev.filter((item) => !selectedAmountItems.includes(item.id)));
                       setSelectedAmountItems([]);
+                    }}
+                    sx={{
+                      '&.Mui-disabled': {
+                        borderColor: 'grey.300',
+                        color: 'grey.500'
+                      }
                     }}
                   >
                     삭제
@@ -2832,6 +2994,7 @@ export default function CostDataTable({
                               setSelectedAmountItems([]);
                             }
                           }}
+                          disabled={!canEdit}
                           size="small"
                         />
                       </TableCell>
@@ -2862,6 +3025,7 @@ export default function CostDataTable({
                                   prev.includes(item.id) ? prev.filter((id) => id !== item.id) : [...prev, item.id]
                                 );
                               }}
+                              disabled={!canEdit}
                               size="small"
                             />
                           </TableCell>
@@ -2891,6 +3055,7 @@ export default function CostDataTable({
                               onChange={(e) => {
                                 setAmountItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, costType: e.target.value } : i)));
                               }}
+                              disabled={!canEdit}
                               variant="standard"
                               disableUnderline
                               renderValue={(selected) => {
@@ -2912,7 +3077,7 @@ export default function CostDataTable({
                                   '&:before': { display: 'none' },
                                   '&:after': { display: 'none' }
                                 },
-                                '&:hover': {
+                                '&:hover': !canEdit ? {} : {
                                   backgroundColor: '#f8f9fa',
                                   borderRadius: '4px'
                                 },
@@ -2935,6 +3100,7 @@ export default function CostDataTable({
                               onChange={(e) => {
                                 setAmountItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, content: e.target.value } : i)));
                               }}
+                              disabled={!canEdit}
                               placeholder="내용 입력"
                               variant="standard"
                               sx={{
@@ -2972,6 +3138,7 @@ export default function CostDataTable({
                                 const amount = quantity * (item.unitPrice || 0);
                                 setAmountItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, quantity, amount } : i)));
                               }}
+                              disabled={!canEdit}
                               InputProps={{
                                 inputProps: { min: 0 },
                                 disableUnderline: true
@@ -3036,6 +3203,7 @@ export default function CostDataTable({
                                   e.target.value = item.unitPrice.toLocaleString() + '원';
                                 }
                               }}
+                              disabled={!canEdit}
                               InputProps={{
                                 disableUnderline: true
                               }}
@@ -3117,16 +3285,16 @@ export default function CostDataTable({
                 onCancelEditComment={handleCancelEditComment}
                 onDeleteComment={handleDeleteComment}
                 onEditCommentTextChange={setEditingCommentText}
-                currentUserName={currentUser.name}
-                currentUserAvatar={currentUser.profileImage}
-                currentUserRole={currentUser.role}
-                currentUserDepartment={currentUser.department}
+                currentUserName={currentUserForRecord.name}
+                currentUserAvatar={currentUserForRecord.profileImage}
+                currentUserRole={currentUserForRecord.role}
+                currentUserDepartment={currentUserForRecord.department}
               />
             </TabPanel>
           )}
 
           {/* 자료 탭 */}
-          {tabValue === 3 && <MaterialTab recordId={dialog.recordId} currentUser={currentUser} />}
+          {tabValue === 3 && <MaterialTab recordId={dialog.recordId} currentUser={currentUserForRecord} canEditOwn={canEdit} canEditOthers={canEdit} />}
         </DialogContent>
         {validationError && (
           <Box sx={{ px: 3, pb: 2, pt: 0 }}>

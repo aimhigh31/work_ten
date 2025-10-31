@@ -3,9 +3,12 @@
 // material-ui
 import Grid from '@mui/material/Grid2';
 import Stack from '@mui/material/Stack';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
 
 // project-imports
 import { GRID_COMMON_SPACING } from 'config';
+import { useMenuPermission } from 'hooks/usePermissions';
 
 import NewOrders from 'sections/widget/chart/NewOrders';
 import NewUsers from 'sections/widget/chart/NewUsers';
@@ -27,9 +30,35 @@ import EcommerceRadial from 'sections/widget/chart/EcommerceRadial';
 // ==============================|| DASHBOARD - ANALYTICS ||============================== //
 
 export default function DashboardAnalytics() {
+  const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers, loading: permissionLoading } = useMenuPermission('/dashboard/analytics');
+
   return (
-    <Grid container spacing={GRID_COMMON_SPACING}>
-      {/* row 1 */}
+    <Box sx={{ height: '100%', overflow: 'auto', p: 3 }}>
+      {/* 권한 체크: 카테고리 보기만 있는 경우 */}
+      {canViewCategory && !canReadData ? (
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            gap: 2,
+            py: 8
+          }}
+        >
+          <Typography variant="h5" color="text.secondary">
+            이 페이지에 대한 데이터 조회 권한이 없습니다.
+          </Typography>
+          <Typography variant="body2" color="text.disabled">
+            관리자에게 권한을 요청하세요.
+          </Typography>
+        </Box>
+      ) : (
+        <>
+          {/* 기존 컨텐츠 시작 */}
+          <Grid container spacing={GRID_COMMON_SPACING}>
+            {/* row 1 */}
       <Grid size={{ xs: 12, md: 4, lg: 3 }}>
         <NewOrders />
       </Grid>
@@ -81,5 +110,9 @@ export default function DashboardAnalytics() {
         </Grid>
       </Grid>
     </Grid>
+          {/* 기존 컨텐츠 끝 */}
+        </>
+      )}
+    </Box>
   );
 }

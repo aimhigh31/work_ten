@@ -59,6 +59,9 @@ interface EvaluationEditDialogProps {
   evaluation?: EvaluationTableData | null;
   generateEvaluationCode?: () => Promise<string>;
   evaluationTypes?: string[];
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 // 평가 아이템 타입
@@ -424,7 +427,7 @@ interface EvaluationDetailItem {
 }
 
 // 커리큘럼 탭 컴포넌트 (제출된 평가 목록 표시)
-const CurriculumTab = memo(({ evaluationCode }: { evaluationCode?: string }) => {
+const CurriculumTab = memo(({ evaluationCode, canEditOwn = true, canEditOthers = true }: { evaluationCode?: string; canEditOwn?: boolean; canEditOthers?: boolean }) => {
   // 제출된 평가 데이터 조회
   const { submissions, loading, fetchSubmissionWithItems, deleteSubmission } = useSupabaseEvaluationSubmissions();
 
@@ -956,11 +959,15 @@ const CurriculumTab = memo(({ evaluationCode }: { evaluationCode?: string }) => 
             startIcon={<Trash size={16} />}
             color="error"
             onClick={handleDeleteSelected}
-            disabled={selectedRows.length === 0}
+            disabled={selectedRows.length === 0 || !(canEditOwn || canEditOthers)}
             sx={{
               px: 2,
-              borderColor: selectedRows.length > 0 ? 'error.main' : 'grey.300',
-              color: selectedRows.length > 0 ? 'error.main' : 'grey.500'
+              borderColor: selectedRows.length > 0 && (canEditOwn || canEditOthers) ? 'error.main' : 'grey.300',
+              color: selectedRows.length > 0 && (canEditOwn || canEditOthers) ? 'error.main' : 'grey.500',
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
             }}
           >
             삭제 {selectedRows.length > 0 && `(${selectedRows.length})`}
@@ -1236,7 +1243,7 @@ const CurriculumTab = memo(({ evaluationCode }: { evaluationCode?: string }) => 
 CurriculumTab.displayName = 'CurriculumTab';
 
 // 자료 탭 컴포넌트 - DB 기반 (보안교육관리와 동일 패턴)
-const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | string; currentUser?: any }) => {
+const MaterialTab = memo(({ recordId, currentUser, canEditOwn = true, canEditOthers = true }: { recordId?: number | string; currentUser?: any; canEditOwn?: boolean; canEditOthers?: boolean }) => {
   // 파일 관리 훅
   const {
     files,
@@ -1371,26 +1378,37 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
             p: 3,
             textAlign: 'center',
             borderStyle: 'dashed',
-            borderColor: 'primary.main',
-            backgroundColor: 'primary.50',
-            cursor: 'pointer',
+            borderColor: (canEditOwn || canEditOthers) ? 'primary.main' : 'grey.300',
+            backgroundColor: (canEditOwn || canEditOthers) ? 'primary.50' : 'grey.100',
+            cursor: (canEditOwn || canEditOthers) ? 'pointer' : 'not-allowed',
             transition: 'all 0.2s ease-in-out',
-            '&:hover': {
+            '&:hover': (canEditOwn || canEditOthers) ? {
               borderColor: 'primary.dark',
               backgroundColor: 'primary.100'
-            }
+            } : {}
           }}
-          onClick={handleUploadClick}
+          onClick={(canEditOwn || canEditOthers) ? handleUploadClick : undefined}
         >
           <Stack spacing={2} alignItems="center">
             <Typography fontSize="48px">📁</Typography>
-            <Typography variant="h6" color="primary.main">
+            <Typography variant="h6" color={(canEditOwn || canEditOthers) ? 'primary.main' : 'grey.500'}>
               파일을 업로드하세요
             </Typography>
             <Typography variant="body2" color="text.secondary">
               클릭하거나 파일을 여기로 드래그하세요
             </Typography>
-            <Button variant="contained" size="small" startIcon={<Typography>📤</Typography>}>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<Typography>📤</Typography>}
+              disabled={!(canEditOwn || canEditOthers)}
+              sx={{
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               파일 선택
             </Button>
           </Stack>
@@ -1503,8 +1521,14 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                         size="small"
                         onClick={() => handleEditMaterial(fileData.id, fileData.file_name)}
                         color="primary"
-                        sx={{ p: 0.5 }}
+                        sx={{
+                          p: 0.5,
+                          '&.Mui-disabled': {
+                            color: 'grey.300'
+                          }
+                        }}
                         title="수정"
+                        disabled={!(canEditOwn || canEditOthers)}
                       >
                         <Typography fontSize="14px">✏️</Typography>
                       </IconButton>
@@ -1512,9 +1536,14 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                         size="small"
                         onClick={() => handleDeleteMaterial(fileData.id)}
                         color="error"
-                        sx={{ p: 0.5 }}
+                        sx={{
+                          p: 0.5,
+                          '&.Mui-disabled': {
+                            color: 'grey.300'
+                          }
+                        }}
                         title="삭제"
-                        disabled={isDeleting}
+                        disabled={isDeleting || !(canEditOwn || canEditOthers)}
                       >
                         <Typography fontSize="14px">🗑️</Typography>
                       </IconButton>
@@ -1564,7 +1593,10 @@ export default function EvaluationEditDialog({
   onSave,
   evaluation,
   generateEvaluationCode,
-  evaluationTypes = []
+  evaluationTypes = [],
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: EvaluationEditDialogProps) {
   const [activeTab, setActiveTab] = useState(0);
 
@@ -1670,6 +1702,35 @@ export default function EvaluationEditDialog({
   }, [session, users]);
 
   const currentUserCode = currentUser?.user_code || '';
+
+  // 데이터 소유자 확인 로직
+  const isOwner = React.useMemo(() => {
+    if (!evaluation) return true; // 신규 생성인 경우 true
+
+    // evaluation의 created_by 또는 manager와 현재 사용자 비교
+    const dataOwner = evaluation.createdBy || evaluation.assignee;
+    const currentUserName = currentUser?.user_name;
+
+    console.log('🔍 [EvaluationEditDialog] 소유자 확인:', {
+      dataOwner,
+      currentUserName,
+      isOwner: dataOwner === currentUserName
+    });
+
+    return dataOwner === currentUserName;
+  }, [evaluation, currentUser]);
+
+  // 편집 가능 여부 결정
+  const canEdit = React.useMemo(() => {
+    const result = canEditOthers || (canEditOwn && isOwner);
+    console.log('🔍 [EvaluationEditDialog] 편집 가능 여부:', {
+      canEditOthers,
+      canEditOwn,
+      isOwner,
+      canEdit: result
+    });
+    return result;
+  }, [canEditOthers, canEditOwn, isOwner]);
 
   // feedbacks를 ref에 저장 (dependency 문제 방지)
   useEffect(() => {
@@ -3065,8 +3126,14 @@ export default function EvaluationEditDialog({
                     variant="contained"
                     color="primary"
                     onClick={handleGenerateEvaluationFormUrl}
-                    disabled={isGeneratingUrl || !evaluation?.evaluationDataId}
-                    sx={{ fontWeight: 600 }}
+                    disabled={isGeneratingUrl || !evaluation?.evaluationDataId || !canEdit}
+                    sx={{
+                      fontWeight: 600,
+                      '&.Mui-disabled': {
+                        backgroundColor: 'grey.300',
+                        color: 'grey.500'
+                      }
+                    }}
                   >
                     {isGeneratingUrl ? '생성 중...' : '평가 폼 URL 생성'}
                   </Button>
@@ -3082,7 +3149,13 @@ export default function EvaluationEditDialog({
                       label="기준정보 체크리스트를 선택하세요"
                       value={selectedChecklistId}
                       onChange={(e) => handleChecklistChange(Number(e.target.value))}
-                      disabled={checklistsLoading}
+                      disabled={checklistsLoading || !canEdit}
+                      sx={{
+                        '& .Mui-disabled': {
+                          backgroundColor: 'grey.100',
+                          color: 'grey.500'
+                        }
+                      }}
                     >
                       <MenuItem value="">선택하세요</MenuItem>
                       {checklists.map((checklist) => (
@@ -3103,6 +3176,13 @@ export default function EvaluationEditDialog({
                       label="평가 유형을 선택하세요"
                       value={checklistEvaluationType}
                       onChange={(e) => setChecklistEvaluationType(e.target.value as EvaluationType)}
+                      disabled={!canEdit}
+                      sx={{
+                        '& .Mui-disabled': {
+                          backgroundColor: 'grey.100',
+                          color: 'grey.500'
+                        }
+                      }}
                     >
                       <MenuItem value="3단계">
                         <Typography variant="body2" sx={{ fontWeight: 400, width: '100%', color: 'black' }}>
@@ -3130,12 +3210,17 @@ export default function EvaluationEditDialog({
                     value={formData.checklistGuide || ''}
                     onChange={handleFieldChange('checklistGuide')}
                     placeholder="체크리스트 평가에 대한 안내사항을 작성하세요. (예: 각 항목을 객관적으로 평가해주세요.)"
+                    disabled={!canEdit}
                     InputLabelProps={{
                       shrink: true
                     }}
                     sx={{
                       '& .MuiInputBase-root': {
                         fontSize: '14px'
+                      },
+                      '& .Mui-disabled': {
+                        backgroundColor: 'grey.100',
+                        color: 'grey.500'
                       }
                     }}
                   />
@@ -3407,7 +3492,7 @@ export default function EvaluationEditDialog({
         );
 
       case 2: // 평가 탭 (커리큘럼)
-        return <CurriculumTab evaluationCode={formData.code} />;
+        return <CurriculumTab evaluationCode={formData.code} canEditOwn={canEdit} canEditOthers={canEdit} />;
 
       case 3: // 평가성과보고 탭
         return (
@@ -3425,6 +3510,7 @@ export default function EvaluationEditDialog({
                   value={formData.performance || ''}
                   onChange={handleFieldChange('performance')}
                   placeholder="평가를 통해 달성한 구체적인 성과나 결과를 기록하세요."
+                  disabled={!canEdit}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -3436,6 +3522,7 @@ export default function EvaluationEditDialog({
                   value={formData.improvements || ''}
                   onChange={handleFieldChange('improvements')}
                   placeholder="향후 평가에서 개선이 필요한 사항이나 보완점을 기록하세요."
+                  disabled={!canEdit}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -3447,6 +3534,7 @@ export default function EvaluationEditDialog({
                   value={formData.thoughts || ''}
                   onChange={handleFieldChange('thoughts')}
                   placeholder="평가 과정에서의 전반적인 소감과 피드백을 종합하여 작성하세요."
+                  disabled={!canEdit}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -3458,6 +3546,7 @@ export default function EvaluationEditDialog({
                   value={formData.notes || ''}
                   onChange={handleFieldChange('notes')}
                   placeholder="기타 특이사항이나 추가로 기록할 내용을 작성하세요."
+                  disabled={!canEdit}
                 />
               </Grid>
             </Grid>
@@ -3486,7 +3575,7 @@ export default function EvaluationEditDialog({
         );
 
       case 5: // 자료 탭
-        return <MaterialTab recordId={evaluation?.id} currentUser={currentUser} />;
+        return <MaterialTab recordId={evaluation?.id} currentUser={currentUser} canEditOwn={canEdit} canEditOthers={canEdit} />;
 
       default:
         return null;
@@ -3646,10 +3735,32 @@ export default function EvaluationEditDialog({
               )}
             </Box>
             <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button variant="outlined" size="small" onClick={handleClose}>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={handleClose}
+                disabled={!evaluation ? !canCreateData : !canEdit}
+                sx={{
+                  '&.Mui-disabled': {
+                    borderColor: 'grey.300',
+                    color: 'grey.500'
+                  }
+                }}
+              >
                 취소
               </Button>
-              <Button variant="contained" size="small" onClick={handleSave}>
+              <Button
+                variant="contained"
+                size="small"
+                onClick={handleSave}
+                disabled={!evaluation ? !canCreateData : !canEdit}
+                sx={{
+                  '&.Mui-disabled': {
+                    backgroundColor: 'grey.300',
+                    color: 'grey.500'
+                  }
+                }}
+              >
                 저장
               </Button>
             </Box>

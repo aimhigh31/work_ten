@@ -193,11 +193,17 @@ export function useSupabaseMenuManagement() {
       if (tableError) {
         console.log('=== 테이블 확인 상세 오류 분석 ===');
         console.log('오류 타입:', typeof tableError);
+        console.log('오류 객체:', tableError);
         console.log('오류 객체 키:', Object.keys(tableError));
+        console.log('오류 전체:', JSON.stringify(tableError, null, 2));
 
         // 모든 속성 출력
-        for (const [key, value] of Object.entries(tableError)) {
-          console.log(`${key}:`, value);
+        try {
+          for (const [key, value] of Object.entries(tableError)) {
+            console.log(`${key}:`, value);
+          }
+        } catch (e) {
+          console.log('속성 출력 실패:', e);
         }
 
         // 특정 Supabase 오류 코드 확인
@@ -211,10 +217,13 @@ export function useSupabaseMenuManagement() {
             message: tableError.message || 'No message',
             code: tableError.code || 'No code',
             details: tableError.details || 'No details',
-            hint: tableError.hint || 'No hint'
+            hint: tableError.hint || 'No hint',
+            fullError: tableError
           });
         }
 
+        // 오류가 발생해도 로컬 모드로 전환하여 계속 작동
+        console.log('⚠️ 테이블 오류 발생했지만 시스템은 계속 작동합니다 (로컬 모드)');
         return false;
       }
 

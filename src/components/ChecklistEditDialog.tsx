@@ -573,6 +573,7 @@ const OverviewTab = memo(
               fullWidth
               label="코드"
               value={taskState.code}
+              placeholder="자동 생성됩니다"
               InputLabelProps={{ shrink: true }}
               variant="outlined"
               InputProps={{
@@ -1825,10 +1826,13 @@ interface ChecklistEditDialogProps {
   assigneeAvatars: Record<string, string>;
   statusOptions: TaskStatus[];
   statusColors: Record<TaskStatus, any>;
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 const ChecklistEditDialog = memo(
-  ({ open, onClose, task, onSave, assignees, assigneeAvatars, statusOptions, statusColors }: ChecklistEditDialogProps) => {
+  ({ open, onClose, task, onSave, assignees, assigneeAvatars, statusOptions, statusColors, canCreateData = true, canEditOwn = true, canEditOthers = true }: ChecklistEditDialogProps) => {
     // 성능 모니터링
     // const { renderCount, logStats } = usePerformanceMonitor('ChecklistEditDialog');
 
@@ -1860,6 +1864,19 @@ const ChecklistEditDialog = memo(
     }, [session, users]);
 
     const currentUserCode = currentUser?.user_code || '';
+
+    // 데이터 소유자 확인 로직
+    const isOwner = useMemo(() => {
+      if (!task) return true; // 신규 생성인 경우 true
+      // task의 createdBy 또는 assignee와 현재 사용자 비교
+      return task.createdBy === currentUser?.user_name ||
+             task.assignee === currentUser?.user_name;
+    }, [task, currentUser]);
+
+    // 편집 가능 여부 결정
+    const canEdit = useMemo(() => {
+      return canEditOthers || (canEditOwn && isOwner);
+    }, [canEditOthers, canEditOwn, isOwner]);
 
     // 체크리스트 관리 훅 사용 (코드 생성용)
     const { generateChecklistCode } = useSupabaseChecklistManagement();
@@ -2003,19 +2020,18 @@ const ChecklistEditDialog = memo(
         if (task) {
           dispatch({ type: 'SET_TASK', task });
         } else if (open) {
-          // 새 Task 생성 시 자동으로 코드와 등록일, 담당자 설정
-          const newCode = await generateTaskCode();
+          // 새 Task 생성 시 자동으로 등록일, 담당자 설정 (코드는 서버에서 생성)
           const newRegistrationDate = getCurrentDate();
           dispatch({
             type: 'INIT_NEW_TASK',
-            code: newCode,
+            code: '', // 빈 문자열로 설정하여 서버에서 생성하도록 함
             registrationDate: newRegistrationDate,
             assignee: currentUserCode
           });
         }
       };
       initTask();
-    }, [task, open, generateTaskCode, getCurrentDate, currentUserCode]);
+    }, [task, open, getCurrentDate, currentUserCode]);
 
     // 팀을 로그인한 사용자의 부서로 자동 설정
     React.useEffect(() => {
@@ -2182,7 +2198,9 @@ const ChecklistEditDialog = memo(
             team: taskState.team,
             department: taskState.department,
             progress: taskState.progress,
-            attachments: []
+            attachments: [],
+            createdBy: currentUser?.user_name || '',
+            updatedBy: currentUser?.user_name || ''
           } as any;
 
           console.log('🚀 새 Task 생성 중:', newTask);
@@ -2207,7 +2225,8 @@ const ChecklistEditDialog = memo(
             department: taskState.department,
             code: taskState.code,
             registrationDate: taskState.registrationDate,
-            progress: taskState.progress
+            progress: taskState.progress,
+            updatedBy: currentUser?.user_name || task.updatedBy || ''
           } as any;
 
           console.log('📝 기존 Task 수정 중:', updatedTask);
@@ -2806,12 +2825,36 @@ const ChecklistEditDialog = memo(
             )}
           </Box>
 
-          {/* 취소, 저장 버튼을 오른쪽 상단으로 이동 */}
+          {/* 🔐 권한 체크: 새 체크리스트(task null)는 canCreateData, 기존 체크리스트는 canEdit */}
           <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-            <Button onClick={handleClose} variant="outlined" size="small" sx={{ minWidth: '60px' }}>
+            <Button
+              onClick={handleClose}
+              variant="outlined"
+              size="small"
+              disabled={!task ? !canCreateData : !canEdit}
+              sx={{
+                minWidth: '60px',
+                '&.Mui-disabled': {
+                  borderColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               취소
             </Button>
-            <Button onClick={handleSave} variant="contained" size="small" sx={{ minWidth: '60px' }}>
+            <Button
+              onClick={handleSave}
+              variant="contained"
+              size="small"
+              disabled={!task ? !canCreateData : !canEdit}
+              sx={{
+                minWidth: '60px',
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               저장
             </Button>
           </Box>
@@ -2838,12 +2881,30 @@ const ChecklistEditDialog = memo(
                     variant="outlined"
                     color="error"
                     onClick={handleDeleteSelectedItems}
-                    disabled={selectedItems.length === 0}
+                    disabled={selectedItems.length === 0 || !canEdit}
                     size="small"
+                    sx={{
+                      '&.Mui-disabled': {
+                        borderColor: 'grey.300',
+                        color: 'grey.500'
+                      }
+                    }}
                   >
                     삭제({selectedItems.length})
                   </Button>
-                  <Button variant="contained" onClick={handleAddItem} size="small" sx={{ fontSize: '12px' }}>
+                  <Button
+                    variant="contained"
+                    onClick={handleAddItem}
+                    size="small"
+                    disabled={!canEdit}
+                    sx={{
+                      fontSize: '12px',
+                      '&.Mui-disabled': {
+                        backgroundColor: 'grey.300',
+                        color: 'grey.500'
+                      }
+                    }}
+                  >
                     추가
                   </Button>
                 </Box>

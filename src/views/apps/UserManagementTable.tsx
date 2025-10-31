@@ -98,6 +98,10 @@ interface UserManagementTableProps {
   users?: UserData[];
   setUsers?: React.Dispatch<React.SetStateAction<UserData[]>>;
   addChangeLog?: (action: string, target: string, description: string, team?: string) => void;
+  // 🔐 권한 관리
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 // UserProfile을 UserData로 변환하는 함수
@@ -138,17 +142,15 @@ const transformUserProfile = (profile: UserProfile, index: number, totalCount: n
     role: profile.role || '',
     status: statusMap[profile.status] || '활성',
     lastLogin: profile.last_login
-      ? new Date(profile.last_login)
-          .toLocaleString('ko-KR', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-          })
-          .replace(/\. /g, '-')
-          .replace(/\./g, '')
-          .replace(' ', ' ')
+      ? (() => {
+          const date = new Date(profile.last_login);
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          const hours = String(date.getHours()).padStart(2, '0');
+          const minutes = String(date.getMinutes()).padStart(2, '0');
+          return `${year}-${month}-${day} ${hours}:${minutes}`;
+        })()
       : '-',
     registrant: profile.created_by,
     userAccount: profile.user_account_id,
@@ -174,15 +176,33 @@ export default function UserManagementTable({
   selectedAssignee = '전체',
   users,
   setUsers,
-  addChangeLog
+  addChangeLog,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: UserManagementTableProps) {
   const theme = useTheme();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session } = useSession();
 
-  // ✅ 권한 체크
-  const { canRead, canWrite, canFull, loading: permissionLoading } = useMenuPermission('/admin-panel/user-settings');
+  // ✅ 권한 체크 (로컬에서 사용하는 권한)
+  const {
+    canRead,
+    canWrite,
+    canFull,
+    canViewCategory,
+    canReadData,
+    canCreateData: hookCanCreateData,
+    canEditOwn: hookCanEditOwn,
+    canEditOthers: hookCanEditOthers,
+    loading: permissionLoading
+  } = useMenuPermission('/admin-panel/user-settings');
+
+  // ✅ 훅에서 가져온 권한을 우선 사용 (props는 fallback)
+  const actualCanCreateData = hookCanCreateData ?? canCreateData;
+  const actualCanEditOwn = hookCanEditOwn ?? canEditOwn;
+  const actualCanEditOthers = hookCanEditOthers ?? canEditOthers;
 
   // 🏪 공용 창고에서 데이터 가져오기 (중복 로딩 방지!)
   const { users: supabaseUsers, departments: supabaseDepartments, masterCodes, refreshCommonData } = useCommonData();
@@ -838,28 +858,41 @@ export default function UserManagementTable({
               Excel Down
             </Button>
           )}
-          {canWrite && (
-            <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={addNewUser} sx={{ px: 2 }}>
-              추가
-            </Button>
-          )}
-          {canFull && (
-            <Button
-              variant="outlined"
-              startIcon={<Trash size={16} />}
-              size="small"
-              color="error"
-              disabled={selected.length === 0}
-              onClick={handleDeleteSelected}
-              sx={{
-                px: 2,
-                borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
-                color: selected.length > 0 ? 'error.main' : 'grey.500'
-              }}
-            >
-              삭제 {selected.length > 0 && `(${selected.length})`}
-            </Button>
-          )}
+          <Button
+            variant="contained"
+            startIcon={<Add size={16} />}
+            size="small"
+            onClick={addNewUser}
+            disabled={!actualCanCreateData}
+            sx={{
+              px: 2,
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
+            추가
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<Trash size={16} />}
+            size="small"
+            color="error"
+            disabled={selected.length === 0 || !(actualCanEditOwn || actualCanEditOthers)}
+            onClick={handleDeleteSelected}
+            sx={{
+              px: 2,
+              borderColor: selected.length > 0 && (actualCanEditOwn || actualCanEditOthers) ? 'error.main' : 'grey.300',
+              color: selected.length > 0 && (actualCanEditOwn || actualCanEditOthers) ? 'error.main' : 'grey.500',
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
+            삭제 {selected.length > 0 && `(${selected.length})`}
+          </Button>
         </Box>
       </Box>
 
@@ -1031,13 +1064,11 @@ export default function UserManagementTable({
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      {canWrite && (
-                        <Tooltip title="수정">
-                          <IconButton size="small" onClick={() => handleEditUser(user)} sx={{ color: 'primary.main' }}>
-                            <Edit size={16} />
-                          </IconButton>
-                        </Tooltip>
-                      )}
+                      <Tooltip title="수정">
+                        <IconButton size="small" onClick={() => handleEditUser(user)} sx={{ color: 'primary.main' }}>
+                          <Edit size={16} />
+                        </IconButton>
+                      </Tooltip>
                     </Box>
                   </TableCell>
                 </TableRow>
@@ -1214,6 +1245,8 @@ export default function UserManagementTable({
           user={editingUser}
           onSave={handleEditUserSave}
           departments={supabaseDepartments}
+          canEditOwn={actualCanEditOwn}
+          canEditOthers={actualCanEditOthers}
         />
       )}
 

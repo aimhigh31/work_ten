@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 
 // Material-UI
 import {
@@ -37,6 +37,8 @@ import EvaluationEditDialog from 'components/EvaluationEditDialog';
 
 // hooks
 import { useSupabaseUsers } from 'hooks/useSupabaseUsers';
+import { useSession } from 'next-auth/react';
+import useUser from 'hooks/useUser';
 
 // data and types
 import {
@@ -53,9 +55,6 @@ import { EvaluationTableData, EvaluationStatus } from 'types/evaluation';
 
 // Icons
 import { Add, Trash, Edit, DocumentDownload } from '@wandersonalwes/iconsax-react';
-
-// Hooks
-import { useMenuPermission } from 'hooks/usePermissions';
 
 // 컬럼 너비 정의
 const columnWidths = {
@@ -93,6 +92,10 @@ interface EvaluationTableProps {
   onSave?: (evaluation: EvaluationTableData) => Promise<void>;
   onDelete?: (ids: number[]) => Promise<void>;
   generateEvaluationCode?: () => Promise<string>;
+  canReadData?: boolean;
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 export default function EvaluationTable({
@@ -105,12 +108,13 @@ export default function EvaluationTable({
   addChangeLog,
   onSave,
   onDelete,
-  generateEvaluationCode
+  generateEvaluationCode,
+  canReadData = true,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: EvaluationTableProps) {
   const theme = useTheme();
-
-  // ✅ 권한 체크
-  const { canRead, canWrite, canFull, loading: permissionLoading } = useMenuPermission('/hr/evaluation');
 
   const [data, setData] = useState<EvaluationTableData[]>(
     evaluations ? evaluations : evaluationData.map((evaluation) => ({ ...evaluation }))
@@ -122,6 +126,37 @@ export default function EvaluationTable({
 
   // 사용자관리 데이터 가져오기
   const { users } = useSupabaseUsers();
+
+  // 현재 로그인한 사용자 정보
+  const { data: session } = useSession();
+  const user = useUser();
+
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || users.length === 0) return null;
+    const found = users.find((u) => u.email === session.user.email);
+    return found;
+  }, [session, users]);
+
+  // 데이터 소유자 확인 함수
+  const isDataOwner = (evaluation: EvaluationTableData) => {
+    if (!currentUser) return false;
+    const dataOwner = evaluation.createdBy || evaluation.assignee;
+    return dataOwner === currentUser.user_name;
+  };
+
+  // 편집 가능 여부 확인 함수
+  const canEditData = useCallback((evaluation: EvaluationTableData) => {
+    return canEditOthers || (canEditOwn && isDataOwner(evaluation));
+  }, [canEditOthers, canEditOwn, currentUser]);
+
+  // 선택된 항목들이 모두 편집 가능한지 확인
+  const canEditAllSelected = useMemo(() => {
+    if (selected.length === 0) return false;
+    return selected.every((id) => {
+      const evaluation = data.find((item) => item.id === id);
+      return evaluation && canEditData(evaluation);
+    });
+  }, [selected, data, canEditData]);
 
   // 사용자 이름으로 사용자 데이터 찾기
   const findUserByName = (userName: string) => {
@@ -701,7 +736,7 @@ export default function EvaluationTable({
   };
 
   // ✅ 권한 없음 - 접근 차단
-  if (!canRead && !permissionLoading) {
+  if (!canReadData) {
     return (
       <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Typography variant="h6" color="error">
@@ -719,7 +754,7 @@ export default function EvaluationTable({
           총 {filteredData.length}건
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          {canRead && (
+          {canReadData && (
             <Button
               variant="outlined"
               startIcon={<DocumentDownload size={16} />}
@@ -739,28 +774,41 @@ export default function EvaluationTable({
               Excel Down
             </Button>
           )}
-          {canWrite && (
-            <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={addNewEvaluation} sx={{ px: 2 }}>
-              추가
-            </Button>
-          )}
-          {canFull && (
-            <Button
-              variant="outlined"
-              startIcon={<Trash size={16} />}
-              size="small"
-              color="error"
-              disabled={selected.length === 0}
-              onClick={handleDeleteSelected}
-              sx={{
-                px: 2,
-                borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
-                color: selected.length > 0 ? 'error.main' : 'grey.500'
-              }}
-            >
-              삭제 {selected.length > 0 && `(${selected.length})`}
-            </Button>
-          )}
+          <Button
+            variant="contained"
+            startIcon={<Add size={16} />}
+            size="small"
+            onClick={addNewEvaluation}
+            disabled={!canCreateData}
+            sx={{
+              px: 2,
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
+            추가
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<Trash size={16} />}
+            size="small"
+            color="error"
+            disabled={!canEditAllSelected}
+            onClick={handleDeleteSelected}
+            sx={{
+              px: 2,
+              borderColor: canEditAllSelected ? 'error.main' : 'grey.300',
+              color: canEditAllSelected ? 'error.main' : 'grey.500',
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
+            삭제 {selected.length > 0 && `(${selected.length})`}
+          </Button>
         </Box>
       </Box>
 
@@ -836,6 +884,7 @@ export default function EvaluationTable({
                   <TableCell padding="checkbox">
                     <Checkbox
                       checked={selected.includes(evaluation.id)}
+                      disabled={!canEditData(evaluation)}
                       onChange={(event) => {
                         const selectedIndex = selected.indexOf(evaluation.id);
                         let newSelected: number[] = [];
@@ -931,13 +980,11 @@ export default function EvaluationTable({
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      {canWrite && (
-                        <Tooltip title="수정">
-                          <IconButton size="small" onClick={() => handleEditEvaluation(evaluation)} sx={{ color: 'primary.main' }}>
-                            <Edit size={16} />
-                          </IconButton>
-                        </Tooltip>
-                      )}
+                      <Tooltip title="수정">
+                        <IconButton size="small" onClick={() => handleEditEvaluation(evaluation)} sx={{ color: 'primary.main' }}>
+                          <Edit size={16} />
+                        </IconButton>
+                      </Tooltip>
                     </Box>
                   </TableCell>
                 </TableRow>
@@ -1088,6 +1135,9 @@ export default function EvaluationTable({
           evaluation={editingEvaluation}
           onSave={handleEditEvaluationSave}
           generateEvaluationCode={generateEvaluationCode}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>

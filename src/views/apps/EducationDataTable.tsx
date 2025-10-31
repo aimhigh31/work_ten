@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 
 // Material-UI
 import {
@@ -34,7 +35,7 @@ import { EducationData } from 'types/education';
 
 // hooks
 import { useSupabaseEducation } from 'hooks/useSupabaseEducation';
-import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
+import { useCommonData } from 'contexts/CommonDataContext';
 import { useSupabaseUsers } from 'hooks/useSupabaseUsers';
 
 // Icons
@@ -73,6 +74,10 @@ interface EducationDataTableProps {
     changedField?: string,
     title?: string
   ) => void;
+  // 🔐 권한 관리
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 export default function EducationDataTable({
@@ -82,7 +87,10 @@ export default function EducationDataTable({
   selectedAssignee = '전체',
   educations,
   setEducations,
-  addChangeLog
+  addChangeLog,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: EducationDataTableProps) {
   const [data, setData] = useState<EducationData[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
@@ -90,6 +98,38 @@ export default function EducationDataTable({
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [goToPage, setGoToPage] = useState('');
   const [isInitialLoading, setIsInitialLoading] = useState(true); // 초기 로딩 상태
+
+  // 현재 로그인한 사용자 정보
+  const { data: session } = useSession();
+  const { users } = useSupabaseUsers();
+
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || !users || users.length === 0) return null;
+    const found = users.find((u) => u.email === session.user.email);
+    return found;
+  }, [session, users]);
+
+  // 데이터 소유자 확인 함수
+  const isDataOwner = useCallback((education: EducationData) => {
+    if (!currentUser) return false;
+    // createdBy 또는 assignee 중 하나라도 현재 사용자와 일치하면 소유자
+    return education.createdBy === currentUser.user_name ||
+           education.assignee === currentUser.user_name;
+  }, [currentUser]);
+
+  // 편집 가능 여부 확인 함수
+  const canEditData = useCallback((education: EducationData) => {
+    return canEditOthers || (canEditOwn && isDataOwner(education));
+  }, [canEditOthers, canEditOwn, isDataOwner]);
+
+  // 선택된 모든 레코드가 편집 가능한지 확인
+  const canEditAllSelected = useMemo(() => {
+    if (selected.length === 0) return false;
+    return selected.every(id => {
+      const education = data.find(edu => edu.id === id);
+      return education && canEditData(education);
+    });
+  }, [selected, data, canEditData]);
 
   // Supabase Education 연동
   const {
@@ -103,14 +143,24 @@ export default function EducationDataTable({
     error
   } = useSupabaseEducation();
 
-  // 마스터코드 연동
-  const { getSubCodesByGroup } = useSupabaseMasterCode3();
-
-  // 사용자관리 연동 (Auto-loading 패턴)
-  const { users } = useSupabaseUsers();
+  // 마스터코드 연동 - CommonDataContext 사용
+  const { getSubCodesByGroup } = useCommonData();
 
   // GROUP023의 Education유형 목록 가져오기
   const educationTypeOptions = getSubCodesByGroup('GROUP023');
+
+  // GROUP008의 교육방식 목록 가져오기
+  const educationMethodOptions = getSubCodesByGroup('GROUP008');
+
+  // 교육방식 코드를 이름으로 변환하는 함수
+  const getEducationMethodName = useCallback((educationType: string) => {
+    if (!educationType) return '미분류';
+    // "GROUP008-SUB003" 형태에서 서브코드명 찾기
+    const method = educationMethodOptions.find(
+      (option) => option.subcode === educationType || `${option.group_code}-${option.subcode}` === educationType
+    );
+    return method?.subcode_name || educationType;
+  }, [educationMethodOptions]);
 
   // 사용자 목록 옵션 생성 (등록자) - useSupabaseUsers가 이미 활성 사용자만 반환
   const userOptions = users.map((user) => user.user_name);
@@ -127,8 +177,18 @@ export default function EducationDataTable({
   // GROUP024의 우선순위 목록 가져오기 (현재 미사용이지만 향후 확장을 위해 유지)
   // const priorityOptions = getSubCodesByGroup('GROUP024');
 
-  // GROUP002의 상태 목록 가져오기 (현재 미사용이지만 향후 확장을 위해 유지)
-  // const statusOptionsFromMaster = getSubCodesByGroup('GROUP002');
+  // GROUP002의 상태 목록 가져오기
+  const statusOptions = getSubCodesByGroup('GROUP002');
+
+  // 상태 코드를 이름으로 변환하는 함수
+  const getStatusName = useCallback((status: string) => {
+    if (!status) return '미분류';
+    // "GROUP002-SUB001" 형태에서 서브코드명 찾기
+    const statusOption = statusOptions.find(
+      (option) => option.subcode === status || `${option.group_code}-${option.subcode}` === status
+    );
+    return statusOption?.subcode_name || status;
+  }, [statusOptions]);
 
   // Education유형별 색상 매핑 함수
   const getEducationTypeColor = (educationType: string) => {
@@ -188,7 +248,7 @@ export default function EducationDataTable({
         NO: education.no,
         등록일: education.registrationDate,
         코드: `MAIN-EDU-${new Date(education.registrationDate).getFullYear().toString().slice(-2)}-${String(education.no).padStart(3, '0')}`,
-        Education유형: education.educationType || '미분류',
+        교육방식: getEducationMethodName(education.educationType),
         요청내용: education.content || '',
         처리내용: education.responseContent || '',
         우선순위: education.priority || '보통',
@@ -700,7 +760,20 @@ export default function EducationDataTable({
               >
                 Excel Down
               </Button>
-              <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={addNewEducation} sx={{ px: 2 }}>
+              <Button
+                variant="contained"
+                startIcon={<Add size={16} />}
+                size="small"
+                onClick={addNewEducation}
+                disabled={!canCreateData}
+                sx={{
+                  px: 2,
+                  '&.Mui-disabled': {
+                    backgroundColor: 'grey.300',
+                    color: 'grey.500'
+                  }
+                }}
+              >
                 추가
               </Button>
               <Button
@@ -708,12 +781,16 @@ export default function EducationDataTable({
                 startIcon={<Trash size={16} />}
                 size="small"
                 color="error"
-                disabled={selected.length === 0}
+                disabled={!canEditAllSelected}
                 onClick={handleDeleteSelected}
                 sx={{
                   px: 2,
-                  borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
-                  color: selected.length > 0 ? 'error.main' : 'grey.500'
+                  borderColor: canEditAllSelected ? 'error.main' : 'grey.300',
+                  color: canEditAllSelected ? 'error.main' : 'grey.500',
+                  '&.Mui-disabled': {
+                    borderColor: 'grey.300',
+                    color: 'grey.500'
+                  }
                 }}
               >
                 삭제 {selected.length > 0 && `(${selected.length})`}
@@ -792,6 +869,7 @@ export default function EducationDataTable({
                       <TableCell padding="checkbox">
                         <Checkbox
                           checked={selected.includes(education.id)}
+                          disabled={!canEditData(education)}
                           onChange={(event) => {
                             const selectedIndex = selected.indexOf(education.id);
                             let newSelected: number[] = [];
@@ -827,7 +905,7 @@ export default function EducationDataTable({
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
-                          {education.educationType || '미분류'}
+                          {getEducationMethodName(education.educationType)}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -861,11 +939,11 @@ export default function EducationDataTable({
                       </TableCell>
                       <TableCell>
                         <Chip
-                          label={education.status}
+                          label={getStatusName(education.status)}
                           size="small"
                           sx={{
-                            backgroundColor: getStatusColor(education.status).bgcolor,
-                            color: getStatusColor(education.status).color,
+                            backgroundColor: getStatusColor(getStatusName(education.status)).bgcolor,
+                            color: getStatusColor(getStatusName(education.status)).color,
                             fontSize: '13px',
                             fontWeight: 500
                           }}
@@ -1051,6 +1129,9 @@ export default function EducationDataTable({
           statusOptions={educationStatusOptions}
           statusColors={educationStatusColors}
           teams={teams}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>

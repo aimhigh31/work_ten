@@ -42,6 +42,7 @@ import { taskData, taskStatusColors, assigneeAvatars } from 'data/task';
 import { TaskTableData, TaskStatus } from 'types/task';
 import { ThemeMode } from 'config';
 import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
+import { useMenuPermission } from '../../hooks/usePermissions';
 
 // 변경로그 타입 정의
 interface ChangeLog {
@@ -419,6 +420,9 @@ export default function ChecklistManagement() {
   const searchParams = useSearchParams();
   const [value, setValue] = useState(0);
 
+  // 🔐 권한 체크
+  const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers } = useMenuPermission('/admin-panel/checklist-management');
+
   // Supabase 훅 사용
   const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 가져오기
 
@@ -593,7 +597,7 @@ export default function ChecklistManagement() {
 
     // ChecklistTable에서 이미 Supabase 저장을 처리하므로,
     // 여기서는 변경로그만 추가
-    addChangeLog('업무 수정', updatedTask.code, `업무가 수정되었습니다: ${updatedTask.workContent}`, updatedTask.team || '기본팀');
+    addChangeLog('수정', updatedTask.code, `업무가 수정되었습니다: ${updatedTask.workContent}`, updatedTask.team || '기본팀');
 
     handleEditDialogClose();
   };
@@ -684,7 +688,29 @@ export default function ChecklistManagement() {
             </Box>
           </Box>
 
-          {/* 탭 네비게이션 및 필터 */}
+          {/* 권한 체크: 카테고리 보기만 있는 경우 */}
+          {canViewCategory && !canReadData ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 대한 데이터 조회 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              {/* 탭 네비게이션 및 필터 */}
           <Box
             sx={{
               borderBottom: 1,
@@ -898,6 +924,9 @@ export default function ChecklistManagement() {
                   selectedStatus={selectedStatus}
                   selectedAssignee={selectedAssignee}
                   tasks={undefined} // Supabase 데이터를 사용하도록 undefined 전달
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                   setTasks={setTasks}
                   addChangeLog={addChangeLog}
                 />
@@ -942,6 +971,8 @@ export default function ChecklistManagement() {
               </Box>
             </TabPanel>
           </Box>
+          </>
+          )}
         </CardContent>
       </Card>
 
@@ -953,6 +984,9 @@ export default function ChecklistManagement() {
           task={editingTask}
           onSave={handleEditTaskSave}
           assignees={users.map((user) => user.user_name)}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
           assigneeAvatars={assigneeAvatars}
           statusOptions={statusTypes.map((statusItem) => statusItem.subcode_name)}
           statusColors={taskStatusColors}

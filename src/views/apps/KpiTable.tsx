@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
+import { useSupabaseUsers } from 'hooks/useSupabaseUsers';
 
 // Material-UI
 import {
@@ -34,6 +36,7 @@ import { SelectChangeEvent } from '@mui/material/Select';
 // project imports
 import MainCard from 'components/MainCard';
 import KpiEditDialog from 'components/KpiEditDialog';
+import { useCommonData } from 'contexts/CommonDataContext';
 
 // data and types
 import { taskData, teams, assignees, taskStatusOptions, taskStatusColors, assigneeAvatars } from 'data/kpi';
@@ -80,6 +83,10 @@ interface TaskTableProps {
   users?: any[];
   onDeleteKpis?: (ids: number[]) => Promise<void>;
   onSaveKpi?: (task: TaskTableData) => Promise<void>;
+  // 🔐 권한 관리
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 export default function KpiTable({
@@ -92,7 +99,10 @@ export default function KpiTable({
   addChangeLog,
   users = [],
   onDeleteKpis,
-  onSaveKpi
+  onSaveKpi,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: TaskTableProps) {
   const theme = useTheme();
   const [data, setData] = useState<TaskTableData[]>(tasks ? tasks : taskData.map((task) => ({ ...task })));
@@ -100,6 +110,61 @@ export default function KpiTable({
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [goToPage, setGoToPage] = useState('');
+
+  // CommonData에서 마스터코드 가져오기
+  const { masterCodes, getSubCodesByGroup } = useCommonData();
+
+  // 코드로 코드명 찾는 함수
+  const getCodeName = useCallback((code: string) => {
+    if (!code || !masterCodes || masterCodes.length === 0) return code;
+    const found = masterCodes.find(mc => mc.subcode === code && mc.is_active);
+    return found?.subcode_name || code;
+  }, [masterCodes]);
+
+  // GROUP002의 상태 목록 가져오기
+  const statusOptions = getSubCodesByGroup('GROUP002');
+
+  // 상태 코드를 이름으로 변환하는 함수
+  const getStatusName = useCallback((status: string) => {
+    if (!status) return '미분류';
+    // "GROUP002-SUB001" 형태에서 서브코드명 찾기
+    const statusOption = statusOptions.find(
+      (option) => option.subcode === status || `${option.group_code}-${option.subcode}` === status
+    );
+    return statusOption?.subcode_name || status;
+  }, [statusOptions]);
+
+  // 현재 로그인한 사용자 정보
+  const { data: session } = useSession();
+  const { users: allUsers } = useSupabaseUsers();
+
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || !allUsers || allUsers.length === 0) return null;
+    const found = allUsers.find((u) => u.email === session.user.email);
+    return found;
+  }, [session, allUsers]);
+
+  // 데이터 소유자 확인 함수
+  const isDataOwner = useCallback((task: TaskTableData) => {
+    if (!currentUser) return false;
+    // createdBy 또는 assignee 중 하나라도 현재 사용자와 일치하면 소유자
+    return task.createdBy === currentUser.user_name ||
+           task.assignee === currentUser.user_name;
+  }, [currentUser]);
+
+  // 편집 가능 여부 확인 함수
+  const canEditData = useCallback((task: TaskTableData) => {
+    return canEditOthers || (canEditOwn && isDataOwner(task));
+  }, [canEditOthers, canEditOwn, isDataOwner]);
+
+  // 선택된 모든 레코드가 편집 가능한지 확인
+  const canEditAllSelected = useMemo(() => {
+    if (selected.length === 0) return false;
+    return selected.every(id => {
+      const task = data.find(t => t.id === id);
+      return task && canEditData(task);
+    });
+  }, [selected, data, canEditData]);
 
   // Edit 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);
@@ -114,14 +179,14 @@ export default function KpiTable({
         NO: index + 1,
         등록일: task.registrationDate,
         코드: task.code,
-        업무분류: task.department || '분류없음',
-        관리분류: (task as any).managementCategory || '-',
+        업무분류: getCodeName(task.department) || '분류없음',
+        관리분류: getCodeName((task as any).managementCategory) || '-',
         주요과제: task.workContent,
         목표KPI: (task as any).targetKpi || (task as any).target_kpi || '-',
         팀: task.team,
         담당자: task.assignee || '-',
         진행율: `${task.progress || 0}%`,
-        상태: task.status,
+        상태: getStatusName(task.status),
         완료일: task.completedDate || '미정'
       }));
 
@@ -359,7 +424,20 @@ export default function KpiTable({
           >
             Excel Down
           </Button>
-          <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={addNewTask} sx={{ px: 2 }}>
+          <Button
+            variant="contained"
+            startIcon={<Add size={16} />}
+            size="small"
+            onClick={addNewTask}
+            disabled={!canCreateData}
+            sx={{
+              px: 2,
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             추가
           </Button>
           <Button
@@ -367,12 +445,16 @@ export default function KpiTable({
             startIcon={<Trash size={16} />}
             size="small"
             color="error"
-            disabled={selected.length === 0}
+            disabled={!canEditAllSelected}
             onClick={handleDeleteSelected}
             sx={{
               px: 2,
-              borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
-              color: selected.length > 0 ? 'error.main' : 'grey.500'
+              borderColor: canEditAllSelected ? 'error.main' : 'grey.300',
+              color: selected.length > 0 && (canEditOwn || canEditOthers) ? 'error.main' : 'grey.500',
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
             }}
           >
             삭제 {selected.length > 0 && `(${selected.length})`}
@@ -454,6 +536,7 @@ export default function KpiTable({
                   <TableCell padding="checkbox">
                     <Checkbox
                       checked={selected.includes(task.id)}
+                      disabled={!canEditData(task)}
                       onChange={(event) => {
                         const selectedIndex = selected.indexOf(task.id);
                         let newSelected: number[] = [];
@@ -489,12 +572,12 @@ export default function KpiTable({
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                      {task.department || '분류없음'}
+                      {getCodeName(task.department) || '분류없음'}
                     </Typography>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                      {(task as any).managementCategory || '-'}
+                      {getCodeName((task as any).managementCategory) || '-'}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -577,10 +660,10 @@ export default function KpiTable({
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={task.status}
+                      label={getStatusName(task.status)}
                       size="small"
                       sx={{
-                        ...getStatusColor(task.status),
+                        ...getStatusColor(getStatusName(task.status)),
                         fontWeight: 500,
                         fontSize: '13px'
                       }}
@@ -762,6 +845,9 @@ export default function KpiTable({
           statusColors={taskStatusColors}
           teams={teams}
           tasks={tasks}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>

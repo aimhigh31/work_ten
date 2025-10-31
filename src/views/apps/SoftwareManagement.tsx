@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 
 // third-party
 import ReactApexChart, { Props as ChartProps } from 'react-apexcharts';
@@ -57,6 +57,7 @@ import { ChangeLogData } from 'types/changelog';
 import { createClient } from '@/lib/supabase/client';
 import { useSession } from 'next-auth/react';
 import useUser from 'hooks/useUser';
+import { useMenuPermission } from '../../hooks/usePermissions';
 
 // 변경로그 타입 정의 (12필드 - 보안점검관리와 동일)
 interface ChangeLog {
@@ -132,6 +133,10 @@ interface KanbanViewProps {
   teams: string[];
   softwareStatusOptions: string[];
   softwareStatusColors: Record<string, any>;
+  users?: any[];
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 function KanbanView({
@@ -146,9 +151,36 @@ function KanbanView({
   assignees,
   teams,
   softwareStatusOptions,
-  softwareStatusColors
+  softwareStatusColors,
+  users = [],
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: KanbanViewProps) {
   const theme = useTheme();
+
+  // 🔐 세션 정보 (권한 체크용)
+  const { data: session } = useSession();
+
+  // 🔐 권한 체크: 현재 사용자 정보
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || users.length === 0) return null;
+    const found = users.find((u) => u.email === session.user.email);
+    console.log('🔐 SoftwareManagement (Kanban) - 현재 사용자:', {
+      email: session?.user?.email,
+      user_name: found?.user_name,
+      found: !!found
+    });
+    return found;
+  }, [session, users]);
+
+  // 🔐 권한 체크: 데이터 소유자 확인
+  const isDataOwner = useCallback((software: TaskTableData) => {
+    if (!currentUser) return false;
+    const isCreator = software.createdBy === currentUser.user_name;
+    const isAssignee = software.assignee === currentUser.user_name;
+    return isCreator || isAssignee;
+  }, [currentUser]);
 
   // 상태 관리
   const [activeTask, setActiveTask] = useState<TaskTableData | null>(null);
@@ -324,9 +356,13 @@ function KanbanView({
   };
 
   // 드래그 가능한 카드 컴포넌트 (표준화된 4단계 구조)
-  function DraggableCard({ task }: { task: TaskTableData }) {
+  function DraggableCard({ task, canEditOwn = true, canEditOthers = true }: { task: TaskTableData; canEditOwn?: boolean; canEditOthers?: boolean }) {
+    // 🔐 권한 체크: 드래그 가능 여부 (타인 데이터 편집 권한 OR (나의 데이터 편집 권한 AND 데이터 소유자))
+    const isDragDisabled = !(canEditOthers || (canEditOwn && isDataOwner(task)));
+
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-      id: task.id
+      id: task.id,
+      disabled: isDragDisabled
     });
 
     const style = transform
@@ -652,7 +688,7 @@ function KanbanView({
             return (
               <DroppableColumn key={column.key} column={column}>
                 {items.map((item) => (
-                  <DraggableCard key={item.id} task={item} />
+                  <DraggableCard key={item.id} task={item} canEditOwn={canEditOwn} canEditOthers={canEditOthers} />
                 ))}
 
                 {/* 빈 칼럼 메시지 */}
@@ -676,7 +712,7 @@ function KanbanView({
           })}
         </div>
 
-        <DragOverlay>{activeTask ? <DraggableCard task={activeTask} /> : null}</DragOverlay>
+        <DragOverlay>{activeTask ? <DraggableCard task={activeTask} canEditOwn={canEditOwn} canEditOthers={canEditOthers} /> : null}</DragOverlay>
       </DndContext>
 
       {/* Task 편집 다이얼로그 */}
@@ -691,6 +727,9 @@ function KanbanView({
           statusOptions={softwareStatusOptions}
           statusColors={softwareStatusColors}
           teams={teams}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>
@@ -823,7 +862,7 @@ function MonthlyScheduleView({
           {/* 월 헤더 - 상반기 */}
           {monthNames.slice(0, 6).map((month, index) => (
             <Box
-              key={index}
+              key={`month-header-first-${index}`}
               sx={{
                 py: 1.5, // 상하 패딩 12px
                 px: 1, // 좌우 패딩 8px
@@ -848,7 +887,7 @@ function MonthlyScheduleView({
 
             return (
               <Box
-                key={monthIndex}
+                key={`month-content-first-${monthIndex}`}
                 sx={{
                   borderRight: monthIndex < 5 ? '1px solid' : 'none',
                   borderColor: 'divider',
@@ -889,7 +928,7 @@ function MonthlyScheduleView({
 
                   return (
                     <Box
-                      key={item.id}
+                      key={`month-${monthIndex}-item-${item.id}`}
                       onClick={() => onCardClick(item)}
                       sx={{
                         mb: itemIndex < items.length - 1 ? 0.8 : 0, // 카드 간격 6.4px (마지막 제외)
@@ -950,7 +989,7 @@ function MonthlyScheduleView({
           {/* 월 헤더 - 하반기 */}
           {monthNames.slice(6, 12).map((month, index) => (
             <Box
-              key={index + 6}
+              key={`month-header-second-${index}`}
               sx={{
                 py: 1.5, // 상하 패딩 12px
                 px: 1, // 좌우 패딩 8px
@@ -976,7 +1015,7 @@ function MonthlyScheduleView({
 
             return (
               <Box
-                key={monthIndex}
+                key={`month-content-second-${index}`}
                 sx={{
                   borderRight: index < 5 ? '1px solid' : 'none',
                   borderColor: 'divider',
@@ -1017,7 +1056,7 @@ function MonthlyScheduleView({
 
                   return (
                     <Box
-                      key={item.id}
+                      key={`month-second-${index}-item-${item.id}`}
                       onClick={() => onCardClick(item)}
                       sx={{
                         mb: itemIndex < items.length - 1 ? 0.8 : 0, // 카드 간격 6.4px (마지막 제외)
@@ -1543,13 +1582,13 @@ function DashboardView({
   const getStatusColor = (status: string) => {
     switch (status) {
       case '대기':
-        return '#9E9E9E'; // 회색
+        return '#90A4AE';
       case '사용중':
-        return '#2196F3'; // 파랑
+        return '#7986CB';
       case '사용만료':
-        return '#4CAF50'; // 초록
+        return '#81C784';
       case '폐기':
-        return '#F44336'; // 빨강
+        return '#E57373';
       default:
         return '#9e9e9e';
     }
@@ -1721,7 +1760,7 @@ function DashboardView({
         text: '업무 건수'
       }
     },
-    colors: ['#9E9E9E', '#2196F3', '#4CAF50', '#F44336'],
+    colors: ['#90A4AE', '#7986CB', '#81C784', '#E57373'],
     legend: {
       position: 'top',
       horizontalAlign: 'right'
@@ -1882,7 +1921,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#48C4B7',
+              background: '#26C6DA',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1901,12 +1940,12 @@ function DashboardView({
           </Card>
         </Grid>
 
-        {/* 완료 */}
+        {/* 대기 */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
               p: 3,
-              background: '#4CAF50',
+              background: '#90A4AE',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1914,23 +1953,23 @@ function DashboardView({
             }}
           >
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
-              사용만료
+              대기
             </Typography>
             <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusStats['사용만료'] || 0}
+              {statusStats['대기'] || 0}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              사용만료된 소프트웨어
+              대기중인 소프트웨어
             </Typography>
           </Card>
         </Grid>
 
-        {/* 진행 */}
+        {/* 사용중 */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
               p: 3,
-              background: '#2196F3',
+              background: '#7986CB',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1949,12 +1988,36 @@ function DashboardView({
           </Card>
         </Grid>
 
-        {/* 홀딩 */}
+        {/* 사용만료 */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
               p: 3,
-              background: '#F44336',
+              background: '#81C784',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+              borderRadius: 2,
+              color: '#fff',
+              textAlign: 'center'
+            }}
+          >
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
+              사용만료
+            </Typography>
+            <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
+              {statusStats['사용만료'] || 0}
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
+              사용만료된 소프트웨어
+            </Typography>
+          </Card>
+        </Grid>
+
+        {/* 폐기 */}
+        <Grid item xs={12} sm={6} md={2.4}>
+          <Card
+            sx={{
+              p: 3,
+              background: '#E57373',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1969,30 +2032,6 @@ function DashboardView({
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
               폐기된 소프트웨어
-            </Typography>
-          </Card>
-        </Grid>
-
-        {/* 대기 */}
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              p: 3,
-              background: '#9E9E9E',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-              borderRadius: 2,
-              color: '#fff',
-              textAlign: 'center'
-            }}
-          >
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
-              대기
-            </Typography>
-            <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusStats['대기'] || 0}
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              대기중인 소프트웨어
             </Typography>
           </Card>
         </Grid>
@@ -2290,6 +2329,20 @@ export default function SoftwareManagement() {
   const theme = useTheme();
   const [value, setValue] = useState(0);
 
+  // 🔐 권한 체크
+  const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers } = useMenuPermission('/it/software');
+
+  // 🔐 권한 값 로깅
+  useEffect(() => {
+    console.log('🔐 SoftwareManagement - 페이지 권한:', {
+      canViewCategory,
+      canReadData,
+      canCreateData,
+      canEditOwn,
+      canEditOthers
+    });
+  }, [canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers]);
+
   // ⭐ Investment 패턴: 데이터 로딩 함수만 가져오기
   const {
     getSoftware,
@@ -2462,6 +2515,7 @@ export default function SoftwareManagement() {
       startDate: softwareItem.start_date || '',
       completedDate: softwareItem.completed_date || '',
       attachments: softwareItem.attachments || [],
+      createdBy: softwareItem.created_by, // 데이터 생성자 (권한 체크용)
 
       // 소프트웨어 특화 필드
       softwareName: softwareItem.software_name || '',
@@ -2476,10 +2530,12 @@ export default function SoftwareManagement() {
     };
 
     // 변환된 데이터 로그 (디버깅용)
-    console.log('🔄 변환 중:', {
+    console.log('🔄 convertSoftwareToTask:', {
       originalId: softwareItem.id,
       status: converted.status,
       assignee: converted.assignee,
+      createdBy: converted.createdBy,
+      original_created_by: softwareItem.created_by,
       currentUser: converted.currentUser,
       original_current_users: softwareItem.current_users,
       convertedId: converted.id,
@@ -2728,7 +2784,48 @@ export default function SoftwareManagement() {
             </Box>
           </Box>
 
-          {/* 탭 네비게이션 및 필터 */}
+          {/* 권한 체크 */}
+          {!canViewCategory ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 접근할 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : !canReadData ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 대한 데이터 조회 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              {/* 탭 네비게이션 및 필터 */}
           <Box
             sx={{
               borderBottom: 1,
@@ -2981,6 +3078,10 @@ export default function SoftwareManagement() {
                   setTasks={setTasks}
                   addChangeLog={addChangeLog}
                   deleteMultipleSoftware={deleteMultipleSoftware}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
+                  users={users}
                 />
               </Box>
             </TabPanel>
@@ -3026,6 +3127,10 @@ export default function SoftwareManagement() {
                   teams={teams}
                   softwareStatusOptions={softwareStatusOptions}
                   softwareStatusColors={softwareStatusColors}
+                  users={users}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                 />
               </Box>
             </TabPanel>
@@ -3034,9 +3139,9 @@ export default function SoftwareManagement() {
               {/* 월간일정 탭 */}
               <Box
                 sx={{
-                  p: 3, // 패딩 24px (3 * 8px)
-                  height: '100%', // 전체 높이
-                  overflow: 'auto', // 스크롤 가능
+                  p: 1.5,
+                  height: '100%',
+                  overflow: 'auto',
                   // 스크롤바 스타일
                   '&::-webkit-scrollbar': {
                     width: '10px',
@@ -3352,6 +3457,8 @@ export default function SoftwareManagement() {
               </Box>
             </TabPanel>
           </Box>
+          </>
+          )}
         </CardContent>
       </Card>
 
@@ -3367,6 +3474,9 @@ export default function SoftwareManagement() {
           statusOptions={softwareStatusOptions}
           statusColors={softwareStatusColors}
           teams={teams}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>

@@ -11,6 +11,7 @@ export interface TaskData {
   startDate: string;
   completedDate: string;
   attachments: string[];
+  createdBy?: string; // 데이터 생성자 (권한 체크용)
 
   // 소프트웨어 관리를 위한 추가 필드
   softwareName?: string;

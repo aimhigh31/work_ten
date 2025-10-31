@@ -22,6 +22,7 @@ export interface SalesRecord {
   assignee?: string;
   createdAt?: string; // created_at from DB
   updatedAt?: string; // updated_at from DB
+  createdBy?: string; // 데이터 생성자 (권한 체크용)
 }
 
 // DB에서 가져온 데이터 타입 (snake_case)
@@ -47,6 +48,7 @@ export interface SalesRecordDB {
   assignee?: string;
   created_at?: string;
   updated_at?: string;
+  created_by?: string;
 }
 
 // 새 매출 생성 시 입력 데이터
@@ -69,6 +71,7 @@ export interface CreateSalesInput {
   contractDate?: string;
   assignee?: string;
   registrationDate?: string;
+  createdBy?: string; // 권한 체크용 생성자 user_name
 }
 
 // 매출 업데이트 시 입력 데이터
@@ -89,6 +92,7 @@ export interface UpdateSalesInput {
   notes?: string;
   contractDate?: string;
   assignee?: string;
+  createdBy?: string; // 권한 체크용 생성자 user_name
 }
 
 // DB 데이터를 프론트엔드 형식으로 변환
@@ -114,7 +118,8 @@ export function convertSalesFromDB(dbData: SalesRecordDB): SalesRecord {
     contractDate: dbData.contract_date,
     assignee: dbData.assignee,
     createdAt: dbData.created_at,
-    updatedAt: dbData.updated_at
+    updatedAt: dbData.updated_at,
+    createdBy: dbData.created_by
   };
 }
 
@@ -140,6 +145,7 @@ export function convertSalesToDB(frontendData: Partial<SalesRecord>): Partial<Sa
   if (frontendData.notes !== undefined) dbData.notes = frontendData.notes;
   if (frontendData.contractDate !== undefined) dbData.contract_date = frontendData.contractDate;
   if (frontendData.assignee !== undefined) dbData.assignee = frontendData.assignee;
+  if (frontendData.createdBy !== undefined) dbData.created_by = frontendData.createdBy;
 
   return dbData;
 }

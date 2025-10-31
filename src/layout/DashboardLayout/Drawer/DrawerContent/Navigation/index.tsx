@@ -16,6 +16,7 @@ import useConfig from 'hooks/useConfig';
 import menuItem from 'menu-items';
 // import { MenuFromAPI } from 'menu-items/dashboard'; // Dashboard 메뉴 임시 숨김 처리 - 추후 사용 가능
 import { useSupabaseMenuManagement } from 'hooks/useSupabaseMenuManagement';
+import { usePermissions } from 'hooks/usePermissions';
 
 // 아이콘 import
 import {
@@ -69,6 +70,9 @@ export default function Navigation() {
   // Supabase 메뉴 데이터 훅
   const { menus: supabaseMenus, loading: supabaseLoading } = useSupabaseMenuManagement();
 
+  // 권한 정보 가져오기
+  const { permissions, loading: permissionsLoading } = usePermissions();
+
   const [selectedID, setSelectedID] = useState<string | null>(menuMaster.openedHorizontalItem);
   const [selectedItems, setSelectedItems] = useState<string | undefined>('');
   const [selectedLevel, setSelectedLevel] = useState<number>(0);
@@ -107,7 +111,7 @@ export default function Navigation() {
   };
 
   // Supabase 메뉴 데이터를 NavItemType으로 변환하는 함수
-  const convertSupabaseMenusToNavItems = (menus: any[]): NavItemType[] => {
+  const convertSupabaseMenusToNavItems = (menus: any[], userPermissions: Record<string, any>): NavItemType[] => {
     try {
       if (!menus || menus.length === 0) {
         console.log('Supabase 메뉴 데이터가 없음:', { menus, length: menus?.length });
@@ -154,15 +158,37 @@ export default function Navigation() {
             id: `group-${category.toLowerCase().replace(/\s+/g, '-')}`,
             title: category,
             type: 'group' as const,
-            children: subMenus.map((menu) => ({
-              id: menu.id.toString(),
-              title: menu.page,
-              type: 'item' as const,
-              url: menu.url,
-              icon: getIconComponent(menu.icon || 'Setting2'), // 아이콘 컴포넌트로 변환
-              breadcrumbs: false,
-              description: menu.description
-            }))
+            children: subMenus
+              .filter((menu) => {
+                // 권한 체크: menuId로 직접 조회 (permissions 객체의 키가 문자열이므로 변환)
+                const menuIdKey = String(menu.id);
+                const menuPermission = userPermissions[menuIdKey];
+
+                console.log(`🔍 [권한체크] 메뉴: ${menu.page}`);
+                console.log(`   menu.id: ${menu.id} (타입: ${typeof menu.id})`);
+                console.log(`   menuIdKey: ${menuIdKey}`);
+                console.log(`   menuPermission:`, menuPermission);
+                console.log(`   canViewCategory:`, menuPermission?.canViewCategory);
+
+                const canView = menuPermission?.canViewCategory === true;
+
+                if (!canView) {
+                  console.log(`🚫 메뉴 숨김`);
+                } else {
+                  console.log(`✅ 메뉴 표시`);
+                }
+
+                return canView;
+              })
+              .map((menu) => ({
+                id: menu.id.toString(),
+                title: menu.page,
+                type: 'item' as const,
+                url: menu.url,
+                icon: getIconComponent(menu.icon || 'Setting2'), // 아이콘 컴포넌트로 변환
+                breadcrumbs: false,
+                description: menu.description
+              }))
           };
 
           console.log('생성된 그룹 아이템:', { category, childrenCount: groupItem.children.length, groupItem });
@@ -243,14 +269,29 @@ export default function Navigation() {
         }
       }
 
-      // Supabase 로딩 중이면 현재 메뉴 상태 유지
-      if (supabaseLoading) {
-        console.log('Supabase 메뉴 로딩 중, 현재 상태 유지');
+      // Supabase 또는 권한 로딩 중이면 현재 메뉴 상태 유지
+      if (supabaseLoading || permissionsLoading) {
+        console.log('Supabase 메뉴 또는 권한 로딩 중, 현재 상태 유지', { supabaseLoading, permissionsLoading });
         return;
       }
 
-      // Supabase 동적 메뉴 변환
-      const dynamicMenuItems = convertSupabaseMenusToNavItems(supabaseMenus);
+      // Supabase 동적 메뉴 변환 (권한 정보 전달)
+      console.log('🔄 [Navigation] 메뉴 변환 시작:', {
+        supabaseMenusCount: supabaseMenus?.length,
+        permissionsCount: Object.keys(permissions).length,
+        permissionsKeys: Object.keys(permissions).slice(0, 5)
+      });
+
+      const dynamicMenuItems = convertSupabaseMenusToNavItems(supabaseMenus, permissions);
+
+      console.log('🔄 [Navigation] 변환 결과:', {
+        dynamicMenuItemsCount: dynamicMenuItems.length,
+        dynamicMenuItems: dynamicMenuItems.map(item => ({
+          id: item.id,
+          title: item.title,
+          childrenCount: item.children?.length
+        }))
+      });
 
       // 동적 메뉴가 없으면 기본 메뉴라도 표시
       const combinedItems =
@@ -259,17 +300,17 @@ export default function Navigation() {
           : ([
               {
                 id: 'fallback-group',
-                title: '시스템 메뉴',
+                title: '메인메뉴',
                 type: 'group',
                 children: [
                   {
-                    id: 'system-settings',
-                    title: '시스템 설정',
+                    id: 'dashboard-default',
+                    title: '대시보드',
                     type: 'item',
-                    url: '/admin-panel/system-settings',
-                    icon: Setting2,
+                    url: '/dashboard/default',
+                    icon: Home3,
                     breadcrumbs: false,
-                    description: '시스템 설정 관리'
+                    description: '대시보드'
                   }
                 ]
               }
@@ -293,17 +334,17 @@ export default function Navigation() {
         items: [
           {
             id: 'error-fallback-group',
-            title: '시스템 메뉴',
+            title: '메인메뉴',
             type: 'group',
             children: [
               {
-                id: 'system-settings-fallback',
-                title: '시스템 설정',
+                id: 'dashboard-default-fallback',
+                title: '대시보드',
                 type: 'item',
-                url: '/admin-panel/system-settings',
-                icon: Setting2,
+                url: '/dashboard/default',
+                icon: Home3,
                 breadcrumbs: false,
-                description: '시스템 설정 관리'
+                description: '대시보드'
               }
             ]
           }
@@ -329,11 +370,12 @@ export default function Navigation() {
       pathname,
       supabaseMenusLength: supabaseMenus?.length || 0,
       supabaseLoading,
+      permissionsLoading,
       trigger: 'dependencies changed'
     });
     updateMenuItems();
     // eslint-disable-next-line
-  }, [menuLoading, pathname, supabaseMenus, supabaseLoading]); // Supabase 메뉴 의존성 추가
+  }, [menuLoading, pathname, supabaseMenus, supabaseLoading, permissions, permissionsLoading]); // 권한 의존성 추가
 
   // 메뉴 업데이트 이벤트 리스너 및 전역 에러 핸들러
   useEffect(() => {

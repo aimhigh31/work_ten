@@ -722,6 +722,8 @@ interface UserHistoryTabProps {
   hardwareId?: string;
   userHistories: UserHistory[];
   onUserHistoriesChange: (histories: UserHistory[]) => void;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 interface UserHistoryTabRef {
@@ -734,7 +736,7 @@ interface MaintenanceHistoryTabRef {
 
 const UserHistoryTab = memo(
   React.forwardRef<UserHistoryTabRef, UserHistoryTabProps>(
-    ({ mode, hardwareId, userHistories: initialUserHistories, onUserHistoriesChange }, ref) => {
+    ({ mode, hardwareId, userHistories: initialUserHistories, onUserHistoriesChange, canEditOwn = true, canEditOthers = true }, ref) => {
       const { getUserHistories, convertToUserHistory } = useSupabaseHardwareUser();
 
       // 사용자 액션 추적을 위한 ref들을 컴포넌트 최상단에 선언
@@ -1227,10 +1229,34 @@ const UserHistoryTab = memo(
               사용자 이력 관리
             </Typography>
             <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button variant="outlined" color="error" onClick={handleDeleteSelected} disabled={selectedRows.length === 0} size="small">
+              <Button
+                variant="outlined"
+                color="error"
+                onClick={handleDeleteSelected}
+                disabled={selectedRows.length === 0 || !(canEditOwn || canEditOthers)}
+                size="small"
+                sx={{
+                  '&.Mui-disabled': {
+                    borderColor: 'grey.300',
+                    color: 'grey.500'
+                  }
+                }}
+              >
                 삭제({selectedRows.length})
               </Button>
-              <Button variant="contained" onClick={handleAddHistory} size="small" sx={{ fontSize: '12px' }}>
+              <Button
+                variant="contained"
+                onClick={handleAddHistory}
+                disabled={!(canEditOwn || canEditOthers)}
+                size="small"
+                sx={{
+                  fontSize: '12px',
+                  '&.Mui-disabled': {
+                    backgroundColor: 'grey.300',
+                    color: 'grey.500'
+                  }
+                }}
+              >
                 추가
               </Button>
             </Box>
@@ -1425,8 +1451,10 @@ const MaintenanceHistoryTab = memo(
       mode: 'add' | 'edit';
       maintenanceHistories: MaintenanceHistory[];
       onMaintenanceHistoriesChange: (histories: MaintenanceHistory[]) => void;
+      canEditOwn?: boolean;
+      canEditOthers?: boolean;
     }
-  >(({ hardwareId, mode, maintenanceHistories: initialHistories, onMaintenanceHistoriesChange }, ref) => {
+  >(({ hardwareId, mode, maintenanceHistories: initialHistories, onMaintenanceHistoriesChange, canEditOwn = true, canEditOthers = true }, ref) => {
     const { getMaintenanceHistories, convertToMaintenanceHistory } = useSupabaseHardwareHistory();
 
     // 사용자 액션 추적을 위한 ref들을 컴포넌트 최상단에 선언
@@ -2031,10 +2059,34 @@ const MaintenanceHistoryTab = memo(
             구매/수리 이력
           </Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button variant="outlined" color="error" onClick={handleDeleteSelected} disabled={selectedRows.length === 0} size="small">
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={handleDeleteSelected}
+              disabled={selectedRows.length === 0 || !(canEditOwn || canEditOthers)}
+              size="small"
+              sx={{
+                '&.Mui-disabled': {
+                  borderColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               취소({selectedRows.length})
             </Button>
-            <Button variant="contained" onClick={handleAddHistory} size="small" sx={{ fontSize: '12px' }}>
+            <Button
+              variant="contained"
+              onClick={handleAddHistory}
+              disabled={!(canEditOwn || canEditOthers)}
+              size="small"
+              sx={{
+                fontSize: '12px',
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               추가
             </Button>
           </Box>
@@ -2873,7 +2925,7 @@ const RecordTab = memo(
 );
 
 // 자료 탭 컴포넌트 - DB 기반 (보안교육관리와 동일 패턴)
-const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | string; currentUser?: any }) => {
+const MaterialTab = memo(({ recordId, currentUser, canEditOwn = true, canEditOthers = true }: { recordId?: number | string; currentUser?: any; canEditOwn?: boolean; canEditOthers?: boolean }) => {
   // 파일 관리 훅
   const {
     files,
@@ -3008,26 +3060,37 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
             p: 3,
             textAlign: 'center',
             borderStyle: 'dashed',
-            borderColor: 'primary.main',
-            backgroundColor: 'primary.50',
-            cursor: 'pointer',
+            borderColor: (canEditOwn || canEditOthers) ? 'primary.main' : 'grey.300',
+            backgroundColor: (canEditOwn || canEditOthers) ? 'primary.50' : 'grey.100',
+            cursor: (canEditOwn || canEditOthers) ? 'pointer' : 'not-allowed',
             transition: 'all 0.2s ease-in-out',
-            '&:hover': {
+            '&:hover': (canEditOwn || canEditOthers) ? {
               borderColor: 'primary.dark',
               backgroundColor: 'primary.100'
-            }
+            } : {}
           }}
-          onClick={handleUploadClick}
+          onClick={(canEditOwn || canEditOthers) ? handleUploadClick : undefined}
         >
           <Stack spacing={2} alignItems="center">
             <Typography fontSize="48px">📁</Typography>
-            <Typography variant="h6" color="primary.main">
+            <Typography variant="h6" color={(canEditOwn || canEditOthers) ? 'primary.main' : 'grey.500'}>
               파일을 업로드하세요
             </Typography>
             <Typography variant="body2" color="text.secondary">
               클릭하거나 파일을 여기로 드래그하세요
             </Typography>
-            <Button variant="contained" size="small" startIcon={<Typography>📤</Typography>}>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<Typography>📤</Typography>}
+              disabled={!(canEditOwn || canEditOthers)}
+              sx={{
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               파일 선택
             </Button>
           </Stack>
@@ -3140,8 +3203,14 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                         size="small"
                         onClick={() => handleEditMaterial(fileData.id, fileData.file_name)}
                         color="primary"
-                        sx={{ p: 0.5 }}
+                        sx={{
+                          p: 0.5,
+                          '&.Mui-disabled': {
+                            color: 'grey.300'
+                          }
+                        }}
                         title="수정"
+                        disabled={!(canEditOwn || canEditOthers)}
                       >
                         <Typography fontSize="14px">✏️</Typography>
                       </IconButton>
@@ -3149,9 +3218,14 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                         size="small"
                         onClick={() => handleDeleteMaterial(fileData.id)}
                         color="error"
-                        sx={{ p: 0.5 }}
+                        sx={{
+                          p: 0.5,
+                          '&.Mui-disabled': {
+                            color: 'grey.300'
+                          }
+                        }}
                         title="삭제"
-                        disabled={isDeleting}
+                        disabled={isDeleting || !(canEditOwn || canEditOthers)}
                       >
                         <Typography fontSize="14px">🗑️</Typography>
                       </IconButton>
@@ -3202,6 +3276,9 @@ interface HardwareDialogProps {
   mode: 'add' | 'edit';
   statusOptions?: string[];
   statusColors?: Record<string, any>;
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 export default function HardwareDialog({
@@ -3211,7 +3288,10 @@ export default function HardwareDialog({
   data,
   mode,
   statusOptions: propStatusOptions,
-  statusColors: propStatusColors
+  statusColors: propStatusColors,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: HardwareDialogProps) {
   const [value, setValue] = useState(0);
   const [validationError, setValidationError] = useState('');
@@ -3245,6 +3325,19 @@ export default function HardwareDialog({
   }, [session, users]);
 
   const currentUserCode = currentUser?.user_code || '';
+
+  // 🔐 권한 체크: 데이터 소유자 확인
+  const isOwner = React.useMemo(() => {
+    if (!data || mode === 'add') return true; // 신규 생성인 경우 true
+    const currentUserName = currentUser?.user_name;
+    // HardwareData는 createdBy와 assignee 둘 다 체크
+    const hardwareData = data as any; // HardwareData로 타입 캐스팅
+    const isOwnerResult =
+      hardwareData.createdBy === currentUserName ||
+      hardwareData.assignee === currentUserName ||
+      data.assignee === currentUserName;
+    return isOwnerResult;
+  }, [data, mode, currentUser]);
 
   // 활성화된 사용자 목록
   const activeUsers = React.useMemo(() => {
@@ -3798,11 +3891,34 @@ export default function HardwareDialog({
             </Typography>
           )}
         </Box>
+        {/* 🔐 권한 체크: 새 하드웨어(mode='add')는 canCreateData 또는 canEditOwn, 기존 하드웨어는 isOwner 확인 */}
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button onClick={handleClose} variant="outlined" size="small">
+          <Button
+            onClick={handleClose}
+            variant="outlined"
+            size="small"
+            disabled={mode === 'add' ? !(canCreateData || canEditOwn) : !(canEditOthers || (canEditOwn && isOwner))}
+            sx={{
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             취소
           </Button>
-          <Button onClick={handleSave} variant="contained" size="small">
+          <Button
+            onClick={handleSave}
+            variant="contained"
+            size="small"
+            disabled={mode === 'add' ? !(canCreateData || canEditOwn) : !(canEditOthers || (canEditOwn && isOwner))}
+            sx={{
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             저장
           </Button>
         </Box>
@@ -3854,6 +3970,8 @@ export default function HardwareDialog({
             hardwareId={data?.id}
             userHistories={userHistories}
             onUserHistoriesChange={setUserHistories}
+            canEditOwn={canEditOwn && isOwner}
+            canEditOthers={canEditOthers}
           />
         </TabPanel>
 
@@ -3864,6 +3982,8 @@ export default function HardwareDialog({
             mode={mode}
             maintenanceHistories={maintenanceHistories}
             onMaintenanceHistoriesChange={setMaintenanceHistories}
+            canEditOwn={canEditOwn && isOwner}
+            canEditOthers={canEditOthers}
           />
         </TabPanel>
 
@@ -3892,7 +4012,7 @@ export default function HardwareDialog({
         </TabPanel>
 
         <TabPanel value={value} index={5}>
-          <MaterialTab recordId={data?.id} currentUser={currentUser} />
+          <MaterialTab recordId={data?.id} currentUser={currentUser} canEditOwn={canEditOwn && isOwner} canEditOthers={canEditOthers} />
         </TabPanel>
       </DialogContent>
 

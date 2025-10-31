@@ -22,8 +22,9 @@ const MAX_CACHE_SIZE_BYTES = 2 * 1024 * 1024;
  * 변경 이력:
  * - v1: 초기 버전
  * - v2: assigned_roles → assignedRole 필드 변경 (2025-10-21)
+ * - v3: IT교육관리 서브코드 → 서브코드명 변경 (2025-10-31)
  */
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 3;
 
 /**
  * 캐시 키 생성 (접두사 + 버전 추가로 충돌 방지 및 자동 무효화)

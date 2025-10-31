@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 
 // Material-UI
 import {
@@ -48,10 +48,12 @@ import { SecurityEducationTableData, SecurityEducationStatus, SecurityEducationR
 
 // hooks
 import { useSupabaseSecurityEducation } from '../../hooks/useSupabaseSecurityEducation';
-import { useSupabaseUsers } from '../../hooks/useSupabaseUsers';
 import useIdGenerator from '../../hooks/useIdGenerator';
 import { supabase } from '../../lib/supabase';
 import { useMenuPermission } from 'hooks/usePermissions'; // ✅ 권한 체크 훅
+import { useSession } from 'next-auth/react';
+import useUser from 'hooks/useUser';
+import { useCommonData } from 'contexts/CommonDataContext';
 
 // 데이터 변환 함수
 const convertTableDataToRecord = (tableData: SecurityEducationTableData): SecurityEducationRecord => {
@@ -75,6 +77,7 @@ const convertTableDataToRecord = (tableData: SecurityEducationTableData): Securi
     executionDate: tableData.executionDate,
     status: tableData.status,
     assignee: tableData.assignee,
+    createdBy: tableData.createdBy, // 데이터 생성자
     team: tableData.team || '보안팀', // 팀 필드 추가
     attachment: Boolean(tableData.attachments?.length),
     attachmentCount: tableData.attachments?.length || 0,
@@ -120,6 +123,7 @@ const convertRecordToTableData = (record: SecurityEducationRecord): SecurityEduc
     executionDate: record.executionDate,
     status: record.status,
     assignee: record.assignee,
+    createdBy: record.createdBy, // 데이터 생성자
     team: record.team || '보안팀', // DB에서 팀 정보 로드
     department: undefined,
     attachments: record.attachments,
@@ -179,6 +183,10 @@ interface SecurityEducationTableProps {
     title?: string
   ) => void;
   onDataRefresh?: () => Promise<void>;
+  canReadData?: boolean;
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 export default function SecurityEducationTable({
@@ -189,20 +197,69 @@ export default function SecurityEducationTable({
   tasks,
   setTasks,
   addChangeLog,
-  onDataRefresh
+  onDataRefresh,
+  canReadData = true,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: SecurityEducationTableProps) {
   const theme = useTheme();
-
-  // ✅ 권한 체크
-  const { canRead, canWrite, canFull, loading: permissionLoading } = useMenuPermission('/security/education');
 
   const [data, setData] = useState<SecurityEducationTableData[]>(tasks ? tasks : securityEducationData.map((task) => ({ ...task })));
   const [selected, setSelected] = useState<number[]>([]);
 
   // Supabase 훅
   const { createEducation, updateEducation, deleteEducation } = useSupabaseSecurityEducation();
-  const { users } = useSupabaseUsers();
+  const { users } = useCommonData();
   const { generateNextId, syncMaxId } = useIdGenerator();
+
+  // 현재 로그인한 사용자 정보
+  const { data: session } = useSession();
+  const user = useUser();
+
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || users.length === 0) return null;
+    const found = users.find((u) => u.email === session.user.email);
+    return found;
+  }, [session, users]);
+
+  // 데이터 소유자 확인 함수
+  const isDataOwner = (education: SecurityEducationTableData) => {
+    if (!currentUser) {
+      console.log('🔍 [SecurityEducationTable] currentUser 없음');
+      return false;
+    }
+
+    // createdBy 또는 assignee 중 하나라도 현재 사용자와 일치하면 소유자로 판단
+    const isOwner =
+      education.createdBy === currentUser.user_name ||
+      education.assignee === currentUser.user_name;
+
+    console.log('🔍 [SecurityEducationTable] 소유자 확인:', {
+      education_id: education.id,
+      education_no: education.no,
+      education_createdBy: education.createdBy,
+      education_assignee: education.assignee,
+      currentUser_user_name: currentUser.user_name,
+      isOwner
+    });
+
+    return isOwner;
+  };
+
+  // 편집 가능 여부 확인 함수
+  const canEditData = useCallback((education: SecurityEducationTableData) => {
+    return canEditOthers || (canEditOwn && isDataOwner(education));
+  }, [canEditOthers, canEditOwn, currentUser]);
+
+  // 선택된 항목들이 모두 편집 가능한지 확인
+  const canEditAllSelected = useMemo(() => {
+    if (selected.length === 0) return false;
+    return selected.every((id) => {
+      const education = data.find((item) => item.id === id);
+      return education && canEditData(education);
+    });
+  }, [selected, data, canEditData]);
 
   // 사용자 이름으로 사용자 데이터 찾기
   const findUserByName = (userName: string) => {
@@ -784,17 +841,6 @@ export default function SecurityEducationTable({
     }
   };
 
-  // ✅ 권한 없을 경우 접근 차단
-  if (!canRead && !permissionLoading) {
-    return (
-      <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Typography variant="h6" color="error">
-          이 페이지에 접근할 권한이 없습니다.
-        </Typography>
-      </Box>
-    );
-  }
-
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* 상단 정보 및 액션 버튼 */}
@@ -803,7 +849,7 @@ export default function SecurityEducationTable({
           총 {filteredData.length}건
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          {canRead && (
+          {canReadData && (
             <Button
               variant="outlined"
               startIcon={<DocumentDownload size={16} />}
@@ -823,28 +869,41 @@ export default function SecurityEducationTable({
               Excel Down
             </Button>
           )}
-          {canWrite && (
-            <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={addNewTask} sx={{ px: 2 }}>
-              추가
-            </Button>
-          )}
-          {canFull && (
-            <Button
-              variant="outlined"
-              startIcon={<Trash size={16} />}
-              size="small"
-              color="error"
-              disabled={selected.length === 0}
-              onClick={handleDeleteSelected}
-              sx={{
-                px: 2,
-                borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
-                color: selected.length > 0 ? 'error.main' : 'grey.500'
-              }}
-            >
-              삭제 {selected.length > 0 && `(${selected.length})`}
-            </Button>
-          )}
+          <Button
+            variant="contained"
+            startIcon={<Add size={16} />}
+            size="small"
+            onClick={addNewTask}
+            disabled={!canCreateData}
+            sx={{
+              px: 2,
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
+            추가
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<Trash size={16} />}
+            size="small"
+            color="error"
+            disabled={!canEditAllSelected}
+            onClick={handleDeleteSelected}
+            sx={{
+              px: 2,
+              borderColor: canEditAllSelected ? 'error.main' : 'grey.300',
+              color: canEditAllSelected ? 'error.main' : 'grey.500',
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
+            삭제 {selected.length > 0 && `(${selected.length})`}
+          </Button>
         </Box>
       </Box>
 
@@ -921,6 +980,7 @@ export default function SecurityEducationTable({
                   <TableCell padding="checkbox">
                     <Checkbox
                       checked={selected.includes(task.id)}
+                      disabled={!canEditData(task)}
                       onChange={(event) => {
                         const selectedIndex = selected.indexOf(task.id);
                         let newSelected: number[] = [];
@@ -1021,13 +1081,11 @@ export default function SecurityEducationTable({
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      {canWrite && (
-                        <Tooltip title="수정">
-                          <IconButton size="small" onClick={() => handleEditTask(task)} sx={{ color: 'primary.main' }}>
-                            <Edit size={16} />
-                          </IconButton>
-                        </Tooltip>
-                      )}
+                      <Tooltip title="수정">
+                        <IconButton size="small" onClick={() => handleEditTask(task)} sx={{ color: 'primary.main' }}>
+                          <Edit size={16} />
+                        </IconButton>
+                      </Tooltip>
                     </Box>
                   </TableCell>
                 </TableRow>
@@ -1178,6 +1236,9 @@ export default function SecurityEducationTable({
           data={editingRecord}
           mode={editMode}
           onSave={handleEditTaskSave}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>

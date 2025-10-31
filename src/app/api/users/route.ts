@@ -42,7 +42,8 @@ export async function GET(request: NextRequest) {
         phone: data[0].phone,
         country: data[0].country,
         address: data[0].address,
-        email: data[0].email
+        email: data[0].email,
+        last_login: data[0].last_login
       });
     }
 

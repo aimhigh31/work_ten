@@ -384,7 +384,7 @@ const RecordTab = memo(
 );
 
 // 자료 탭 컴포넌트 - DB 기반 (보안교육관리와 동일 패턴)
-const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | string; currentUser?: any }) => {
+const MaterialTab = memo(({ recordId, currentUser, canEditOwn = true, canEditOthers = true }: { recordId?: number | string; currentUser?: any; canEditOwn?: boolean; canEditOthers?: boolean }) => {
   // 파일 관리 훅
   const {
     files,
@@ -519,26 +519,37 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
             p: 3,
             textAlign: 'center',
             borderStyle: 'dashed',
-            borderColor: 'primary.main',
-            backgroundColor: 'primary.50',
-            cursor: 'pointer',
+            borderColor: (canEditOwn || canEditOthers) ? 'primary.main' : 'grey.300',
+            backgroundColor: (canEditOwn || canEditOthers) ? 'primary.50' : 'grey.100',
+            cursor: (canEditOwn || canEditOthers) ? 'pointer' : 'not-allowed',
             transition: 'all 0.2s ease-in-out',
-            '&:hover': {
+            '&:hover': (canEditOwn || canEditOthers) ? {
               borderColor: 'primary.dark',
               backgroundColor: 'primary.100'
-            }
+            } : {}
           }}
-          onClick={handleUploadClick}
+          onClick={(canEditOwn || canEditOthers) ? handleUploadClick : undefined}
         >
           <Stack spacing={2} alignItems="center">
             <Typography fontSize="48px">📁</Typography>
-            <Typography variant="h6" color="primary.main">
+            <Typography variant="h6" color={(canEditOwn || canEditOthers) ? 'primary.main' : 'grey.500'}>
               파일을 업로드하세요
             </Typography>
             <Typography variant="body2" color="text.secondary">
               클릭하거나 파일을 여기로 드래그하세요
             </Typography>
-            <Button variant="contained" size="small" startIcon={<Typography>📤</Typography>}>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<Typography>📤</Typography>}
+              disabled={!(canEditOwn || canEditOthers)}
+              sx={{
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               파일 선택
             </Button>
           </Stack>
@@ -651,8 +662,14 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                         size="small"
                         onClick={() => handleEditMaterial(fileData.id, fileData.file_name)}
                         color="primary"
-                        sx={{ p: 0.5 }}
+                        sx={{
+                          p: 0.5,
+                          '&.Mui-disabled': {
+                            color: 'grey.300'
+                          }
+                        }}
                         title="수정"
+                        disabled={!(canEditOwn || canEditOthers)}
                       >
                         <Typography fontSize="14px">✏️</Typography>
                       </IconButton>
@@ -660,9 +677,14 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                         size="small"
                         onClick={() => handleDeleteMaterial(fileData.id)}
                         color="error"
-                        sx={{ p: 0.5 }}
+                        sx={{
+                          p: 0.5,
+                          '&.Mui-disabled': {
+                            color: 'grey.300'
+                          }
+                        }}
                         title="삭제"
-                        disabled={isDeleting}
+                        disabled={isDeleting || !(canEditOwn || canEditOthers)}
                       >
                         <Typography fontSize="14px">🗑️</Typography>
                       </IconButton>
@@ -815,10 +837,13 @@ interface SecurityIncidentEditDialogProps {
   assigneeAvatars: Record<string, string>;
   statusOptions: string[];
   statusColors: Record<string, any>;
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 const SecurityIncidentEditDialog = memo(
-  ({ open, onClose, task, onSave, assignees, assigneeAvatars, statusOptions, statusColors }: SecurityIncidentEditDialogProps) => {
+  ({ open, onClose, task, onSave, assignees, assigneeAvatars, statusOptions, statusColors, canCreateData = true, canEditOwn = true, canEditOthers = true }: SecurityIncidentEditDialogProps) => {
     const [editTab, setEditTab] = useState(0);
     const [draggedItemId, setDraggedItemId] = useState<number | null>(null);
 
@@ -850,6 +875,29 @@ const SecurityIncidentEditDialog = memo(
       } : '없음');
       return foundUser;
     }, [session, users]);
+
+    // 데이터 소유자 확인 로직
+    const isOwner = React.useMemo(() => {
+      if (!task || task.id === 0) return true; // 신규 생성인 경우 true
+
+      const currentUserName = currentUser?.user_name;
+
+      // createdBy 또는 assignee 중 하나라도 현재 사용자와 일치하면 소유자로 판단
+      const isOwnerResult =
+        task.createdBy === currentUserName ||
+        task.assignee === currentUserName;
+
+      console.log('🔍 [SecurityIncidentEditDialog] 데이터 소유자 확인:', {
+        task_id: task.id,
+        task_createdBy: task.createdBy,
+        task_assignee: task.assignee,
+        currentUser_email: currentUser?.email,
+        currentUser_user_name: currentUserName,
+        isOwner: isOwnerResult
+      });
+
+      return isOwnerResult;
+    }, [task, currentUser]);
 
     // 사고보고 데이터 관리를 위한 훅
     const { loading: reportLoading, error: reportError, fetchReportByAccidentId, saveReport, deleteReport } = useSupabaseAccidentReport();
@@ -2009,10 +2057,34 @@ const SecurityIncidentEditDialog = memo(
 
           {/* 취소, 저장 버튼을 오른쪽 상단으로 이동 */}
           <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-            <Button onClick={handleClose} variant="outlined" size="small" sx={{ minWidth: '60px' }}>
+            <Button
+              onClick={handleClose}
+              variant="outlined"
+              size="small"
+              disabled={(!task || task.id === 0) ? !(canCreateData || canEditOwn) : !(canEditOthers || (canEditOwn && isOwner))}
+              sx={{
+                minWidth: '60px',
+                '&.Mui-disabled': {
+                  borderColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               취소
             </Button>
-            <Button onClick={handleSave} variant="contained" size="small" sx={{ minWidth: '60px' }}>
+            <Button
+              onClick={handleSave}
+              variant="contained"
+              size="small"
+              disabled={(!task || task.id === 0) ? !(canCreateData || canEditOwn) : !(canEditOthers || (canEditOwn && isOwner))}
+              sx={{
+                minWidth: '60px',
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               저장
             </Button>
           </Box>
@@ -2057,7 +2129,7 @@ const SecurityIncidentEditDialog = memo(
               currentUserDepartment={currentUser?.department || user?.department || ''}
             />
           )}
-          {editTab === 3 && <MaterialTab recordId={task?.id} currentUser={currentUser} />}
+          {editTab === 3 && <MaterialTab recordId={task?.id} currentUser={currentUser} canEditOwn={canEditOwn && isOwner} canEditOthers={canEditOthers} />}
         </DialogContent>
 
         {/* 에러 메시지 표시 */}

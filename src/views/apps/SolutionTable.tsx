@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 
 // Material-UI
 import {
@@ -39,7 +40,7 @@ import SolutionEditDialog from 'components/SolutionEditDialog';
 import { solutionData, teams, assignees, solutionStatusOptions, solutionStatusColors, assigneeAvatars } from 'data/solution';
 import { SolutionTableData, SolutionStatus } from 'types/solution';
 import { useSupabaseSolution } from '../../hooks/useSupabaseSolution';
-import { useSupabaseUsers } from '../../hooks/useSupabaseUsers';
+import { useCommonData } from 'contexts/CommonDataContext';
 
 // Icons
 import { Add, Trash, Edit, DocumentDownload } from '@wandersonalwes/iconsax-react';
@@ -78,6 +79,10 @@ interface SolutionTableProps {
     changedField?: string,
     title?: string
   ) => void;
+  users?: any[];
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 export default function SolutionTable({
@@ -87,24 +92,80 @@ export default function SolutionTable({
   selectedAssignee = '전체',
   solutions,
   setSolutions,
-  addChangeLog
+  addChangeLog,
+  users = [],
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: SolutionTableProps) {
   const theme = useTheme();
+
+  // 공통 데이터 가져오기
+  const { masterCodes } = useCommonData();
+
+  // 솔루션유형 서브코드명 변환 함수 (GROUP021)
+  const getSolutionTypeName = useCallback((subcode: string) => {
+    if (!subcode) return '';
+    const found = masterCodes.find(
+      (item) => item.codetype === 'subcode' && item.group_code === 'GROUP021' && item.subcode === subcode && item.is_active
+    );
+    return found ? found.subcode_name : subcode;
+  }, [masterCodes]);
+
+  // 개발유형 서브코드명 변환 함수 (GROUP022)
+  const getDevelopmentTypeName = useCallback((subcode: string) => {
+    if (!subcode) return '';
+    const found = masterCodes.find(
+      (item) => item.codetype === 'subcode' && item.group_code === 'GROUP022' && item.subcode === subcode && item.is_active
+    );
+    return found ? found.subcode_name : subcode;
+  }, [masterCodes]);
 
   // Supabase 연동 훅
   const { createSolution, updateSolution, deleteSolution, convertToDbSolutionData, convertToSolutionData, getSolutions } =
     useSupabaseSolution();
 
-  // 사용자관리 훅 - 담당자 프로필 사진 연동
-  const { users } = useSupabaseUsers();
+  // State 선언 (권한 체크보다 먼저 선언)
+  const [data, setData] = useState<SolutionTableData[]>(solutions ? solutions : solutionData.map((solution) => ({ ...solution })));
+  const [selected, setSelected] = useState<number[]>([]);
+
+  // 🔐 세션 정보 (권한 체크용)
+  const { data: session } = useSession();
+
+  // 🔐 권한 체크: 현재 사용자 정보
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || !users || users.length === 0) return null;
+    const found = users.find((u) => u.email === session.user.email);
+    return found;
+  }, [session, users]);
+
+  // 🔐 권한 체크: 데이터 소유자 확인
+  const isDataOwner = (solution: SolutionTableData) => {
+    if (!currentUser) return false;
+    const isCreator = solution.createdBy === currentUser.user_name;
+    const isAssignee = solution.assignee === currentUser.user_name;
+    return isCreator || isAssignee;
+  };
+
+  // 🔐 권한 체크: 개별 데이터 편집 가능 여부
+  const canEditData = useCallback((solution: SolutionTableData) => {
+    return canEditOthers || (canEditOwn && isDataOwner(solution));
+  }, [canEditOthers, canEditOwn, currentUser]);
+
+  // 🔐 권한 체크: 선택된 모든 데이터 편집 가능 여부
+  const canEditAllSelected = useMemo(() => {
+    if (selected.length === 0) return false;
+    return selected.every((id) => {
+      const solution = data.find((item) => item.id === id);
+      return solution && canEditData(solution);
+    });
+  }, [selected, data, canEditData]);
 
   // 사용자 이름으로 사용자 데이터 찾기
   const findUserByName = (userName: string) => {
+    if (!users || users.length === 0) return null;
     return users.find((user) => user.user_name === userName);
   };
-
-  const [data, setData] = useState<SolutionTableData[]>(solutions ? solutions : solutionData.map((solution) => ({ ...solution })));
-  const [selected, setSelected] = useState<number[]>([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [goToPage, setGoToPage] = useState('');
@@ -626,7 +687,20 @@ export default function SolutionTable({
           >
             Excel Down
           </Button>
-          <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={addNewSolution} sx={{ px: 2 }}>
+          <Button
+            variant="contained"
+            startIcon={<Add size={16} />}
+            size="small"
+            onClick={addNewSolution}
+            disabled={!canCreateData}
+            sx={{
+              px: 2,
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             추가
           </Button>
           <Button
@@ -634,12 +708,16 @@ export default function SolutionTable({
             startIcon={<Trash size={16} />}
             size="small"
             color="error"
-            disabled={selected.length === 0}
+            disabled={!canEditAllSelected}
             onClick={handleDeleteSelected}
             sx={{
               px: 2,
-              borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
-              color: selected.length > 0 ? 'error.main' : 'grey.500'
+              borderColor: selected.length > 0 && (canEditOwn || canEditOthers) ? 'error.main' : 'grey.300',
+              color: selected.length > 0 && (canEditOwn || canEditOthers) ? 'error.main' : 'grey.500',
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
             }}
           >
             삭제 {selected.length > 0 && `(${selected.length})`}
@@ -720,6 +798,7 @@ export default function SolutionTable({
                   <TableCell padding="checkbox">
                     <Checkbox
                       checked={selected.includes(solution.id)}
+                      disabled={!canEditData(solution)}
                       onChange={(event) => {
                         const selectedIndex = selected.indexOf(solution.id);
                         let newSelected: number[] = [];
@@ -755,12 +834,12 @@ export default function SolutionTable({
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                      {solution.solutionType}
+                      {getSolutionTypeName(solution.solutionType)}
                     </Typography>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                      {solution.developmentType}
+                      {getDevelopmentTypeName(solution.developmentType)}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -988,6 +1067,9 @@ export default function SolutionTable({
           statusOptions={solutionStatusOptions}
           statusColors={solutionStatusColors}
           teams={teams}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>

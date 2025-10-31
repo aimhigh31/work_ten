@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
+import { useSession } from 'next-auth/react';
 import { createClient } from '@supabase/supabase-js';
 import {
   Dialog,
@@ -39,6 +40,10 @@ interface SalesEditDialogProps {
   onClose: () => void;
   salesRecord: SalesRecord | null;
   onSave: (updatedRecord: SalesRecord) => void;
+  users?: any[];
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 // 기록 탭 컴포넌트
@@ -381,7 +386,7 @@ const RecordTab = memo(
 RecordTab.displayName = 'RecordTab';
 
 // 자료 탭 컴포넌트 - DB 기반 파일 관리
-const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | string; currentUser?: any }) => {
+const MaterialTab = memo(({ recordId, currentUser, canEdit = true, canEditOwn = true, canEditOthers = true }: { recordId?: number | string; currentUser?: any; canEdit?: boolean; canEditOwn?: boolean; canEditOthers?: boolean }) => {
   const {
     files,
     loading: filesLoading,
@@ -528,26 +533,37 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
             p: 3,
             textAlign: 'center',
             borderStyle: 'dashed',
-            borderColor: 'primary.main',
-            backgroundColor: 'primary.50',
-            cursor: 'pointer',
+            borderColor: canEdit ? 'primary.main' : 'grey.300',
+            backgroundColor: canEdit ? 'primary.50' : 'grey.100',
+            cursor: canEdit ? 'pointer' : 'not-allowed',
             transition: 'all 0.2s ease-in-out',
-            '&:hover': {
+            '&:hover': canEdit ? {
               borderColor: 'primary.dark',
               backgroundColor: 'primary.100'
-            }
+            } : {}
           }}
-          onClick={handleUploadClick}
+          onClick={canEdit ? handleUploadClick : undefined}
         >
           <Stack spacing={2} alignItems="center">
             <Typography fontSize="48px">📁</Typography>
-            <Typography variant="h6" color="primary.main">
+            <Typography variant="h6" color={canEdit ? 'primary.main' : 'grey.500'}>
               {isUploading ? '파일 업로드 중...' : '파일을 업로드하세요'}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               클릭하거나 파일을 여기로 드래그하세요
             </Typography>
-            <Button variant="contained" size="small" startIcon={<Typography>📤</Typography>} disabled={isUploading || !recordId}>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<Typography>📤</Typography>}
+              disabled={isUploading || !recordId || !canEdit}
+              sx={{
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               파일 선택
             </Button>
           </Stack>
@@ -662,7 +678,13 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                           size="small"
                           onClick={() => handleEditMaterial(file.id, file.file_name)}
                           color="primary"
-                          sx={{ p: 0.5 }}
+                          disabled={!canEdit}
+                          sx={{
+                            p: 0.5,
+                            '&.Mui-disabled': {
+                              color: 'grey.400'
+                            }
+                          }}
                           title="수정"
                         >
                           <Typography fontSize="14px">✏️</Typography>
@@ -671,9 +693,14 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                           size="small"
                           onClick={() => handleDeleteMaterial(file.id)}
                           color="error"
-                          sx={{ p: 0.5 }}
+                          disabled={isDeleting || !canEdit}
+                          sx={{
+                            p: 0.5,
+                            '&.Mui-disabled': {
+                              color: 'grey.400'
+                            }
+                          }}
                           title="삭제"
-                          disabled={isDeleting}
                         >
                           <Typography fontSize="14px">🗑️</Typography>
                         </IconButton>
@@ -745,7 +772,7 @@ function a11yProps(index: number) {
   };
 }
 
-const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesRecord, onSave }) => {
+const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesRecord, onSave, users: propUsers, canCreateData = true, canEditOwn = true, canEditOthers = true }) => {
   const [value, setValue] = useState(0);
   const [formData, setFormData] = useState<SalesRecord | null>(null);
 
@@ -763,6 +790,69 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
 
   console.log('🔍 [SalesEditDialog] masterCodes:', masterCodes?.length);
   console.log('🔍 [SalesEditDialog] users:', users?.length);
+
+  // 세션 및 권한 체크
+  const { data: session } = useSession();
+  const usersForPermissionCheck = propUsers || users;
+
+  const currentUserForPermission = useMemo(() => {
+    if (!session?.user?.email || !usersForPermissionCheck || usersForPermissionCheck.length === 0) {
+      console.log('🔍 [SalesEditDialog] currentUserForPermission: 없음 (세션 또는 users 없음)');
+      return null;
+    }
+    const found = usersForPermissionCheck.find((u) => u.email === session.user.email);
+    console.log('🔍 [SalesEditDialog] currentUserForPermission:', found ? found.user_name : '없음');
+    return found;
+  }, [session, usersForPermissionCheck]);
+
+  // 데이터 소유자 확인 (생성자 또는 담당자)
+  const isDataOwner = useMemo(() => {
+    if (!salesRecord) return true; // 신규 생성인 경우 true
+    if (!currentUserForPermission) return false;
+
+    const currentUserName = currentUserForPermission?.user_name;
+
+    // createdBy로 확인 (우선순위 1)
+    const isCreator = salesRecord.createdBy === currentUserName;
+
+    // registrant로 확인 (우선순위 2)
+    // registrant가 "홍길동 팀장" 형식일 수 있으므로, startsWith도 체크
+    const registrantStartsWith = salesRecord.registrant?.startsWith(currentUserName || '');
+    const isAssignee = salesRecord.registrant === currentUserName || registrantStartsWith;
+
+    const result = isCreator || isAssignee;
+
+    console.log('🔍 [SalesEditDialog] 소유자 확인:', {
+      salesRecordId: salesRecord.id,
+      createdBy: salesRecord.createdBy,
+      registrant: salesRecord.registrant,
+      currentUserName,
+      isCreator,
+      registrantStartsWith,
+      isAssignee,
+      isDataOwner: result
+    });
+
+    return result;
+  }, [salesRecord, currentUserForPermission]);
+
+  // 편집 권한 확인
+  const canEdit = useMemo(() => {
+    if (!salesRecord) {
+      console.log('🔍 [SalesEditDialog] 신규 생성 - canEdit:', canCreateData);
+      return canCreateData; // 신규 생성
+    }
+
+    const result = canEditOthers || (canEditOwn && isDataOwner);
+    console.log('🔍 [SalesEditDialog] 편집 가능 여부:', {
+      canEditOthers,
+      canEditOwn,
+      isDataOwner,
+      canEdit: result
+    });
+
+    return result;
+  }, [salesRecord, canCreateData, canEditOwn, canEditOthers, isDataOwner]);
 
   // Supabase 클라이언트 생성 (DB 직접 조회용)
   const supabaseClient = React.useMemo(() => {
@@ -1227,10 +1317,34 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
 
         {/* 취소, 저장 버튼을 오른쪽 상단으로 이동 */}
         <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-          <Button onClick={handleClose} variant="outlined" size="small" sx={{ minWidth: '60px' }}>
+          <Button
+            onClick={handleClose}
+            variant="outlined"
+            size="small"
+            disabled={!canEdit}
+            sx={{
+              minWidth: '60px',
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             취소
           </Button>
-          <Button onClick={handleSave} variant="contained" size="small" sx={{ minWidth: '60px' }}>
+          <Button
+            onClick={handleSave}
+            variant="contained"
+            size="small"
+            disabled={!canEdit}
+            sx={{
+              minWidth: '60px',
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             저장
           </Button>
         </Box>
@@ -1772,7 +1886,7 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
             </TabPanel>
 
             <TabPanel value={value} index={2}>
-              <MaterialTab recordId={formData?.id} currentUser={currentUser} />
+              <MaterialTab recordId={formData?.id} currentUser={currentUser} canEdit={canEdit} canEditOwn={canEditOwn} canEditOthers={canEditOthers} />
             </TabPanel>
           </>
         )}

@@ -32,22 +32,26 @@ const viewOptions = [
   {
     label: '월',
     value: 'dayGridMonth',
-    icon: Category
+    icon: Category,
+    disabled: false
   },
   {
     label: '주',
     value: 'timeGridWeek',
-    icon: Grid6
+    icon: Grid6,
+    disabled: true
   },
   {
     label: '일',
     value: 'timeGridDay',
-    icon: Calendar1
+    icon: Calendar1,
+    disabled: true
   },
   {
     label: '일정',
     value: 'listWeek',
-    icon: TableDocument
+    icon: TableDocument,
+    disabled: true
   }
 ];
 
@@ -68,6 +72,7 @@ interface ToolbarProps {
   onAssigneeFilterChange?: (assignee: string) => void;
   onAttendeesFilterChange?: (attendees: string[]) => void;
   allAttendees?: string[];
+  canCreateData?: boolean;
 }
 
 export default function Toolbar({
@@ -85,6 +90,7 @@ export default function Toolbar({
   onAssigneeFilterChange,
   onAttendeesFilterChange,
   allAttendees,
+  canCreateData = true,
   ...others
 }: ToolbarProps) {
   const downSM = useMediaQuery((theme: Theme) => theme.breakpoints.down('sm'));
@@ -124,14 +130,27 @@ export default function Toolbar({
               const Icon = viewOption.icon;
               return (
                 <Tooltip title={viewOption.label} key={viewOption.value}>
-                  <Button
-                    disableElevation
-                    variant={viewOption.value === view ? 'contained' : 'outlined'}
-                    onClick={() => onChangeView(viewOption.value)}
-                    sx={{ minWidth: downSM ? '32px' : '40px' }}
-                  >
-                    <Icon variant={viewOption.value === view ? 'Bold' : 'Linear'} size={downSM ? 14 : 18} />
-                  </Button>
+                  <span>
+                    <Button
+                      disableElevation
+                      variant={viewOption.value === view ? 'contained' : 'outlined'}
+                      onClick={() => onChangeView(viewOption.value)}
+                      disabled={viewOption.disabled}
+                      sx={{
+                        minWidth: downSM ? '32px' : '40px',
+                        ...(viewOption.disabled && {
+                          color: 'text.disabled',
+                          borderColor: 'action.disabledBackground',
+                          '&.Mui-disabled': {
+                            color: 'text.disabled',
+                            borderColor: 'action.disabledBackground'
+                          }
+                        })
+                      }}
+                    >
+                      <Icon variant={viewOption.value === view ? 'Bold' : 'Linear'} size={downSM ? 14 : 18} />
+                    </Button>
+                  </span>
                 </Tooltip>
               );
             })}
@@ -216,21 +235,23 @@ export default function Toolbar({
           />
 
           {/* 일정 추가 버튼 */}
-          <Button
-            variant="contained"
-            startIcon={<Add size={16} />}
-            onClick={onAddEvent}
-            size={downSM ? 'small' : 'medium'}
-            sx={{
-              backgroundColor: 'primary.main',
-              '&:hover': {
-                backgroundColor: 'primary.dark'
-              },
-              whiteSpace: 'nowrap'
-            }}
-          >
-            일정 추가
-          </Button>
+          {canCreateData && (
+            <Button
+              variant="contained"
+              startIcon={<Add size={16} />}
+              onClick={onAddEvent}
+              size={downSM ? 'small' : 'medium'}
+              sx={{
+                backgroundColor: 'primary.main',
+                '&:hover': {
+                  backgroundColor: 'primary.dark'
+                },
+                whiteSpace: 'nowrap'
+              }}
+            >
+              일정 추가
+            </Button>
+          )}
         </Stack>
       </Grid>
     </Grid>

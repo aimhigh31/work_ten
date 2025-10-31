@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 
 // Material-UI
 import {
@@ -38,9 +39,9 @@ import SoftwareEditDialog from 'components/SoftwareEditDialog';
 // data and types
 import { taskData, teams, assignees, softwareStatusOptions, softwareStatusColors, assigneeAvatars } from 'data/software';
 import { TaskTableData, SoftwareStatus } from 'types/software';
+import { useCommonData } from 'contexts/CommonDataContext';
 
-// Users hook
-import { useSupabaseUsers } from '../../hooks/useSupabaseUsers';
+// Users hook - users prop으로 전달받음 (props 사용)
 
 // GROUP002 hook
 import { useGroup002 } from '../../hooks/useGroup002';
@@ -83,6 +84,10 @@ interface SoftwareTableProps {
     title?: string
   ) => void;
   deleteMultipleSoftware?: (ids: number[]) => Promise<any>;
+  users?: any[];
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 export default function SoftwareTable({
@@ -93,7 +98,11 @@ export default function SoftwareTable({
   tasks,
   setTasks,
   addChangeLog,
-  deleteMultipleSoftware
+  deleteMultipleSoftware,
+  users = [],
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: SoftwareTableProps) {
   const theme = useTheme();
   const [data, setData] = useState<TaskTableData[]>([]);
@@ -102,14 +111,85 @@ export default function SoftwareTable({
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [goToPage, setGoToPage] = useState('');
 
-  // 사용자 데이터 가져오기
-  const { users, loading: usersLoading } = useSupabaseUsers();
+  // 공통 데이터 가져오기
+  const { masterCodes } = useCommonData();
+
+  // 소프트웨어분류 서브코드명 변환 함수
+  const getSoftwareCategoryName = useCallback((subcode: string) => {
+    if (!subcode) return '';
+    const found = masterCodes.find(
+      (item) => item.codetype === 'subcode' && item.group_code === 'GROUP015' && item.subcode === subcode && item.is_active
+    );
+    return found ? found.subcode_name : subcode;
+  }, [masterCodes]);
+
+  // 상태 코드를 이름으로 변환하는 함수
+  const getStatusName = useCallback((statusCode: string) => {
+    if (!statusCode) return '대기';
+    // "GROUP002-SUB001" 형태에서 서브코드명 찾기
+    const status = masterCodes.find(
+      (code) => code.codetype === 'subcode' && code.group_code === 'GROUP002' && (code.subcode === statusCode || `${code.group_code}-${code.subcode}` === statusCode)
+    );
+    return status?.subcode_name || statusCode;
+  }, [masterCodes]);
+
+  // 🔐 세션 정보 (권한 체크용)
+  const { data: session } = useSession();
+
+  // 🔐 권한 체크: 현재 사용자 정보
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || !users || users.length === 0) return null;
+    const found = users.find((u) => u.email === session.user.email);
+    console.log('🔐 SoftwareTable - 현재 사용자:', {
+      email: session?.user?.email,
+      user_name: found?.user_name,
+      found: !!found
+    });
+    return found;
+  }, [session, users]);
+
+  // 🔐 권한 체크: 데이터 소유자 확인
+  const isDataOwner = (software: TaskTableData) => {
+    if (!currentUser) return false;
+    const isCreator = software.createdBy === currentUser.user_name;
+    const isAssignee = software.assignee === currentUser.user_name;
+    const result = isCreator || isAssignee;
+
+    if (software.id === data[0]?.id) { // 첫 번째 항목만 로그
+      console.log('🔐 SoftwareTable - 데이터 소유자 확인 (첫 항목):', {
+        softwareId: software.id,
+        currentUserName: currentUser.user_name,
+        createdBy: software.createdBy,
+        assignee: software.assignee,
+        isCreator,
+        isAssignee,
+        isOwner: result
+      });
+    }
+
+    return result;
+  };
+
+  // 🔐 권한 체크: 개별 데이터 편집 가능 여부
+  const canEditData = useCallback((software: TaskTableData) => {
+    return canEditOthers || (canEditOwn && isDataOwner(software));
+  }, [canEditOthers, canEditOwn, currentUser]);
+
+  // 🔐 권한 체크: 선택된 모든 데이터 편집 가능 여부
+  const canEditAllSelected = useMemo(() => {
+    if (selected.length === 0) return false;
+    return selected.every((id) => {
+      const software = data.find((item) => item.id === id);
+      return software && canEditData(software);
+    });
+  }, [selected, data, canEditData]);
 
   // GROUP002 상태 데이터 가져오기
   const { statusOptions: masterStatusOptions, loading: statusLoading, error: statusError } = useGroup002();
 
   // 사용자 이름으로 사용자 데이터 찾기
   const findUserByName = (userName: string) => {
+    if (!users || users.length === 0) return null;
     return users.find((user) => user.user_name === userName);
   };
 
@@ -142,7 +222,7 @@ export default function SoftwareTable({
         소프트웨어분류: (task as any).softwareCategory || '분류없음',
         소프트웨어명: (task as any).softwareName || task.workContent,
         스펙: (task as any).spec || '미정',
-        상태: task.status,
+        상태: getStatusName(task.status),
         사용자: (task as any).currentUser || '미할당',
         담당자: task.assignee,
         시작일: task.startDate || '미정',
@@ -634,11 +714,7 @@ export default function SoftwareTable({
     }
   };
 
-  // 상태 값을 올바른 형태로 변환하는 함수
-  const getDisplayStatus = (status: string) => {
-    // DB에 저장된 상태값이 이미 subcode_name이므로 그대로 사용
-    return status || '상태없음';
-  };
+  // 상태 값을 올바른 형태로 변환하는 함수 (제거 - getStatusName 사용)
 
   // 팀 색상
   const getTeamColor = (team: string) => {
@@ -671,7 +747,20 @@ export default function SoftwareTable({
           >
             Excel Down
           </Button>
-          <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={addNewTask} sx={{ px: 2 }}>
+          <Button
+            variant="contained"
+            startIcon={<Add size={16} />}
+            size="small"
+            onClick={addNewTask}
+            disabled={!canCreateData}
+            sx={{
+              px: 2,
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             추가
           </Button>
           <Button
@@ -679,12 +768,16 @@ export default function SoftwareTable({
             startIcon={<Trash size={16} />}
             size="small"
             color="error"
-            disabled={selected.length === 0}
+            disabled={!canEditAllSelected}
             onClick={handleDeleteSelected}
             sx={{
               px: 2,
-              borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
-              color: selected.length > 0 ? 'error.main' : 'grey.500'
+              borderColor: (selected.length > 0 && (canEditOwn || canEditOthers)) ? 'error.main' : 'grey.300',
+              color: (selected.length > 0 && (canEditOwn || canEditOthers)) ? 'error.main' : 'grey.500',
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
             }}
           >
             삭제 {selected.length > 0 && `(${selected.length})`}
@@ -765,6 +858,7 @@ export default function SoftwareTable({
                   <TableCell padding="checkbox">
                     <Checkbox
                       checked={selected.includes(task.id)}
+                      disabled={!canEditData(task)}
                       onChange={(event) => {
                         const selectedIndex = selected.indexOf(task.id);
                         let newSelected: number[] = [];
@@ -800,7 +894,7 @@ export default function SoftwareTable({
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                      {(task as any).softwareCategory || '분류없음'}
+                      {getSoftwareCategoryName((task as any).softwareCategory) || '분류없음'}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -856,7 +950,7 @@ export default function SoftwareTable({
                         px: 1,
                         py: 0.25,
                         borderRadius: 2,
-                        backgroundColor: getStatusColor(task.status).backgroundColor
+                        backgroundColor: getStatusColor(getStatusName(task.status)).backgroundColor
                       }}
                     >
                       <Typography
@@ -864,10 +958,10 @@ export default function SoftwareTable({
                         sx={{
                           fontSize: '13px',
                           fontWeight: 500,
-                          color: getStatusColor(task.status).color
+                          color: getStatusColor(getStatusName(task.status)).color
                         }}
                       >
-                        {getDisplayStatus(task.status)}
+                        {getStatusName(task.status)}
                       </Typography>
                     </Box>
                   </TableCell>
@@ -1051,6 +1145,9 @@ export default function SoftwareTable({
           statusOptions={softwareStatusOptions}
           statusColors={softwareStatusColors}
           teams={teams}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 
 // Material-UI
 import {
@@ -35,7 +36,7 @@ import { VocData } from 'types/voc';
 // hooks
 import { useSupabaseVoc } from 'hooks/useSupabaseVoc';
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
-import { useSupabaseUsers } from 'hooks/useSupabaseUsers';
+import { useCommonData } from 'contexts/CommonDataContext';
 
 // Icons
 import { Add, Trash, Edit, DocumentDownload } from '@wandersonalwes/iconsax-react';
@@ -74,6 +75,10 @@ interface VOCDataTableProps {
     changedField?: string,
     title?: string
   ) => void;
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
+  users?: any[];
 }
 
 export default function VOCDataTable({
@@ -83,7 +88,11 @@ export default function VOCDataTable({
   selectedAssignee = '전체',
   vocs,
   setVOCs,
-  addChangeLog
+  addChangeLog,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true,
+  users = []
 }: VOCDataTableProps) {
   const [data, setData] = useState<VocData[]>(vocs ? vocs : []);
   const [selected, setSelected] = useState<number[]>([]);
@@ -94,14 +103,47 @@ export default function VOCDataTable({
   // Supabase VOC 연동
   const { getVocs, createVoc, updateVoc, deleteVoc, convertToVocData, convertToDbVocData, loading, error } = useSupabaseVoc();
 
+  // 세션 정보 가져오기
+  const { data: session } = useSession();
+
+  // 권한 체크 - 현재 사용자 확인
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || !users || users.length === 0) return null;
+    const found = users.find((u) => u.email === session.user.email);
+    return found;
+  }, [session, users]);
+
+  // 데이터 소유자 확인 (createdBy 또는 assignee)
+  const isDataOwner = (voc: VocData) => {
+    if (!currentUser) return false;
+    const isCreator = voc.createdBy === currentUser.user_name;
+    const isAssignee = voc.assignee === currentUser.user_name;
+    return isCreator || isAssignee;
+  };
+
+  // 개별 데이터 편집 가능 여부
+  const canEditData = useCallback(
+    (voc: VocData) => {
+      return canEditOthers || (canEditOwn && isDataOwner(voc));
+    },
+    [canEditOthers, canEditOwn, currentUser]
+  );
+
+  // 선택된 모든 데이터 편집 가능 여부
+  const canEditAllSelected = useMemo(() => {
+    if (selected.length === 0) return false;
+    return selected.every((id) => {
+      const voc = data.find((item) => item.id === id);
+      return voc && canEditData(voc);
+    });
+  }, [selected, data, canEditData]);
+
   // 마스터코드 연동
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
-  // 사용자관리 연동
-  const { users } = useSupabaseUsers();
-
   // 사용자 이름으로 사용자 데이터 찾기
   const findUserByName = (userName: string) => {
+    if (!users || users.length === 0) return null;
     return users.find((user) => user.user_name === userName);
   };
 
@@ -116,6 +158,36 @@ export default function VOCDataTable({
 
   // GROUP002의 상태 목록 가져오기 (현재 미사용이지만 향후 확장을 위해 유지)
   // const statusOptionsFromMaster = getSubCodesByGroup('GROUP002');
+
+  // CommonData에서 masterCodes 가져오기
+  const { masterCodes } = useCommonData();
+
+  // VOC유형 서브코드를 서브코드명으로 변환하는 함수
+  const getVocTypeName = useCallback((subcode: string) => {
+    if (!subcode) return '';
+    const found = masterCodes.find(
+      (item) => item.codetype === 'subcode' && item.group_code === 'GROUP023' && item.subcode === subcode && item.is_active
+    );
+    return found ? found.subcode_name : subcode;
+  }, [masterCodes]);
+
+  // 우선순위 서브코드를 서브코드명으로 변환하는 함수
+  const getPriorityName = useCallback((subcode: string) => {
+    if (!subcode) return '';
+    const found = masterCodes.find(
+      (item) => item.codetype === 'subcode' && item.group_code === 'GROUP024' && item.subcode === subcode && item.is_active
+    );
+    return found ? found.subcode_name : subcode;
+  }, [masterCodes]);
+
+  // 상태 서브코드를 서브코드명으로 변환하는 함수
+  const getStatusName = useCallback((subcode: string) => {
+    if (!subcode) return '';
+    const found = masterCodes.find(
+      (item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.subcode === subcode && item.is_active
+    );
+    return found ? found.subcode_name : subcode;
+  }, [masterCodes]);
 
   // VOC유형별 색상 매핑 함수
   const getVocTypeColor = (vocType: string) => {
@@ -222,10 +294,16 @@ export default function VOCDataTable({
     }
   };
 
-  // 컴포넌트 마운트 시 VOC 데이터 로드
+  // 컴포넌트 마운트 시 VOC 데이터 로드 (vocs prop이 없을 때만)
   useEffect(() => {
+    // vocs prop이 있으면 자체 로딩을 하지 않음
+    if (vocs && vocs.length > 0) {
+      console.log('📞 VOCDataTable - props에서 VOC 데이터 사용:', vocs.length);
+      return;
+    }
+
     const loadVocData = async () => {
-      console.log('📞 VOC 데이터 로드 시작');
+      console.log('📞 VOCDataTable - 자체 VOC 데이터 로드 시작');
       const dbVocs = await getVocs();
       const vocData = dbVocs.map(convertToVocData);
       setData(vocData);
@@ -235,11 +313,12 @@ export default function VOCDataTable({
     };
 
     loadVocData();
-  }, [getVocs, convertToVocData, setVOCs]);
+  }, [vocs, getVocs, convertToVocData, setVOCs]);
 
   // vocs props가 변경될 때 data 상태 업데이트
   useEffect(() => {
     if (vocs) {
+      console.log('📞 VOCDataTable - vocs prop 업데이트:', vocs.length);
       setData([...vocs]);
     }
   }, [vocs]);
@@ -373,10 +452,10 @@ export default function VOCDataTable({
             addChangeLog(
               '수정',
               vocCode,
-              `VOC관리 ${vocContent}(${vocCode}) 정보의 개요탭 VOC유형이 ${originalVOC.vocType || ''} → ${updatedVOC.vocType || ''} 로 수정 되었습니다.`,
+              `VOC관리 ${vocContent}(${vocCode}) 정보의 개요탭 VOC유형이 ${getVocTypeName(originalVOC.vocType) || ''} → ${getVocTypeName(updatedVOC.vocType) || ''} 로 수정 되었습니다.`,
               updatedVOC.team || '미분류',
-              originalVOC.vocType || '',
-              updatedVOC.vocType || '',
+              getVocTypeName(originalVOC.vocType) || '',
+              getVocTypeName(updatedVOC.vocType) || '',
               'VOC유형',
               vocContent
             );
@@ -443,10 +522,10 @@ export default function VOCDataTable({
             addChangeLog(
               '수정',
               vocCode,
-              `VOC관리 ${vocContent}(${vocCode}) 정보의 개요탭 우선순위가 ${originalVOC.priority || ''} → ${updatedVOC.priority || ''} 로 수정 되었습니다.`,
+              `VOC관리 ${vocContent}(${vocCode}) 정보의 개요탭 우선순위가 ${getPriorityName(originalVOC.priority) || ''} → ${getPriorityName(updatedVOC.priority) || ''} 로 수정 되었습니다.`,
               updatedVOC.team || '미분류',
-              originalVOC.priority || '',
-              updatedVOC.priority || '',
+              getPriorityName(originalVOC.priority) || '',
+              getPriorityName(updatedVOC.priority) || '',
               '우선순위',
               vocContent
             );
@@ -457,10 +536,10 @@ export default function VOCDataTable({
             addChangeLog(
               '수정',
               vocCode,
-              `VOC관리 ${vocContent}(${vocCode}) 정보의 개요탭 상태가 ${originalVOC.status || ''} → ${updatedVOC.status || ''} 로 수정 되었습니다.`,
+              `VOC관리 ${vocContent}(${vocCode}) 정보의 개요탭 상태가 ${getStatusName(originalVOC.status) || ''} → ${getStatusName(updatedVOC.status) || ''} 로 수정 되었습니다.`,
               updatedVOC.team || '미분류',
-              originalVOC.status || '',
-              updatedVOC.status || '',
+              getStatusName(originalVOC.status) || '',
+              getStatusName(updatedVOC.status) || '',
               '상태',
               vocContent
             );
@@ -654,7 +733,20 @@ export default function VOCDataTable({
           >
             Excel Down
           </Button>
-          <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={addNewVOC} sx={{ px: 2 }}>
+          <Button
+            variant="contained"
+            startIcon={<Add size={16} />}
+            size="small"
+            onClick={addNewVOC}
+            disabled={!canCreateData}
+            sx={{
+              px: 2,
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             추가
           </Button>
           <Button
@@ -662,12 +754,16 @@ export default function VOCDataTable({
             startIcon={<Trash size={16} />}
             size="small"
             color="error"
-            disabled={selected.length === 0}
+            disabled={!canEditAllSelected}
             onClick={handleDeleteSelected}
             sx={{
               px: 2,
-              borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
-              color: selected.length > 0 ? 'error.main' : 'grey.500'
+              borderColor: canEditAllSelected ? 'error.main' : 'grey.300',
+              color: canEditAllSelected ? 'error.main' : 'grey.500',
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
             }}
           >
             삭제 {selected.length > 0 && `(${selected.length})`}
@@ -748,6 +844,7 @@ export default function VOCDataTable({
                   <TableCell padding="checkbox">
                     <Checkbox
                       checked={selected.includes(voc.id)}
+                      disabled={!canEditData(voc)}
                       onChange={(event) => {
                         const selectedIndex = selected.indexOf(voc.id);
                         let newSelected: number[] = [];
@@ -783,7 +880,7 @@ export default function VOCDataTable({
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                      {voc.vocType || '미분류'}
+                      {getVocTypeName(voc.vocType) || '미분류'}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -825,15 +922,15 @@ export default function VOCDataTable({
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                      {voc.priority}
+                      {getPriorityName(voc.priority)}
                     </Typography>
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={voc.status}
+                      label={getStatusName(voc.status)}
                       size="small"
                       sx={{
-                        ...getStatusColor(voc.status),
+                        ...getStatusColor(getStatusName(voc.status)),
                         fontWeight: 500,
                         fontSize: '13px'
                       }}
@@ -1033,6 +1130,9 @@ export default function VOCDataTable({
           statusOptions={vocStatusOptions}
           statusColors={vocStatusColors}
           teams={teams}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 
 // dnd-kit
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
@@ -45,6 +45,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useSession } from 'next-auth/react';
 import useUser from 'hooks/useUser';
 import type { SalesRecord } from 'types/sales';
+import { useMenuPermission } from '../../hooks/usePermissions';
 
 // 변경로그 타입 정의
 interface ChangeLog {
@@ -428,6 +429,10 @@ interface SalesDashboardViewProps {
   selectedRecentStatus: string;
   setSelectedRecentStatus: (status: string) => void;
   sales: SalesRecord[];
+  getBusinessUnitName?: (subcode: string) => string;
+  getCustomerName?: (subcode: string) => string;
+  getSalesTypeName?: (subcode: string) => string;
+  getStatusName?: (subcode: string) => string;
 }
 
 function SalesDashboardView({
@@ -437,7 +442,11 @@ function SalesDashboardView({
   selectedAssignee,
   selectedRecentStatus,
   setSelectedRecentStatus,
-  sales
+  sales,
+  getBusinessUnitName = (subcode: string) => subcode,
+  getCustomerName = (subcode: string) => subcode,
+  getSalesTypeName = (subcode: string) => subcode,
+  getStatusName = (subcode: string) => subcode
 }: SalesDashboardViewProps) {
   const theme = useTheme();
   const [startDate, setStartDate] = useState('');
@@ -547,13 +556,13 @@ function SalesDashboardView({
   const getStatusColor = (status: string) => {
     switch (status) {
       case '대기':
-        return '#ED8936';
+        return '#90A4AE';
       case '진행':
-        return '#4267B2';
+        return '#7986CB';
       case '완료':
-        return '#4A5568';
+        return '#81C784';
       case '홀딩':
-        return '#E53E3E';
+        return '#E57373';
       default:
         return '#9e9e9e';
     }
@@ -562,6 +571,8 @@ function SalesDashboardView({
   // 라벨과 값 배열 미리 생성
   const categoryLabels = Object.keys(categoryStats);
   const categoryValues = Object.values(categoryStats);
+  // 서브코드를 서브코드명으로 변환한 라벨
+  const categoryLabelNames = categoryLabels.map(label => getSalesTypeName(label));
 
   // 원형차트 옵션 - 새로운 접근방식: 내장 툴팁 포맷터 사용
   const pieChartOptions: ApexOptions = {
@@ -569,7 +580,7 @@ function SalesDashboardView({
       type: 'pie',
       toolbar: { show: false }
     },
-    labels: categoryLabels,
+    labels: categoryLabelNames,
     colors: ['#01439C', '#389CD7', '#59B8D5', '#BCE3EC', '#E0D8D2', '#F2E8E2'],
     legend: {
       show: false
@@ -705,7 +716,7 @@ function SalesDashboardView({
         text: '매출 건수'
       }
     },
-    colors: ['#ED8936', '#4267B2', '#4A5568', '#E53E3E'],
+    colors: ['#90A4AE', '#7986CB', '#81C784', '#E57373'],
     legend: {
       position: 'top',
       horizontalAlign: 'right'
@@ -858,7 +869,7 @@ function SalesDashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#48C4B7',
+              background: '#26C6DA',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -882,7 +893,7 @@ function SalesDashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#4A5568',
+              background: '#90A4AE',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -906,7 +917,7 @@ function SalesDashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#4267B2',
+              background: '#7986CB',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -930,7 +941,7 @@ function SalesDashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#E53E3E',
+              background: '#81C784',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -954,7 +965,7 @@ function SalesDashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#ED8936',
+              background: '#E57373',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1051,7 +1062,7 @@ function SalesDashboardView({
                             }}
                           />
                           <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                            {key} - {count}건 ({percentage}%)
+                            {getSalesTypeName(key)} - {count}건 ({percentage}%)
                           </Typography>
                         </Box>
                       );
@@ -1108,7 +1119,7 @@ function SalesDashboardView({
                             whiteSpace: 'nowrap'
                           }}
                         >
-                          {sale.customerName || '고객명 없음'}
+                          {getCustomerName(sale.customerName) || '고객명 없음'}
                         </TableCell>
                         <TableCell
                           sx={{
@@ -1125,10 +1136,10 @@ function SalesDashboardView({
                         <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{sale.deliveryDate || '-'}</TableCell>
                         <TableCell sx={{ py: 0.5 }}>
                           <Chip
-                            label={sale.status}
+                            label={getStatusName(sale.status)}
                             size="small"
                             sx={{
-                              bgcolor: getStatusColor(sale.status),
+                              bgcolor: getStatusColor(getStatusName(sale.status)),
                               color: 'white',
                               fontSize: '13px',
                               height: 18,
@@ -1324,6 +1335,20 @@ function SalesMonthlyScheduleView({
   onCardClick
 }: SalesMonthlyScheduleViewProps) {
   const theme = useTheme();
+  const { masterCodes } = useCommonData();
+
+  // 코드를 코드명으로 변환하는 함수
+  const getCodeName = useMemo(() => {
+    return (groupCode: string, subCode: string) => {
+      if (!masterCodes || masterCodes.length === 0) return subCode;
+
+      const masterCode = masterCodes.find(
+        (mc) => mc.group_code === groupCode && mc.subcode === subCode && mc.is_active
+      );
+
+      return masterCode?.subcode_name || subCode;
+    };
+  }, [masterCodes]);
 
   // 데이터 필터링
   const filteredData = sales.filter((sale) => {
@@ -1418,15 +1443,16 @@ function SalesMonthlyScheduleView({
             {/* 월 헤더 - 상반기 */}
             {monthNames.slice(0, 6).map((month, index) => (
               <Box
-                key={index}
+                key={`month-header-first-${index}`}
                 sx={{
-                  p: 2,
+                  py: 1.5,
+                  px: 1,
                   textAlign: 'center',
                   borderRight: index < 5 ? '1px solid' : 'none',
                   borderBottom: '1px solid',
                   borderColor: 'divider',
                   fontWeight: 600,
-                  fontSize: '15px',
+                  fontSize: '14px',
                   color: theme.palette.text.primary,
                   backgroundColor: theme.palette.grey[50]
                 }}
@@ -1445,29 +1471,37 @@ function SalesMonthlyScheduleView({
 
               return (
                 <Box
-                  key={monthIndex}
+                  key={`month-content-first-${monthIndex}`}
                   sx={{
                     borderRight: monthIndex < 5 ? '1px solid' : 'none',
                     borderColor: 'divider',
                     p: 1.5,
                     backgroundColor: '#fff',
-                    minHeight: '150px',
-                    maxHeight: '200px',
-                    verticalAlign: 'top',
+                    minHeight: '254px',
+                    maxHeight: '254px',
                     overflowY: 'auto',
+                    verticalAlign: 'top',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    // 스크롤바 스타일
                     '&::-webkit-scrollbar': {
-                      width: '6px'
+                      width: '10px',
+                      height: '10px'
                     },
                     '&::-webkit-scrollbar-track': {
-                      backgroundColor: '#f1f1f1',
-                      borderRadius: '3px'
+                      backgroundColor: '#f8f9fa',
+                      borderRadius: '4px'
                     },
                     '&::-webkit-scrollbar-thumb': {
-                      backgroundColor: '#c1c1c1',
-                      borderRadius: '3px',
-                      '&:hover': {
-                        backgroundColor: '#a8a8a8'
-                      }
+                      backgroundColor: '#e9ecef',
+                      borderRadius: '4px',
+                      border: '2px solid #f8f9fa'
+                    },
+                    '&::-webkit-scrollbar-thumb:hover': {
+                      backgroundColor: '#dee2e6'
+                    },
+                    '&::-webkit-scrollbar-corner': {
+                      backgroundColor: '#f8f9fa'
                     }
                   }}
                 >
@@ -1478,7 +1512,7 @@ function SalesMonthlyScheduleView({
 
                     return (
                       <Box
-                        key={item.id}
+                        key={`month-${monthIndex}-item-${item.id}`}
                         onClick={async () => {
                           try {
                             await Promise.resolve(onCardClick(item));
@@ -1490,7 +1524,7 @@ function SalesMonthlyScheduleView({
                           mb: itemIndex < items.length - 1 ? 0.8 : 0,
                           p: 0.6,
                           borderRadius: 1,
-                          backgroundColor: getStatusColor(item.status),
+                          backgroundColor: getStatusColor(getCodeName('GROUP002', item.status)),
                           cursor: 'pointer',
                           transition: 'all 0.2s ease',
                           '&:hover': {
@@ -1503,7 +1537,7 @@ function SalesMonthlyScheduleView({
                           variant="body2"
                           sx={{
                             fontSize: '13px',
-                            color: getStatusTextColor(item.status),
+                            color: getStatusTextColor(getCodeName('GROUP002', item.status)),
                             fontWeight: 500,
                             display: 'flex',
                             alignItems: 'center',
@@ -1511,7 +1545,7 @@ function SalesMonthlyScheduleView({
                           }}
                         >
                           <span>{`${month}-${day}`}</span>
-                          <span>{item.status}</span>
+                          <span>{getCodeName('GROUP002', item.status)}</span>
                         </Typography>
                         <Typography
                           variant="body2"
@@ -1523,9 +1557,9 @@ function SalesMonthlyScheduleView({
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap'
                           }}
-                          title={item.customerName || '고객명 없음'}
+                          title={getCodeName('GROUP039', item.customerName) || '고객명 없음'}
                         >
-                          {item.customerName || '고객명 없음'}
+                          {getCodeName('GROUP039', item.customerName) || '고객명 없음'}
                         </Typography>
                       </Box>
                     );
@@ -1545,15 +1579,16 @@ function SalesMonthlyScheduleView({
             {/* 월 헤더 - 하반기 */}
             {monthNames.slice(6, 12).map((month, index) => (
               <Box
-                key={index + 6}
+                key={`month-header-second-${index}`}
                 sx={{
-                  p: 2,
+                  py: 1.5,
+                  px: 1,
                   textAlign: 'center',
                   borderRight: index < 5 ? '1px solid' : 'none',
                   borderBottom: '1px solid',
                   borderColor: 'divider',
                   fontWeight: 600,
-                  fontSize: '15px',
+                  fontSize: '14px',
                   color: theme.palette.text.primary,
                   backgroundColor: theme.palette.grey[50]
                 }}
@@ -1573,29 +1608,37 @@ function SalesMonthlyScheduleView({
 
               return (
                 <Box
-                  key={monthIndex + 6}
+                  key={`month-content-second-${monthIndex}`}
                   sx={{
                     borderRight: monthIndex < 5 ? '1px solid' : 'none',
                     borderColor: 'divider',
                     p: 1.5,
                     backgroundColor: '#fff',
-                    minHeight: '150px',
-                    maxHeight: '200px',
-                    verticalAlign: 'top',
+                    minHeight: '254px',
+                    maxHeight: '254px',
                     overflowY: 'auto',
+                    verticalAlign: 'top',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    // 스크롤바 스타일
                     '&::-webkit-scrollbar': {
-                      width: '6px'
+                      width: '10px',
+                      height: '10px'
                     },
                     '&::-webkit-scrollbar-track': {
-                      backgroundColor: '#f1f1f1',
-                      borderRadius: '3px'
+                      backgroundColor: '#f8f9fa',
+                      borderRadius: '4px'
                     },
                     '&::-webkit-scrollbar-thumb': {
-                      backgroundColor: '#c1c1c1',
-                      borderRadius: '3px',
-                      '&:hover': {
-                        backgroundColor: '#a8a8a8'
-                      }
+                      backgroundColor: '#e9ecef',
+                      borderRadius: '4px',
+                      border: '2px solid #f8f9fa'
+                    },
+                    '&::-webkit-scrollbar-thumb:hover': {
+                      backgroundColor: '#dee2e6'
+                    },
+                    '&::-webkit-scrollbar-corner': {
+                      backgroundColor: '#f8f9fa'
                     }
                   }}
                 >
@@ -1606,7 +1649,7 @@ function SalesMonthlyScheduleView({
 
                     return (
                       <Box
-                        key={item.id}
+                        key={`month-second-${monthIndex}-item-${item.id}`}
                         onClick={async () => {
                           try {
                             await Promise.resolve(onCardClick(item));
@@ -1618,7 +1661,7 @@ function SalesMonthlyScheduleView({
                           mb: itemIndex < items.length - 1 ? 0.8 : 0,
                           p: 0.6,
                           borderRadius: 1,
-                          backgroundColor: getStatusColor(item.status),
+                          backgroundColor: getStatusColor(getCodeName('GROUP002', item.status)),
                           cursor: 'pointer',
                           transition: 'all 0.2s ease',
                           '&:hover': {
@@ -1631,7 +1674,7 @@ function SalesMonthlyScheduleView({
                           variant="body2"
                           sx={{
                             fontSize: '13px',
-                            color: getStatusTextColor(item.status),
+                            color: getStatusTextColor(getCodeName('GROUP002', item.status)),
                             fontWeight: 500,
                             display: 'flex',
                             alignItems: 'center',
@@ -1639,7 +1682,7 @@ function SalesMonthlyScheduleView({
                           }}
                         >
                           <span>{`${month}-${day}`}</span>
-                          <span>{item.status}</span>
+                          <span>{getCodeName('GROUP002', item.status)}</span>
                         </Typography>
                         <Typography
                           variant="body2"
@@ -1651,9 +1694,9 @@ function SalesMonthlyScheduleView({
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap'
                           }}
-                          title={item.customerName || '고객명 없음'}
+                          title={getCodeName('GROUP039', item.customerName) || '고객명 없음'}
                         >
-                          {item.customerName || '고객명 없음'}
+                          {getCodeName('GROUP039', item.customerName) || '고객명 없음'}
                         </Typography>
                       </Box>
                     );
@@ -1670,6 +1713,7 @@ function SalesMonthlyScheduleView({
 
 export default function SalesManagement() {
   const [value, setValue] = useState(0);
+  const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers } = useMenuPermission('/planning/sales');
 
   // 🏪 공용 창고에서 재료 가져오기
   const { users, departments, masterCodes } = useCommonData();
@@ -1996,22 +2040,63 @@ export default function SalesManagement() {
             </Box>
           </Box>
 
-          {/* 탭 네비게이션 및 필터 */}
-          <Box
-            sx={{
-              borderBottom: 1,
-              borderColor: 'divider',
-              mt: 1,
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexShrink: 0
-            }}
-          >
-            <Tabs
-              value={value}
-              onChange={handleChange}
-              aria-label="매출관리 탭"
+          {/* 권한 체크 */}
+          {!canViewCategory ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 접근할 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : !canReadData ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 대한 데이터 조회 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              {/* 탭 네비게이션 및 필터 */}
+              <Box
+                sx={{
+                  borderBottom: 1,
+                  borderColor: 'divider',
+                  mt: 1,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexShrink: 0
+                }}
+              >
+                <Tabs
+                  value={value}
+                  onChange={handleChange}
+                  aria-label="매출관리 탭"
               sx={{
                 flexGrow: 1,
                 '& .MuiTab-root': {
@@ -2258,6 +2343,10 @@ export default function SalesManagement() {
                   editingRecord={editingSales}
                   onEditClick={handleCardClick}
                   onAddClick={handleAddClick}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
+                  users={users}
                 />
               </Box>
             </TabPanel>
@@ -2301,6 +2390,9 @@ export default function SalesManagement() {
                   addChangeLog={addChangeLog}
                   onCardClick={handleCardClick}
                   assigneeList={users.filter((user) => user.status === 'active')}
+                  users={users}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                 />
               </Box>
             </TabPanel>
@@ -2382,6 +2474,10 @@ export default function SalesManagement() {
                   selectedRecentStatus={selectedRecentStatus}
                   setSelectedRecentStatus={setSelectedRecentStatus}
                   sales={sales}
+                  getBusinessUnitName={getBusinessUnitName}
+                  getCustomerName={getCustomerName}
+                  getSalesTypeName={getSalesTypeName}
+                  getStatusName={getStatusName}
                 />
               </Box>
             </TabPanel>
@@ -2423,6 +2519,8 @@ export default function SalesManagement() {
               </Box>
             </TabPanel>
           </Box>
+          </>
+          )}
         </CardContent>
       </Card>
 
@@ -2431,6 +2529,10 @@ export default function SalesManagement() {
         open={editDialog}
         onClose={handleEditDialogClose}
         salesRecord={editingSales}
+        canCreateData={canCreateData}
+        canEditOwn={canEditOwn}
+        canEditOthers={canEditOthers}
+        users={users}
         onSave={async (updatedRecord) => {
           console.log('💾 [SalesManagement] onSave 호출됨, editingSales:', editingSales);
           console.log('📦 [SalesManagement] updatedRecord:', updatedRecord);
@@ -2654,6 +2756,10 @@ export default function SalesManagement() {
 
               console.log('🆕 자동 생성된 코드:', newCode);
 
+              // 현재 사용자의 user_name 가져오기 (권한 체크용)
+              const currentUserName = session?.user?.email ? users.find((u) => u.email === session.user.email)?.user_name : undefined;
+              console.log('👤 신규 생성 - createdBy 설정:', currentUserName);
+
               // SalesRecord를 CreateSalesInput으로 변환
               const createInput = {
                 code: newCode, // 자동 생성된 코드 사용
@@ -2673,7 +2779,8 @@ export default function SalesManagement() {
                 notes: updatedRecord.notes,
                 contractDate: updatedRecord.contractDate,
                 assignee: updatedRecord.assignee,
-                registrationDate: updatedRecord.registrationDate
+                registrationDate: updatedRecord.registrationDate,
+                createdBy: currentUserName // 권한 체크용 생성자 user_name 저장
               };
 
               const newSales = await createSales(createInput);
@@ -2743,6 +2850,9 @@ interface SalesKanbanViewProps {
   addChangeLog: (action: string, target: string, description: string, team?: string) => void;
   onCardClick: (sales: SalesRecord) => void;
   assigneeList?: any[];
+  users?: any[];
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 function SalesKanbanView({
@@ -2754,9 +2864,72 @@ function SalesKanbanView({
   setSalesData,
   addChangeLog,
   onCardClick,
-  assigneeList
+  assigneeList,
+  users,
+  canEditOwn = true,
+  canEditOthers = true
 }: SalesKanbanViewProps) {
   const theme = useTheme();
+  const { data: session } = useSession();
+  const { masterCodes } = useCommonData();
+  const { updateSales } = useSupabaseSales();
+
+  // 코드를 코드명으로 변환하는 함수
+  const getCodeName = useMemo(() => {
+    return (groupCode: string, subCode: string) => {
+      if (!masterCodes || masterCodes.length === 0) return subCode;
+
+      const masterCode = masterCodes.find(
+        (mc) => mc.group_code === groupCode && mc.subcode === subCode && mc.is_active
+      );
+
+      return masterCode?.subcode_name || subCode;
+    };
+  }, [masterCodes]);
+
+  // 현재 로그인한 사용자 정보 조회
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || !users || users.length === 0) {
+      console.log('🔍 [SalesKanbanView] currentUser: 없음');
+      return null;
+    }
+    const found = users.find((u) => u.email === session.user.email);
+    console.log('🔍 [SalesKanbanView] currentUser:', found ? found.user_name : '없음');
+    return found;
+  }, [session, users]);
+
+  // 데이터 소유자 확인 (생성자 또는 담당자)
+  const isDataOwner = useCallback((sales: SalesRecord) => {
+    if (!currentUser) return false;
+
+    const currentUserName = currentUser.user_name;
+
+    // createdBy로 확인 (우선순위 1)
+    const isCreator = sales.createdBy === currentUserName;
+
+    // registrant로 확인 (우선순위 2)
+    // registrant가 "홍길동 팀장" 형식일 수 있으므로, startsWith도 체크
+    const registrantStartsWith = sales.registrant?.startsWith(currentUserName);
+    const isAssignee = sales.registrant === currentUserName || registrantStartsWith;
+
+    const result = isCreator || isAssignee;
+
+    console.log('🔍 [SalesKanbanView] 드래그 권한 체크:', {
+      salesId: sales.id,
+      createdBy: sales.createdBy,
+      registrant: sales.registrant,
+      currentUserName,
+      isCreator,
+      registrantStartsWith,
+      isAssignee,
+      isDataOwner: result,
+      canEditOwn,
+      canEditOthers,
+      isDragDisabled: !(canEditOthers || (canEditOwn && result))
+    });
+
+    return result;
+  }, [currentUser, canEditOwn, canEditOthers]);
 
   // 상태 관리
   const [activeSales, setActiveSales] = useState<SalesRecord | null>(null);
@@ -2953,7 +3126,7 @@ function SalesKanbanView({
       const newStatus = over.id as string;
 
       // 상태가 변경된 경우만 업데이트
-      const currentSales = sales.find((s) => s.id === salesId);
+      const currentSales = salesData.find((s) => s.id === salesId);
 
       if (!currentSales) {
         console.warn('드래그한 매출 데이터를 찾을 수 없음:', salesId);
@@ -2965,10 +3138,10 @@ function SalesKanbanView({
 
         try {
           // DB 업데이트
-          await updateSales(salesId as number, { ...currentSales, status: newStatus });
+          await updateSales(salesId as number, { status: newStatus });
 
           // 로컬 상태 업데이트
-          setSales((prev) => {
+          setSalesData((prev) => {
             try {
               return prev.map((s) => (s.id === salesId ? { ...s, status: newStatus } : s));
             } catch (error) {
@@ -2980,10 +3153,11 @@ function SalesKanbanView({
           // 변경로그 추가
           try {
             const salesCode = currentSales.code || `SALES-${salesId}`;
-            const customerName = currentSales.customerName || '매출정보 없음';
+            const customerName = getCodeName('GROUP039', currentSales.customerName) || '매출정보 없음';
+            const businessUnitName = getCodeName('GROUP035', currentSales.businessUnit) || '미분류';
             const description = `${customerName} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
 
-            addChangeLog('매출 상태 변경', salesCode, description, currentSales.businessUnit || '미분류').catch((logError) => {
+            addChangeLog('수정', salesCode, description, businessUnitName).catch((logError) => {
               console.error('변경로그 추가 중 비동기 오류:', logError);
             });
           } catch (logError) {
@@ -3081,18 +3255,22 @@ function SalesKanbanView({
   };
 
   // 드래그 가능한 카드 컴포넌트 (사양에 맞춰 완전히 새로 작성)
-  function DraggableCard({ sales }: { sales: SalesRecord }) {
+  function DraggableCard({ sales, canEditOwn = true, canEditOthers = true }: { sales: SalesRecord; canEditOwn?: boolean; canEditOthers?: boolean }) {
+    // 드래그 권한 확인
+    const isDragDisabled = !(canEditOthers || (canEditOwn && isDataOwner(sales)));
+
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-      id: sales.id
+      id: sales.id,
+      disabled: isDragDisabled
     });
 
     const style = transform
       ? {
           transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
           opacity: isDragging ? 0.5 : 1,
-          cursor: isDragging ? 'grabbing' : 'pointer'
+          cursor: isDragging ? 'grabbing' : (isDragDisabled ? 'default' : 'grab')
         }
-      : { cursor: 'pointer' };
+      : { cursor: isDragDisabled ? 'default' : 'grab' };
 
     // 상태별 태그 색상 (매출관리 전용)
     const getStatusTagStyle = (status: string) => {
@@ -3124,7 +3302,7 @@ function SalesKanbanView({
       <article
         ref={setNodeRef}
         style={style}
-        {...listeners}
+        {...(isDragDisabled ? {} : listeners)}
         {...attributes}
         className="kanban-card"
         onClick={async (e) => {
@@ -3143,11 +3321,11 @@ function SalesKanbanView({
           <span className="status-tag" style={getStatusTagStyle(sales.status)}>
             {sales.status}
           </span>
-          <span className="incident-type-tag">{sales.businessUnit || '일반사업부'}</span>
+          <span className="incident-type-tag">{getCodeName('GROUP035', sales.businessUnit) || '일반사업부'}</span>
         </div>
 
         {/* 2. 카드 제목 */}
-        <h3 className="card-title">{sales.customerName || '고객명 없음'}</h3>
+        <h3 className="card-title">{getCodeName('GROUP039', sales.customerName) || '고객명 없음'}</h3>
 
         {/* 3. 정보 라인 */}
         <div className="card-info">
@@ -3477,7 +3655,7 @@ function SalesKanbanView({
             return (
               <DroppableColumn key={column.key} column={column}>
                 {items.map((item) => (
-                  <DraggableCard key={item.id} sales={item} />
+                  <DraggableCard key={item.id} sales={item} canEditOwn={canEditOwn} canEditOthers={canEditOthers} />
                 ))}
 
                 {/* 빈 칼럼 메시지 */}

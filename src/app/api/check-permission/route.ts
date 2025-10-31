@@ -8,7 +8,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from 'utils/authOptions';
-import { getAllMenuPermissions } from 'lib/authMiddleware';
+import { getAllMenuPermissions, getCurrentUserRoleCodes } from 'lib/authMiddleware';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: { autoRefreshToken: false, persistSession: false }
+});
 
 /**
  * GET: 현재 사용자의 전체 메뉴 권한 조회
@@ -16,13 +24,20 @@ import { getAllMenuPermissions } from 'lib/authMiddleware';
  * 응답 예시:
  * {
  *   success: true,
- *   roleId: 1,
- *   roleName: "시스템관리자",
+ *   roleCodes: ["ROLE-25-001", "ROLE-25-002"],
  *   permissions: {
  *     "/apps/education": {
+ *       // 기존 3개 필드 (하위 호환성)
  *       canRead: true,
  *       canWrite: true,
  *       canFull: true,
+ *       // 새로운 5개 필드 (세밀한 권한 제어)
+ *       canViewCategory: true,
+ *       canReadData: true,
+ *       canCreateData: true,
+ *       canEditOwn: true,
+ *       canEditOthers: true,
+ *       // 메뉴 정보
  *       menuPage: "개인교육관리",
  *       menuCategory: "메인메뉴"
  *     },
@@ -37,8 +52,8 @@ export async function GET(request: NextRequest) {
     // 1. 세션 확인
     const session = await getServerSession(authOptions);
 
-    if (!session?.user?.roleId) {
-      console.warn('⚠️ [check-permission API] 세션 없음 또는 roleId 없음');
+    if (!session?.user) {
+      console.warn('⚠️ [check-permission API] 세션 없음');
       return NextResponse.json(
         {
           success: false,
@@ -48,12 +63,39 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { roleId, roleName } = session.user;
+    // 2. assignedRoles 가져오기 (세션 또는 DB)
+    let roleCodes = session.user.assignedRoles || [];
 
-    console.log(`✅ [check-permission API] 사용자 확인: roleId=${roleId}, roleName=${roleName}`);
+    if (!roleCodes || roleCodes.length === 0) {
+      console.warn('⚠️ [check-permission API] 세션에 assignedRoles 없음 - DB에서 조회');
 
-    // 2. 전체 메뉴 권한 조회
-    const permissionMap = await getAllMenuPermissions(roleId);
+      // DB에서 assignedRoles 조회
+      roleCodes = await getCurrentUserRoleCodes(request);
+
+      if (!roleCodes || roleCodes.length === 0) {
+        console.error('❌ [check-permission API] DB에서도 assignedRoles 조회 실패');
+        return NextResponse.json(
+          {
+            success: false,
+            error: '사용자 역할 정보를 찾을 수 없습니다.'
+          },
+          { status: 401 }
+        );
+      }
+
+      console.log(`✅ [check-permission API] DB에서 조회: roleCodes=${roleCodes.join(', ')}`);
+    }
+
+    console.log(`✅ [check-permission API] 사용자 확인: roleCodes=${roleCodes.join(', ')}`);
+
+    // 3. 전체 메뉴 권한 조회 (모든 역할의 권한을 OR 조건으로 병합)
+    console.log(`🔄 [check-permission API] getAllMenuPermissions 호출 시작...`);
+    const permissionMap = await getAllMenuPermissions(roleCodes);
+    console.log(`📊 [check-permission API] Map 결과:`, {
+      type: permissionMap.constructor.name,
+      size: permissionMap.size,
+      keys: Array.from(permissionMap.keys()).slice(0, 5)
+    });
 
     // Map을 객체로 변환
     const permissions: Record<string, any> = {};
@@ -61,12 +103,16 @@ export async function GET(request: NextRequest) {
       permissions[key] = value;
     });
 
-    console.log(`✅ [check-permission API] 응답 전송: ${Object.keys(permissions).length}개 메뉴 권한`);
+    console.log(`✅ [check-permission API] 응답 전송:`, {
+      permissionsCount: Object.keys(permissions).length,
+      permissionsKeys: Object.keys(permissions).slice(0, 10)
+    });
 
     return NextResponse.json({
       success: true,
-      roleId,
-      roleName,
+      roleCodes: roleCodes,
+      roleId: null, // ✅ 하위 호환성을 위해 null로 유지
+      roleName: roleCodes.length > 0 ? roleCodes.join(', ') : '역할 미지정', // ✅ 하위 호환성
       permissions
     });
   } catch (error: any) {

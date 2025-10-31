@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 
 // Material-UI
 import {
@@ -38,7 +39,7 @@ import HardwareEditDialog from 'components/HardwareEditDialog';
 // data and types
 import { hardwareData, teams, assignees, hardwareStatusOptions, hardwareStatusColors, assigneeAvatars } from 'data/hardware';
 import { HardwareTableData, HardwareStatus } from 'types/hardware';
-import { useSupabaseUsers } from 'hooks/useSupabaseUsers';
+import { useCommonData } from 'contexts/CommonDataContext';
 
 // Icons
 import { Add, Trash, Edit, DocumentDownload } from '@wandersonalwes/iconsax-react';
@@ -79,6 +80,10 @@ interface HardwareTableProps {
   deleteMultipleHardware?: (ids: number[]) => Promise<any>;
   onHardwareSave?: (hardware: HardwareTableData) => Promise<void>;
   statusTypes?: any[];
+  users?: any[];
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 export default function HardwareTable({
@@ -91,17 +96,72 @@ export default function HardwareTable({
   addChangeLog,
   deleteMultipleHardware,
   onHardwareSave,
-  statusTypes = []
+  statusTypes = [],
+  users = [],
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: HardwareTableProps) {
   const theme = useTheme();
+  const { data: session } = useSession();
+
+  // 공통 데이터 가져오기
+  const { masterCodes } = useCommonData();
+
+  // 자산분류 서브코드명 변환 함수
+  const getAssetCategoryName = useCallback((subcode: string) => {
+    if (!subcode) return '';
+    const found = masterCodes.find(
+      (item) => item.codetype === 'subcode' && item.group_code === 'GROUP018' && item.subcode === subcode && item.is_active
+    );
+    return found ? found.subcode_name : subcode;
+  }, [masterCodes]);
+
+  // 상태 코드를 이름으로 변환하는 함수
+  const getStatusName = useCallback((statusCode: string) => {
+    if (!statusCode) return '예비';
+    // "GROUP002-SUB001" 형태에서 서브코드명 찾기
+    const status = masterCodes.find(
+      (code) => code.codetype === 'subcode' && code.group_code === 'GROUP002' && (code.subcode === statusCode || `${code.group_code}-${code.subcode}` === statusCode)
+    );
+    return status?.subcode_name || statusCode;
+  }, [masterCodes]);
+
   const [data, setData] = useState<HardwareTableData[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
+
+  // 🔐 권한 체크: 현재 사용자 정보
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || users.length === 0) return null;
+    const found = users.find((u) => u.email === session.user.email);
+    return found;
+  }, [session, users]);
+
+  // 🔐 권한 체크: 데이터 소유자 확인
+  const isDataOwner = (hardware: HardwareTableData) => {
+    if (!currentUser) return false;
+    return (
+      hardware.createdBy === currentUser.user_name ||
+      hardware.assignee === currentUser.user_name
+    );
+  };
+
+  // 🔐 권한 체크: 개별 데이터 편집 가능 여부
+  const canEditData = useCallback((hardware: HardwareTableData) => {
+    return canEditOthers || (canEditOwn && isDataOwner(hardware));
+  }, [canEditOthers, canEditOwn, currentUser]);
+
+  // 🔐 권한 체크: 선택된 모든 데이터 편집 가능 여부
+  const canEditAllSelected = useMemo(() => {
+    if (selected.length === 0) return false;
+    return selected.every((id) => {
+      const hardware = data.find((item) => item.id === id);
+      return hardware && canEditData(hardware);
+    });
+  }, [selected, data, canEditData]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [goToPage, setGoToPage] = useState('');
-
-  // 사용자 데이터 훅
-  const { users } = useSupabaseUsers();
 
   // 사용자 이름으로 사용자 데이터 찾기
   const findUserByName = (userName: string) => {
@@ -133,7 +193,7 @@ export default function HardwareTable({
         사용자: (task as any).currentUser || '-',
         위치: (task as any).location || '-',
         담당자: task.assignee || '-',
-        상태: task.status,
+        상태: getStatusName(task.status),
         구매일: (task as any).purchaseDate || '-'
       }));
 
@@ -663,7 +723,20 @@ export default function HardwareTable({
           >
             Excel Down
           </Button>
-          <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={addNewHardware} sx={{ px: 2 }}>
+          <Button
+            variant="contained"
+            startIcon={<Add size={16} />}
+            size="small"
+            onClick={addNewHardware}
+            disabled={!canCreateData}
+            sx={{
+              px: 2,
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             추가
           </Button>
           <Button
@@ -671,12 +744,16 @@ export default function HardwareTable({
             startIcon={<Trash size={16} />}
             size="small"
             color="error"
-            disabled={selected.length === 0}
+            disabled={!canEditAllSelected}
             onClick={handleDeleteSelected}
             sx={{
               px: 2,
-              borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
-              color: selected.length > 0 ? 'error.main' : 'grey.500'
+              borderColor: canEditAllSelected ? 'error.main' : 'grey.300',
+              color: canEditAllSelected ? 'error.main' : 'grey.500',
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
             }}
           >
             삭제 {selected.length > 0 && `(${selected.length})`}
@@ -756,6 +833,7 @@ export default function HardwareTable({
                   <TableCell padding="checkbox">
                     <Checkbox
                       checked={selected.includes(task.id)}
+                      disabled={!canEditData(task)}
                       onChange={(event) => {
                         const selectedIndex = selected.indexOf(task.id);
                         let newSelected: number[] = [];
@@ -791,7 +869,7 @@ export default function HardwareTable({
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                      {(task as any).assetCategory || task.department || '분류없음'}
+                      {getAssetCategoryName((task as any).assetCategory) || task.department || '분류없음'}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -841,10 +919,10 @@ export default function HardwareTable({
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={task.status}
+                      label={getStatusName(task.status)}
                       size="small"
                       sx={{
-                        ...getStatusColor(task.status),
+                        ...getStatusColor(getStatusName(task.status)),
                         fontWeight: 500,
                         fontSize: '13px'
                       }}
@@ -1051,6 +1129,9 @@ export default function HardwareTable({
           mode={editingHardware ? 'edit' : 'add'}
           statusOptions={statusTypes.length > 0 ? statusTypes.map((s) => s.subcode_name) : hardwareStatusOptions}
           statusColors={hardwareStatusColors}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>

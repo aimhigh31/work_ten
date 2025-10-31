@@ -9,19 +9,25 @@ declare module 'next-auth' {
     position?: string;
     department?: string;
     profileImage?: string;
-    roleId?: number;        // ✅ 추가: 역할 ID
-    roleName?: string;      // ✅ 추가: 역할명
+    assignedRoles?: string[];  // ✅ 역할 코드 배열 (예: ["ROLE-25-001", "ROLE-25-002"])
   }
   interface Session {
+    id?: string;
     user: {
       name?: string | null;
       email?: string | null;
       image?: string | null;
       position?: string;
       department?: string;
-      roleId?: number;      // ✅ 추가: 역할 ID
-      roleName?: string;    // ✅ 추가: 역할명
+      assignedRoles?: string[];  // ✅ 역할 코드 배열
     };
+  }
+}
+
+declare module 'next-auth/jwt' {
+  interface JWT {
+    id?: string;
+    assignedRoles?: string[];
   }
 }
 
@@ -63,8 +69,7 @@ export const authOptions: NextAuthOptions = {
             .select(`
               email, user_name, status, is_active, auth_user_id,
               position, department, avatar_url, profile_image_url,
-              role_id,
-              admin_users_rules(id, role_name)
+              assigned_roles
             `)
             .or(`user_code.eq.${credentials.email},user_account_id.eq.${credentials.email}`)
             .limit(1);
@@ -111,15 +116,38 @@ export const authOptions: NextAuthOptions = {
           // 로그인 성공
           console.log('✅ Login successful:', authData.user.email);
 
+          // 마지막 로그인 시간 업데이트
+          const now = new Date().toISOString();
+          const { error: updateError } = await supabaseAdmin
+            .from('admin_users_userprofiles')
+            .update({ last_login: now })
+            .eq('email', userProfile.email);
+
+          if (updateError) {
+            console.error('⚠️ Failed to update last_login:', updateError.message);
+          } else {
+            console.log('✅ Last login updated:', now);
+          }
+
           // 프로필 이미지 우선순위: profile_image_url > avatar_url > 기본 이미지
           const profileImage = userProfile.profile_image_url || userProfile.avatar_url || '/assets/images/users/avatar-1.png';
 
-          // 역할 정보 추출 (admin_users_rules 조인 데이터)
-          const roleData = userProfile.admin_users_rules;
-          const roleId = userProfile.role_id || null;
-          const roleName = roleData?.role_name || '역할 미지정';
+          // assigned_roles 파싱 (JSON 문자열 → 배열)
+          let assignedRoles: string[] = [];
+          try {
+            if (userProfile.assigned_roles) {
+              if (Array.isArray(userProfile.assigned_roles)) {
+                assignedRoles = userProfile.assigned_roles;
+              } else if (typeof userProfile.assigned_roles === 'string') {
+                assignedRoles = JSON.parse(userProfile.assigned_roles);
+              }
+            }
+          } catch (error) {
+            console.warn('⚠️ assigned_roles 파싱 실패:', error);
+            assignedRoles = [];
+          }
 
-          console.log('✅ 사용자 역할 정보:', { roleId, roleName });
+          console.log('✅ 사용자 역할 정보:', { assignedRoles });
 
           return {
             id: authData.user.id,
@@ -128,8 +156,7 @@ export const authOptions: NextAuthOptions = {
             position: userProfile.position,
             department: userProfile.department,
             profileImage: profileImage,
-            roleId: roleId,              // ✅ 추가
-            roleName: roleName,          // ✅ 추가
+            assignedRoles: assignedRoles,  // ✅ 역할 코드 배열
             accessToken: authData.session?.access_token || 'authenticated'
           };
         } catch (e: any) {
@@ -186,8 +213,7 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         token.email = user.email;
         token.name = user.name;
-        token.roleId = user.roleId;       // ✅ 추가
-        token.roleName = user.roleName;   // ✅ 추가
+        token.assignedRoles = user.assignedRoles;  // ✅ 역할 코드 배열
       }
       return token;
     },
@@ -196,8 +222,7 @@ export const authOptions: NextAuthOptions = {
         session.id = token.id;
         session.user.email = token.email as string;
         session.user.name = token.name as string;
-        session.user.roleId = token.roleId as number;       // ✅ 추가
-        session.user.roleName = token.roleName as string;   // ✅ 추가
+        session.user.assignedRoles = token.assignedRoles as string[];  // ✅ 역할 코드 배열
       }
       return session;
     },

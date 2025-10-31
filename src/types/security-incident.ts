@@ -11,6 +11,7 @@ export interface SecurityIncidentRecord {
   severity: '높음' | '중간' | '낮음';
   status: '대기' | '진행' | '완료' | '홀딩';
   assignee: string;
+  createdBy?: string; // 데이터 생성자 (권한 체크용)
   team?: string; // 팀
   occurrenceDate?: string; // 발생일자
   completedDate?: string; // 완료일자

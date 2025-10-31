@@ -70,7 +70,6 @@ interface UserData {
   profile_image_url?: string; // Supabase Storage URL
   assignedRole?: string[]; // 할당된 역할 목록
   rule?: string; // 역할 코드 (RULE-25-002 형식)
-  role_id?: number | null; // 역할 ID (admin_users_rules.id)
   auth_user_id?: string; // Supabase Auth users.id (UUID)
 }
 
@@ -104,9 +103,11 @@ interface UserEditDialogProps {
   user: UserData | null;
   onSave: (user: UserData) => void;
   departments?: any[];
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
-export default function UserEditDialog({ open, onClose, user, onSave, departments = [] }: UserEditDialogProps) {
+export default function UserEditDialog({ open, onClose, user, onSave, departments = [], canEditOwn = true, canEditOthers = true }: UserEditDialogProps) {
   const [tabValue, setTabValue] = useState(0);
   const [tempImageFile, setTempImageFile] = useState<File | null>(null);
   const [isImageChanged, setIsImageChanged] = useState(false);
@@ -273,8 +274,8 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
           console.log(`🔧 역할 ${role.role_code} 최종 상태:`, isActive ? '활성' : '비활성');
 
           return {
-            id: index + 1,
-            no: index + 1,
+            id: role.id, // ✅ 실제 DB ID 사용 (인덱스가 아니라)
+            no: index + 1, // no는 표시용이므로 인덱스 사용
             registrationDate: role.created_at ? new Date(role.created_at).toISOString().split('T')[0] : '2025-09-01',
             code: role.role_code,
             role: role.role_name,
@@ -491,7 +492,6 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
         registrant: currentUser && typeof currentUser !== 'boolean' ? currentUser.name || '' : '',
         assignedRole: [],
         rule: 'ROLE-25-003',
-        role_id: null,
         phone: '',
         country: '',
         address: '',
@@ -905,6 +905,7 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
     console.log('  ✅ department:', formData.department);
     console.log('  ✅ position:', formData.position);
     console.log('  ✅ role:', formData.role);
+    console.log('  ✅ assignedRole:', formData.assignedRole);
 
     console.log('💾 [UserEditDialog] finalData (formData + 이미지):', {
       userAccount: finalData.userAccount,
@@ -1072,10 +1073,34 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
 
           {/* 취소, 저장 버튼을 오른쪽 상단으로 이동 */}
           <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-            <Button onClick={handleClose} variant="outlined" size="small" sx={{ minWidth: '60px' }}>
+            <Button
+              onClick={handleClose}
+              variant="outlined"
+              size="small"
+              disabled={!(canEditOwn || canEditOthers)}
+              sx={{
+                minWidth: '60px',
+                '&.Mui-disabled': {
+                  borderColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               취소
             </Button>
-            <Button onClick={handleSave} variant="contained" size="small" sx={{ minWidth: '60px' }} disabled={uploading}>
+            <Button
+              onClick={handleSave}
+              variant="contained"
+              size="small"
+              disabled={uploading || !(canEditOwn || canEditOthers)}
+              sx={{
+                minWidth: '60px',
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               {uploading ? '업로드 중...' : '저장'}
             </Button>
           </Box>
@@ -1116,10 +1141,17 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
                             variant="outlined"
                             color="error"
                             size="small"
+                            disabled={!(canEditOwn || canEditOthers)}
                             onClick={() => {
                               setFormData((prev) => ({ ...prev, profileImage: undefined }));
                               setTempImageFile(null);
                               setIsImageChanged(true);
+                            }}
+                            sx={{
+                              '&.Mui-disabled': {
+                                borderColor: 'grey.300',
+                                color: 'grey.500'
+                              }
                             }}
                           >
                             사진 제거
@@ -1244,12 +1276,38 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
                       </Box>
 
                       {/* 비밀번호 변경 버튼 */}
-                      <Button variant="outlined" color="primary" fullWidth sx={{ mt: 2 }} onClick={handlePasswordChangeOpen}>
+                      <Button
+                        variant="outlined"
+                        color="primary"
+                        fullWidth
+                        disabled={!(canEditOwn || canEditOthers)}
+                        sx={{
+                          mt: 2,
+                          '&.Mui-disabled': {
+                            borderColor: 'grey.300',
+                            color: 'grey.500'
+                          }
+                        }}
+                        onClick={handlePasswordChangeOpen}
+                      >
                         비밀번호 변경
                       </Button>
 
                       {/* 비밀번호 초기화 버튼 */}
-                      <Button variant="outlined" color="warning" fullWidth sx={{ mt: 1 }} onClick={handlePasswordReset}>
+                      <Button
+                        variant="outlined"
+                        color="warning"
+                        fullWidth
+                        disabled={!(canEditOwn || canEditOthers)}
+                        sx={{
+                          mt: 1,
+                          '&.Mui-disabled': {
+                            borderColor: 'grey.300',
+                            color: 'grey.500'
+                          }
+                        }}
+                        onClick={handlePasswordReset}
+                      >
                         비밀번호 초기화
                       </Button>
                     </Stack>
@@ -1726,7 +1784,7 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
                                   const hasRole = currentRoles.includes(role.code);
                                   const newRoles = hasRole ? currentRoles.filter((r) => r !== role.code) : [...currentRoles, role.code];
 
-                                  console.log('🔄🔄🔄 역할 설정/해제 버튼 클릭');
+                                  console.log('🔄 역할 설정/해제 버튼 클릭');
                                   console.log('  현재 역할:', currentRoles);
                                   console.log('  새 역할:', newRoles);
 
@@ -1807,19 +1865,24 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
                             <Stack spacing={1}>
                               {rolePermission.detailed_permissions && rolePermission.detailed_permissions.length > 0 ? (
                                 rolePermission.detailed_permissions.map((permission: any, index: number) => {
-                                  // 권한 레벨 결정 함수
-                                  const getPermissionLevel = (canRead: boolean, canWrite: boolean, canFull: boolean) => {
-                                    if (canFull) return '전체';
-                                    if (canWrite) return '쓰기';
-                                    if (canRead) return '읽기';
+                                  // 권한 레벨 결정 함수 (세밀한 권한 포함)
+                                  const getPermissionLevel = (perm: any) => {
+                                    // 최상위 권한 체크
+                                    if (perm.can_full) return '전체';
+
+                                    // 세밀한 권한 필드 체크 (can_write보다 먼저 체크)
+                                    if (perm.can_create_data || perm.can_edit_own || perm.can_edit_others) return '데이터 추가/편집';
+                                    if (perm.can_read_data) return '데이터조회';
+                                    if (perm.can_view_category) return '카테고리 보기';
+
+                                    // 레거시 권한 체크 (하위 호환성)
+                                    if (perm.can_write) return '쓰기';
+                                    if (perm.can_read) return '읽기';
+
                                     return '없음';
                                   };
 
-                                  const permissionLevel = getPermissionLevel(
-                                    permission.can_read,
-                                    permission.can_write,
-                                    permission.can_full
-                                  );
+                                  const permissionLevel = getPermissionLevel(permission);
 
                                   // 권한이 없는 경우 표시하지 않음
                                   if (permissionLevel === '없음') return null;
@@ -1850,9 +1913,15 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
                                               ? 'success'
                                               : permissionLevel === '쓰기'
                                                 ? 'primary'
-                                                : permissionLevel === '읽기'
-                                                  ? 'warning'
-                                                  : 'default'
+                                                : permissionLevel === '데이터 추가/편집'
+                                                  ? 'secondary'
+                                                  : permissionLevel === '데이터조회'
+                                                    ? 'info'
+                                                    : permissionLevel === '읽기'
+                                                      ? 'warning'
+                                                      : permissionLevel === '카테고리 보기'
+                                                        ? 'default'
+                                                        : 'default'
                                           }
                                           sx={{ minWidth: '60px', fontWeight: 600 }}
                                         />

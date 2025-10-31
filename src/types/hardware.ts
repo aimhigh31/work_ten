@@ -11,6 +11,7 @@ export interface HardwareData {
   startDate: string;
   completedDate: string;
   attachments: string[];
+  createdBy?: string; // 데이터 생성자 (권한 체크용)
   assetCategory?: string;
   assetName?: string;
   assetDescription?: string;

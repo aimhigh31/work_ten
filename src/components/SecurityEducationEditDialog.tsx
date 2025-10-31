@@ -780,12 +780,18 @@ const ParticipantsTab = memo(
     mode,
     educationId,
     onParticipantCountChange,
-    attendanceTypes
+    attendanceTypes,
+    canCreateData = true,
+    canEditOwn = true,
+    canEditOthers = true
   }: {
     mode: 'add' | 'edit';
     educationId?: number;
     onParticipantCountChange?: (count: number) => void;
     attendanceTypes: any[];
+    canCreateData?: boolean;
+    canEditOwn?: boolean;
+    canEditOthers?: boolean;
   }) => {
     // Supabase 참석자 관리 훅
     const { fetchAttendeesByEducationId, addMultipleAttendees, updateAttendee, deleteAttendee } = useSupabaseSecurityAttendee();
@@ -1347,10 +1353,34 @@ const ParticipantsTab = memo(
             참석자 관리
           </Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button variant="outlined" color="error" onClick={handleDeleteSelected} disabled={selectedRows.length === 0} size="small">
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={handleDeleteSelected}
+              disabled={selectedRows.length === 0 || !(canEditOwn || canEditOthers)}
+              size="small"
+              sx={{
+                '&.Mui-disabled': {
+                  borderColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               삭제({selectedRows.length})
             </Button>
-            <Button variant="contained" onClick={handleAddItem} size="small" sx={{ fontSize: '12px' }}>
+            <Button
+              variant="contained"
+              onClick={handleAddItem}
+              disabled={mode === 'add' ? !canCreateData : !(canEditOwn || canEditOthers)}
+              size="small"
+              sx={{
+                fontSize: '12px',
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               추가
             </Button>
           </Box>
@@ -1539,7 +1569,7 @@ const ParticipantsTab = memo(
 );
 
 // 커리큘럼 탭 컴포넌트 - 임시 데이터 저장 기능 추가
-const CurriculumTab = memo(({ mode, educationId }: { mode: 'add' | 'edit'; educationId?: number }) => {
+const CurriculumTab = memo(({ mode, educationId, canCreateData = true, canEditOwn = true, canEditOthers = true }: { mode: 'add' | 'edit'; educationId?: number; canCreateData?: boolean; canEditOwn?: boolean; canEditOthers?: boolean }) => {
   // Supabase 커리큘럼 hook
   const {
     data: curriculumData,
@@ -2049,10 +2079,34 @@ const CurriculumTab = memo(({ mode, educationId }: { mode: 'add' | 'edit'; educa
           커리큘럼 관리
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button variant="outlined" color="error" onClick={handleDeleteSelected} disabled={selectedRows.length === 0} size="small">
+          <Button
+            variant="outlined"
+            color="error"
+            onClick={handleDeleteSelected}
+            disabled={selectedRows.length === 0 || !(canEditOwn || canEditOthers)}
+            size="small"
+            sx={{
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             삭제({selectedRows.length})
           </Button>
-          <Button variant="contained" onClick={handleAddItem} size="small" sx={{ fontSize: '12px' }}>
+          <Button
+            variant="contained"
+            onClick={handleAddItem}
+            disabled={mode === 'add' ? !canCreateData : !(canEditOwn || canEditOthers)}
+            size="small"
+            sx={{
+              fontSize: '12px',
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             추가
           </Button>
         </Box>
@@ -2750,9 +2804,11 @@ interface MaterialTabProps {
   recordId?: number | string;
   currentUser?: UserProfile | null;
   onFileChange?: (action: string, fileName: string, fileData?: any) => void;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
-const MaterialTab = memo(({ recordId, currentUser, onFileChange }: MaterialTabProps) => {
+const MaterialTab = memo(({ recordId, currentUser, onFileChange, canEditOwn = true, canEditOthers = true }: MaterialTabProps) => {
   // 파일 관리 훅
   const {
     files,
@@ -2776,7 +2832,7 @@ const MaterialTab = memo(({ recordId, currentUser, onFileChange }: MaterialTabPr
 
       // recordId가 없으면 업로드 불가
       if (!recordId) {
-        alert('파일을 업로드하려면 먼저 교육을 저장해주세요.');
+        setValidationError('파일을 업로드하려면 먼저 교육을 저장해주세요.');
         return;
       }
 
@@ -2792,7 +2848,7 @@ const MaterialTab = memo(({ recordId, currentUser, onFileChange }: MaterialTabPr
         });
 
         if (!result.success) {
-          alert(`파일 업로드 실패: ${result.error}`);
+          setValidationError(`파일 업로드 실패: ${result.error}`);
         } else {
           // 파일 업로드 성공 시 로깅
           onFileChange?.('FILE_UPLOAD', file.name, { fileType: file.type, fileSize: file.size });
@@ -2852,7 +2908,7 @@ const MaterialTab = memo(({ recordId, currentUser, onFileChange }: MaterialTabPr
         setEditingMaterialId(null);
         setEditingMaterialText('');
       } else {
-        alert(`파일명 수정 실패: ${result.error}`);
+        setValidationError(`파일명 수정 실패: ${result.error}`);
       }
     }
   }, [editingMaterialId, editingMaterialText, updateFile, files, onFileChange]);
@@ -2872,7 +2928,7 @@ const MaterialTab = memo(({ recordId, currentUser, onFileChange }: MaterialTabPr
 
       const result = await deleteFile(materialId);
       if (!result.success) {
-        alert(`파일 삭제 실패: ${result.error}`);
+        setValidationError(`파일 삭제 실패: ${result.error}`);
       } else {
         // 파일 삭제 성공 시 로깅
         onFileChange?.('FILE_DELETE', fileName);
@@ -2903,16 +2959,16 @@ const MaterialTab = memo(({ recordId, currentUser, onFileChange }: MaterialTabPr
             p: 3,
             textAlign: 'center',
             borderStyle: 'dashed',
-            borderColor: 'primary.main',
-            backgroundColor: 'primary.50',
-            cursor: 'pointer',
+            borderColor: (canEditOwn || canEditOthers) ? 'primary.main' : 'grey.300',
+            backgroundColor: (canEditOwn || canEditOthers) ? 'primary.50' : 'grey.100',
+            cursor: (canEditOwn || canEditOthers) ? 'pointer' : 'not-allowed',
             transition: 'all 0.2s ease-in-out',
-            '&:hover': {
+            '&:hover': (canEditOwn || canEditOthers) ? {
               borderColor: 'primary.dark',
               backgroundColor: 'primary.100'
-            }
+            } : {}
           }}
-          onClick={handleUploadClick}
+          onClick={(canEditOwn || canEditOthers) ? handleUploadClick : undefined}
         >
           <Stack spacing={2} alignItems="center">
             <Typography fontSize="48px">📁</Typography>
@@ -2922,7 +2978,18 @@ const MaterialTab = memo(({ recordId, currentUser, onFileChange }: MaterialTabPr
             <Typography variant="body2" color="text.secondary">
               클릭하거나 파일을 여기로 드래그하세요
             </Typography>
-            <Button variant="contained" size="small" startIcon={<Typography>📤</Typography>}>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<Typography>📤</Typography>}
+              disabled={!(canEditOwn || canEditOthers)}
+              sx={{
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               파일 선택
             </Button>
           </Stack>
@@ -3035,8 +3102,14 @@ const MaterialTab = memo(({ recordId, currentUser, onFileChange }: MaterialTabPr
                         size="small"
                         onClick={() => handleEditMaterial(fileData.id, fileData.file_name)}
                         color="primary"
-                        sx={{ p: 0.5 }}
+                        sx={{
+                          p: 0.5,
+                          '&.Mui-disabled': {
+                            color: 'grey.300'
+                          }
+                        }}
                         title="수정"
+                        disabled={!(canEditOwn || canEditOthers)}
                       >
                         <Typography fontSize="14px">✏️</Typography>
                       </IconButton>
@@ -3044,9 +3117,14 @@ const MaterialTab = memo(({ recordId, currentUser, onFileChange }: MaterialTabPr
                         size="small"
                         onClick={() => handleDeleteMaterial(fileData.id)}
                         color="error"
-                        sx={{ p: 0.5 }}
+                        sx={{
+                          p: 0.5,
+                          '&.Mui-disabled': {
+                            color: 'grey.300'
+                          }
+                        }}
                         title="삭제"
-                        disabled={isDeleting}
+                        disabled={isDeleting || !(canEditOwn || canEditOthers)}
                       >
                         <Typography fontSize="14px">🗑️</Typography>
                       </IconButton>
@@ -3118,9 +3196,12 @@ interface SecurityEducationDialogProps {
   onSave: (data: SecurityEducationRecord) => void;
   data?: SecurityEducationRecord | null;
   mode: 'add' | 'edit';
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
-export default function SecurityEducationDialog({ open, onClose, onSave, data, mode }: SecurityEducationDialogProps) {
+export default function SecurityEducationDialog({ open, onClose, onSave, data, mode, canCreateData = true, canEditOwn = true, canEditOthers = true }: SecurityEducationDialogProps) {
   const [value, setValue] = useState(0);
 
   // 현재 로그인 사용자 정보
@@ -3154,6 +3235,42 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
     } : '없음');
     return found;
   }, [session, users]);
+
+  // 데이터 소유자 확인 로직
+  const isOwner = React.useMemo(() => {
+    if (!data) return true; // 신규 생성인 경우 true
+
+    const currentUserName = currentUser?.user_name;
+
+    // createdBy 또는 assignee 중 하나라도 현재 사용자와 일치하면 소유자로 판단
+    const isOwnerResult =
+      data.createdBy === currentUserName ||
+      data.assignee === currentUserName;
+
+    console.log('🔍 [SecurityEducationEditDialog] 소유자 확인 상세:', {
+      data_id: data.id,
+      data_createdBy: data.createdBy,
+      data_assignee: data.assignee,
+      currentUser_email: currentUser?.email,
+      currentUser_user_code: currentUser?.user_code,
+      currentUser_user_name: currentUserName,
+      isOwner: isOwnerResult
+    });
+
+    return isOwnerResult;
+  }, [data, currentUser]);
+
+  // 편집 가능 여부 결정
+  const canEdit = React.useMemo(() => {
+    const result = canEditOthers || (canEditOwn && isOwner);
+    console.log('🔍 [SecurityEducationEditDialog] 편집 가능 여부:', {
+      canEditOthers,
+      canEditOwn,
+      isOwner,
+      canEdit: result
+    });
+    return result;
+  }, [canEditOthers, canEditOwn, isOwner]);
 
   // 보안교육 훅 (코드 생성용)
   const { securityEducations } = useSupabaseSecurityEducation();
@@ -4276,12 +4393,36 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
             </Typography>
           )}
         </Box>
-        {/* 취소, 저장 버튼을 오른쪽 상단으로 이동 */}
+        {/* 🔐 권한 체크: 새 교육(mode='add')은 canCreateData, 기존 교육(mode='edit')은 canEdit */}
         <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-          <Button onClick={handleClose} variant="outlined" size="small" sx={{ minWidth: '60px' }}>
+          <Button
+            onClick={handleClose}
+            variant="outlined"
+            size="small"
+            disabled={mode === 'add' ? !canCreateData : !canEdit}
+            sx={{
+              minWidth: '60px',
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             취소
           </Button>
-          <Button onClick={handleSave} variant="contained" size="small" sx={{ minWidth: '60px' }}>
+          <Button
+            onClick={handleSave}
+            variant="contained"
+            size="small"
+            disabled={mode === 'add' ? !canCreateData : !canEdit}
+            sx={{
+              minWidth: '60px',
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             저장
           </Button>
         </Box>
@@ -4313,7 +4454,13 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
         </TabPanel>
 
         <TabPanel value={value} index={1}>
-          <CurriculumTab mode={mode} educationId={typeof data?.id === 'string' ? parseInt(data.id) : data?.id} />
+          <CurriculumTab
+            mode={mode}
+            educationId={typeof data?.id === 'string' ? parseInt(data.id) : data?.id}
+            canCreateData={canCreateData}
+            canEditOwn={canEdit}
+            canEditOthers={canEdit}
+          />
         </TabPanel>
 
         <TabPanel value={value} index={2}>
@@ -4322,6 +4469,9 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
             educationId={data?.id}
             onParticipantCountChange={handleParticipantCountChange}
             attendanceTypes={attendanceTypes}
+            canCreateData={canCreateData}
+            canEditOwn={canEdit}
+            canEditOthers={canEdit}
           />
         </TabPanel>
 
@@ -4350,7 +4500,13 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
         </TabPanel>
 
         <TabPanel value={value} index={5}>
-          <MaterialTab recordId={data?.id} currentUser={currentUser} onFileChange={handleFileChange} />
+          <MaterialTab
+            recordId={data?.id}
+            currentUser={currentUser}
+            onFileChange={handleFileChange}
+            canEditOwn={canEdit}
+            canEditOthers={canEdit}
+          />
         </TabPanel>
       </DialogContent>
 

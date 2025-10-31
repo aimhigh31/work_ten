@@ -11,7 +11,7 @@ const ExperimentalStyled = styled(Box)(({ theme }) => ({
   border: '1px solid #e0e0e0',
   borderRadius: '8px',
   overflow: 'auto',
-  maxHeight: 'calc(100vh - 180px)',
+  height: '100%',
   // hide license message
   '& .fc-license-message': {
     display: 'none'
@@ -107,7 +107,7 @@ const ExperimentalStyled = styled(Box)(({ theme }) => ({
     border: '1px solid #e0e0e0 !important',
     borderLeft: '4px solid var(--event-color) !important',
     overflow: 'hidden',
-    backgroundColor: '#ffffff !important',
+    backgroundColor: '#ffffff',
     position: 'relative'
   },
   '& .fc-v-event .fc-event-title': {

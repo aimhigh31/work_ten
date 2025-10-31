@@ -1856,10 +1856,13 @@ interface RegulationEditDialogProps {
   statusOptions: RegulationStatus[];
   statusColors: Record<RegulationStatus, any>;
   teams?: string[];
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 const RegulationEditDialog = memo(
-  ({ open, onClose, task, onSave, assignees, assigneeAvatars, statusOptions, statusColors, teams }: RegulationEditDialogProps) => {
+  ({ open, onClose, task, onSave, assignees, assigneeAvatars, statusOptions, statusColors, teams, canCreateData = true, canEditOwn = true, canEditOthers = true }: RegulationEditDialogProps) => {
     // 성능 모니터링
     // const { renderCount, logStats } = usePerformanceMonitor('RegulationEditDialog');
 
@@ -2588,12 +2591,36 @@ const RegulationEditDialog = memo(
             )}
           </Box>
 
-          {/* 취소, 저장 버튼을 오른쪽 상단으로 이동 */}
+          {/* 🔐 권한 체크: 새 규정(task null)은 canCreateData, 기존 규정은 canEditOwn/canEditOthers */}
           <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-            <Button onClick={handleClose} variant="outlined" size="small" sx={{ minWidth: '60px' }}>
+            <Button
+              onClick={handleClose}
+              variant="outlined"
+              size="small"
+              disabled={!task ? !canCreateData : !(canEditOwn || canEditOthers)}
+              sx={{
+                minWidth: '60px',
+                '&.Mui-disabled': {
+                  borderColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               취소
             </Button>
-            <Button onClick={handleSave} variant="contained" size="small" sx={{ minWidth: '60px' }}>
+            <Button
+              onClick={handleSave}
+              variant="contained"
+              size="small"
+              disabled={!task ? !canCreateData : !(canEditOwn || canEditOthers)}
+              sx={{
+                minWidth: '60px',
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               저장
             </Button>
           </Box>

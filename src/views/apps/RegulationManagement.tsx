@@ -74,6 +74,7 @@ import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창�
 import useUser from 'hooks/useUser';
 import { useSupabaseFeedback } from 'hooks/useSupabaseFeedback';
 import { PAGE_IDENTIFIERS, FeedbackData } from 'types/feedback';
+import { useMenuPermission } from '../../hooks/usePermissions';
 
 // 변경로그 타입 정의
 interface ChangeLog {
@@ -98,7 +99,7 @@ interface FolderItem {
   description?: string;
   code?: string; // SECDOC 코드 추가
   // 개요탭 관련 필드들
-  status?: string; // 상태 (대기, 진행, 승인, 취소)
+  status?: string; // 상태 (대기, 진행, 완료, 홀딩)
   documentType?: string; // 문서유형
   team?: string; // 팀
   assignee?: string; // 담당자
@@ -171,7 +172,7 @@ const initialFolderData: FolderItem[] = [
         createdDate: '2025-02-01',
         modifiedDate: '2025-06-20',
         description: '보안 업무 수행을 위한 상세 가이드',
-        status: '승인',
+        status: '완료',
         documentType: '보안매뉴얼',
         assignee: '이영수',
         code: 'SEC-DOC-24-003',
@@ -215,7 +216,7 @@ const initialFolderData: FolderItem[] = [
         createdDate: '2025-01-20',
         modifiedDate: '2025-04-30',
         description: '주기적 보안 점검을 위한 체크리스트',
-        status: '승인',
+        status: '완료',
         documentType: '보안절차',
         assignee: '정현우',
         code: 'SEC-DOC-24-005',
@@ -617,10 +618,8 @@ const OverviewTab = React.memo(
                         return { backgroundColor: '#F5F5F5', color: '#757575' };
                       case '진행':
                         return { backgroundColor: '#E3F2FD', color: '#1976D2' };
-                      case '승인':
                       case '완료':
                         return { backgroundColor: '#E8F5E9', color: '#388E3C' };
-                      case '취소':
                       case '홀딩':
                         return { backgroundColor: '#FFEBEE', color: '#D32F2F' };
                       default:
@@ -654,10 +653,8 @@ const OverviewTab = React.memo(
                             return { backgroundColor: '#F5F5F5', color: '#757575' };
                           case '진행':
                             return { backgroundColor: '#E3F2FD', color: '#1976D2' };
-                          case '승인':
                           case '완료':
                             return { backgroundColor: '#E8F5E9', color: '#388E3C' };
-                          case '취소':
                           case '홀딩':
                             return { backgroundColor: '#FFEBEE', color: '#D32F2F' };
                           default:
@@ -717,7 +714,7 @@ const OverviewTab = React.memo(
                           진행
                         </Box>
                       </MenuItem>,
-                      <MenuItem key="승인" value="승인">
+                      <MenuItem key="완료" value="완료">
                         <Box
                           sx={{
                             display: 'inline-block',
@@ -730,10 +727,10 @@ const OverviewTab = React.memo(
                             fontSize: '13px'
                           }}
                         >
-                          승인
+                          완료
                         </Box>
                       </MenuItem>,
-                      <MenuItem key="취소" value="취소">
+                      <MenuItem key="홀딩" value="홀딩">
                         <Box
                           sx={{
                             display: 'inline-block',
@@ -746,7 +743,7 @@ const OverviewTab = React.memo(
                             fontSize: '13px'
                           }}
                         >
-                          취소
+                          홀딩
                         </Box>
                       </MenuItem>
                     ]}
@@ -1259,9 +1256,12 @@ interface MaterialTabProps {
     >
   >;
   onRefreshRevisions?: () => void;
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
-const MaterialTab = React.memo(({ selectedItem, attachedFiles, setAttachedFiles, onRefreshRevisions }: MaterialTabProps) => {
+const MaterialTab = React.memo(({ selectedItem, attachedFiles, setAttachedFiles, onRefreshRevisions, canCreateData = true, canEditOwn = true, canEditOthers = true }: MaterialTabProps) => {
   const theme = useTheme();
   const [selectedFiles, setSelectedFiles] = React.useState<Set<string>>(new Set());
   const { createRevision, updateRevision, deleteRevision } = useSupabaseSecurityRevision();
@@ -1395,7 +1395,20 @@ const MaterialTab = React.memo(({ selectedItem, attachedFiles, setAttachedFiles,
           첨부파일 목록 ({attachedFiles.length}건)
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button variant="contained" startIcon={<Add size={16} />} size="small" component="label" sx={{ px: 2 }}>
+          <Button
+            variant="contained"
+            startIcon={<Add size={16} />}
+            size="small"
+            component="label"
+            disabled={!canCreateData}
+            sx={{
+              px: 2,
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             추가
             <input type="file" multiple hidden onChange={handleFileUpload} accept="*/*" />
           </Button>
@@ -1404,12 +1417,16 @@ const MaterialTab = React.memo(({ selectedItem, attachedFiles, setAttachedFiles,
             startIcon={<Trash size={16} />}
             size="small"
             color="error"
-            disabled={selectedFiles.size === 0}
+            disabled={selectedFiles.size === 0 || !(canEditOwn || canEditOthers)}
             onClick={handleDeleteSelected}
             sx={{
               px: 2,
-              borderColor: selectedFiles.size > 0 ? 'error.main' : 'grey.300',
-              color: selectedFiles.size > 0 ? 'error.main' : 'grey.500'
+              borderColor: selectedFiles.size > 0 && (canEditOwn || canEditOthers) ? 'error.main' : 'grey.300',
+              color: selectedFiles.size > 0 && (canEditOwn || canEditOthers) ? 'error.main' : 'grey.500',
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
             }}
           >
             삭제 {selectedFiles.size > 0 && `(${selectedFiles.size})`}
@@ -1580,6 +1597,9 @@ interface OverviewPanelProps {
       }>
     >
   >;
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 const OverviewPanel = React.memo(
@@ -1591,7 +1611,10 @@ const OverviewPanel = React.memo(
     statusTypes,
     assigneeList,
     attachedFiles: externalAttachedFiles,
-    setAttachedFiles: externalSetAttachedFiles
+    setAttachedFiles: externalSetAttachedFiles,
+    canCreateData = true,
+    canEditOwn = true,
+    canEditOthers = true
   }: OverviewPanelProps) => {
     const [detailTab, setDetailTab] = React.useState(0);
     const { revisions, fetchRevisions } = useSupabaseSecurityRevision();
@@ -1868,6 +1891,7 @@ const OverviewPanel = React.memo(
                 console.log('폴더뷰 개요창 취소 버튼 클릭');
                 // 취소 로직 구현 예정
               }}
+              disabled={!(canEditOwn || canEditOthers)}
               sx={{
                 minWidth: 'auto',
                 px: 2,
@@ -1878,6 +1902,10 @@ const OverviewPanel = React.memo(
                 '&:hover': {
                   borderColor: '#b71c1c',
                   backgroundColor: 'rgba(211, 47, 47, 0.04)'
+                },
+                '&.Mui-disabled': {
+                  borderColor: 'grey.300',
+                  color: 'grey.500'
                 }
               }}
             >
@@ -1912,6 +1940,7 @@ const OverviewPanel = React.memo(
                   console.error('저장 중 오류:', error);
                 }
               }}
+              disabled={!(canEditOwn || canEditOthers)}
               sx={{
                 minWidth: 'auto',
                 px: 2,
@@ -1920,6 +1949,10 @@ const OverviewPanel = React.memo(
                 backgroundColor: '#1976d2',
                 '&:hover': {
                   backgroundColor: '#1565c0'
+                },
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
                 }
               }}
             >
@@ -1977,6 +2010,9 @@ const OverviewPanel = React.memo(
                       fetchRevisions(regulationId);
                     }
                   }}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                 />
               )}
               {detailTab === 2 && (
@@ -2061,6 +2097,9 @@ interface FolderViewProps {
       }>
     >
   >;
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 function FolderView({
@@ -2078,7 +2117,10 @@ function FolderView({
   statusTypes,
   assigneeList,
   sharedAttachedFiles,
-  setSharedAttachedFiles
+  setSharedAttachedFiles,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: FolderViewProps) {
   const theme = useTheme();
   const user = useUser(); // 로그인한 사용자 정보
@@ -2298,7 +2340,16 @@ function FolderView({
                 size="small"
                 startIcon={<FolderAdd size={16} />}
                 onClick={() => setIsAddingFolder(true)}
-                sx={{ textTransform: 'none', fontSize: '0.75rem', px: 1 }}
+                disabled={!canCreateData}
+                sx={{
+                  textTransform: 'none',
+                  fontSize: '0.75rem',
+                  px: 1,
+                  '&.Mui-disabled': {
+                    borderColor: 'grey.300',
+                    color: 'grey.500'
+                  }
+                }}
               >
                 폴더추가
               </Button>
@@ -2307,12 +2358,15 @@ function FolderView({
                 size="small"
                 startIcon={<Add size={16} />}
                 onClick={() => setIsAddingFile(true)}
-                disabled={!selectedItem || selectedItem.type !== 'folder'}
+                disabled={!canCreateData || !selectedItem || selectedItem.type !== 'folder'}
                 sx={{
                   textTransform: 'none',
                   fontSize: '0.75rem',
                   px: 1,
-                  opacity: !selectedItem || selectedItem.type !== 'folder' ? 0.5 : 1
+                  '&.Mui-disabled': {
+                    borderColor: 'grey.300',
+                    color: 'grey.500'
+                  }
                 }}
               >
                 파일추가
@@ -2344,6 +2398,9 @@ function FolderView({
             assigneeList={assigneeList}
             attachedFiles={sharedAttachedFiles}
             setAttachedFiles={setSharedAttachedFiles}
+            canCreateData={canCreateData}
+            canEditOwn={canEditOwn}
+            canEditOthers={canEditOthers}
           />
         </Box>
       </Box>
@@ -2467,6 +2524,8 @@ interface KanbanViewProps {
     user_code: string;
     avatar: string;
   }>;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 function KanbanView({
@@ -2482,7 +2541,9 @@ function KanbanView({
   setFolderData,
   onFileCardClick,
   getAllFilesFromFolders,
-  assigneeList
+  assigneeList,
+  canEditOwn = true,
+  canEditOthers = true
 }: KanbanViewProps) {
   const theme = useTheme();
 
@@ -2507,12 +2568,12 @@ function KanbanView({
   }, [folderData, getAllFilesFromFolders]);
 
   // 상태 매핑 함수 (폴더 상태 -> 칸반 상태)
-  const mapFolderStatusToKanban = React.useCallback((folderStatus: string | undefined): '대기' | '진행' | '승인' | '취소' => {
+  const mapFolderStatusToKanban = React.useCallback((folderStatus: string | undefined): '대기' | '진행' | '완료' | '홀딩' => {
     switch (folderStatus) {
       case '완료':
-        return '승인';
+        return '완료';
       case '홀딩':
-        return '취소';
+        return '홀딩';
       case '진행':
         return '진행';
       case '대기':
@@ -2522,11 +2583,11 @@ function KanbanView({
   }, []);
 
   // 칸반 상태를 폴더 상태로 매핑하는 함수
-  const mapKanbanStatusToFolder = React.useCallback((kanbanStatus: '대기' | '진행' | '승인' | '취소'): string => {
+  const mapKanbanStatusToFolder = React.useCallback((kanbanStatus: '대기' | '진행' | '완료' | '홀딩'): string => {
     switch (kanbanStatus) {
-      case '승인':
+      case '완료':
         return '완료';
-      case '취소':
+      case '홀딩':
         return '홀딩';
       case '진행':
         return '진행';
@@ -2605,7 +2666,7 @@ function KanbanView({
     const newStatus = over.id as string;
 
     // 유효한 상태인지 확인
-    if (!['대기', '진행', '승인', '취소'].includes(newStatus)) {
+    if (!['대기', '진행', '완료', '홀딩'].includes(newStatus)) {
       return;
     }
 
@@ -2621,7 +2682,7 @@ function KanbanView({
 
       if (correspondingFile) {
         // 칸반 상태를 폴더 상태로 변환하여 업데이트
-        const folderStatus = mapKanbanStatusToFolder(newStatus as '대기' | '진행' | '승인' | '취소');
+        const folderStatus = mapKanbanStatusToFolder(newStatus as '대기' | '진행' | '완료' | '홀딩');
 
         setFolderData((prev) => {
           const updateItemInArray = (items: FolderItem[]): FolderItem[] => {
@@ -2644,7 +2705,7 @@ function KanbanView({
       const workContent = currentTask.workContent || '문서내용 없음';
       const description = `${workContent} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
 
-      addChangeLog('규정 상태 변경', taskCode, description, currentTask.team || '미분류');
+      addChangeLog('수정', taskCode, description, currentTask.team || '미분류');
     }
   };
 
@@ -2652,8 +2713,8 @@ function KanbanView({
   const statusColumns = [
     { key: '대기', title: '대기', pillColor: '#F0F0F0', textColor: '#424242' },
     { key: '진행', title: '진행', pillColor: '#E3F2FD', textColor: '#1976D2' },
-    { key: '승인', title: '승인', pillColor: '#E8F5E8', textColor: '#388E3C' },
-    { key: '취소', title: '취소', pillColor: '#FFEBEE', textColor: '#D32F2F' }
+    { key: '완료', title: '완료', pillColor: '#E8F5E8', textColor: '#388E3C' },
+    { key: '홀딩', title: '홀딩', pillColor: '#FFEBEE', textColor: '#D32F2F' }
   ];
 
   // 상태별 아이템 가져오기
@@ -2697,23 +2758,25 @@ function KanbanView({
 
   // 드래그 가능한 카드 컴포넌트
   function DraggableCard({ task }: { task: RegulationTableData }) {
+    const isDragDisabled = !(canEditOwn || canEditOthers);
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-      id: task.id
+      id: task.id,
+      disabled: isDragDisabled
     });
 
     const style = transform
       ? {
           transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
           opacity: isDragging ? 0.5 : 1,
-          cursor: isDragging ? 'grabbing' : 'pointer'
+          cursor: isDragging ? 'grabbing' : (isDragDisabled ? 'default' : 'grab')
         }
-      : { cursor: 'pointer' };
+      : { cursor: isDragDisabled ? 'default' : 'grab' };
 
     return (
       <article
         ref={setNodeRef}
         style={style}
-        {...listeners}
+        {...(isDragDisabled ? {} : listeners)}
         {...attributes}
         className="kanban-card"
         onClick={(e) => {
@@ -2923,12 +2986,12 @@ function KanbanView({
           color: #3b82f6;
         }
         
-        .status-승인 {
+        .status-완료 {
           background: rgba(34, 197, 94, 0.15);
           color: #16a34a;
         }
-        
-        .status-취소 {
+
+        .status-홀딩 {
           background: rgba(239, 68, 68, 0.15);
           color: #dc2626;
         }
@@ -3159,13 +3222,13 @@ function MonthlyScheduleView({
           workContent: item.name,
           severity: '중간',
           status: item.status,
-          responseStage: item.status === '승인' ? '완료' : item.status === '진행' ? '진행 중' : '대기',
+          responseStage: item.status === '완료' ? '완료' : item.status === '진행' ? '진행 중' : '대기',
           assignee: item.assignee,
           team: '보안팀',
           occurrenceDate: item.createdDate,
-          completedDate: item.status === '승인' ? item.modifiedDate : undefined,
+          completedDate: item.status === '완료' ? item.modifiedDate : undefined,
           startDate: item.createdDate,
-          progress: item.status === '승인' ? 100 : item.status === '진행' ? 50 : 0,
+          progress: item.status === '완료' ? 100 : item.status === '진행' ? 50 : 0,
           attachment: item.materials && item.materials.length > 0,
           attachmentCount: item.materials?.length || 0,
           attachments: item.materials || [],
@@ -3248,9 +3311,9 @@ function MonthlyScheduleView({
         return '#E0E0E0';
       case '진행':
         return '#e3f2fd';
-      case '승인':
+      case '완료':
         return '#e8f5e8';
-      case '취소':
+      case '홀딩':
         return '#ffebee';
       default:
         return '#f5f5f5';
@@ -3263,9 +3326,9 @@ function MonthlyScheduleView({
         return '#424242';
       case '진행':
         return '#1976D2';
-      case '승인':
+      case '완료':
         return '#388E3C';
-      case '취소':
+      case '홀딩':
         return '#D32F2F';
       default:
         return '#424242';
@@ -3320,7 +3383,7 @@ function MonthlyScheduleView({
           {/* 월 헤더 - 상반기 */}
           {monthNames.slice(0, 6).map((month, index) => (
             <Box
-              key={index}
+              key={`month-header-first-${index}`}
               sx={{
                 py: 1.5,
                 px: 1,
@@ -3345,7 +3408,7 @@ function MonthlyScheduleView({
 
             return (
               <Box
-                key={monthIndex}
+                key={`month-content-first-${monthIndex}`}
                 sx={{
                   borderRight: monthIndex < 5 ? '1px solid' : 'none',
                   borderColor: 'divider',
@@ -3366,7 +3429,7 @@ function MonthlyScheduleView({
 
                   return (
                     <Box
-                      key={item.id}
+                      key={`month-${monthIndex}-item-${item.id}`}
                       onClick={() => {
                         if (item.isFromFolder) {
                           // 폴더 파일인 경우, 폴더 데이터에서 원본 파일 찾아서 처리
@@ -3447,7 +3510,7 @@ function MonthlyScheduleView({
           {/* 월 헤더 - 하반기 */}
           {monthNames.slice(6, 12).map((month, index) => (
             <Box
-              key={index + 6}
+              key={`month-header-second-${index}`}
               sx={{
                 py: 1.5,
                 px: 1,
@@ -3473,7 +3536,7 @@ function MonthlyScheduleView({
 
             return (
               <Box
-                key={monthIndex}
+                key={`month-content-second-${index}`}
                 sx={{
                   borderRight: index < 5 ? '1px solid' : 'none',
                   borderColor: 'divider',
@@ -3494,7 +3557,7 @@ function MonthlyScheduleView({
 
                   return (
                     <Box
-                      key={item.id}
+                      key={`month-second-${index}-item-${item.id}`}
                       onClick={() => {
                         if (item.isFromFolder) {
                           // 폴더 파일인 경우, 폴더 데이터에서 원본 파일 찾아서 처리
@@ -3593,6 +3656,11 @@ function ChangeLogView({
 }: ChangeLogViewProps) {
   const theme = useTheme();
 
+  // 팀 색상 설정 함수
+  const getTeamColor = (team: string) => {
+    return 'transparent';
+  };
+
   // 페이지별로 데이터 슬라이스
   const startIndex = page * rowsPerPage;
   const paginatedLogs = changeLogs.slice(startIndex, startIndex + rowsPerPage);
@@ -3646,13 +3714,17 @@ function ChangeLogView({
           <TableHead>
             <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
               <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 130 }}>변경시간</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 100 }}>코드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 180 }}>업무내용</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 120 }}>변경분류</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 280 }}>변경 세부내용</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 150 }}>변경시간</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 110 }}>코드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 140 }}>제목</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경분류</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경위치</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90 }}>변경필드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 100 }}>변경전</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 100 }}>변경후</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 400 }}>변경세부내용</TableCell>
               <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>담당자</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -3665,45 +3737,78 @@ function ChangeLogView({
                 }}
               >
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {changeLogs.length - (page * rowsPerPage + index)}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.secondary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {log.dateTime}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                    {log.code}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {log.target}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                    {(() => {
-                      const task = tasks.find((task) => task.code === log.target);
-                      return task?.workContent || log.description.split(' - ')[0] || '업무내용 없음';
-                    })()}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontSize: '13px',
-                      fontWeight: 500
-                    }}
-                  >
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {log.action}
                   </Typography>
                 </TableCell>
                 <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                    {log.location}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                    {log.changedField || '-'}
+                  </Typography>
+                </TableCell>
+                <TableCell>
                   <Typography
                     variant="body2"
                     sx={{
-                      fontSize: '13px',
-                      color: 'text.secondary',
+                      fontSize: '12px',
+                      color: 'text.primary',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: 100
+                    }}
+                    title={log.beforeValue || '-'}
+                  >
+                    {log.beforeValue || '-'}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontSize: '12px',
+                      color: 'text.primary',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: 100
+                    }}
+                    title={log.afterValue || '-'}
+                  >
+                    {log.afterValue || '-'}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontSize: '12px',
+                      color: 'text.primary',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'normal',
@@ -3723,15 +3828,14 @@ function ChangeLogView({
                     size="small"
                     sx={{
                       height: 22,
-                      fontSize: '13px',
-                      backgroundColor: 'transparent',
-                      color: '#333333',
-                      fontWeight: 500
+                      fontSize: '12px',
+                      backgroundColor: getTeamColor(log.team),
+                      color: '#333333'
                     }}
                   />
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {log.user}
                   </Typography>
                 </TableCell>
@@ -4030,8 +4134,8 @@ function DashboardView({
   //   categoryValues: Object.values(categoryStats)
   // });
 
-  // 월별 통계 (막대차트용) - 승인 상태 추가
-  const monthlyStats: { month: string; 대기: number; 진행: number; 승인: number; 취소: number }[] = [];
+  // 월별 통계 (막대차트용) - 완료 상태 추가
+  const monthlyStats: { month: string; 대기: number; 진행: number; 완료: number; 홀딩: number }[] = [];
   const monthData: Record<string, Record<string, number>> = {};
 
   // 파일 데이터와 tasks 데이터를 통합 처리
@@ -4043,11 +4147,11 @@ function DashboardView({
     const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
 
     if (!monthData[monthKey]) {
-      monthData[monthKey] = { 대기: 0, 진행: 0, 승인: 0, 취소: 0 };
+      monthData[monthKey] = { 대기: 0, 진행: 0, 완료: 0, 홀딩: 0 };
     }
 
-    // 상태 매핑 (완료 -> 승인으로 통합)
-    const status = item.status === '완료' ? '승인' : item.status;
+    // 상태를 그대로 사용
+    const status = item.status;
     monthData[monthKey][status] = (monthData[monthKey][status] || 0) + 1;
   });
 
@@ -4061,8 +4165,8 @@ function DashboardView({
         month: `${yearShort}/${monthNum}`,
         대기: monthData[month]['대기'] || 0,
         진행: monthData[month]['진행'] || 0,
-        승인: monthData[month]['승인'] || 0,
-        취소: monthData[month]['취소'] || 0
+        완료: monthData[month]['완료'] || 0,
+        홀딩: monthData[month]['홀딩'] || 0
       });
     });
 
@@ -4073,10 +4177,9 @@ function DashboardView({
         return '#90A4AE';
       case '진행':
         return '#7986CB';
-      case '승인':
       case '완료':
         return '#81C784';
-      case '취소':
+      case '홀딩':
         return '#E57373';
       default:
         return '#9e9e9e';
@@ -4266,11 +4369,11 @@ function DashboardView({
         const 대기 = Number(item.대기) || 0;
         const 진행 = Number(item.진행) || 0;
         const 완료 = Number(item.완료) || 0;
-        const 취소 = Number(item.취소) || 0;
-        const total = 대기 + 진행 + 완료 + 취소;
+        const 홀딩 = Number(item.홀딩) || 0;
+        const total = 대기 + 진행 + 완료 + 홀딩;
 
         // 디버깅: 각 월의 데이터 확인
-        console.log(`${item.month}: 대기=${대기}, 진행=${진행}, 완료=${완료}, 취소=${취소}, total=${total}`);
+        console.log(`${item.month}: 대기=${대기}, 진행=${진행}, 완료=${완료}, 홀딩=${홀딩}, total=${total}`);
 
         // 6월, 8월 특별 확인
         if (item.month === '06월' || item.month === '08월') {
@@ -4323,12 +4426,12 @@ function DashboardView({
       data: monthlyStats.map((item) => item.진행)
     },
     {
-      name: '승인',
-      data: monthlyStats.map((item) => item.승인)
+      name: '완료',
+      data: monthlyStats.map((item) => item.완료)
     },
     {
-      name: '취소',
-      data: monthlyStats.map((item) => item.취소)
+      name: '홀딩',
+      data: monthlyStats.map((item) => item.홀딩)
     }
   ];
 
@@ -4442,13 +4545,13 @@ function DashboardView({
               textAlign: 'center'
             }}
           >
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
+            <Typography variant="body2" sx={{ color: '#fff', fontSize: '14px', mb: 1 }}>
               대기
             </Typography>
             <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
               {statusStats['대기'] || 0}
             </Typography>
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
+            <Typography variant="body2" sx={{ color: '#fff', fontSize: '13px' }}>
               대기중인 업무
             </Typography>
           </Card>
@@ -4491,18 +4594,18 @@ function DashboardView({
             }}
           >
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
-              승인
+              완료
             </Typography>
             <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusStats['승인'] || statusStats['완료'] || 0}
+              {statusStats['완료'] || 0}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              승인된 업무
+              완료된 업무
             </Typography>
           </Card>
         </Grid>
 
-        {/* 취소 */}
+        {/* 홀딩 */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
@@ -4515,13 +4618,13 @@ function DashboardView({
             }}
           >
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
-              취소
+              홀딩
             </Typography>
             <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusStats['취소'] || 0}
+              {statusStats['홀딩'] || 0}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              취소된 업무
+              홀딩된 업무
             </Typography>
           </Card>
         </Grid>
@@ -4817,9 +4920,12 @@ function DashboardView({
   );
 }
 
-export default function TaskManagement() {
+export default function RegulationManagement() {
   const theme = useTheme();
   const [value, setValue] = useState(0);
+
+  // 🔐 권한 체크
+  const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers } = useMenuPermission('/security/regulation');
 
   // 공유 Tasks 상태
   const [tasks, setTasks] = useState<RegulationTableData[]>(regulationData);
@@ -5249,7 +5355,7 @@ export default function TaskManagement() {
     });
 
     // 변경로그 추가
-    addChangeLog('파일 생성', secDocCode, `새 문서 "${newFile.name}" 생성`, '시스템');
+    addChangeLog('추가', secDocCode, `새 문서 "${newFile.name}" 생성`, '시스템');
 
     // 팝업 닫기
     handleFolderDetailDialogClose();
@@ -5274,7 +5380,7 @@ export default function TaskManagement() {
     // 여기서는 저장 완료 메시지만 표시하고 팝업을 닫습니다
 
     // 변경로그 추가
-    addChangeLog('파일 저장', selectedFile.code || selectedFile.id, `파일 "${selectedFile.name}" 저장 완료`, '시스템');
+    addChangeLog('수정', selectedFile.code || selectedFile.id, `파일 "${selectedFile.name}" 저장 완료`, '시스템');
 
     // 팝업 닫기
     handleFolderDetailDialogClose();
@@ -5380,12 +5486,12 @@ export default function TaskManagement() {
       }
 
       if (changes.length > 0) {
-        addChangeLog('업무 수정', updatedTask.code, changes.join(', '), updatedTask.team);
+        addChangeLog('수정', updatedTask.code, changes.join(', '), updatedTask.team);
       }
     } else {
       // 새로 생성
       setTasks((prevTasks) => [...prevTasks, updatedTask]);
-      addChangeLog('업무 생성', updatedTask.code, `새로운 업무가 생성되었습니다: ${updatedTask.workContent}`, updatedTask.team);
+      addChangeLog('추가', updatedTask.code, `새로운 업무가 생성되었습니다: ${updatedTask.workContent}`, updatedTask.team);
     }
 
     handleEditDialogClose();
@@ -5482,7 +5588,48 @@ export default function TaskManagement() {
             </Box>
           </Box>
 
-          {/* 탭 네비게이션 및 필터 */}
+          {/* 권한 체크 */}
+          {!canViewCategory ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 접근할 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : canViewCategory && !canReadData ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 대한 데이터 조회 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              {/* 탭 네비게이션 및 필터 */}
           <Box
             sx={{
               borderBottom: 1,
@@ -5736,6 +5883,9 @@ export default function TaskManagement() {
                     assigneeList={assigneeList}
                     sharedAttachedFiles={sharedAttachedFiles}
                     setSharedAttachedFiles={setSharedAttachedFiles}
+                    canCreateData={canCreateData}
+                    canEditOwn={canEditOwn}
+                    canEditOthers={canEditOthers}
                   />
                 )}
               </Box>
@@ -5775,6 +5925,8 @@ export default function TaskManagement() {
                     onFileCardClick={handleFileCardClick}
                     getAllFilesFromFolders={getAllFilesFromFolders}
                     assigneeList={assigneeList}
+                    canEditOwn={canEditOwn}
+                    canEditOthers={canEditOthers}
                   />
                 )}
               </Box>
@@ -5907,6 +6059,8 @@ export default function TaskManagement() {
               </Box>
             </TabPanel>
           </Box>
+          </>
+          )}
         </CardContent>
       </Card>
 
@@ -5922,6 +6076,9 @@ export default function TaskManagement() {
           statusOptions={regulationStatusOptions}
           statusColors={regulationStatusColors}
           teams={teams}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
 
@@ -5991,12 +6148,17 @@ export default function TaskManagement() {
               variant="outlined"
               size="small"
               onClick={handleFolderDetailDialogClose}
+              disabled={!(canEditOwn || canEditOthers)}
               sx={{
                 minWidth: 'auto',
                 px: 2,
                 fontSize: '13px',
                 color: '#666',
-                borderColor: '#ddd'
+                borderColor: '#ddd',
+                '&.Mui-disabled': {
+                  borderColor: 'grey.300',
+                  color: 'grey.500'
+                }
               }}
             >
               취소
@@ -6005,6 +6167,7 @@ export default function TaskManagement() {
               variant="contained"
               size="small"
               onClick={handleSaveSelectedFile}
+              disabled={!(canEditOwn || canEditOthers)}
               sx={{
                 minWidth: 'auto',
                 px: 2,
@@ -6012,6 +6175,10 @@ export default function TaskManagement() {
                 backgroundColor: '#1976d2',
                 '&:hover': {
                   backgroundColor: '#1565c0'
+                },
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
                 }
               }}
             >
@@ -6055,7 +6222,14 @@ export default function TaskManagement() {
                 />
               )}
               {selectedTab === 1 && (
-                <MaterialTab selectedItem={selectedFile} attachedFiles={sharedAttachedFiles} setAttachedFiles={setSharedAttachedFiles} />
+                <MaterialTab
+                  selectedItem={selectedFile}
+                  attachedFiles={sharedAttachedFiles}
+                  setAttachedFiles={setSharedAttachedFiles}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
+                />
               )}
               {selectedTab === 2 && (
                 <RecordTab

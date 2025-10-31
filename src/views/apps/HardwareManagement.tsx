@@ -57,6 +57,7 @@ import { ChangeLogData } from 'types/changelog';
 import { createClient } from '@/lib/supabase/client';
 import { useSession } from 'next-auth/react';
 import useUser from 'hooks/useUser';
+import { useMenuPermission } from '../../hooks/usePermissions';
 
 // 변경로그 타입 정의 (13필드 - title 추가)
 interface ChangeLog {
@@ -129,7 +130,11 @@ interface KanbanViewProps {
   ) => void;
   assigneeList?: any[];
   statusTypes?: any[];
+  users?: any[];
   onHardwareSave?: (hardware: Partial<HardwareRecord>) => Promise<void>;
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 function KanbanView({
@@ -142,9 +147,30 @@ function KanbanView({
   addChangeLog,
   assigneeList,
   statusTypes = [],
-  onHardwareSave
+  users = [],
+  onHardwareSave,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: KanbanViewProps) {
   const theme = useTheme();
+  const { data: session } = useSession();
+
+  // 🔐 권한 체크: 현재 사용자 정보
+  const currentUser = React.useMemo(() => {
+    if (!session?.user?.email || users.length === 0) return null;
+    const found = users.find((u) => u.email === session.user.email);
+    return found;
+  }, [session, users]);
+
+  // 🔐 권한 체크: 데이터 소유자 확인
+  const isDataOwner = React.useCallback((hardware: HardwareTableData) => {
+    if (!currentUser) return false;
+    return (
+      hardware.createdBy === currentUser.user_name ||
+      hardware.assignee === currentUser.user_name
+    );
+  }, [currentUser]);
 
   // 상태 관리
   const [activeHardware, setActiveHardware] = useState<HardwareTableData | null>(null);
@@ -228,7 +254,7 @@ function KanbanView({
       const workContent = currentHardware.workContent || '업무내용 없음';
       const description = `${workContent} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
 
-      addChangeLog('업무 상태 변경', taskCode, description, currentHardware.team || '미분류');
+      addChangeLog('수정', taskCode, description, currentHardware.team || '미분류');
     }
   };
 
@@ -333,9 +359,11 @@ function KanbanView({
   };
 
   // 드래그 가능한 카드 컴포넌트 (표준화된 5단계 구조)
-  function DraggableCard({ task }: { task: HardwareTableData }) {
+  function DraggableCard({ task, canEditOwn = true, canEditOthers = true }: { task: HardwareTableData; canEditOwn?: boolean; canEditOthers?: boolean }) {
+    const isDragDisabled = !(canEditOthers || (canEditOwn && isDataOwner(task)));
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-      id: task.id
+      id: task.id,
+      disabled: isDragDisabled
     });
 
     const style = transform
@@ -668,7 +696,7 @@ function KanbanView({
             return (
               <DroppableColumn key={column.key} column={column}>
                 {items.map((item) => (
-                  <DraggableCard key={item.id} task={item} />
+                  <DraggableCard key={item.id} task={item} canEditOwn={canEditOwn} canEditOthers={canEditOthers} />
                 ))}
 
                 {/* 빈 칼럼 메시지 */}
@@ -692,7 +720,7 @@ function KanbanView({
           })}
         </div>
 
-        <DragOverlay>{activeHardware ? <DraggableCard task={activeHardware} /> : null}</DragOverlay>
+        <DragOverlay>{activeHardware ? <DraggableCard task={activeHardware} canEditOwn={canEditOwn} canEditOthers={canEditOthers} /> : null}</DragOverlay>
       </DndContext>
 
       {/* Hardware 편집 다이얼로그 */}
@@ -754,6 +782,9 @@ function KanbanView({
           mode={editingHardware ? 'edit' : 'add'}
           onSave={onHardwareSave || (() => Promise.resolve())}
           statusOptions={statusTypes.length > 0 ? statusTypes.map((s) => s.subcode_name) : undefined}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>
@@ -894,7 +925,7 @@ function MonthlyScheduleView({
           {/* 월 헤더 - 상반기 */}
           {monthNames.slice(0, 6).map((month, index) => (
             <Box
-              key={index}
+              key={`month-header-first-${index}`}
               sx={{
                 py: 1.5,
                 px: 1,
@@ -919,7 +950,7 @@ function MonthlyScheduleView({
 
             return (
               <Box
-                key={monthIndex}
+                key={`month-content-first-${monthIndex}`}
                 sx={{
                   borderRight: monthIndex < 5 ? '1px solid' : 'none',
                   borderColor: 'divider',
@@ -940,7 +971,7 @@ function MonthlyScheduleView({
 
                   return (
                     <Box
-                      key={item.id}
+                      key={`month-${monthIndex}-item-${item.id}`}
                       onClick={() => onCardClick(item)}
                       sx={{
                         mb: itemIndex < items.length - 1 ? 0.8 : 0,
@@ -1001,7 +1032,7 @@ function MonthlyScheduleView({
           {/* 월 헤더 - 하반기 */}
           {monthNames.slice(6, 12).map((month, index) => (
             <Box
-              key={index + 6}
+              key={`month-header-second-${index}`}
               sx={{
                 py: 1.5,
                 px: 1,
@@ -1027,7 +1058,7 @@ function MonthlyScheduleView({
 
             return (
               <Box
-                key={monthIndex}
+                key={`month-content-second-${index}`}
                 sx={{
                   borderRight: index < 5 ? '1px solid' : 'none',
                   borderColor: 'divider',
@@ -1048,7 +1079,7 @@ function MonthlyScheduleView({
 
                   return (
                     <Box
-                      key={item.id}
+                      key={`month-second-${index}-item-${item.id}`}
                       onClick={() => onCardClick(item)}
                       sx={{
                         mb: itemIndex < items.length - 1 ? 0.8 : 0,
@@ -1129,6 +1160,22 @@ function DashboardView({
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
+  // 공용 데이터 가져오기
+  const { masterCodes } = useCommonData();
+
+  // 마스터코드에서 상태 옵션 가져오기 (GROUP002)
+  const statusTypesMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // subcode → subcode_name 변환 함수
+  const getStatusName = React.useCallback((subcode: string) => {
+    const found = statusTypesMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [statusTypesMap]);
+
   // 날짜 범위 필터링 함수
   const filterByDateRange = (data: HardwareTableData[]) => {
     if (!startDate && !endDate) {
@@ -1155,7 +1202,7 @@ function DashboardView({
   };
 
   // 데이터 필터링
-  const filteredData = filterByDateRange(tasks).filter((task) => {
+  const filteredData = filterByDateRange(hardware).filter((task) => {
     // 연도 필터
     if (selectedYear !== '전체') {
       const taskYear = new Date(task.startDate).getFullYear().toString();
@@ -1240,13 +1287,13 @@ function DashboardView({
   const getStatusColor = (status: string) => {
     switch (status) {
       case '대기':
-        return '#ED8936';
+        return '#90A4AE';
       case '진행':
-        return '#4267B2';
+        return '#7986CB';
       case '완료':
-        return '#4A5568';
+        return '#81C784';
       case '홀딩':
-        return '#E53E3E';
+        return '#E57373';
       default:
         return '#9e9e9e';
     }
@@ -1418,7 +1465,7 @@ function DashboardView({
         text: '업무 건수'
       }
     },
-    colors: ['#ED8936', '#4267B2', '#4A5568', '#E53E3E'],
+    colors: ['#90A4AE', '#7986CB', '#81C784', '#E57373'],
     legend: {
       position: 'top',
       horizontalAlign: 'right'
@@ -1579,7 +1626,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#48C4B7',
+              background: '#26C6DA',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1598,12 +1645,12 @@ function DashboardView({
           </Card>
         </Grid>
 
-        {/* 완료 */}
+        {/* 대기 */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
               p: 3,
-              background: '#4A5568',
+              background: '#90A4AE',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1611,13 +1658,13 @@ function DashboardView({
             }}
           >
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
-              완료
+              대기
             </Typography>
             <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusStats['완료'] || 0}
+              {statusStats['대기'] || 0}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              완료된 업무
+              대기중인 업무
             </Typography>
           </Card>
         </Grid>
@@ -1627,7 +1674,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#4267B2',
+              background: '#7986CB',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1646,12 +1693,36 @@ function DashboardView({
           </Card>
         </Grid>
 
+        {/* 완료 */}
+        <Grid item xs={12} sm={6} md={2.4}>
+          <Card
+            sx={{
+              p: 3,
+              background: '#81C784',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+              borderRadius: 2,
+              color: '#fff',
+              textAlign: 'center'
+            }}
+          >
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
+              완료
+            </Typography>
+            <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
+              {statusStats['완료'] || 0}
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
+              완료된 업무
+            </Typography>
+          </Card>
+        </Grid>
+
         {/* 홀딩 */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
               p: 3,
-              background: '#E53E3E',
+              background: '#E57373',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1666,30 +1737,6 @@ function DashboardView({
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
               보류중인 업무
-            </Typography>
-          </Card>
-        </Grid>
-
-        {/* 대기 */}
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              p: 3,
-              background: '#ED8936',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-              borderRadius: 2,
-              color: '#fff',
-              textAlign: 'center'
-            }}
-          >
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
-              대기
-            </Typography>
-            <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusStats['대기'] || 0}
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              대기중인 업무
             </Typography>
           </Card>
         </Grid>
@@ -1987,6 +2034,9 @@ export default function HardwareManagement() {
   const theme = useTheme();
   const [value, setValue] = useState(0);
 
+  // 🔐 권한 체크
+  const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers } = useMenuPermission('/it/hardware');
+
   // ⭐ Investment 패턴: 데이터 로딩 함수만 가져오기 (KPI 패턴 적용)
   const {
     hardware: hardwareFromHook,
@@ -2086,6 +2136,7 @@ export default function HardwareManagement() {
       startDate: hardwareItem.start_date || '',
       completedDate: hardwareItem.completed_date || '',
       attachments: hardwareItem.attachments || [],
+      createdBy: hardwareItem.created_by, // 데이터 생성자 (권한 체크용)
 
       // 하드웨어 특화 필드
       assetCategory: hardwareItem.asset_category || '',
@@ -2335,7 +2386,7 @@ export default function HardwareManagement() {
 
         // ✅ createHardware가 내부에서 setHardware 호출 (KPI 패턴)
         console.log('✅ 하드웨어 생성 성공');
-        addChangeLog('하드웨어 생성', hardwareData.code, `새로운 하드웨어가 생성되었습니다: ${updatedHardware.assetName}`, '개발팀');
+        addChangeLog('추가', hardwareData.code, `새로운 하드웨어가 생성되었습니다: ${updatedHardware.assetName}`, '개발팀');
       }
 
       handleEditDialogClose();
@@ -2431,7 +2482,48 @@ export default function HardwareManagement() {
             </Box>
           </Box>
 
-          {/* 탭 네비게이션 및 필터 */}
+          {/* 권한 체크 */}
+          {!canViewCategory ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 접근할 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : !canReadData ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 대한 데이터 조회 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              {/* 탭 네비게이션 및 필터 */}
           <Box
             sx={{
               borderBottom: 1,
@@ -2686,6 +2778,10 @@ export default function HardwareManagement() {
                   deleteMultipleHardware={deleteMultipleHardware}
                   onHardwareSave={handleEditHardwareSave}
                   statusTypes={statusTypes}
+                  users={users}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                 />
               </Box>
             </TabPanel>
@@ -2728,7 +2824,11 @@ export default function HardwareManagement() {
                   addChangeLog={addChangeLog}
                   assigneeList={users.filter((user) => user.status === 'active')}
                   statusTypes={statusTypes}
+                  users={users}
                   onHardwareSave={handleEditHardwareSave}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                 />
               </Box>
             </TabPanel>
@@ -3055,6 +3155,8 @@ export default function HardwareManagement() {
               </Box>
             </TabPanel>
           </Box>
+          </>
+          )}
         </CardContent>
       </Card>
 

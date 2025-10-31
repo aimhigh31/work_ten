@@ -29,6 +29,7 @@ import dayjs, { Dayjs } from 'dayjs';
 import MainCard from 'components/MainCard';
 import { createClient } from '@/lib/supabase/client';
 import { useSupabaseMenuManagement } from 'hooks/useSupabaseMenuManagement';
+import { useMenuPermission } from 'hooks/usePermissions';
 
 // icons
 import { DocumentText } from '@wandersonalwes/iconsax-react';
@@ -85,6 +86,9 @@ function a11yProps(index: number) {
 // ==============================|| 종합 변경로그 페이지 ||============================== //
 
 export default function ChangeLogPage() {
+  // 권한 체크
+  const { canViewCategory, canReadData, loading: permissionLoading } = useMenuPermission('/admin-panel/change-log');
+
   // 메뉴 데이터 (Database -> 페이지명 매핑용)
   const { menus } = useSupabaseMenuManagement();
 
@@ -326,12 +330,34 @@ export default function ChangeLogPage() {
         </Box>
       </Box>
 
-      {/* 탭 영역 */}
-      <MainCard
-        border={false}
-        content={false}
-        sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: 'none' }}
-      >
+      {/* 권한 체크: 카테고리 보기만 가능한 경우 */}
+      {canViewCategory && !canReadData ? (
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            gap: 2,
+            py: 8
+          }}
+        >
+          <Typography variant="h5" color="text.secondary">
+            이 페이지에 대한 데이터 조회 권한이 없습니다.
+          </Typography>
+          <Typography variant="body2" color="text.disabled">
+            관리자에게 권한을 요청하세요.
+          </Typography>
+        </Box>
+      ) : (
+        <>
+          {/* 탭 영역 */}
+          <MainCard
+            border={false}
+            content={false}
+            sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: 'none' }}
+          >
         <Box
           sx={{
             borderBottom: 1,
@@ -747,6 +773,8 @@ export default function ChangeLogPage() {
           </Box>
         </TabPanel>
       </MainCard>
+        </>
+      )}
     </Box>
   );
 }

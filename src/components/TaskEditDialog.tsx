@@ -48,6 +48,7 @@ import { useSupabasePlanManagement, PlanItemInput } from '../hooks/useSupabasePl
 import useUser from '../hooks/useUser';
 import { useCommonData } from '../contexts/CommonDataContext';
 import { useSupabaseFeedback } from '../hooks/useSupabaseFeedback';
+import { useSession } from 'next-auth/react';
 import { PAGE_IDENTIFIERS } from '../types/feedback';
 import { useSupabaseFiles } from '../hooks/useSupabaseFiles';
 import { FileData } from '../types/files';
@@ -1133,7 +1134,8 @@ const PlanTab = memo(
     draggedItemId,
     setEditingChecklistId,
     setEditingField,
-    setEditingProgressValue
+    setEditingProgressValue,
+    canEdit = true
   }: any) => {
     // 필터 및 뷰 모드 상태 관리
     const [filter, setFilter] = useState<string>('all');
@@ -2412,13 +2414,20 @@ const PlanTab = memo(
             onKeyPress={handleChecklistKeyPress}
             variant="outlined"
             InputLabelProps={{ shrink: true }}
-            disabled={viewMode === 'gantt' || viewMode === 'kanban'}
+            disabled={viewMode === 'gantt' || viewMode === 'kanban' || !canEdit}
           />
           <Button
             variant="contained"
             onClick={onAddChecklistItem}
-            disabled={viewMode === 'gantt' || viewMode === 'kanban' || !newChecklistText.trim()}
-            sx={{ minWidth: '80px', height: '40px' }}
+            disabled={viewMode === 'gantt' || viewMode === 'kanban' || !newChecklistText.trim() || !canEdit}
+            sx={{
+              minWidth: '80px',
+              height: '40px',
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
           >
             등록
           </Button>
@@ -2491,7 +2500,7 @@ PlanTab.displayName = 'PlanTab';
 
 // 자료 탭 컴포넌트
 // 자료 탭 컴포넌트 (DB 기반)
-const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | string; currentUser?: any }) => {
+const MaterialTab = memo(({ recordId, currentUser, canEdit = true }: { recordId?: number | string; currentUser?: any; canEdit?: boolean }) => {
   const {
     files,
     loading: filesLoading,
@@ -2645,26 +2654,37 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
             p: 3,
             textAlign: 'center',
             borderStyle: 'dashed',
-            borderColor: 'primary.main',
-            backgroundColor: 'primary.50',
-            cursor: 'pointer',
+            borderColor: canEdit ? 'primary.main' : 'grey.300',
+            backgroundColor: canEdit ? 'primary.50' : 'grey.100',
+            cursor: canEdit ? 'pointer' : 'not-allowed',
             transition: 'all 0.2s ease-in-out',
-            '&:hover': {
+            '&:hover': canEdit ? {
               borderColor: 'primary.dark',
               backgroundColor: 'primary.100'
-            }
+            } : {}
           }}
-          onClick={handleUploadClick}
+          onClick={canEdit ? handleUploadClick : undefined}
         >
           <Stack spacing={2} alignItems="center">
             <Typography fontSize="48px">📁</Typography>
-            <Typography variant="h6" color="primary.main">
+            <Typography variant="h6" color={canEdit ? 'primary.main' : 'grey.500'}>
               파일을 업로드하세요
             </Typography>
             <Typography variant="body2" color="text.secondary">
               클릭하거나 파일을 여기로 드래그하세요
             </Typography>
-            <Button variant="contained" size="small" startIcon={<Typography>📤</Typography>} disabled={isUploading}>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<Typography>📤</Typography>}
+              disabled={isUploading || !recordId || !canEdit}
+              sx={{
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               {isUploading ? '업로드 중...' : '파일 선택'}
             </Button>
           </Stack>
@@ -2779,7 +2799,13 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                           size="small"
                           onClick={() => handleEditMaterial(String(file.id), file.file_name)}
                           color="primary"
-                          sx={{ p: 0.5 }}
+                          disabled={!canEdit}
+                          sx={{
+                            p: 0.5,
+                            '&.Mui-disabled': {
+                              color: 'grey.400'
+                            }
+                          }}
                           title="수정"
                         >
                           <Typography fontSize="14px">✏️</Typography>
@@ -2788,9 +2814,14 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                           size="small"
                           onClick={() => handleDeleteMaterial(String(file.id))}
                           color="error"
-                          sx={{ p: 0.5 }}
+                          disabled={isDeleting || !canEdit}
+                          sx={{
+                            p: 0.5,
+                            '&.Mui-disabled': {
+                              color: 'grey.400'
+                            }
+                          }}
                           title="삭제"
-                          disabled={isDeleting}
                         >
                           <Typography fontSize="14px">🗑️</Typography>
                         </IconButton>
@@ -2848,10 +2879,28 @@ interface TaskEditDialogProps {
   statusColors: Record<TaskStatus, any>;
   kpiData?: any[]; // KPI 데이터 배열 (옵션)
   tasks?: TaskTableData[]; // 전체 업무 목록 (이미 사용중인 KPI 확인용)
+  // 🔐 권한 관리
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 const TaskEditDialog = memo(
-  ({ open, onClose, task, onSave, assignees, assigneeAvatars, statusOptions, statusColors, kpiData = [], tasks = [] }: TaskEditDialogProps) => {
+  ({
+    open,
+    onClose,
+    task,
+    onSave,
+    assignees,
+    assigneeAvatars,
+    statusOptions,
+    statusColors,
+    kpiData = [],
+    tasks = [],
+    canCreateData = true,
+    canEditOwn = true,
+    canEditOthers = true
+  }: TaskEditDialogProps) => {
     // 성능 모니터링
     // const { renderCount, logStats } = usePerformanceMonitor('TaskEditDialog');
 
@@ -2877,6 +2926,24 @@ const TaskEditDialog = memo(
     // 현재 로그인한 사용자 정보
     const user = useUser();
     const { users } = useCommonData();
+    const { data: session } = useSession();
+
+    const currentUser = useMemo(() => {
+      if (!session?.user?.email || users.length === 0) return null;
+      const found = users.find((u: any) => u.email === session.user.email);
+      return found;
+    }, [session, users]);
+
+    // 데이터 소유자 확인 함수
+    const isOwner = useMemo(() => {
+      if (!currentUser || !task) return false;
+      // createdBy 또는 assignee 중 하나라도 현재 사용자와 일치하면 소유자
+      return task.createdBy === currentUser.user_name ||
+             task.assignee === currentUser.user_name;
+    }, [currentUser, task]);
+
+    // 편집 가능 여부
+    const canEdit = canEditOthers || (canEditOwn && isOwner);
 
     // 계획탭 Supabase 연동
     const { fetchPlanItems, savePlanItems } = useSupabasePlanManagement();
@@ -3946,7 +4013,8 @@ const TaskEditDialog = memo(
         draggedItemId,
         setEditingChecklistId,
         setEditingField,
-        setEditingProgressValue
+        setEditingProgressValue,
+        canEdit
       }),
       [
         checklistItems,
@@ -3971,7 +4039,8 @@ const TaskEditDialog = memo(
         handleChecklistStartDateChange,
         draggedItemId,
         editingField,
-        editingProgressValue
+        editingProgressValue,
+        canEdit
       ]
     );
 
@@ -4042,11 +4111,36 @@ const TaskEditDialog = memo(
             </Box>
 
             {/* 취소, 저장 버튼을 오른쪽 상단으로 이동 */}
+            {/* 🔐 권한 체크: 새 업무(task === null)는 canCreateData, 기존 업무는 canEdit */}
             <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-              <Button onClick={handleClose} variant="outlined" size="small" sx={{ minWidth: '60px' }}>
+              <Button
+                onClick={handleClose}
+                variant="outlined"
+                size="small"
+                disabled={!task ? !canCreateData : !canEdit}
+                sx={{
+                  minWidth: '60px',
+                  '&.Mui-disabled': {
+                    borderColor: 'grey.300',
+                    color: 'grey.500'
+                  }
+                }}
+              >
                 취소
               </Button>
-              <Button onClick={handleSave} variant="contained" size="small" sx={{ minWidth: '60px' }}>
+              <Button
+                onClick={handleSave}
+                variant="contained"
+                size="small"
+                disabled={!task ? !canCreateData : !canEdit}
+                sx={{
+                  minWidth: '60px',
+                  '&.Mui-disabled': {
+                    backgroundColor: 'grey.300',
+                    color: 'grey.500'
+                  }
+                }}
+              >
                 저장
               </Button>
             </Box>
@@ -4065,7 +4159,7 @@ const TaskEditDialog = memo(
             {editTab === 0 && <OverviewTab {...overviewTabProps} />}
             {editTab === 1 && <PlanTab {...planTabProps} />}
             {editTab === 2 && <RecordTab {...recordTabProps} />}
-            {editTab === 3 && <MaterialTab recordId={task?.id} currentUser={user} />}
+            {editTab === 3 && <MaterialTab recordId={task?.id} currentUser={user} canEdit={canEdit} />}
           </DialogContent>
 
           {/* 에러 메시지 표시 */}

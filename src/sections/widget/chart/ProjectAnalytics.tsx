@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, SyntheticEvent } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 
 // material-ui
 import { useTheme } from '@mui/material/styles';
@@ -13,8 +13,6 @@ import ListItemText from '@mui/material/ListItemText';
 import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import Stack from '@mui/material/Stack';
-import Tab from '@mui/material/Tab';
-import Tabs from '@mui/material/Tabs';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 
@@ -23,34 +21,15 @@ import ReactApexChart, { Props as ChartProps } from 'react-apexcharts';
 
 // project-imports
 import Avatar from 'components/@extended/Avatar';
-import IconButton from 'components/@extended/IconButton';
-import MoreIcon from 'components/@extended/MoreIcon';
 import MainCard from 'components/MainCard';
 import { ThemeMode } from 'config';
 
 // assets
-import {
-  ArrowDown,
-  ArrowSwapHorizontal,
-  ArrowUp,
-  Bookmark,
-  Chart,
-  Edit,
-  HomeTrendUp,
-  Maximize4,
-  ShoppingCart
-} from '@wandersonalwes/iconsax-react';
-
-function a11yProps(index: number) {
-  return {
-    id: `simple-tab-${index}`,
-    'aria-controls': `simple-tabpanel-${index}`
-  };
-}
+import { ArrowSwapHorizontal, Chart, Clock, Diagram, TickCircle } from '@wandersonalwes/iconsax-react';
 
 // ==============================|| CHART ||============================== //
 
-function EcommerceDataChart({ data }: { data: any[] }) {
+function CostDataChart({ data, categories, counts }: { data: number[]; categories: string[]; counts: number[] }) {
   const theme = useTheme();
   const mode = theme.palette.mode;
 
@@ -71,9 +50,7 @@ function EcommerceDataChart({ data }: { data: any[] }) {
       }
     },
     legend: {
-      show: true,
-      position: 'top',
-      horizontalAlign: 'left'
+      show: false
     },
     dataLabels: {
       enabled: false
@@ -84,15 +61,10 @@ function EcommerceDataChart({ data }: { data: any[] }) {
       colors: ['transparent']
     },
     fill: {
-      opacity: [1, 0.5]
+      opacity: 1
     },
     grid: {
       strokeDashArray: 4
-    },
-    tooltip: {
-      y: {
-        formatter: (val: number) => '$ ' + val
-      }
     }
   };
 
@@ -104,9 +76,9 @@ function EcommerceDataChart({ data }: { data: any[] }) {
   useEffect(() => {
     setOptions((prevState) => ({
       ...prevState,
-      colors: [theme.palette.primary.main, theme.palette.primary.main],
+      colors: [theme.palette.primary.main],
       xaxis: {
-        categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
+        categories: categories,
         labels: {
           style: { colors: secondary }
         },
@@ -116,95 +88,158 @@ function EcommerceDataChart({ data }: { data: any[] }) {
         },
         axisTicks: {
           show: false
-        },
-        tickAmount: 11
+        }
       },
       yaxis: {
         labels: {
-          style: { colors: secondary }
+          style: { colors: secondary },
+          formatter: (val: number) => '₩' + val.toLocaleString()
         }
       },
       grid: {
         borderColor: line
       },
-      legend: {
-        labels: {
-          colors: 'secondary.main'
-        }
-      },
       theme: {
         mode: mode === ThemeMode.DARK ? 'dark' : 'light'
+      },
+      tooltip: {
+        custom: function({ seriesIndex, dataPointIndex, w }: any) {
+          const count = counts[dataPointIndex] || 0;
+          const amount = data[dataPointIndex] || 0;
+          return `<div style="padding: 8px 12px; background: white; border: 1px solid #e0e0e0; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <span style="font-size: 13px; color: #333;">${count}건, ₩${amount.toLocaleString()}</span>
+          </div>`;
+        }
       }
     }));
-  }, [mode, primary, secondary, line, theme]);
+  }, [mode, primary, secondary, line, theme, categories, counts, data]);
 
-  const [series, setSeries] = useState(data);
-
-  useEffect(() => {
-    setSeries(data);
-  }, [data]);
+  const series = [
+    {
+      name: '',
+      data: data
+    }
+  ];
 
   return <ReactApexChart options={options} series={series} type="bar" height={250} />;
 }
 
 // ==============================|| CHART WIDGET - PROJECT ANALYTICS ||============================== //
 
-export default function ProjectAnalytics() {
-  const [value, setValue] = useState(0);
-  const [age, setAge] = useState('Total');
+interface ProjectAnalyticsProps {
+  costs: any[];
+  userName: string;
+}
 
-  const chartData = [
-    [
-      {
-        name: 'Net Profit',
-        data: [76, 85, 101, 98, 87, 105, 91]
-      },
-      {
-        name: 'Revenue',
-        data: [44, 55, 57, 56, 61, 58, 63]
-      }
-    ],
-    [
-      {
-        name: 'Net Profit',
-        data: [80, 101, 90, 65, 120, 105, 85]
-      },
-      {
-        name: 'Revenue',
-        data: [45, 30, 57, 45, 78, 48, 63]
-      }
-    ],
-    [
-      {
-        name: 'Net Profit',
-        data: [79, 85, 107, 95, 83, 115, 97]
-      },
-      {
-        name: 'Revenue',
-        data: [48, 56, 50, 54, 68, 53, 65]
-      }
-    ],
-    [
-      {
-        name: 'Net Profit',
-        data: [90, 111, 105, 55, 70, 65, 75]
-      },
-      {
-        name: 'Revenue',
-        data: [55, 80, 57, 45, 38, 48, 43]
-      }
-    ]
-  ];
+export default function ProjectAnalytics({ costs = [], userName }: ProjectAnalyticsProps) {
+  const [period, setPeriod] = useState('Monthly');
 
-  const [data, setData] = useState(chartData[0]);
+  // 현재 사용자의 비용 데이터만 필터링
+  const myCosts = useMemo(() => {
+    return costs.filter((cost) => cost.assignee === userName);
+  }, [costs, userName]);
 
-  const handleChangeSelect = (event: SelectChangeEvent) => {
-    setAge(event.target.value as string);
-  };
+  // 기간별 데이터 계산
+  const chartData = useMemo(() => {
+    const today = new Date();
 
-  const handleChange = (event: SyntheticEvent, newValue: number) => {
-    setValue(newValue);
-    setData(chartData[newValue]);
+    if (period === 'Today') {
+      // 최근 12일
+      const days = [];
+      const amounts = [];
+      const counts = [];
+
+      for (let i = 11; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+
+        const dayCosts = myCosts.filter((cost) => {
+          const costDate = new Date(cost.start_date || cost.created_at);
+          return costDate.toISOString().split('T')[0] === dateStr;
+        });
+
+        const dayAmount = dayCosts.reduce((sum, cost) => sum + (parseFloat(cost.amount) || 0), 0);
+
+        days.push(`${date.getMonth() + 1}/${date.getDate()}`);
+        amounts.push(dayAmount);
+        counts.push(dayCosts.length);
+      }
+
+      return { categories: days, data: amounts, counts };
+    } else if (period === 'Weekly') {
+      // 최근 12주
+      const weeks = [];
+      const amounts = [];
+      const counts = [];
+
+      for (let i = 11; i >= 0; i--) {
+        const weekStart = new Date(today);
+        weekStart.setDate(weekStart.getDate() - (i * 7 + 6));
+        const weekEnd = new Date(today);
+        weekEnd.setDate(weekEnd.getDate() - i * 7);
+
+        const weekCosts = myCosts.filter((cost) => {
+          const costDate = new Date(cost.start_date || cost.created_at);
+          return costDate >= weekStart && costDate <= weekEnd;
+        });
+
+        const weekAmount = weekCosts.reduce((sum, cost) => sum + (parseFloat(cost.amount) || 0), 0);
+
+        weeks.push(`${weekStart.getMonth() + 1}/${weekStart.getDate()}`);
+        amounts.push(weekAmount);
+        counts.push(weekCosts.length);
+      }
+
+      return { categories: weeks, data: amounts, counts };
+    } else {
+      // Monthly - 최근 12개월
+      const months = [];
+      const amounts = [];
+      const counts = [];
+
+      for (let i = 11; i >= 0; i--) {
+        const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1;
+
+        const monthCosts = myCosts.filter((cost) => {
+          const costDate = new Date(cost.start_date || cost.created_at);
+          return costDate.getFullYear() === year && costDate.getMonth() + 1 === month;
+        });
+
+        const monthAmount = monthCosts.reduce((sum, cost) => sum + (parseFloat(cost.amount) || 0), 0);
+
+        months.push(`${year}-${String(month).padStart(2, '0')}`);
+        amounts.push(monthAmount);
+        counts.push(monthCosts.length);
+      }
+
+      return { categories: months, data: amounts, counts };
+    }
+  }, [myCosts, period]);
+
+  // 우측 통계 계산
+  const stats = useMemo(() => {
+    const total = myCosts.reduce((sum, cost) => sum + (parseFloat(cost.amount) || 0), 0);
+    const waiting = myCosts
+      .filter((cost) => cost.status === '대기')
+      .reduce((sum, cost) => sum + (parseFloat(cost.amount) || 0), 0);
+    const inProgress = myCosts
+      .filter((cost) => cost.status === '진행')
+      .reduce((sum, cost) => sum + (parseFloat(cost.amount) || 0), 0);
+    const completed = myCosts
+      .filter((cost) => cost.status === '완료')
+      .reduce((sum, cost) => sum + (parseFloat(cost.amount) || 0), 0);
+    const holding = myCosts
+      .filter((cost) => cost.status === '홀딩')
+      .reduce((sum, cost) => sum + (parseFloat(cost.amount) || 0), 0);
+
+    return { total, waiting, inProgress, completed, holding };
+  }, [myCosts]);
+
+  const handleChangePeriod = (event: SelectChangeEvent) => {
+    setPeriod(event.target.value as string);
   };
 
   return (
@@ -218,128 +253,84 @@ export default function ProjectAnalytics() {
         }
       }}
     >
-      <Box sx={{ width: '100%' }}>
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs
-            value={value}
-            onChange={handleChange}
-            aria-label="basic tabs example"
-            sx={{ px: 3, pt: 0.5, '& .MuiTab-root': { mb: 0.5 } }}
-          >
-            <Tab label="Overview" {...a11yProps(0)} />
-            <Tab label="Marketing" {...a11yProps(1)} />
-            <Tab label="Project" {...a11yProps(2)} />
-            <Tab label="Order" {...a11yProps(2)} />
-          </Tabs>
-        </Box>
-        <Box sx={{ p: 3 }}>
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 8 }}>
-              <Stack sx={{ gap: 2 }}>
-                <Stack direction="row" sx={{ gap: 1, alignItems: 'center', justifyContent: 'flex-end' }}>
-                  <Box sx={{ minWidth: 120 }}>
-                    <FormControl fullWidth>
-                      <Select id="demo-simple-select" value={age} onChange={handleChangeSelect}>
-                        <MenuItem value="Today">Today</MenuItem>
-                        <MenuItem value="Weekly">Weekly</MenuItem>
-                        <MenuItem value="Monthly">Monthly</MenuItem>
-                        <MenuItem value="Total">Total</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Box>
-                </Stack>
-                <EcommerceDataChart data={data} />
+      <Box sx={{ width: '100%', p: 3 }}>
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, md: 8 }}>
+            <Stack sx={{ gap: 2 }}>
+              <Stack direction="row" sx={{ gap: 1, alignItems: 'center', justifyContent: 'flex-end' }}>
+                <Box sx={{ minWidth: 120 }}>
+                  <FormControl fullWidth>
+                    <Select id="period-select" value={period} onChange={handleChangePeriod}>
+                      <MenuItem value="Today">Today</MenuItem>
+                      <MenuItem value="Weekly">Weekly</MenuItem>
+                      <MenuItem value="Monthly">Monthly</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Box>
               </Stack>
-            </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
-              <List disablePadding sx={{ '& .MuiListItem-root': { px: 3, py: 1.5 } }}>
-                <ListItem
-                  divider
-                  secondaryAction={
-                    <Stack sx={{ gap: 0.25, alignItems: 'flex-end' }}>
-                      <Typography variant="subtitle1">-245</Typography>
-                      <Typography color="error" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <ArrowDown style={{ transform: 'rotate(45deg)' }} size={14} /> 10.6%
-                      </Typography>
-                    </Stack>
-                  }
-                >
-                  <ListItemAvatar>
-                    <Avatar variant="rounded" color="secondary" sx={{ color: 'text.secondary' }}>
-                      <Chart />
-                    </Avatar>
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={<Typography sx={{ color: 'text.secondary' }}>Total Sales</Typography>}
-                    secondary={<Typography variant="subtitle1">1,800</Typography>}
-                  />
-                </ListItem>
-                <ListItem
-                  divider
-                  secondaryAction={
-                    <Stack sx={{ gap: 0.25, alignItems: 'flex-end' }}>
-                      <Typography variant="subtitle1">+2,100</Typography>
-                      <Typography sx={{ color: 'success.main', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <ArrowUp style={{ transform: 'rotate(45deg)' }} size={14} /> 30.6%
-                      </Typography>
-                    </Stack>
-                  }
-                >
-                  <ListItemAvatar>
-                    <Avatar variant="rounded" color="secondary" sx={{ color: 'text.secondary' }}>
-                      <HomeTrendUp />
-                    </Avatar>
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={<Typography sx={{ color: 'text.secondary' }}>Revenue</Typography>}
-                    secondary={<Typography variant="subtitle1">$5,667</Typography>}
-                  />
-                </ListItem>
-                <ListItem
-                  divider
-                  secondaryAction={
-                    <Stack sx={{ gap: 0.25, alignItems: 'flex-end' }}>
-                      <Typography variant="subtitle1">-26</Typography>
-                      <Typography sx={{ color: 'warning.main', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <ArrowSwapHorizontal size={14} /> 5%
-                      </Typography>
-                    </Stack>
-                  }
-                >
-                  <ListItemAvatar>
-                    <Avatar variant="rounded" color="secondary" sx={{ color: 'text.secondary' }}>
-                      <ShoppingCart />
-                    </Avatar>
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={<Typography sx={{ color: 'text.secondary' }}>Abandon Cart</Typography>}
-                    secondary={<Typography variant="subtitle1">128</Typography>}
-                  />
-                </ListItem>
-                <ListItem
-                  secondaryAction={
-                    <Stack sx={{ gap: 0.25, alignItems: 'flex-end' }}>
-                      <Typography variant="subtitle1">+200</Typography>
-                      <Typography sx={{ color: 'success.main', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <ArrowUp style={{ transform: 'rotate(45deg)' }} size={14} /> 10.6%
-                      </Typography>
-                    </Stack>
-                  }
-                >
-                  <ListItemAvatar>
-                    <Avatar variant="rounded" color="secondary" sx={{ color: 'text.secondary' }}>
-                      <Bookmark />
-                    </Avatar>
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={<Typography sx={{ color: 'text.secondary' }}>Ads Spent</Typography>}
-                    secondary={<Typography variant="subtitle1">$2,500</Typography>}
-                  />
-                </ListItem>
-              </List>
-            </Grid>
+              <CostDataChart data={chartData.data} categories={chartData.categories} counts={chartData.counts} />
+            </Stack>
           </Grid>
-        </Box>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <List disablePadding sx={{ mt: -1.5, '& .MuiListItem-root': { px: 3, py: 0.75 } }}>
+              <ListItem divider>
+                <ListItemAvatar>
+                  <Avatar variant="rounded" color="primary" sx={{ color: 'primary.main' }}>
+                    <Chart />
+                  </Avatar>
+                </ListItemAvatar>
+                <ListItemText
+                  primary={<Typography sx={{ color: 'primary.main', fontWeight: 600 }}>총합계</Typography>}
+                  secondary={<Typography variant="subtitle1" sx={{ color: 'primary.main', fontWeight: 600 }}>₩{stats.total.toLocaleString()}</Typography>}
+                />
+              </ListItem>
+              <ListItem divider>
+                <ListItemAvatar>
+                  <Avatar variant="rounded" color="secondary" sx={{ color: 'text.secondary' }}>
+                    <Clock />
+                  </Avatar>
+                </ListItemAvatar>
+                <ListItemText
+                  primary={<Typography sx={{ color: 'text.secondary' }}>대기</Typography>}
+                  secondary={<Typography variant="subtitle1">₩{stats.waiting.toLocaleString()}</Typography>}
+                />
+              </ListItem>
+              <ListItem divider>
+                <ListItemAvatar>
+                  <Avatar variant="rounded" color="secondary" sx={{ color: 'text.secondary' }}>
+                    <Diagram />
+                  </Avatar>
+                </ListItemAvatar>
+                <ListItemText
+                  primary={<Typography sx={{ color: 'text.secondary' }}>진행</Typography>}
+                  secondary={<Typography variant="subtitle1">₩{stats.inProgress.toLocaleString()}</Typography>}
+                />
+              </ListItem>
+              <ListItem divider>
+                <ListItemAvatar>
+                  <Avatar variant="rounded" color="secondary" sx={{ color: 'text.secondary' }}>
+                    <TickCircle />
+                  </Avatar>
+                </ListItemAvatar>
+                <ListItemText
+                  primary={<Typography sx={{ color: 'text.secondary' }}>완료</Typography>}
+                  secondary={<Typography variant="subtitle1">₩{stats.completed.toLocaleString()}</Typography>}
+                />
+              </ListItem>
+              <ListItem>
+                <ListItemAvatar>
+                  <Avatar variant="rounded" color="secondary" sx={{ color: 'text.secondary' }}>
+                    <ArrowSwapHorizontal />
+                  </Avatar>
+                </ListItemAvatar>
+                <ListItemText
+                  primary={<Typography sx={{ color: 'text.secondary' }}>홀딩</Typography>}
+                  secondary={<Typography variant="subtitle1">₩{stats.holding.toLocaleString()}</Typography>}
+                />
+              </ListItem>
+            </List>
+          </Grid>
+        </Grid>
       </Box>
     </MainCard>
   );

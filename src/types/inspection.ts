@@ -8,6 +8,7 @@ export interface InspectionData {
   inspectionContent: string;
   team: '개발팀' | '디자인팀' | '기획팀' | '마케팅팀';
   assignee: string;
+  createdBy?: string; // 데이터 생성자 (권한 체크용)
   status: '대기' | '진행' | '완료' | '홀딩';
   inspectionDate: string;
   details?: string; // 세부설명

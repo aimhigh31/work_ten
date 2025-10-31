@@ -53,6 +53,7 @@ import { taskData, taskStatusColors, assigneeAvatars } from 'data/task';
 import { TaskTableData, TaskStatus } from 'types/task';
 import { ThemeMode } from 'config';
 import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
+import { useMenuPermission } from 'hooks/usePermissions'; // 권한 관리
 
 // 변경로그 타입 정의
 interface ChangeLog {
@@ -239,7 +240,7 @@ function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssign
       const workContent = currentTask.workContent || '업무내용 없음';
       const description = `${workContent} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
 
-      addChangeLog('업무 상태 변경', taskCode, description, currentTask.team || '미분류');
+      addChangeLog('수정', taskCode, description, currentTask.team || '미분류');
     }
   };
 
@@ -908,7 +909,7 @@ function MonthlyScheduleView({
           {/* 월 헤더 - 상반기 */}
           {monthNames.slice(0, 6).map((month, index) => (
             <Box
-              key={index}
+              key={`month-header-first-${index}`}
               sx={{
                 py: 1.5,
                 px: 1,
@@ -933,7 +934,7 @@ function MonthlyScheduleView({
 
             return (
               <Box
-                key={monthIndex}
+                key={`month-content-first-${monthIndex}`}
                 sx={{
                   borderRight: monthIndex < 5 ? '1px solid' : 'none',
                   borderColor: 'divider',
@@ -973,7 +974,7 @@ function MonthlyScheduleView({
 
                   return (
                     <Box
-                      key={item.id}
+                      key={`month-${monthIndex}-item-${item.id}`}
                       onClick={() => onCardClick(item)}
                       sx={{
                         mb: itemIndex < items.length - 1 ? 0.8 : 0,
@@ -1034,7 +1035,7 @@ function MonthlyScheduleView({
           {/* 월 헤더 - 하반기 */}
           {monthNames.slice(6, 12).map((month, index) => (
             <Box
-              key={index + 6}
+              key={`month-header-second-${index}`}
               sx={{
                 py: 1.5,
                 px: 1,
@@ -1060,7 +1061,7 @@ function MonthlyScheduleView({
 
             return (
               <Box
-                key={monthIndex}
+                key={`month-content-second-${index}`}
                 sx={{
                   borderRight: index < 5 ? '1px solid' : 'none',
                   borderColor: 'divider',
@@ -1100,7 +1101,7 @@ function MonthlyScheduleView({
 
                   return (
                     <Box
-                      key={item.id}
+                      key={`month-second-${index}-item-${item.id}`}
                       onClick={() => onCardClick(item)}
                       sx={{
                         mb: itemIndex < items.length - 1 ? 0.8 : 0,
@@ -2636,6 +2637,9 @@ export default function TaskManagement() {
   const searchParams = useSearchParams();
   const [value, setValue] = useState(0);
 
+  // 권한 관리
+  const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers, loading: permissionLoading } = useMenuPermission('/admin-panel/user-settings');
+
   // Supabase 훅 사용
   const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 가져오기
 
@@ -2884,12 +2888,12 @@ export default function TaskManagement() {
       }
 
       if (changes.length > 0) {
-        addChangeLog('업무 수정', updatedTask.code, changes.join(', '), updatedTask.team);
+        addChangeLog('수정', updatedTask.code, changes.join(', '), updatedTask.team);
       }
     } else {
       // 새로 생성
       setTasks((prevTasks) => [...prevTasks, updatedTask]);
-      addChangeLog('업무 생성', updatedTask.code, `새로운 업무가 생성되었습니다: ${updatedTask.workContent}`, updatedTask.team);
+      addChangeLog('추가', updatedTask.code, `새로운 업무가 생성되었습니다: ${updatedTask.workContent}`, updatedTask.team);
     }
 
     handleEditDialogClose();
@@ -2981,18 +2985,40 @@ export default function TaskManagement() {
             </Box>
           </Box>
 
-          {/* 탭 네비게이션 및 필터 */}
-          <Box
-            sx={{
-              borderBottom: 1,
-              borderColor: 'divider',
-              flexShrink: 0,
-              mt: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}
-          >
+          {/* 권한 체크: 카테고리 보기만 있는 경우 */}
+          {canViewCategory && !canReadData ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 대한 데이터 조회 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              {/* 탭 네비게이션 및 필터 */}
+              <Box
+                sx={{
+                  borderBottom: 1,
+                  borderColor: 'divider',
+                  flexShrink: 0,
+                  mt: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}
+              >
             <Tabs
               value={value}
               onChange={handleChange}
@@ -3207,6 +3233,9 @@ export default function TaskManagement() {
                   selectedStatus={selectedStatus}
                   selectedAssignee={selectedAssignee}
                   addChangeLog={addChangeLog}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                 />
               </Box>
             </TabPanel>
@@ -3245,6 +3274,9 @@ export default function TaskManagement() {
                   selectedStatus={selectedStatus}
                   selectedAssignee={selectedAssignee}
                   addChangeLog={addChangeLog}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                 />
               </Box>
             </TabPanel>
@@ -3283,10 +3315,15 @@ export default function TaskManagement() {
                   selectedStatus={selectedStatus}
                   selectedAssignee={selectedAssignee}
                   addChangeLog={addChangeLog}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                 />
               </Box>
             </TabPanel>
           </Box>
+          </>
+          )}
         </CardContent>
       </Card>
 

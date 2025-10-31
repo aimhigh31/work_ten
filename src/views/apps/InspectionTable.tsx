@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 
 // Material-UI
 import {
@@ -56,6 +56,8 @@ import { Add, Trash, Edit, DocumentDownload } from '@wandersonalwes/iconsax-reac
 
 // Hooks
 import { useMenuPermission } from 'hooks/usePermissions';
+import { useSession } from 'next-auth/react';
+import useUser from 'hooks/useUser';
 
 // 컬럼 너비 정의 (VOC관리와 유사하게)
 const columnWidths = {
@@ -93,6 +95,10 @@ interface InspectionTableProps {
   onSave?: (inspection: InspectionTableData) => Promise<void>;
   onDelete?: (ids: number[]) => Promise<void>;
   generateInspectionCode?: () => Promise<string>;
+  canReadData?: boolean;
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 export default function InspectionTable({
@@ -105,12 +111,13 @@ export default function InspectionTable({
   addChangeLog,
   onSave,
   onDelete,
-  generateInspectionCode
+  generateInspectionCode,
+  canReadData = true,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: InspectionTableProps) {
   const theme = useTheme();
-
-  // ✅ 권한 체크
-  const { canRead, canWrite, canFull, loading: permissionLoading } = useMenuPermission('/security/inspection');
 
   const [data, setData] = useState<InspectionTableData[]>(
     inspections ? inspections : inspectionData.map((inspection) => ({ ...inspection }))
@@ -123,10 +130,43 @@ export default function InspectionTable({
   // 사용자관리 데이터 가져오기
   const { users } = useSupabaseUsers();
 
+  // 현재 로그인한 사용자 정보
+  const { data: session } = useSession();
+  const user = useUser();
+
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || users.length === 0) return null;
+    const found = users.find((u) => u.email === session.user.email);
+    return found;
+  }, [session, users]);
+
   // 사용자 이름으로 사용자 데이터 찾기
   const findUserByName = (userName: string) => {
     return users.find((user) => user.user_name === userName);
   };
+
+  // 데이터 소유자 확인 함수 - createdBy 또는 assignee가 본인인 경우
+  const isDataOwner = (inspection: InspectionTableData) => {
+    if (!currentUser) return false;
+    return (
+      inspection.createdBy === currentUser.user_name ||
+      inspection.assignee === currentUser.user_name
+    );
+  };
+
+  // 편집 가능 여부 확인 함수
+  const canEditData = useCallback((inspection: InspectionTableData) => {
+    return canEditOthers || (canEditOwn && isDataOwner(inspection));
+  }, [canEditOthers, canEditOwn, currentUser]);
+
+  // 선택된 항목들이 모두 편집 가능한지 확인
+  const canEditAllSelected = useMemo(() => {
+    if (selected.length === 0) return false;
+    return selected.every((id) => {
+      const inspection = data.find((item) => item.id === id);
+      return inspection && canEditData(inspection);
+    });
+  }, [selected, data, canEditData]);
 
   // Edit 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);
@@ -700,17 +740,6 @@ export default function InspectionTable({
     return { color: '#333333' };
   };
 
-  // ✅ 권한 없음 - 접근 차단
-  if (!canRead && !permissionLoading) {
-    return (
-      <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Typography variant="h6" color="error">
-          이 페이지에 접근할 권한이 없습니다.
-        </Typography>
-      </Box>
-    );
-  }
-
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* 상단 정보 및 액션 버튼 */}
@@ -719,7 +748,7 @@ export default function InspectionTable({
           총 {filteredData.length}건
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          {canRead && (
+          {canReadData && (
             <Button
               variant="outlined"
               startIcon={<DocumentDownload size={16} />}
@@ -739,28 +768,41 @@ export default function InspectionTable({
               Excel Down
             </Button>
           )}
-          {canWrite && (
-            <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={addNewInspection} sx={{ px: 2 }}>
-              추가
-            </Button>
-          )}
-          {canFull && (
-            <Button
-              variant="outlined"
-              startIcon={<Trash size={16} />}
-              size="small"
-              color="error"
-              disabled={selected.length === 0}
-              onClick={handleDeleteSelected}
-              sx={{
-                px: 2,
-                borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
-                color: selected.length > 0 ? 'error.main' : 'grey.500'
-              }}
-            >
-              삭제 {selected.length > 0 && `(${selected.length})`}
-            </Button>
-          )}
+          <Button
+            variant="contained"
+            startIcon={<Add size={16} />}
+            size="small"
+            onClick={addNewInspection}
+            disabled={!(canCreateData || canEditOwn)}
+            sx={{
+              px: 2,
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
+            추가
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<Trash size={16} />}
+            size="small"
+            color="error"
+            disabled={!canEditAllSelected}
+            onClick={handleDeleteSelected}
+            sx={{
+              px: 2,
+              borderColor: canEditAllSelected ? 'error.main' : 'grey.300',
+              color: canEditAllSelected ? 'error.main' : 'grey.500',
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
+            삭제 {selected.length > 0 && `(${selected.length})`}
+          </Button>
         </Box>
       </Box>
 
@@ -836,6 +878,7 @@ export default function InspectionTable({
                   <TableCell padding="checkbox">
                     <Checkbox
                       checked={selected.includes(inspection.id)}
+                      disabled={!canEditData(inspection)}
                       onChange={(event) => {
                         const selectedIndex = selected.indexOf(inspection.id);
                         let newSelected: number[] = [];
@@ -931,13 +974,11 @@ export default function InspectionTable({
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      {canWrite && (
-                        <Tooltip title="수정">
-                          <IconButton size="small" onClick={() => handleEditInspection(inspection)} sx={{ color: 'primary.main' }}>
-                            <Edit size={16} />
-                          </IconButton>
-                        </Tooltip>
-                      )}
+                      <Tooltip title="수정">
+                        <IconButton size="small" onClick={() => handleEditInspection(inspection)} sx={{ color: 'primary.main' }}>
+                          <Edit size={16} />
+                        </IconButton>
+                      </Tooltip>
                     </Box>
                   </TableCell>
                 </TableRow>
@@ -1088,6 +1129,9 @@ export default function InspectionTable({
           inspection={editingInspection}
           onSave={handleEditInspectionSave}
           generateInspectionCode={generateInspectionCode}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>

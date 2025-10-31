@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+import { useCommonData } from 'contexts/CommonDataContext';
 
 // Material-UI
 import {
@@ -85,6 +87,10 @@ interface SalesDataTableProps {
   editingRecord?: SalesRecord | null;
   onEditClick?: (record: SalesRecord) => void; // 편집 버튼 클릭 시 호출
   onAddClick?: () => void; // 추가 버튼 클릭 시 호출
+  users?: any[];
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 const SalesDataTable: React.FC<SalesDataTableProps> = ({
@@ -99,9 +105,82 @@ const SalesDataTable: React.FC<SalesDataTableProps> = ({
   onEditDialogClose,
   editingRecord = null,
   onEditClick,
-  onAddClick
+  onAddClick,
+  users,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }) => {
   const theme = useTheme();
+  const { data: session } = useSession();
+  const { masterCodes } = useCommonData();
+
+  // 코드를 코드명으로 변환하는 함수
+  const getCodeName = useMemo(() => {
+    return (groupCode: string, subCode: string) => {
+      if (!masterCodes || masterCodes.length === 0) return subCode;
+
+      const masterCode = masterCodes.find(
+        (mc) => mc.group_code === groupCode && mc.subcode === subCode && mc.is_active
+      );
+
+      return masterCode?.subcode_name || subCode;
+    };
+  }, [masterCodes]);
+
+  // 현재 로그인한 사용자 정보 조회
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || !users || users.length === 0) {
+      console.log('🔍 [SalesDataTable] currentUser: 없음 (세션 또는 users 없음)');
+      return null;
+    }
+    const found = users.find((u) => u.email === session.user.email);
+    console.log('🔍 [SalesDataTable] currentUser:', found ? found.user_name : '없음');
+    return found;
+  }, [session, users]);
+
+  // 데이터 소유자 확인 (생성자 또는 담당자)
+  const isDataOwner = (sales: SalesRecord) => {
+    if (!currentUser) return false;
+
+    const currentUserName = currentUser.user_name;
+
+    // createdBy로 확인 (우선순위 1)
+    const isCreator = sales.createdBy === currentUserName;
+
+    // registrant로 확인 (우선순위 2)
+    // registrant가 "홍길동 팀장" 형식일 수 있으므로, startsWith도 체크
+    const registrantStartsWith = sales.registrant?.startsWith(currentUserName);
+    const isAssignee = sales.registrant === currentUserName || registrantStartsWith;
+
+    const result = isCreator || isAssignee;
+
+    console.log('🔍 [SalesDataTable] 소유자 확인:', {
+      salesId: sales.id,
+      salesCode: sales.code,
+      createdBy: sales.createdBy,
+      registrant: sales.registrant,
+      currentUserName,
+      isCreator,
+      registrantStartsWith,
+      isAssignee,
+      isDataOwner: result
+    });
+
+    return result;
+  };
+
+  // 편집 권한 확인
+  const canEditData = (sales: SalesRecord) => {
+    const result = canEditOthers || (canEditOwn && isDataOwner(sales));
+    console.log('🔍 [SalesDataTable] 편집 권한:', {
+      salesId: sales.id,
+      canEditOthers,
+      canEditOwn,
+      canEditData: result
+    });
+    return result;
+  };
 
   // 기본 데이터 (초기 로드시에만 사용)
   const initialData: SalesRecord[] = [
@@ -429,6 +508,15 @@ const SalesDataTable: React.FC<SalesDataTableProps> = ({
     });
   }, [sales, searchTerm]);
 
+  // 선택된 모든 항목의 편집 가능 여부
+  const canEditAllSelected = useMemo(() => {
+    if (selectedRecords.length === 0) return false;
+    return selectedRecords.every((id) => {
+      const salesRecord = filteredRecords.find((item) => item.id === id);
+      return salesRecord && canEditData(salesRecord);
+    });
+  }, [selectedRecords, filteredRecords, canEditOthers, canEditOwn, currentUser]);
+
   // 페이지네이션
   const totalPages = Math.ceil(filteredRecords.length / rowsPerPage);
   const paginatedRecords = filteredRecords.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
@@ -719,7 +807,20 @@ const SalesDataTable: React.FC<SalesDataTableProps> = ({
           >
             Excel Down
           </Button>
-          <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={handleAddRecord} sx={{ px: 2 }}>
+          <Button
+            variant="contained"
+            startIcon={<Add size={16} />}
+            size="small"
+            onClick={handleAddRecord}
+            disabled={!canCreateData}
+            sx={{
+              px: 2,
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             추가
           </Button>
           <Button
@@ -727,12 +828,16 @@ const SalesDataTable: React.FC<SalesDataTableProps> = ({
             startIcon={<Trash size={16} />}
             size="small"
             color="error"
-            disabled={selectedRecords.length === 0}
+            disabled={!canEditAllSelected}
             onClick={handleDeleteRecords}
             sx={{
               px: 2,
-              borderColor: selectedRecords.length > 0 ? 'error.main' : 'grey.300',
-              color: selectedRecords.length > 0 ? 'error.main' : 'grey.500'
+              borderColor: canEditAllSelected ? 'error.main' : 'grey.300',
+              color: canEditAllSelected ? 'error.main' : 'grey.500',
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
             }}
           >
             삭제 {selectedRecords.length > 0 && `(${selectedRecords.length})`}
@@ -813,7 +918,11 @@ const SalesDataTable: React.FC<SalesDataTableProps> = ({
                 }}
               >
                 <TableCell padding="checkbox">
-                  <Checkbox checked={selectedRecords.includes(record.id)} onChange={() => handleSelectRecord(record.id)} />
+                  <Checkbox
+                    checked={selectedRecords.includes(record.id)}
+                    disabled={!canEditData(record)}
+                    onChange={() => handleSelectRecord(record.id)}
+                  />
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
@@ -832,17 +941,17 @@ const SalesDataTable: React.FC<SalesDataTableProps> = ({
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
-                    {record.customerName || '-'}
+                    {getCodeName('GROUP039', record.customerName) || '-'}
                   </Typography>
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
-                    {record.salesType}
+                    {getCodeName('GROUP036', record.salesType)}
                   </Typography>
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
-                    {record.businessUnit || '-'}
+                    {getCodeName('GROUP035', record.businessUnit) || '-'}
                   </Typography>
                 </TableCell>
                 <TableCell>
@@ -887,10 +996,10 @@ const SalesDataTable: React.FC<SalesDataTableProps> = ({
                 </TableCell>
                 <TableCell>
                   <Chip
-                    label={record.status}
+                    label={getCodeName('GROUP002', record.status)}
                     size="small"
                     sx={{
-                      ...getStatusColor(record.status),
+                      ...getStatusColor(getCodeName('GROUP002', record.status)),
                       fontSize: '13px',
                       fontWeight: 500,
                       border: 'none'

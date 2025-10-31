@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 
 // third-party
@@ -53,9 +54,9 @@ import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창�
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
 import { ChangeLogData } from 'types/changelog';
 import { createClient } from '@/lib/supabase/client';
-import { useSession } from 'next-auth/react';
 import useUser from 'hooks/useUser';
 import { ThemeMode } from 'config';
+import { useMenuPermission } from '../../hooks/usePermissions';
 
 // 변경로그 타입 정의 (13컬럼 - title 추가)
 interface ChangeLog {
@@ -119,6 +120,10 @@ interface KanbanViewProps {
   setSolutions: React.Dispatch<React.SetStateAction<SolutionTableData[]>>;
   addChangeLog: (action: string, target: string, description: string, team?: string) => void;
   assigneeList?: any[];
+  users?: any[];
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 function KanbanView({
@@ -129,9 +134,31 @@ function KanbanView({
   solutions,
   setSolutions,
   addChangeLog,
-  assigneeList
+  assigneeList,
+  users = [],
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: KanbanViewProps) {
   const theme = useTheme();
+
+  // 🔐 세션 정보 (권한 체크용)
+  const { data: session } = useSession();
+
+  // 🔐 권한 체크: 현재 사용자 정보
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || users.length === 0) return null;
+    const found = users.find((u) => u.email === session.user.email);
+    return found;
+  }, [session, users]);
+
+  // 🔐 권한 체크: 데이터 소유자 확인
+  const isDataOwner = useCallback((solution: SolutionTableData) => {
+    if (!currentUser) return false;
+    const isCreator = solution.createdBy === currentUser.user_name;
+    const isAssignee = solution.assignee === currentUser.user_name;
+    return isCreator || isAssignee;
+  }, [currentUser]);
 
   // 상태 관리
   const [activeSolution, setActiveSolution] = useState<SolutionTableData | null>(null);
@@ -251,7 +278,7 @@ function KanbanView({
       const workContent = currentSolution.detailContent || '업무내용 없음';
       const description = `${workContent} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
 
-      addChangeLog('업무 상태 변경', solutionCode, description, currentSolution.team || '미분류');
+      addChangeLog('수정', solutionCode, description, currentSolution.team || '미분류');
     }
   };
 
@@ -345,9 +372,13 @@ function KanbanView({
   };
 
   // 드래그 가능한 솔루션 카드 컴포넌트 (5단계 구조)
-  function DraggableCard({ solution }: { solution: SolutionTableData }) {
+  function DraggableCard({ solution, canEditOwn = true, canEditOthers = true }: { solution: SolutionTableData; canEditOwn?: boolean; canEditOthers?: boolean }) {
+    // 🔐 권한 체크: 드래그 가능 여부 (타인 데이터 편집 권한 OR (나의 데이터 편집 권한 AND 데이터 소유자))
+    const isDragDisabled = !(canEditOthers || (canEditOwn && isDataOwner(solution)));
+
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-      id: solution.id
+      id: solution.id,
+      disabled: isDragDisabled
     });
 
     const style = transform
@@ -691,7 +722,7 @@ function KanbanView({
             return (
               <DroppableColumn key={column.key} column={column}>
                 {items.map((item) => (
-                  <DraggableCard key={item.id} solution={item} />
+                  <DraggableCard key={item.id} solution={item} canEditOwn={canEditOwn} canEditOthers={canEditOthers} />
                 ))}
 
                 {/* 빈 칼럼 메시지 */}
@@ -715,7 +746,7 @@ function KanbanView({
           })}
         </div>
 
-        <DragOverlay>{activeSolution ? <DraggableCard solution={activeSolution} /> : null}</DragOverlay>
+        <DragOverlay>{activeSolution ? <DraggableCard solution={activeSolution} canEditOwn={canEditOwn} canEditOthers={canEditOthers} /> : null}</DragOverlay>
       </DndContext>
 
       {/* Solution 편집 다이얼로그 */}
@@ -730,6 +761,9 @@ function KanbanView({
           statusOptions={solutionStatusOptions}
           statusColors={solutionStatusColors}
           teams={teams}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>
@@ -870,7 +904,7 @@ function MonthlyScheduleView({
           {/* 월 헤더 - 상반기 */}
           {monthNames.slice(0, 6).map((month, index) => (
             <Box
-              key={index}
+              key={`month-header-first-${index}`}
               sx={{
                 py: 1.5,
                 px: 1,
@@ -895,7 +929,7 @@ function MonthlyScheduleView({
 
             return (
               <Box
-                key={monthIndex}
+                key={`month-content-first-${monthIndex}`}
                 sx={{
                   borderRight: monthIndex < 5 ? '1px solid' : 'none',
                   borderColor: 'divider',
@@ -916,7 +950,7 @@ function MonthlyScheduleView({
 
                   return (
                     <Box
-                      key={item.id}
+                      key={`month-${monthIndex}-item-${item.id}`}
                       onClick={() => onCardClick(item)}
                       sx={{
                         mb: itemIndex < items.length - 1 ? 0.8 : 0,
@@ -976,7 +1010,7 @@ function MonthlyScheduleView({
           {/* 월 헤더 - 하반기 */}
           {monthNames.slice(6, 12).map((month, index) => (
             <Box
-              key={index + 6}
+              key={`month-header-second-${index}`}
               sx={{
                 py: 1.5,
                 px: 1,
@@ -1002,7 +1036,7 @@ function MonthlyScheduleView({
 
             return (
               <Box
-                key={monthIndex}
+                key={`month-content-second-${index}`}
                 sx={{
                   borderRight: index < 5 ? '1px solid' : 'none',
                   borderColor: 'divider',
@@ -1023,7 +1057,7 @@ function MonthlyScheduleView({
 
                   return (
                     <Box
-                      key={item.id}
+                      key={`month-second-${index}-item-${item.id}`}
                       onClick={() => onCardClick(item)}
                       sx={{
                         mb: itemIndex < items.length - 1 ? 0.8 : 0,
@@ -1554,13 +1588,13 @@ function DashboardView({
   const getStatusColor = (status: string) => {
     switch (status) {
       case '대기':
-        return '#ED8936';
+        return '#90A4AE';
       case '진행':
-        return '#4267B2';
+        return '#7986CB';
       case '완료':
-        return '#4A5568';
+        return '#81C784';
       case '홀딩':
-        return '#E53E3E';
+        return '#E57373';
       default:
         return '#9e9e9e';
     }
@@ -1758,7 +1792,7 @@ function DashboardView({
         text: '업무 건수'
       }
     },
-    colors: ['#ED8936', '#4267B2', '#4A5568', '#E53E3E'],
+    colors: ['#90A4AE', '#7986CB', '#81C784', '#E57373'],
     legend: {
       position: 'top',
       horizontalAlign: 'right'
@@ -1919,7 +1953,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#48C4B7',
+              background: '#26C6DA',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1943,7 +1977,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#4A5568',
+              background: '#90A4AE',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1967,7 +2001,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#4267B2',
+              background: '#7986CB',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1991,7 +2025,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#E53E3E',
+              background: '#81C784',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -2015,7 +2049,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#ED8936',
+              background: '#E57373',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -2329,6 +2363,7 @@ export default function SolutionManagement() {
   const theme = useTheme();
   const searchParams = useSearchParams();
   const [value, setValue] = useState(0);
+  const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers } = useMenuPermission('/it/solution');
 
   // 공유 Solutions 상태
   // DB 연동 훅
@@ -2436,6 +2471,7 @@ export default function SolutionManagement() {
 
         const convertedSolutions = dbSolutions.map((dbSolution: DbSolutionData) => ({
           ...convertToSolutionData(dbSolution),
+          createdBy: dbSolution.created_by, // 데이터 생성자 (권한 체크용)
           isEditing: false
         }));
 
@@ -2574,12 +2610,12 @@ export default function SolutionManagement() {
           console.log('✅ 솔루션 업데이트 성공');
           alert('솔루션이 성공적으로 업데이트되었습니다.');
         } else {
-          console.error('❌ 솔루션 업데이트 실패');
+          console.warn('⚠️ 솔루션 업데이트 실패');
           alert('솔루션 업데이트에 실패했습니다. 다시 시도해주세요.');
           return;
         }
       } catch (error) {
-        console.error('❌ 솔루션 업데이트 오류:', error);
+        console.warn('⚠️ 솔루션 업데이트 오류:', error);
         alert(`솔루션 업데이트 중 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
         return;
       }
@@ -2639,12 +2675,12 @@ export default function SolutionManagement() {
           console.log('✅ 새 솔루션 생성 완료:', createdSolution);
           alert('새 솔루션이 성공적으로 생성되었습니다.');
         } else {
-          console.error('❌ 새 솔루션 생성 실패 - createSolution이 null 반환');
+          console.warn('⚠️ 새 솔루션 생성 실패 - createSolution이 null 반환');
           alert('솔루션 생성에 실패했습니다. 입력 데이터를 확인하고 다시 시도해주세요.');
           return;
         }
       } catch (error) {
-        console.error('❌ 새 솔루션 생성 오류 상세:', {
+        console.warn('⚠️ 새 솔루션 생성 오류 상세:', {
           error,
           message: error instanceof Error ? error.message : '알 수 없는 오류',
           stack: error instanceof Error ? error.stack : undefined
@@ -2744,7 +2780,48 @@ export default function SolutionManagement() {
             </Box>
           </Box>
 
-          {/* 탭 네비게이션 및 필터 */}
+          {/* 권한 체크 */}
+          {!canViewCategory ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 접근할 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : !canReadData ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 대한 데이터 조회 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              {/* 탭 네비게이션 및 필터 */}
           <Box
             sx={{
               borderBottom: 1,
@@ -2996,6 +3073,10 @@ export default function SolutionManagement() {
                   solutions={solutions}
                   setSolutions={setSolutions}
                   addChangeLog={addChangeLog}
+                  users={users}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                 />
               </Box>
             </TabPanel>
@@ -3037,6 +3118,10 @@ export default function SolutionManagement() {
                   setSolutions={setSolutions}
                   addChangeLog={addChangeLog}
                   assigneeList={users.filter((user) => user.status === 'active')}
+                  users={users}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                 />
               </Box>
             </TabPanel>
@@ -3366,6 +3451,8 @@ export default function SolutionManagement() {
               </Box>
             </TabPanel>
           </Box>
+          </>
+          )}
         </CardContent>
       </Card>
 
@@ -3381,6 +3468,9 @@ export default function SolutionManagement() {
           statusOptions={solutionStatusOptions}
           statusColors={solutionStatusColors}
           teams={teams}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>

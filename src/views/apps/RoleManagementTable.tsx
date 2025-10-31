@@ -83,6 +83,10 @@ interface RoleManagementTableProps {
   roles?: RoleData[];
   setRoles?: React.Dispatch<React.SetStateAction<RoleData[]>>;
   addChangeLog?: (action: string, target: string, description: string, team?: string) => void;
+  canReadData?: boolean;
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 export default function RoleManagementTable({
@@ -92,7 +96,11 @@ export default function RoleManagementTable({
   selectedAssignee = '전체',
   roles,
   setRoles,
-  addChangeLog
+  addChangeLog,
+  canReadData = true,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: RoleManagementTableProps) {
   const theme = useTheme();
 
@@ -542,37 +550,44 @@ export default function RoleManagementTable({
               Excel Down
             </Button>
           )}
-          {canWrite && (
-            <Button
-              variant="contained"
-              startIcon={<Add size={16} />}
-              size="small"
-              onClick={() => {
-                setEditingRole(null);
-                setEditDialogOpen(true);
-              }}
-              sx={{ px: 2 }}
-            >
-              추가
-            </Button>
-          )}
-          {canFull && (
-            <Button
-              variant="outlined"
-              startIcon={<Trash size={16} />}
-              size="small"
-              color="error"
-              disabled={selected.length === 0}
-              onClick={handleDeleteSelected}
-              sx={{
-                px: 2,
-                borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
-                color: selected.length > 0 ? 'error.main' : 'grey.500'
-              }}
-            >
-              삭제 {selected.length > 0 && `(${selected.length})`}
-            </Button>
-          )}
+          <Button
+            variant="contained"
+            startIcon={<Add size={16} />}
+            size="small"
+            onClick={() => {
+              setEditingRole(null);
+              setEditDialogOpen(true);
+            }}
+            disabled={!canCreateData}
+            sx={{
+              px: 2,
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
+            추가
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<Trash size={16} />}
+            size="small"
+            color="error"
+            disabled={selected.length === 0 || !(canEditOwn || canEditOthers)}
+            onClick={handleDeleteSelected}
+            sx={{
+              px: 2,
+              borderColor: selected.length > 0 && (canEditOwn || canEditOthers) ? 'error.main' : 'grey.300',
+              color: selected.length > 0 && (canEditOwn || canEditOthers) ? 'error.main' : 'grey.500',
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
+            삭제 {selected.length > 0 && `(${selected.length})`}
+          </Button>
         </Box>
       </Box>
 
@@ -741,23 +756,21 @@ export default function RoleManagementTable({
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    {canWrite && (
-                      <Tooltip title="편집">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleEditRole(role)}
-                          sx={{
-                            color: 'primary.main',
-                            '&:hover': {
-                              backgroundColor: 'primary.main',
-                              color: 'white'
-                            }
-                          }}
-                        >
-                          <Edit size={16} />
-                        </IconButton>
-                      </Tooltip>
-                    )}
+                    <Tooltip title="편집">
+                      <IconButton
+                        size="small"
+                        onClick={() => handleEditRole(role)}
+                        sx={{
+                          color: 'primary.main',
+                          '&:hover': {
+                            backgroundColor: 'primary.main',
+                            color: 'white'
+                          }
+                        }}
+                      >
+                        <Edit size={16} />
+                      </IconButton>
+                    </Tooltip>
                   </TableCell>
                 </TableRow>
               ))
@@ -917,6 +930,8 @@ export default function RoleManagementTable({
         }}
         role={editingRole}
         onSave={handleSaveRole}
+        canEditOwn={canEditOwn}
+        canEditOthers={canEditOthers}
       />
 
       {/* 알림창 */}

@@ -50,6 +50,7 @@ import { Code, Add, Edit, Trash, Eye, Setting2, TableDocument, DocumentText } fr
 // Supabase 타입 import - 마스터코드3 플랫 구조 사용
 import { useSupabaseMasterCode3, GroupInfo, SubCodeInfo, MasterCodeFlat } from '../../hooks/useSupabaseMasterCode3';
 import { useCommonData } from '../../contexts/CommonDataContext';
+import { useMenuPermission } from '../../hooks/usePermissions';
 
 // 플랫 구조에 맞춘 타입 별칭
 type MasterCodeData2 = GroupInfo;
@@ -446,9 +447,12 @@ interface MasterCodeDialogProps {
   dialogState: MasterCodeDialogState;
   onClose: () => void;
   onSave: (data: any) => void;
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
-function MasterCodeDialog({ dialogState, onClose, onSave }: MasterCodeDialogProps) {
+function MasterCodeDialog({ dialogState, onClose, onSave, canCreateData = true, canEditOwn = true, canEditOthers = true }: MasterCodeDialogProps) {
   const [formData, setFormData] = useState({
     code_group: '',
     code_group_name: '',
@@ -540,22 +544,43 @@ function MasterCodeDialog({ dialogState, onClose, onSave }: MasterCodeDialogProp
               <Switch
                 checked={formData.is_active}
                 onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                disabled={dialogState.mode === 'view'}
+                disabled={dialogState.mode === 'view' || (dialogState.mode === 'create' ? !canCreateData : !(canEditOwn || canEditOthers))}
               />
             }
             label="활성화"
             sx={{
               '& .MuiFormControlLabel-label': {
-                fontSize: '0.75rem'
+                fontSize: '0.75rem',
+                color: (dialogState.mode === 'view' || (dialogState.mode === 'create' ? !canCreateData : !(canEditOwn || canEditOthers))) ? 'grey.500' : 'inherit'
               }
             }}
           />
         </Box>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>취소</Button>
+        <Button
+          onClick={onClose}
+          disabled={dialogState.mode === 'create' ? !canCreateData : !(canEditOwn || canEditOthers)}
+          sx={{
+            '&.Mui-disabled': {
+              color: 'grey.500'
+            }
+          }}
+        >
+          취소
+        </Button>
         {dialogState.mode !== 'view' && (
-          <Button onClick={handleSave} variant="contained">
+          <Button
+            onClick={handleSave}
+            variant="contained"
+            disabled={dialogState.mode === 'create' ? !canCreateData : !(canEditOwn || canEditOthers)}
+            sx={{
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             {dialogState.mode === 'create' ? '추가' : '수정'}
           </Button>
         )}
@@ -569,9 +594,12 @@ interface SubCodeDialogProps {
   dialogState: SubCodeDialogState;
   onClose: () => void;
   onSave: (data: any) => void;
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
-function SubCodeDialog({ dialogState, onClose, onSave }: SubCodeDialogProps) {
+function SubCodeDialog({ dialogState, onClose, onSave, canCreateData = true, canEditOwn = true, canEditOthers = true }: SubCodeDialogProps) {
   const [formData, setFormData] = useState({
     sub_code: '',
     sub_code_name: '',
@@ -700,20 +728,45 @@ function SubCodeDialog({ dialogState, onClose, onSave }: SubCodeDialogProps) {
                   <Switch
                     checked={formData.is_active}
                     onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                    disabled={dialogState.mode === 'view'}
+                    disabled={dialogState.mode === 'view' || (dialogState.mode === 'create' ? !canCreateData : !(canEditOwn || canEditOthers))}
                   />
                 }
                 label="활성화"
-                sx={{ mt: 1 }}
+                sx={{
+                  mt: 1,
+                  '& .MuiFormControlLabel-label': {
+                    color: (dialogState.mode === 'view' || (dialogState.mode === 'create' ? !canCreateData : !(canEditOwn || canEditOthers))) ? 'grey.500' : 'inherit'
+                  }
+                }}
               />
             </Grid>
           </Grid>
         </Box>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>취소</Button>
+        <Button
+          onClick={onClose}
+          disabled={dialogState.mode === 'create' ? !canCreateData : !(canEditOwn || canEditOthers)}
+          sx={{
+            '&.Mui-disabled': {
+              color: 'grey.500'
+            }
+          }}
+        >
+          취소
+        </Button>
         {dialogState.mode !== 'view' && (
-          <Button onClick={handleSave} variant="contained">
+          <Button
+            onClick={handleSave}
+            variant="contained"
+            disabled={dialogState.mode === 'create' ? !canCreateData : !(canEditOwn || canEditOthers)}
+            sx={{
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             {dialogState.mode === 'create' ? '추가' : '수정'}
           </Button>
         )}
@@ -726,6 +779,9 @@ export default function MasterCodeManagement() {
   const theme = useTheme();
   const pathname = usePathname();
   const router = useRouter();
+
+  // ✅ 권한 체크
+  const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers, loading: permissionLoading } = useMenuPermission('/admin-panel/master-code');
 
   // 메인 탭 상태 (데이터, 변경로그)
   const [mainTabValue, setMainTabValue] = useState(0);
@@ -987,7 +1043,7 @@ export default function MasterCodeManagement() {
 
         // 변경로그 추가
         if (deletedGroup) {
-          addChangeLog('마스터코드 삭제', deletedGroup.group_code, `삭제: ${deletedGroup.group_code_name}`);
+          addChangeLog('삭제', deletedGroup.group_code, `삭제: ${deletedGroup.group_code_name}`);
         }
       }
     } catch (error) {
@@ -1032,7 +1088,7 @@ export default function MasterCodeManagement() {
         });
 
         // 변경로그 추가
-        addChangeLog('마스터코드 수정', data.code_group, `수정: ${data.code_group_name}`);
+        addChangeLog('수정', data.code_group, `수정: ${data.code_group_name}`);
       } else {
         // 새 그룹 생성 (그룹만 생성)
         await createGroup({
@@ -1051,7 +1107,7 @@ export default function MasterCodeManagement() {
           message: '마스터코드 그룹이 생성되었습니다.',
           severity: 'success'
         });
-        addChangeLog('마스터코드 생성', data.code_group, `생성: ${data.code_group_name} - ${data.code_group_description || '설명 없음'}`);
+        addChangeLog('추가', data.code_group, `생성: ${data.code_group_name} - ${data.code_group_description || '설명 없음'}`);
       }
       setMasterCodeDialog({ open: false, mode: 'create', data: null });
     } catch (error) {
@@ -1119,7 +1175,7 @@ export default function MasterCodeManagement() {
 
       // 변경로그 추가
       if (subCodeToDelete) {
-        addChangeLog('서브코드 삭제', subCodeToDelete.group_code, `삭제: ${subCodeToDelete.subcode} (${subCodeToDelete.subcode_name})`);
+        addChangeLog('삭제', subCodeToDelete.group_code, `삭제: ${subCodeToDelete.subcode} (${subCodeToDelete.subcode_name})`);
       }
     } catch (error) {
       setSnackbar({
@@ -1180,7 +1236,7 @@ export default function MasterCodeManagement() {
       // 변경로그 추가
       const masterCode = masterCodes.find((mc) => mc.id === data.mastercode_id);
       addChangeLog(
-        data.id ? '서브코드 수정' : '서브코드 생성',
+        data.id ? '수정' : '추가',
         masterCode?.code_group || 'UNKNOWN',
         `${data.id ? '수정' : '생성'}: ${data.sub_code} (${data.sub_code_name}) - ${data.sub_code_description || '설명 없음'}`
       );
@@ -1250,7 +1306,7 @@ export default function MasterCodeManagement() {
 
       // 변경로그 추가
       addChangeLog(
-        '서브코드 생성',
+        '추가',
         selectedGroup.group_code,
         `생성: 자동생성 (${subCodeNameValue}) - ${editValues[`${newRowData.id}_sub_code_description`] || '설명 없음'}`
       );
@@ -1287,7 +1343,7 @@ export default function MasterCodeManagement() {
 
       // 변경로그 추가
       const subCode = filteredSubCodes.find((sc) => sc.id === updateData.id);
-      addChangeLog('서브코드 수정', subCode?.group_code || 'UNKNOWN', `수정: ${subCode?.subcode} (${subCode?.subcode_name})`);
+      addChangeLog('수정', subCode?.group_code || 'UNKNOWN', `수정: ${subCode?.subcode} (${subCode?.subcode_name})`);
     } catch (error) {
       setSnackbar({
         open: true,
@@ -1365,19 +1421,41 @@ export default function MasterCodeManagement() {
             </Box>
           </Box>
 
-          {/* 탭 네비게이션 및 필터 */}
-          <Box
-            sx={{
-              borderBottom: 1,
-              borderColor: 'divider',
-              flexShrink: 0,
-              mt: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}
-          >
-            <Tabs
+          {/* 권한 체크: 카테고리 보기만 있는 경우 */}
+          {canViewCategory && !canReadData ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 대한 데이터 조회 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              {/* 탭 네비게이션 및 필터 */}
+              <Box
+                sx={{
+                  borderBottom: 1,
+                  borderColor: 'divider',
+                  flexShrink: 0,
+                  mt: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}
+              >
+                <Tabs
               value={mainTabValue}
               onChange={handleMainTabChange}
               aria-label="마스터코드관리3 탭"
@@ -1457,20 +1535,39 @@ export default function MasterCodeManagement() {
                           variant="outlined"
                           startIcon={<Add size={16} />}
                           onClick={handleCreateMasterCode}
-                          sx={{ textTransform: 'none', fontSize: '0.75rem', px: 1 }}
+                          disabled={!canCreateData}
+                          sx={{
+                            textTransform: 'none',
+                            fontSize: '0.75rem',
+                            px: 1,
+                            '&.Mui-disabled': {
+                              backgroundColor: 'grey.300',
+                              color: 'grey.500',
+                              borderColor: 'grey.300'
+                            }
+                          }}
                         >
                           그룹 추가
                         </Button>
                         <Button
                           variant="outlined"
-                          disabled={selectedItems.size === 0}
-                          color={selectedItems.size > 0 ? 'error' : 'inherit'}
+                          disabled={selectedItems.size === 0 || !(canEditOwn || canEditOthers)}
+                          color={selectedItems.size > 0 && (canEditOwn || canEditOthers) ? 'error' : 'inherit'}
                           startIcon={<Trash size={16} />}
                           onClick={() => {
                             selectedItems.forEach((id) => handleDeleteMasterCode(id));
                             setSelectedItems(new Set());
                           }}
-                          sx={{ textTransform: 'none', fontSize: '0.75rem', px: 1 }}
+                          sx={{
+                            textTransform: 'none',
+                            fontSize: '0.75rem',
+                            px: 1,
+                            '&.Mui-disabled': {
+                              backgroundColor: 'grey.300',
+                              color: 'grey.500',
+                              borderColor: 'grey.300'
+                            }
+                          }}
                         >
                           삭제 {selectedItems.size > 0 ? `(${selectedItems.size})` : ''}
                         </Button>
@@ -1601,27 +1698,41 @@ export default function MasterCodeManagement() {
                             color={newRowData ? 'inherit' : 'primary'}
                             startIcon={<Add size={16} />}
                             onClick={handleCreateSubCode}
-                            disabled={!selectedMasterCode || newRowData}
+                            disabled={!selectedMasterCode || newRowData || !canCreateData}
                             sx={{
                               textTransform: 'none',
                               fontSize: '0.75rem',
                               px: 2,
                               fontWeight: newRowData ? 400 : 600,
-                              boxShadow: newRowData ? 'none' : undefined
+                              boxShadow: newRowData ? 'none' : undefined,
+                              '&.Mui-disabled': {
+                                backgroundColor: 'grey.300',
+                                color: 'grey.500',
+                                borderColor: 'grey.300'
+                              }
                             }}
                           >
                             {newRowData ? '입력 중...' : '서브코드 추가'}
                           </Button>
                           <Button
                             variant="outlined"
-                            disabled={selectedSubItems.size === 0}
-                            color={selectedSubItems.size > 0 ? 'error' : 'inherit'}
+                            disabled={selectedSubItems.size === 0 || !(canEditOwn || canEditOthers)}
+                            color={selectedSubItems.size > 0 && (canEditOwn || canEditOthers) ? 'error' : 'inherit'}
                             startIcon={<Trash size={16} />}
                             onClick={() => {
                               selectedSubItems.forEach((id) => handleDeleteSubCode(id));
                               setSelectedSubItems(new Set());
                             }}
-                            sx={{ textTransform: 'none', fontSize: '0.75rem', px: 1 }}
+                            sx={{
+                              textTransform: 'none',
+                              fontSize: '0.75rem',
+                              px: 1,
+                              '&.Mui-disabled': {
+                                backgroundColor: 'grey.300',
+                                color: 'grey.500',
+                                borderColor: 'grey.300'
+                              }
+                            }}
                           >
                             삭제 {selectedSubItems.size > 0 ? `(${selectedSubItems.size})` : ''}
                           </Button>
@@ -2042,6 +2153,8 @@ export default function MasterCodeManagement() {
               </Box>
             </TabPanel>
           </Box>
+          </>
+          )}
         </CardContent>
       </Card>
 
@@ -2050,12 +2163,18 @@ export default function MasterCodeManagement() {
         dialogState={masterCodeDialog}
         onClose={() => setMasterCodeDialog({ open: false, mode: 'create', data: null })}
         onSave={handleSaveMasterCode}
+        canCreateData={canCreateData}
+        canEditOwn={canEditOwn}
+        canEditOthers={canEditOthers}
       />
 
       <SubCodeDialog
         dialogState={subCodeDialog}
         onClose={() => setSubCodeDialog({ open: false, mode: 'create', mastercode_id: null, data: null })}
         onSave={handleSaveSubCode}
+        canCreateData={canCreateData}
+        canEditOwn={canEditOwn}
+        canEditOthers={canEditOthers}
       />
 
       {/* 스낵바 */}

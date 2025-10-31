@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 
 // Material-UI
 import {
@@ -42,6 +42,9 @@ import { SecurityIncidentRecord, incidentTypeOptions, statusOptions } from 'type
 import { useSupabaseUsers } from 'hooks/useSupabaseUsers';
 import { useSupabaseSecurityAccident } from 'hooks/useSupabaseSecurityAccident';
 import { TaskTableData, TaskStatus } from 'types/task';
+import { useSession } from 'next-auth/react';
+import useUser from 'hooks/useUser';
+import { useCommonData } from 'contexts/CommonDataContext';
 
 // Icons
 import { Edit } from '@wandersonalwes/iconsax-react';
@@ -98,6 +101,9 @@ interface SecurityIncidentTableProps {
   ) => void;
   error?: string | null;
   onDataRefresh?: () => Promise<void>;
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 export default function SecurityIncidentTable({
@@ -109,11 +115,44 @@ export default function SecurityIncidentTable({
   setTasks,
   addChangeLog,
   error = null,
-  onDataRefresh
+  onDataRefresh,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: SecurityIncidentTableProps) {
   const theme = useTheme();
   const { users } = useSupabaseUsers();
   const { createAccident, updateAccident, deleteAccident } = useSupabaseSecurityAccident();
+  const { masterCodes } = useCommonData();
+
+  // 사고유형 코드를 이름으로 변환하는 함수
+  const getIncidentTypeName = useCallback((incidentType: string) => {
+    if (!incidentType) return '미분류';
+    // "GROUP009-SUB001" 형태에서 서브코드명 찾기
+    const type = masterCodes.find(
+      (code) => code.codetype === 'subcode' && code.group_code === 'GROUP009' && (code.subcode === incidentType || `${code.group_code}-${code.subcode}` === incidentType)
+    );
+    return type?.subcode_name || incidentType;
+  }, [masterCodes]);
+
+  // 현재 로그인한 사용자 정보
+  const { data: session } = useSession();
+  const user = useUser();
+
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || users.length === 0) return null;
+    const found = users.find((u) => u.email === session.user.email);
+    return found;
+  }, [session, users]);
+
+  // 데이터 소유자 확인 함수 - createdBy 또는 assignee가 본인인 경우
+  const isDataOwner = (incident: SecurityIncidentRecord) => {
+    if (!currentUser) return false;
+    return (
+      incident.createdBy === currentUser.user_name ||
+      incident.assignee === currentUser.user_name
+    );
+  };
 
   // 사용자 이름으로 사용자 데이터 찾기
   const findUserByName = (userName: string) => {
@@ -128,7 +167,22 @@ export default function SecurityIncidentTable({
     });
     return profiles;
   }, [users]);
+
   const [selected, setSelected] = useState<number[]>([]);
+
+  // 편집 가능 여부 확인 함수
+  const canEditData = useCallback((incident: SecurityIncidentRecord) => {
+    return canEditOthers || (canEditOwn && isDataOwner(incident));
+  }, [canEditOthers, canEditOwn, currentUser]);
+
+  // 선택된 항목들이 모두 편집 가능한지 확인
+  const canEditAllSelected = useMemo(() => {
+    if (selected.length === 0) return false;
+    return selected.every((id) => {
+      const incident = tasks.find((item) => item.id === id);
+      return incident && canEditData(incident);
+    });
+  }, [selected, tasks, canEditData]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [goToPage, setGoToPage] = useState('');
@@ -145,7 +199,7 @@ export default function SecurityIncidentTable({
         NO: index + 1,
         등록일: task.registrationDate,
         코드: task.code,
-        사고유형: task.incidentType,
+        사고유형: getIncidentTypeName(task.incidentType),
         사고내용: task.mainContent,
         대응조치: task.responseAction,
         팀: task.team || '-',
@@ -632,7 +686,20 @@ export default function SecurityIncidentTable({
           >
             Excel Down
           </Button>
-          <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={addNewIncident} sx={{ px: 2 }}>
+          <Button
+            variant="contained"
+            startIcon={<Add size={16} />}
+            size="small"
+            onClick={addNewIncident}
+            disabled={!(canCreateData || canEditOwn)}
+            sx={{
+              px: 2,
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             추가
           </Button>
           <Button
@@ -640,12 +707,16 @@ export default function SecurityIncidentTable({
             startIcon={<Trash size={16} />}
             size="small"
             color="error"
-            disabled={selected.length === 0}
+            disabled={!canEditAllSelected}
             onClick={handleDeleteSelected}
             sx={{
               px: 2,
-              borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
-              color: selected.length > 0 ? 'error.main' : 'grey.500'
+              borderColor: canEditAllSelected ? 'error.main' : 'grey.300',
+              color: canEditAllSelected ? 'error.main' : 'grey.500',
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
             }}
           >
             삭제 {selected.length > 0 && `(${selected.length})`}
@@ -735,6 +806,7 @@ export default function SecurityIncidentTable({
                   <TableCell padding="checkbox">
                     <Checkbox
                       checked={selected.includes(task.id)}
+                      disabled={!canEditData(task)}
                       onChange={(event) => {
                         const selectedIndex = selected.indexOf(task.id);
                         let newSelected: number[] = [];
@@ -770,7 +842,7 @@ export default function SecurityIncidentTable({
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                      {task.incidentType || '미분류'}
+                      {getIncidentTypeName(task.incidentType)}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -851,7 +923,11 @@ export default function SecurityIncidentTable({
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
                       <Tooltip title="수정">
-                        <IconButton size="small" onClick={() => handleEditIncident(task)} sx={{ color: 'primary.main' }}>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleEditIncident(task)}
+                          sx={{ color: 'primary.main' }}
+                        >
                           <Edit size={16} />
                         </IconButton>
                       </Tooltip>
@@ -1015,6 +1091,9 @@ export default function SecurityIncidentTable({
               홀딩: 'error'
             } as Record<TaskStatus, any>
           }
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>

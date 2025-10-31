@@ -264,7 +264,9 @@ export const useSupabaseEducation = (): UseSupabaseEducationReturn => {
       responseContent: dbData.response_content || '',
       resolutionDate: dbData.completion_date || '',
       satisfactionScore: dbData.satisfaction_score,
-      attachments: dbData.attachments || []
+      attachments: dbData.attachments || [],
+      createdBy: dbData.created_by || '',
+      updatedBy: dbData.updated_by || ''
     };
   }, []);
 
@@ -294,8 +296,8 @@ export const useSupabaseEducation = (): UseSupabaseEducationReturn => {
       completion_date: frontendData.resolutionDate || null,
       satisfaction_score: frontendData.satisfactionScore || null,
       attachments: frontendData.attachments || [],
-      created_by: 'system',
-      updated_by: 'system',
+      created_by: frontendData.createdBy || '',
+      updated_by: frontendData.updatedBy || '',
       is_active: true
     };
   }, []);

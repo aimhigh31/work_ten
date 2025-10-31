@@ -11,6 +11,7 @@ export interface SecurityEducationData {
   executionDate: string;
   status: '대기' | '진행' | '완료' | '홀딩';
   assignee: string;
+  createdBy?: string; // 데이터 생성자 (권한 체크용)
   team?: '보안팀' | 'IT팀' | '개발팀' | '관리팀';
   department?: 'IT' | '보안';
   attachments?: string[];
@@ -66,6 +67,7 @@ export interface SecurityEducationRecord {
   executionDate: string;
   status: SecurityEducationStatus;
   assignee: string;
+  createdBy?: string; // 데이터 생성자 (권한 체크용)
   team?: string;
   attachment: boolean;
   attachmentCount: number;

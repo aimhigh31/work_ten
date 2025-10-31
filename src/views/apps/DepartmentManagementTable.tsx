@@ -81,6 +81,10 @@ interface DepartmentManagementTableProps {
   departments?: DepartmentData[];
   setDepartments?: React.Dispatch<React.SetStateAction<DepartmentData[]>>;
   addChangeLog?: (action: string, target: string, description: string, team?: string) => void;
+  canReadData?: boolean;
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 // Department을 DepartmentData로 변환하는 함수
@@ -169,7 +173,11 @@ export default function DepartmentManagementTable({
   selectedAssignee = '전체',
   departments,
   setDepartments,
-  addChangeLog
+  addChangeLog,
+  canReadData = true,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: DepartmentManagementTableProps) {
   const theme = useTheme();
 
@@ -631,28 +639,41 @@ export default function DepartmentManagementTable({
               Excel Down
             </Button>
           )}
-          {canWrite && (
-            <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={addNewDepartment} sx={{ px: 2 }}>
-              추가
-            </Button>
-          )}
-          {canFull && (
-            <Button
-              variant="outlined"
-              startIcon={<Trash size={16} />}
-              size="small"
-              color="error"
-              disabled={selected.length === 0}
-              onClick={handleDeleteSelected}
-              sx={{
-                px: 2,
-                borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
-                color: selected.length > 0 ? 'error.main' : 'grey.500'
-              }}
-            >
-              삭제 {selected.length > 0 && `(${selected.length})`}
-            </Button>
-          )}
+          <Button
+            variant="contained"
+            startIcon={<Add size={16} />}
+            size="small"
+            onClick={addNewDepartment}
+            disabled={!canCreateData}
+            sx={{
+              px: 2,
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
+            추가
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<Trash size={16} />}
+            size="small"
+            color="error"
+            disabled={selected.length === 0 || !(canEditOwn || canEditOthers)}
+            onClick={handleDeleteSelected}
+            sx={{
+              px: 2,
+              borderColor: selected.length > 0 && (canEditOwn || canEditOthers) ? 'error.main' : 'grey.300',
+              color: selected.length > 0 && (canEditOwn || canEditOthers) ? 'error.main' : 'grey.500',
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
+            삭제 {selected.length > 0 && `(${selected.length})`}
+          </Button>
         </Box>
       </Box>
 
@@ -824,13 +845,11 @@ export default function DepartmentManagementTable({
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      {canWrite && (
-                        <Tooltip title="수정">
-                          <IconButton size="small" onClick={() => handleEditDepartment(dept)} sx={{ color: 'primary.main' }}>
-                            <Edit size={16} />
-                          </IconButton>
-                        </Tooltip>
-                      )}
+                      <Tooltip title="수정">
+                        <IconButton size="small" onClick={() => handleEditDepartment(dept)} sx={{ color: 'primary.main' }}>
+                          <Edit size={16} />
+                        </IconButton>
+                      </Tooltip>
                     </Box>
                   </TableCell>
                 </TableRow>
@@ -1007,6 +1026,8 @@ export default function DepartmentManagementTable({
           department={editingDepartment}
           onSave={handleEditDepartmentSave}
           existingDepartments={data}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
 

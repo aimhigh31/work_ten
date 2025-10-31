@@ -14,6 +14,8 @@ export interface TaskData {
   completedDate?: string; // completed_date를 camelCase로
   progress: number; // 진척율 추가
   attachments: any[]; // 첨부파일
+  createdBy?: string; // 생성자
+  updatedBy?: string; // 수정자
 }
 
 export interface TaskTableData extends TaskData {

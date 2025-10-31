@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 
 // Material-UI
 import {
@@ -39,6 +40,7 @@ import ITEducationEditDialog from 'components/ITEducationEditDialog';
 import { itEducationData, teams, assignees, itEducationStatusOptions, itEducationStatusColors, assigneeAvatars } from 'data/it-education';
 import { ITEducationTableData, ITEducationStatus, ITEducationRecord } from 'types/it-education';
 import { useSupabaseItEducation, ItEducationData } from 'hooks/useSupabaseItEducation';
+import { useCommonData } from 'contexts/CommonDataContext';
 
 // 데이터 변환 함수
 const convertTableDataToRecord = (tableData: ITEducationTableData): ITEducationRecord => {
@@ -120,6 +122,10 @@ interface ITEducationTableProps {
     title?: string
   ) => void;
   users?: any[]; // CommonData에서 전달받은 사용자 목록
+  // 🔐 권한 관리
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 export default function ITEducationTable({
@@ -130,9 +136,35 @@ export default function ITEducationTable({
   tasks,
   setTasks,
   addChangeLog,
-  users = [] // CommonData에서 전달받은 사용자 목록
+  users = [], // CommonData에서 전달받은 사용자 목록
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: ITEducationTableProps) {
   const theme = useTheme();
+  const { data: session } = useSession();
+
+  // 공통 데이터 가져오기
+  const { masterCodes } = useCommonData();
+
+  // 교육유형 서브코드명 변환 함수
+  const getEducationTypeName = useCallback((subcode: string) => {
+    if (!subcode) return '';
+    const found = masterCodes.find(
+      (item) => item.codetype === 'subcode' && item.group_code === 'GROUP008' && item.subcode === subcode && item.is_active
+    );
+    return found ? found.subcode_name : subcode;
+  }, [masterCodes]);
+
+  // 상태 코드를 이름으로 변환하는 함수
+  const getStatusName = useCallback((statusCode: string) => {
+    if (!statusCode) return '대기';
+    // "GROUP002-SUB001" 형태에서 서브코드명 찾기
+    const status = masterCodes.find(
+      (code) => code.codetype === 'subcode' && code.group_code === 'GROUP002' && (code.subcode === statusCode || `${code.group_code}-${code.subcode}` === statusCode)
+    );
+    return status?.subcode_name || statusCode;
+  }, [masterCodes]);
 
   // Supabase 훅 사용
   const { loading, error, getItEducationData, deleteItEducation } = useSupabaseItEducation();
@@ -156,6 +188,36 @@ export default function ITEducationTable({
 
   const [data, setData] = useState<ITEducationTableData[]>(tasks ? tasks : []);
   const [selected, setSelected] = useState<number[]>([]);
+
+  // 🔐 권한 체크: 현재 사용자 정보
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || users.length === 0) return null;
+    const found = users.find((u) => u.email === session.user.email);
+    return found;
+  }, [session, users]);
+
+  // 🔐 권한 체크: 데이터 소유자 확인
+  const isDataOwner = (education: ITEducationTableData) => {
+    if (!currentUser) return false;
+    return (
+      education.createdBy === currentUser.user_name ||
+      education.assignee === currentUser.user_name
+    );
+  };
+
+  // 🔐 권한 체크: 개별 데이터 편집 가능 여부
+  const canEditData = useCallback((education: ITEducationTableData) => {
+    return canEditOthers || (canEditOwn && isDataOwner(education));
+  }, [canEditOthers, canEditOwn, currentUser]);
+
+  // 🔐 권한 체크: 선택된 모든 데이터 편집 가능 여부
+  const canEditAllSelected = useMemo(() => {
+    if (selected.length === 0) return false;
+    return selected.every((id) => {
+      const education = data.find((item) => item.id === id);
+      return education && canEditData(education);
+    });
+  }, [selected, data, canEditData]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [goToPage, setGoToPage] = useState('');
@@ -181,7 +243,7 @@ export default function ITEducationTable({
         참석수: task.attendeeCount,
         팀: task.team || '-',
         담당자: task.assignee,
-        상태: task.status,
+        상태: getStatusName(task.status),
         실행일: task.executionDate
       }));
 
@@ -675,7 +737,20 @@ export default function ITEducationTable({
           >
             Excel Down
           </Button>
-          <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={addNewTask} sx={{ px: 2 }}>
+          <Button
+            variant="contained"
+            startIcon={<Add size={16} />}
+            size="small"
+            onClick={addNewTask}
+            disabled={!canCreateData}
+            sx={{
+              px: 2,
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             추가
           </Button>
           <Button
@@ -683,12 +758,16 @@ export default function ITEducationTable({
             startIcon={<Trash size={16} />}
             size="small"
             color="error"
-            disabled={selected.length === 0}
+            disabled={!canEditAllSelected}
             onClick={handleDeleteSelected}
             sx={{
               px: 2,
-              borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
-              color: selected.length > 0 ? 'error.main' : 'grey.500'
+              borderColor: canEditAllSelected ? 'error.main' : 'grey.300',
+              color: canEditAllSelected ? 'error.main' : 'grey.500',
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
             }}
           >
             삭제 {selected.length > 0 && `(${selected.length})`}
@@ -768,6 +847,7 @@ export default function ITEducationTable({
                   <TableCell padding="checkbox">
                     <Checkbox
                       checked={selected.includes(task.id)}
+                      disabled={!canEditData(task)}
                       onChange={(event) => {
                         const selectedIndex = selected.indexOf(task.id);
                         let newSelected: number[] = [];
@@ -802,7 +882,7 @@ export default function ITEducationTable({
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
-                      {task.educationType || '유형없음'}
+                      {getEducationTypeName(task.educationType) || '유형없음'}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -851,11 +931,11 @@ export default function ITEducationTable({
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={task.status}
+                      label={getStatusName(task.status)}
                       size="small"
                       sx={{
-                        backgroundColor: getStatusColor(task.status).bgcolor,
-                        color: getStatusColor(task.status).color,
+                        backgroundColor: getStatusColor(getStatusName(task.status)).bgcolor,
+                        color: getStatusColor(getStatusName(task.status)).color,
                         fontSize: '13px',
                         fontWeight: 500
                       }}
@@ -1030,6 +1110,9 @@ export default function ITEducationTable({
           recordId={editingTaskId}
           tasks={data}
           onSave={handleEditTaskSave}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>

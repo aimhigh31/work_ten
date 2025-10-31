@@ -16,6 +16,7 @@ export interface InvestmentData {
   actualReturn?: number;
   riskLevel: '낮음' | '보통' | '높음' | '매우높음';
   attachments: string[];
+  createdBy?: string; // 데이터 생성자 (권한 체크용)
 }
 
 export interface InvestmentTableData extends InvestmentData {

@@ -64,7 +64,9 @@ function convertToTaskTableData(checklist: ChecklistData): TaskTableData {
     progress: checklist.progress,
     attachments: checklist.attachments || [],
     startDate: checklist.registration_date, // 시작일을 등록일로 사용
-    dueDate: checklist.completed_date || '' // 마감일을 완료일로 사용
+    dueDate: checklist.completed_date || '', // 마감일을 완료일로 사용
+    createdBy: checklist.created_by,
+    updatedBy: checklist.updated_by
   };
 }
 
@@ -83,7 +85,9 @@ function convertToChecklistData(task: TaskTableData, existingId?: number): Parti
     assignee: task.assignee || '',
     completed_date: task.completedDate || undefined,
     progress: task.progress || 0,
-    attachments: task.attachments || []
+    attachments: task.attachments || [],
+    created_by: task.createdBy,
+    updated_by: task.updatedBy
   };
 }
 

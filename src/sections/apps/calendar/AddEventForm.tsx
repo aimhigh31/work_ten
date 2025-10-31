@@ -111,6 +111,9 @@ interface AddEventFormProps {
   createEvent?: (eventData: any) => Promise<any>;
   updateEvent?: (event_id: string, eventData: any) => Promise<any>;
   deleteEvent?: (event_id: string) => Promise<void>;
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 export default function AddEventFrom({
@@ -120,7 +123,10 @@ export default function AddEventFrom({
   modalCallback,
   createEvent: createEventProp,
   updateEvent: updateEventProp,
-  deleteEvent: deleteEventProp
+  deleteEvent: deleteEventProp,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: AddEventFormProps) {
   const theme = useTheme();
   const isCreating = !event;
@@ -142,6 +148,18 @@ export default function AddEventFrom({
   const currentUser = users.find((u) => u.email === currentUserEmail);
   const currentUserTeam = currentUser?.department || '';
   const currentUserName = currentUser?.user_name || '';
+
+  // 데이터 소유자 확인 로직
+  const isOwner = React.useMemo(() => {
+    if (!event) return true; // 신규 생성인 경우 true
+    // event의 assignee와 현재 사용자 비교
+    return event.assignee === currentUserName;
+  }, [event, currentUserName]);
+
+  // 편집 가능 여부 결정
+  const canEdit = React.useMemo(() => {
+    return canEditOthers || (canEditOwn && isOwner);
+  }, [canEditOthers, canEditOwn, isOwner]);
 
   // 팀별 색상 매핑
   const teamColors: Record<string, string> = {
@@ -360,50 +378,55 @@ export default function AddEventFrom({
                 </Typography>
               )}
             </Box>
-            <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-              <Button
-                variant="outlined"
-                color="error"
-                onClick={deleteHandler}
-                size="medium"
-                disabled={isCreating}
-                startIcon={<Trash size={16} />}
-                sx={{
-                  px: 2,
-                  borderColor: isCreating ? 'grey.300' : 'error.main',
-                  color: isCreating ? 'grey.500' : 'error.main',
-                  backgroundColor: 'transparent',
-                  '&:hover': {
-                    backgroundColor: isCreating ? 'transparent' : 'error.lighter',
-                    borderColor: isCreating ? 'grey.300' : 'error.main'
-                  },
-                  '&:disabled': {
-                    borderColor: 'grey.300',
-                    color: 'grey.500',
-                    cursor: 'not-allowed'
-                  }
-                }}
-              >
-                삭제
-              </Button>
-              <Button
-                type="submit"
-                variant="contained"
-                disabled={isSubmitting}
-                size="medium"
-                sx={{
-                  backgroundColor: 'primary.main',
-                  '&:hover': {
-                    backgroundColor: 'primary.dark'
-                  },
-                  '&:disabled': {
-                    backgroundColor: 'grey.300'
-                  }
-                }}
-              >
-                {event ? '저장' : '추가'}
-              </Button>
-            </Stack>
+            {((!event && canCreateData) || (event && (canEditOwn || canEditOthers))) && (
+              <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+                {event && (canEditOwn || canEditOthers) && (
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    onClick={deleteHandler}
+                    size="medium"
+                    disabled={isCreating || !canEdit}
+                    startIcon={<Trash size={16} />}
+                    sx={{
+                      px: 2,
+                      borderColor: (isCreating || !canEdit) ? 'grey.300' : 'error.main',
+                      color: (isCreating || !canEdit) ? 'grey.500' : 'error.main',
+                      backgroundColor: 'transparent',
+                      '&:hover': {
+                        backgroundColor: (isCreating || !canEdit) ? 'transparent' : 'error.lighter',
+                        borderColor: (isCreating || !canEdit) ? 'grey.300' : 'error.main'
+                      },
+                      '&:disabled': {
+                        borderColor: 'grey.300',
+                        color: 'grey.500',
+                        cursor: 'not-allowed'
+                      }
+                    }}
+                  >
+                    삭제
+                  </Button>
+                )}
+                <Button
+                  type="submit"
+                  variant="contained"
+                  disabled={isSubmitting || (!event ? !canCreateData : !canEdit)}
+                  size="medium"
+                  sx={{
+                    backgroundColor: 'primary.main',
+                    '&:hover': {
+                      backgroundColor: 'primary.dark'
+                    },
+                    '&:disabled': {
+                      backgroundColor: 'grey.300',
+                      color: 'grey.500'
+                    }
+                  }}
+                >
+                  {event ? '저장' : '추가'}
+                </Button>
+              </Stack>
+            )}
           </DialogTitle>
           <Divider sx={{ mt: 1 }} />
           <DialogContent
@@ -612,36 +635,6 @@ export default function AddEventFrom({
                     }
                   }}
                 />
-              </Grid>
-
-              {/* 배경색상 */}
-              <Grid size={12}>
-                <FormControl fullWidth>
-                  <InputLabel shrink sx={{ backgroundColor: 'white', px: 0.5 }}>
-                    배경색상
-                  </InputLabel>
-                  <Stack
-                    direction="row"
-                    spacing={2}
-                    sx={{ alignItems: 'center', py: 1, px: 2, border: '1px solid #e0e0e0', borderRadius: 1, mt: 2 }}
-                  >
-                    <div
-                      style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '8px',
-                        backgroundColor: values.color || '#FFE5E5',
-                        border: '2px solid #e0e0e0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                    />
-                    <Typography variant="body2" color="text.secondary">
-                      {values.team ? `${values.team} 색상이 자동으로 적용됩니다.` : '팀을 선택하면 색상이 자동으로 설정됩니다.'}
-                    </Typography>
-                  </Stack>
-                </FormControl>
               </Grid>
             </Grid>
           </DialogContent>

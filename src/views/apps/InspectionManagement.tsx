@@ -55,6 +55,7 @@ import { ChangeLogData } from 'types/changelog';
 import { createClient } from '@/lib/supabase/client';
 import { useSession } from 'next-auth/react';
 import useUser from 'hooks/useUser';
+import { useMenuPermission } from '../../hooks/usePermissions';
 
 // 변경로그 타입 정의 (UI용)
 interface ChangeLog {
@@ -127,6 +128,10 @@ interface KanbanViewProps {
   ) => void;
   generateInspectionCode?: () => Promise<string>;
   assigneeList?: any[];
+  users?: any[];
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 function KanbanView({
@@ -138,9 +143,32 @@ function KanbanView({
   setInspections,
   addChangeLog,
   generateInspectionCode,
-  assigneeList
+  assigneeList,
+  users = [],
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: KanbanViewProps) {
   const theme = useTheme();
+
+  // 현재 로그인한 사용자 정보
+  const { data: session } = useSession();
+  const user = useUser();
+
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || users.length === 0) return null;
+    const found = users.find((u) => u.email === session.user.email);
+    return found;
+  }, [session, users]);
+
+  // 데이터 소유자 확인 함수 - createdBy 또는 assignee가 본인인 경우
+  const isDataOwner = useCallback((inspection: InspectionTableData) => {
+    if (!currentUser) return false;
+    return (
+      inspection.createdBy === currentUser.user_name ||
+      inspection.assignee === currentUser.user_name
+    );
+  }, [currentUser]);
 
   // 상태 관리
   const [activeInspection, setActiveInspection] = useState<InspectionTableData | null>(null);
@@ -370,17 +398,19 @@ function KanbanView({
 
   // 드래그 가능한 카드 컴포넌트
   function DraggableCard({ inspection }: { inspection: InspectionTableData }) {
+    const isDragDisabled = !(canEditOthers || (canEditOwn && isDataOwner(inspection)));
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-      id: inspection.id
+      id: inspection.id,
+      disabled: isDragDisabled
     });
 
     const style = transform
       ? {
           transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
           opacity: isDragging ? 0.5 : 1,
-          cursor: isDragging ? 'grabbing' : 'pointer'
+          cursor: isDragging ? 'grabbing' : (isDragDisabled ? 'default' : 'grab')
         }
-      : { cursor: 'pointer' };
+      : { cursor: isDragDisabled ? 'default' : 'grab' };
 
     const statusTagColor = getStatusTagColor(inspection.status);
     const progress = getProgressFromStatus(inspection.status);
@@ -396,7 +426,7 @@ function KanbanView({
       <article
         ref={setNodeRef}
         style={style}
-        {...listeners}
+        {...(isDragDisabled ? {} : listeners)}
         {...attributes}
         className="kanban-card"
         onClick={(e) => {
@@ -730,6 +760,9 @@ function KanbanView({
           inspection={editingInspection}
           onSave={handleEditInspectionSave}
           generateInspectionCode={generateInspectionCode}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>
@@ -876,7 +909,7 @@ function MonthlyScheduleView({
             {/* 월 헤더 - 상반기 */}
             {monthNames.slice(0, 6).map((month, index) => (
               <Box
-                key={index}
+                key={`month-header-first-${index}`}
                 sx={{
                   py: 1.5,
                   px: 1,
@@ -901,7 +934,7 @@ function MonthlyScheduleView({
 
               return (
                 <Box
-                  key={monthIndex}
+                  key={`month-content-first-${monthIndex}`}
                   sx={{
                     borderRight: monthIndex < 5 ? '1px solid' : 'none',
                     borderColor: 'divider',
@@ -924,7 +957,7 @@ function MonthlyScheduleView({
 
                       return (
                         <Box
-                          key={item.id}
+                          key={`month-${monthIndex}-item-${item.id}`}
                           onClick={() => onCardClick(item)}
                           sx={{
                             mb: itemIndex < items.length - 1 ? 0.8 : 0,
@@ -994,7 +1027,7 @@ function MonthlyScheduleView({
             {/* 월 헤더 - 하반기 */}
             {monthNames.slice(6, 12).map((month, index) => (
               <Box
-                key={index + 6}
+                key={`month-header-second-${index}`}
                 sx={{
                   py: 1.5,
                   px: 1,
@@ -1020,7 +1053,7 @@ function MonthlyScheduleView({
 
               return (
                 <Box
-                  key={monthIndex}
+                  key={`month-content-second-${index}`}
                   sx={{
                     borderRight: index < 5 ? '1px solid' : 'none',
                     borderColor: 'divider',
@@ -1256,13 +1289,13 @@ function DashboardView({
   const getStatusColor = (status: string) => {
     switch (status) {
       case '대기':
-        return '#ED8936';
+        return '#90A4AE';
       case '진행':
-        return '#4267B2';
+        return '#7986CB';
       case '완료':
-        return '#4A5568';
+        return '#81C784';
       case '홀딩':
-        return '#E53E3E';
+        return '#E57373';
       default:
         return '#9e9e9e';
     }
@@ -1434,7 +1467,7 @@ function DashboardView({
         text: '점검 건수'
       }
     },
-    colors: ['#ED8936', '#4267B2', '#4A5568', '#E53E3E'],
+    colors: ['#90A4AE', '#7986CB', '#81C784', '#E57373'],
     legend: {
       position: 'top',
       horizontalAlign: 'right'
@@ -1595,7 +1628,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#48C4B7',
+              background: '#26C6DA',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1614,12 +1647,12 @@ function DashboardView({
           </Card>
         </Grid>
 
-        {/* 완료 */}
+        {/* 대기 */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
               p: 3,
-              background: '#4A5568',
+              background: '#90A4AE',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1627,13 +1660,13 @@ function DashboardView({
             }}
           >
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
-              완료
+              대기
             </Typography>
             <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusStats['완료'] || 0}
+              {statusStats['대기'] || 0}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              완료된 점검
+              대기중인 점검
             </Typography>
           </Card>
         </Grid>
@@ -1643,7 +1676,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#4267B2',
+              background: '#7986CB',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1662,12 +1695,36 @@ function DashboardView({
           </Card>
         </Grid>
 
+        {/* 완료 */}
+        <Grid item xs={12} sm={6} md={2.4}>
+          <Card
+            sx={{
+              p: 3,
+              background: '#81C784',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+              borderRadius: 2,
+              color: '#fff',
+              textAlign: 'center'
+            }}
+          >
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
+              완료
+            </Typography>
+            <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
+              {statusStats['완료'] || 0}
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
+              완료된 점검
+            </Typography>
+          </Card>
+        </Grid>
+
         {/* 홀딩 */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
               p: 3,
-              background: '#E53E3E',
+              background: '#E57373',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1682,30 +1739,6 @@ function DashboardView({
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
               보류중인 점검
-            </Typography>
-          </Card>
-        </Grid>
-
-        {/* 대기 */}
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              p: 3,
-              background: '#ED8936',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-              borderRadius: 2,
-              color: '#fff',
-              textAlign: 'center'
-            }}
-          >
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
-              대기
-            </Typography>
-            <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusStats['대기'] || 0}
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              대기중인 점검
             </Typography>
           </Card>
         </Grid>
@@ -2001,6 +2034,9 @@ export default function InspectionManagement() {
   const theme = useTheme();
   const [value, setValue] = useState(0);
 
+  // 🔐 권한 체크
+  const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers } = useMenuPermission('/security/inspection');
+
   // Supabase 보안점검 관리 훅
   const {
     loading: supabaseLoading,
@@ -2122,6 +2158,7 @@ export default function InspectionManagement() {
           inspectionContent: item.inspection_content || '',
           team: item.team || '',
           assignee: item.assignee || '',
+          createdBy: item.created_by, // DB의 created_by 필드 매핑
           status: item.status || '대기',
           inspectionDate: item.inspection_date || '',
           details: (item as any).details || '',
@@ -2485,7 +2522,48 @@ export default function InspectionManagement() {
             </Box>
           </Box>
 
-          {/* 탭 네비게이션 및 필터 */}
+          {/* 권한 체크 */}
+          {!canViewCategory ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 접근할 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : !canReadData ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 대한 데이터 조회 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              {/* 탭 네비게이션 및 필터 */}
           <Box
             sx={{
               borderBottom: 1,
@@ -2740,6 +2818,10 @@ export default function InspectionManagement() {
                   onSave={handleEditInspectionSave}
                   onDelete={handleDeleteInspections}
                   generateInspectionCode={generateInspectionCode}
+                  canReadData={canReadData}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                 />
               </Box>
             </TabPanel>
@@ -2782,6 +2864,10 @@ export default function InspectionManagement() {
                   addChangeLog={addChangeLog}
                   generateInspectionCode={generateInspectionCode}
                   assigneeList={users.filter((user) => user.status === 'active')}
+                  users={users}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                 />
               </Box>
             </TabPanel>
@@ -3215,6 +3301,8 @@ export default function InspectionManagement() {
               </Box>
             </TabPanel>
           </Box>
+          </>
+          )}
         </CardContent>
       </Card>
 
@@ -3226,6 +3314,9 @@ export default function InspectionManagement() {
           inspection={editingInspection}
           onSave={handleEditInspectionSave}
           generateInspectionCode={generateInspectionCode}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>

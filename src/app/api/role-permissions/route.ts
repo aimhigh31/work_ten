@@ -74,6 +74,10 @@ export async function GET(request: NextRequest) {
           can_read,
           can_write,
           can_full,
+          can_view_category,
+          can_read_data,
+          can_manage_own,
+          can_edit_others,
           admin_systemsetting_menu (
             menu_category,
             menu_page,
@@ -100,9 +104,17 @@ export async function GET(request: NextRequest) {
           }
           acc[p.role_id].push({
             menu_id: p.menu_id,
+            // 기존 3개 필드 (하위 호환성)
             can_read: p.can_read,
             can_write: p.can_write,
             can_full: p.can_full,
+            // 새로운 5개 필드
+            can_view_category: p.can_view_category,
+            can_read_data: p.can_read_data,
+            // ✅ 통합된 can_manage_own을 두 필드로 제공 (하위 호환성)
+            can_create_data: p.can_manage_own,
+            can_edit_own: p.can_manage_own,
+            can_edit_others: p.can_edit_others,
             menu_category: p.admin_systemsetting_menu?.menu_category,
             menu_page: p.admin_systemsetting_menu?.menu_page,
             menu_description: p.admin_systemsetting_menu?.menu_description
@@ -313,7 +325,19 @@ export async function POST(request: NextRequest) {
       const permissionsToInsert = [];
 
       for (const permission of permissions) {
-        const { menuId, canRead, canWrite, canFull } = permission;
+        const {
+          menuId,
+          // 기존 3개 필드 (하위 호환성)
+          canRead,
+          canWrite,
+          canFull,
+          // 새로운 5개 필드
+          canViewCategory,
+          canReadData,
+          canCreateData,
+          canEditOwn,
+          canEditOthers
+        } = permission;
 
         // menuId가 유효한지 확인
         if (!menuId || menuId === null || menuId === undefined) {
@@ -321,18 +345,27 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
+        // ✅ can_create_data와 can_edit_own을 can_manage_own으로 통합
+        const canManageOwn = canCreateData || canEditOwn;
+
         // 적어도 하나의 권한이라도 true인 경우에만 저장
-        if (canRead || canWrite || canFull) {
+        if (canRead || canWrite || canFull || canViewCategory || canReadData || canManageOwn || canEditOthers) {
           permissionsToInsert.push({
             role_id: roleId,
             menu_id: menuId,
+            // 기존 3개 필드 (하위 호환성)
             can_read: canRead || false,
             can_write: canWrite || false,
             can_full: canFull || false,
+            // 새로운 필드 (세밀한 권한 제어)
+            can_view_category: canViewCategory || false,
+            can_read_data: canReadData || false,
+            can_manage_own: canManageOwn || false, // ✅ 통합된 필드
+            can_edit_others: canEditOthers || false,
             created_by: 'system',
             updated_by: 'system'
           });
-          console.log(`✅ 메뉴 ${menuId} 권한 저장: read=${canRead}, write=${canWrite}, full=${canFull}`);
+          console.log(`✅ 메뉴 ${menuId} 권한 저장: read=${canRead}, write=${canWrite}, full=${canFull}, viewCategory=${canViewCategory}, readData=${canReadData}, manageOwn=${canManageOwn}, editOthers=${canEditOthers}`);
         } else {
           console.log(`⏩ 메뉴 ${menuId}: 권한 없음, 건너뜀`);
         }

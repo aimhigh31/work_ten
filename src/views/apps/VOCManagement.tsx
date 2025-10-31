@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 
 // third-party
 import ReactApexChart from 'react-apexcharts';
@@ -50,6 +50,8 @@ import { ChangeLogData } from 'types/changelog';
 import { createClient } from '@/lib/supabase/client';
 import { useSession } from 'next-auth/react';
 import useUser from 'hooks/useUser';
+import { useMenuPermission } from '../../hooks/usePermissions';
+import { useSupabaseVoc } from 'hooks/useSupabaseVoc';
 
 // 변경로그 타입 정의
 interface ChangeLog {
@@ -112,6 +114,13 @@ interface KanbanViewProps {
   setVOCs: React.Dispatch<React.SetStateAction<VOCTableData[]>>;
   addChangeLog: (action: string, target: string, description: string, team?: string) => void;
   assigneeList?: any[];
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
+  users?: any[];
+  getVocTypeName?: (subcode: string) => string;
+  getPriorityName?: (subcode: string) => string;
+  getStatusName?: (subcode: string) => string;
 }
 
 function KanbanView({
@@ -122,8 +131,43 @@ function KanbanView({
   vocs,
   setVOCs,
   addChangeLog,
-  assigneeList
+  assigneeList,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true,
+  users = [],
+  getVocTypeName = (subcode: string) => subcode,
+  getPriorityName = (subcode: string) => subcode,
+  getStatusName = (subcode: string) => subcode
 }: KanbanViewProps) {
+  // 세션 정보 가져오기
+  const { data: session } = useSession();
+
+  // 권한 체크 - 현재 사용자 확인
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || !users || users.length === 0) return null;
+    const found = users.find((u: any) => u.email === session.user.email);
+    console.log('🔐 KanbanView - currentUser:', found);
+    return found;
+  }, [session, users]);
+
+  // 데이터 소유자 확인 (createdBy 또는 assignee)
+  const isDataOwner = useCallback((voc: VOCTableData) => {
+    if (!currentUser) return false;
+    const isCreator = voc.createdBy === currentUser.user_name;
+    const isAssignee = voc.assignee === currentUser.user_name;
+    console.log('🔐 KanbanView - isDataOwner:', {
+      vocId: voc.id,
+      currentUserName: currentUser.user_name,
+      createdBy: voc.createdBy,
+      assignee: voc.assignee,
+      isCreator,
+      isAssignee,
+      isOwner: isCreator || isAssignee
+    });
+    return isCreator || isAssignee;
+  }, [currentUser]);
+
   // 상태 관리
   const [activeVOC, setActiveVOC] = useState<VOCTableData | null>(null);
   const [isDraggingState, setIsDraggingState] = useState(false);
@@ -245,16 +289,16 @@ function KanbanView({
       const requestContent = currentVOC.requestContent || 'VOC내용 없음';
       const description = `${requestContent} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
 
-      addChangeLog('VOC 상태 변경', vocCode, description, currentVOC.team || '미분류');
+      addChangeLog('수정', vocCode, description, currentVOC.team || '미분류');
     }
   };
 
-  // 상태별 컬럼 정의 - VOC 상태에 맞게 수정
+  // 상태별 컬럼 정의 - DB의 실제 status 값에 맞게 수정
   const statusColumns = [
-    { key: '접수', title: '접수', pillBg: '#FFF3E0', pillColor: '#F57C00' },
-    { key: '진행중', title: '진행중', pillBg: '#E3F2FD', pillColor: '#1976D2' },
+    { key: '대기', title: '대기', pillBg: '#FFF3E0', pillColor: '#F57C00' },
+    { key: '진행', title: '진행중', pillBg: '#E3F2FD', pillColor: '#1976D2' },
     { key: '완료', title: '완료', pillBg: '#E8F5E8', pillColor: '#388E3C' },
-    { key: '보류', title: '홀딩', pillBg: '#FFEBEE', pillColor: '#D32F2F' }
+    { key: '홀딩', title: '홀딩', pillBg: '#FFEBEE', pillColor: '#D32F2F' }
   ];
 
   // 상태별 아이템 가져오기
@@ -305,13 +349,13 @@ function KanbanView({
   // 상태 태그 스타일 함수
   const getStatusTagStyle = (status: string) => {
     switch (status) {
-      case '접수':
+      case '대기':
         return { backgroundColor: 'rgba(251, 191, 36, 0.15)', color: '#f59e0b' };
-      case '진행중':
+      case '진행':
         return { backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6' };
       case '완료':
         return { backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#16a34a' };
-      case '보류':
+      case '홀딩':
         return { backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#dc2626' };
       default:
         return { backgroundColor: 'rgba(156, 163, 175, 0.15)', color: '#4b5563' };
@@ -332,13 +376,13 @@ function KanbanView({
   // 상태별 진행률 계산
   const getProgressFromStatus = (status: string) => {
     switch (status) {
-      case '접수':
+      case '대기':
         return 25;
-      case '진행중':
+      case '진행':
         return 75;
       case '완료':
         return 100;
-      case '보류':
+      case '홀딩':
         return 10;
       default:
         return 0;
@@ -346,9 +390,10 @@ function KanbanView({
   };
 
   // 드래그 가능한 카드 컴포넌트
-  function DraggableCard({ voc }: { voc: VOCTableData }) {
+  function DraggableCard({ voc, canEditOwn = true, canEditOthers = true, isDragDisabled = false }: { voc: VOCTableData; canEditOwn?: boolean; canEditOthers?: boolean; isDragDisabled?: boolean }) {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-      id: voc.id
+      id: voc.id,
+      disabled: isDragDisabled
     });
 
     const style = transform
@@ -382,10 +427,10 @@ function KanbanView({
       >
         {/* 1. 상태 태그 영역 */}
         <div className="status-tags">
-          <span className="status-tag" style={getStatusTagStyle(voc.status)}>
-            {voc.status}
+          <span className="status-tag" style={getStatusTagStyle(getStatusName(voc.status))}>
+            {getStatusName(voc.status)}
           </span>
-          <span className="incident-type-tag">{voc.vocType || '일반요청'}</span>
+          <span className="incident-type-tag">{getVocTypeName(voc.vocType) || '일반요청'}</span>
         </div>
 
         {/* 2. 카드 제목 */}
@@ -401,11 +446,11 @@ function KanbanView({
           </div>
           <div className="info-line">
             <span className="info-label">VOC유형:</span>
-            <span className="info-value">{voc.vocType || '미설정'}</span>
+            <span className="info-value">{getVocTypeName(voc.vocType) || '미설정'}</span>
           </div>
           <div className="info-line">
             <span className="info-label">우선순위:</span>
-            <span className="info-value">{voc.priority || '미설정'}</span>
+            <span className="info-value">{getPriorityName(voc.priority) || '미설정'}</span>
           </div>
           <div className="info-line">
             <span className="info-label">완료일:</span>
@@ -674,9 +719,10 @@ function KanbanView({
             const items = getItemsByStatus(column.key);
             return (
               <DroppableColumn key={column.key} column={column}>
-                {items.map((item) => (
-                  <DraggableCard key={item.id} voc={item} />
-                ))}
+                {items.map((item) => {
+                  const isDragDisabled = !(canEditOthers || (canEditOwn && isDataOwner(item)));
+                  return <DraggableCard key={item.id} voc={item} canEditOwn={canEditOwn} canEditOthers={canEditOthers} isDragDisabled={isDragDisabled} />;
+                })}
 
                 {/* 빈 칼럼 메시지 */}
                 {items.length === 0 && (
@@ -699,7 +745,16 @@ function KanbanView({
           })}
         </div>
 
-        <DragOverlay>{activeVOC ? <DraggableCard voc={activeVOC} /> : null}</DragOverlay>
+        <DragOverlay>
+          {activeVOC ? (
+            <DraggableCard
+              voc={activeVOC}
+              canEditOwn={canEditOwn}
+              canEditOthers={canEditOthers}
+              isDragDisabled={!(canEditOthers || (canEditOwn && isDataOwner(activeVOC)))}
+            />
+          ) : null}
+        </DragOverlay>
       </DndContext>
 
       {/* VOC 편집 다이얼로그 */}
@@ -714,6 +769,9 @@ function KanbanView({
           statusOptions={vocStatusOptions}
           statusColors={vocStatusColors}
           teams={teams}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>
@@ -745,7 +803,7 @@ function MonthlyScheduleView({
   const filteredData = vocs.filter((voc) => {
     // 연도 필터 (메인 필터 사용)
     if (selectedYear !== '전체') {
-      const vocYear = new Date(voc.startDate).getFullYear().toString();
+      const vocYear = new Date(voc.registrationDate).getFullYear().toString();
       if (vocYear !== selectedYear) return false;
     }
 
@@ -761,10 +819,10 @@ function MonthlyScheduleView({
     return true;
   });
 
-  // 월별로 데이터 그룹화 (startDate 기준)
+  // 월별로 데이터 그룹화 (registrationDate 기준)
   const monthlyData: { [key: number]: VOCTableData[] } = {};
   filteredData.forEach((item) => {
-    const date = new Date(item.startDate);
+    const date = new Date(item.registrationDate);
     const month = date.getMonth();
     if (!monthlyData[month]) {
       monthlyData[month] = [];
@@ -778,13 +836,13 @@ function MonthlyScheduleView({
   // 상태별 색상 (VOC 상태에 맞게 수정)
   const getStatusColor = (status: string) => {
     switch (status) {
-      case '접수':
+      case '대기':
         return '#E0E0E0';
-      case '진행중':
+      case '진행':
         return '#e3f2fd';
       case '완료':
         return '#e8f5e8';
-      case '보류':
+      case '홀딩':
         return '#ffebee';
       default:
         return '#f5f5f5';
@@ -793,13 +851,13 @@ function MonthlyScheduleView({
 
   const getStatusTextColor = (status: string) => {
     switch (status) {
-      case '접수':
+      case '대기':
         return '#424242';
-      case '진행중':
+      case '진행':
         return '#1976D2';
       case '완료':
         return '#388E3C';
-      case '보류':
+      case '홀딩':
         return '#D32F2F';
       default:
         return '#424242';
@@ -854,7 +912,7 @@ function MonthlyScheduleView({
           {/* 월 헤더 - 상반기 */}
           {monthNames.slice(0, 6).map((month, index) => (
             <Box
-              key={index}
+              key={`month-header-first-${index}`}
               sx={{
                 py: 1.5,
                 px: 1,
@@ -875,11 +933,11 @@ function MonthlyScheduleView({
           {/* 월 내용 - 상반기 */}
           {monthNames.slice(0, 6).map((_, monthIndex) => {
             const items = monthlyData[monthIndex] || [];
-            items.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+            items.sort((a, b) => new Date(a.registrationDate).getTime() - new Date(b.registrationDate).getTime());
 
             return (
               <Box
-                key={monthIndex}
+                key={`month-content-first-${monthIndex}`}
                 sx={{
                   borderRight: monthIndex < 5 ? '1px solid' : 'none',
                   borderColor: 'divider',
@@ -894,13 +952,13 @@ function MonthlyScheduleView({
                 }}
               >
                 {items.map((item, itemIndex) => {
-                  const date = new Date(item.startDate);
+                  const date = new Date(item.registrationDate);
                   const month = (date.getMonth() + 1).toString().padStart(2, '0');
                   const day = date.getDate().toString().padStart(2, '0');
 
                   return (
                     <Box
-                      key={item.id}
+                      key={`month-${monthIndex}-item-${item.id}`}
                       onClick={() => onCardClick(item)}
                       sx={{
                         mb: itemIndex < items.length - 1 ? 0.8 : 0,
@@ -961,7 +1019,7 @@ function MonthlyScheduleView({
           {/* 월 헤더 - 하반기 */}
           {monthNames.slice(6, 12).map((month, index) => (
             <Box
-              key={index + 6}
+              key={`month-header-second-${index}`}
               sx={{
                 py: 1.5,
                 px: 1,
@@ -983,11 +1041,11 @@ function MonthlyScheduleView({
           {monthNames.slice(6, 12).map((_, index) => {
             const monthIndex = index + 6;
             const items = monthlyData[monthIndex] || [];
-            items.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+            items.sort((a, b) => new Date(a.registrationDate).getTime() - new Date(b.registrationDate).getTime());
 
             return (
               <Box
-                key={monthIndex}
+                key={`month-content-second-${index}`}
                 sx={{
                   borderRight: index < 5 ? '1px solid' : 'none',
                   borderColor: 'divider',
@@ -1002,13 +1060,13 @@ function MonthlyScheduleView({
                 }}
               >
                 {items.map((item, itemIndex) => {
-                  const date = new Date(item.startDate);
+                  const date = new Date(item.registrationDate);
                   const month = (date.getMonth() + 1).toString().padStart(2, '0');
                   const day = date.getDate().toString().padStart(2, '0');
 
                   return (
                     <Box
-                      key={item.id}
+                      key={`month-second-${index}-item-${item.id}`}
                       onClick={() => onCardClick(item)}
                       sx={{
                         mb: itemIndex < items.length - 1 ? 0.8 : 0,
@@ -1436,6 +1494,9 @@ interface DashboardViewProps {
   selectedRecentStatus: string;
   setSelectedRecentStatus: (status: string) => void;
   vocs: VOCTableData[];
+  getVocTypeName?: (subcode: string) => string;
+  getPriorityName?: (subcode: string) => string;
+  getStatusName?: (subcode: string) => string;
 }
 
 function DashboardView({
@@ -1445,7 +1506,10 @@ function DashboardView({
   selectedAssignee,
   selectedRecentStatus,
   setSelectedRecentStatus,
-  vocs
+  vocs,
+  getVocTypeName = (subcode: string) => subcode,
+  getPriorityName = (subcode: string) => subcode,
+  getStatusName = (subcode: string) => subcode
 }: DashboardViewProps) {
   const theme = useTheme();
   const [startDate, setStartDate] = useState('');
@@ -1531,8 +1595,8 @@ function DashboardView({
   //   categoryValues: Object.values(categoryStats)
   // });
 
-  // 월별 통계 (막대차트용) - VOC 상태에 맞게 수정
-  const monthlyStats: { month: string; 접수: number; 진행중: number; 완료: number; 보류: number }[] = [];
+  // 월별 통계 (막대차트용) - DB 실제 상태 값에 맞게 수정
+  const monthlyStats: { month: string; 대기: number; 진행: number; 완료: number; 홀딩: number }[] = [];
   const monthData: Record<string, Record<string, number>> = {};
 
   filteredData.forEach((item) => {
@@ -1540,7 +1604,7 @@ function DashboardView({
     const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
 
     if (!monthData[monthKey]) {
-      monthData[monthKey] = { 접수: 0, 진행중: 0, 완료: 0, 보류: 0 };
+      monthData[monthKey] = { 대기: 0, 진행: 0, 완료: 0, 홀딩: 0 };
     }
     monthData[monthKey][item.status] = (monthData[monthKey][item.status] || 0) + 1;
   });
@@ -1553,10 +1617,10 @@ function DashboardView({
       const yearShort = year.slice(-2); // 연도를 마지막 2자리로
       monthlyStats.push({
         month: `${yearShort}/${monthNum}`,
-        접수: monthData[month]['접수'] || 0,
-        진행중: monthData[month]['진행중'] || 0,
+        대기: monthData[month]['대기'] || 0,
+        진행: monthData[month]['진행'] || 0,
         완료: monthData[month]['완료'] || 0,
-        보류: monthData[month]['보류'] || 0
+        홀딩: monthData[month]['홀딩'] || 0
       });
     });
 
@@ -1564,13 +1628,13 @@ function DashboardView({
   const getStatusColor = (status: string) => {
     switch (status) {
       case '대기':
-        return '#ED8936';
+        return '#90A4AE';
       case '진행':
-        return '#4267B2';
+        return '#7986CB';
       case '완료':
-        return '#4A5568';
+        return '#81C784';
       case '홀딩':
-        return '#E53E3E';
+        return '#E57373';
       default:
         return '#9e9e9e';
     }
@@ -1742,7 +1806,7 @@ function DashboardView({
         text: 'VOC 건수'
       }
     },
-    colors: ['#ED8936', '#4267B2', '#4A5568', '#E53E3E'],
+    colors: ['#90A4AE', '#7986CB', '#81C784', '#E57373'],
     legend: {
       position: 'top',
       horizontalAlign: 'right'
@@ -1755,15 +1819,15 @@ function DashboardView({
     },
     annotations: {
       points: monthlyStats.map((item, index) => {
-        // 각 상태별 실제 값을 합산하여 정확한 총합 계산 (안전한 숫자 변환) - VOC 상태로 수정
-        const 접수 = Number(item.접수) || 0;
-        const 진행중 = Number(item.진행중) || 0;
+        // 각 상태별 실제 값을 합산하여 정확한 총합 계산 (안전한 숫자 변환) - DB 실제 상태로 수정
+        const 대기 = Number(item.대기) || 0;
+        const 진행 = Number(item.진행) || 0;
         const 완료 = Number(item.완료) || 0;
-        const 보류 = Number(item.보류) || 0;
-        const total = 접수 + 진행중 + 완료 + 보류;
+        const 홀딩 = Number(item.홀딩) || 0;
+        const total = 대기 + 진행 + 완료 + 홀딩;
 
         // 디버깅: 각 월의 데이터 확인
-        console.log(`${item.month}: 접수=${접수}, 진행중=${진행중}, 완료=${완료}, 보류=${보류}, total=${total}`);
+        console.log(`${item.month}: 대기=${대기}, 진행=${진행}, 완료=${완료}, 홀딩=${홀딩}, total=${total}`);
 
         // total > 0 조건 제거하여 모든 월에 대해 annotation 생성
         return {
@@ -1803,20 +1867,20 @@ function DashboardView({
 
   const barChartSeries = [
     {
-      name: '접수',
-      data: monthlyStats.map((item) => item.접수)
+      name: '대기',
+      data: monthlyStats.map((item) => item.대기)
     },
     {
-      name: '진행중',
-      data: monthlyStats.map((item) => item.진행중)
+      name: '진행',
+      data: monthlyStats.map((item) => item.진행)
     },
     {
       name: '완료',
       data: monthlyStats.map((item) => item.완료)
     },
     {
-      name: '보류',
-      data: monthlyStats.map((item) => item.보류)
+      name: '홀딩',
+      data: monthlyStats.map((item) => item.홀딩)
     }
   ];
 
@@ -1898,7 +1962,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#48C4B7',
+              background: '#26C6DA',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1922,7 +1986,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#4A5568',
+              background: '#90A4AE',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1946,7 +2010,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#4267B2',
+              background: '#7986CB',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1970,7 +2034,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#E53E3E',
+              background: '#81C784',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1994,7 +2058,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#ED8936',
+              background: '#E57373',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -2148,16 +2212,16 @@ function DashboardView({
                             whiteSpace: 'nowrap'
                           }}
                         >
-                          {voc.workContent || 'VOC내용 없음'}
+                          {voc.content || 'VOC내용 없음'}
                         </TableCell>
                         <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{voc.assignee || '-'}</TableCell>
-                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{voc.completedDate || '-'}</TableCell>
+                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{voc.resolutionDate || '-'}</TableCell>
                         <TableCell sx={{ py: 0.5 }}>
                           <Chip
-                            label={voc.status}
+                            label={getStatusName(voc.status)}
                             size="small"
                             sx={{
-                              bgcolor: getStatusColor(voc.status),
+                              bgcolor: getStatusColor(getStatusName(voc.status)),
                               color: 'white',
                               fontSize: '13px',
                               height: 18,
@@ -2305,6 +2369,7 @@ function DashboardView({
 export default function VOCManagement() {
   const theme = useTheme();
   const [value, setValue] = useState(0);
+  const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers } = useMenuPermission('/it/voc');
 
   // 세션 및 사용자 정보
   const { data: session } = useSession();
@@ -2343,22 +2408,34 @@ export default function VOCManagement() {
 
   // subcode → subcode_name 변환 함수들
   const getVocTypeName = React.useCallback((subcode: string) => {
-    const found = vocTypesMap.find(item => item.subcode === subcode);
+    if (!subcode) return '미분류';
+    const found = vocTypesMap.find(
+      item => item.subcode === subcode || `${item.group_code}-${item.subcode}` === subcode
+    );
     return found ? found.subcode_name : subcode;
   }, [vocTypesMap]);
 
   const getPriorityName = React.useCallback((subcode: string) => {
-    const found = priorityTypesMap.find(item => item.subcode === subcode);
+    if (!subcode) return '미분류';
+    const found = priorityTypesMap.find(
+      item => item.subcode === subcode || `${item.group_code}-${item.subcode}` === subcode
+    );
     return found ? found.subcode_name : subcode;
   }, [priorityTypesMap]);
 
   const getStatusName = React.useCallback((subcode: string) => {
-    const found = statusTypes.find(item => item.subcode === subcode);
+    if (!subcode) return '미분류';
+    const found = statusTypes.find(
+      item => item.subcode === subcode || `${item.group_code}-${item.subcode}` === subcode
+    );
     return found ? found.subcode_name : subcode;
   }, [statusTypes]);
 
+  // Supabase VOC 연동
+  const { getVocs, createVoc, updateVoc, deleteVoc, convertToVocData, convertToDbVocData, loading, error } = useSupabaseVoc();
+
   // 공유 VOCs 상태
-  const [vocs, setVOCs] = useState<VOCTableData[]>(vocData);
+  const [vocs, setVOCs] = useState<VOCTableData[]>([]);
 
   // 편집 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);
@@ -2370,7 +2447,7 @@ export default function VOCManagement() {
   const [changeLogGoToPage, setChangeLogGoToPage] = useState('');
 
   // Supabase 변경로그 훅 사용 (page='it_voc')
-  const { logs, loading, error, fetchChangeLogs, addChangeLog: addSupabaseChangeLog, isAdding } = useSupabaseChangeLog('it_voc');
+  const { logs, loading: changeLogLoading, error: changeLogError, fetchChangeLogs, addChangeLog: addSupabaseChangeLog, isAdding } = useSupabaseChangeLog('it_voc');
 
   // 변경로그 데이터 변환 (ChangeLogData -> ChangeLog)
   const changeLogs = React.useMemo(() => {
@@ -2403,6 +2480,33 @@ export default function VOCManagement() {
   const [selectedStatus, setSelectedStatus] = useState('전체');
   const [selectedAssignee, setSelectedAssignee] = useState('전체');
   const [selectedRecentStatus, setSelectedRecentStatus] = useState('전체');
+
+  // 컴포넌트 마운트 시 VOC 데이터 로드
+  useEffect(() => {
+    const loadVocData = async () => {
+      console.log('📞 VOC 데이터 로드 시작');
+      const dbVocs = await getVocs();
+      console.log('📞 DB에서 가져온 VOC 개수:', dbVocs.length);
+
+      // DB 데이터를 프론트엔드 형식으로 변환
+      const vocData = dbVocs.map((dbVoc) => {
+        const converted = convertToVocData(dbVoc);
+
+        // subcode를 subcode_name으로 변환
+        return {
+          ...converted,
+          vocType: getVocTypeName(converted.vocType) || converted.vocType,
+          priority: getPriorityName(converted.priority) || converted.priority,
+          status: getStatusName(converted.status) || converted.status
+        };
+      });
+
+      console.log('📞 변환된 VOC 데이터:', vocData);
+      setVOCs(vocData);
+    };
+
+    loadVocData();
+  }, [getVocs, convertToVocData, getVocTypeName, getPriorityName, getStatusName]);
 
   // 연도 옵션 생성
   const currentYearValue = new Date().getFullYear();
@@ -2486,12 +2590,12 @@ export default function VOCManagement() {
       }
 
       if (changes.length > 0) {
-        addChangeLog('VOC 수정', updatedVOC.code, changes.join(', '), updatedVOC.team);
+        addChangeLog('수정', updatedVOC.code, changes.join(', '), updatedVOC.team);
       }
     } else {
       // 새로 생성
       setVOCs((prevVOCs) => [...prevVOCs, updatedVOC]);
-      addChangeLog('VOC 생성', updatedVOC.code, `새로운 VOC가 생성되었습니다: ${updatedVOC.workContent}`, updatedVOC.team);
+      addChangeLog('추가', updatedVOC.code, `새로운 VOC가 생성되었습니다: ${updatedVOC.workContent}`, updatedVOC.team);
     }
 
     handleEditDialogClose();
@@ -2583,22 +2687,63 @@ export default function VOCManagement() {
             </Box>
           </Box>
 
-          {/* 탭 네비게이션 및 필터 */}
-          <Box
-            sx={{
-              borderBottom: 1,
-              borderColor: 'divider',
-              flexShrink: 0,
-              mt: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}
-          >
-            <Tabs
-              value={value}
-              onChange={handleChange}
-              aria-label="VOC관리 탭"
+          {/* 권한 체크 */}
+          {!canViewCategory ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 접근할 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : !canReadData ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 대한 데이터 조회 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              {/* 탭 네비게이션 및 필터 */}
+              <Box
+                sx={{
+                  borderBottom: 1,
+                  borderColor: 'divider',
+                  flexShrink: 0,
+                  mt: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}
+              >
+                <Tabs
+                  value={value}
+                  onChange={handleChange}
+                  aria-label="VOC관리 탭"
               sx={{
                 '& .MuiTab-root': {
                   minHeight: 48,
@@ -2835,6 +2980,10 @@ export default function VOCManagement() {
                   vocs={vocs}
                   setVOCs={setVOCs}
                   addChangeLog={addChangeLog}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
+                  users={users}
                 />
               </Box>
             </TabPanel>
@@ -2876,6 +3025,13 @@ export default function VOCManagement() {
                   setVOCs={setVOCs}
                   addChangeLog={addChangeLog}
                   assigneeList={users.filter((user) => user.status === 'active')}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
+                  users={users}
+                  getVocTypeName={getVocTypeName}
+                  getPriorityName={getPriorityName}
+                  getStatusName={getStatusName}
                 />
               </Box>
             </TabPanel>
@@ -2957,6 +3113,9 @@ export default function VOCManagement() {
                   selectedRecentStatus={selectedRecentStatus}
                   setSelectedRecentStatus={setSelectedRecentStatus}
                   vocs={vocs}
+                  getVocTypeName={getVocTypeName}
+                  getPriorityName={getPriorityName}
+                  getStatusName={getStatusName}
                 />
               </Box>
             </TabPanel>
@@ -2998,6 +3157,8 @@ export default function VOCManagement() {
               </Box>
             </TabPanel>
           </Box>
+          </>
+          )}
         </CardContent>
       </Card>
 
@@ -3013,6 +3174,9 @@ export default function VOCManagement() {
           statusOptions={vocStatusOptions}
           statusColors={vocStatusColors}
           teams={teams}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>

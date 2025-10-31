@@ -69,6 +69,10 @@ export interface EducationData {
 
   // 파일 첨부
   attachments: any[];
+
+  // 시스템 필드 (선택적)
+  createdBy?: string;
+  updatedBy?: string;
 }
 
 // 테이블 데이터 타입 (EducationData와 동일)

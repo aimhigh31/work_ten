@@ -28,6 +28,7 @@ import Backdrop from '@mui/material/Backdrop';
 import { GRID_COMMON_SPACING } from 'config';
 import menuItems from 'menu-items';
 import { useSupabaseSystemSettings } from 'hooks/useSupabaseSystemSettings';
+import { useMenuPermission } from 'hooks/usePermissions';
 
 // assets
 import { Setting2, Notification, Camera, DocumentUpload, Category2 } from '@wandersonalwes/iconsax-react';
@@ -71,6 +72,9 @@ export default function SystemSettings() {
     refreshSystemSettings,
     refreshAll
   } = useSupabaseSystemSettings();
+
+  // ✅ 권한 체크
+  const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers, loading: permissionLoading } = useMenuPermission('/admin-panel/system-settings');
 
   // 로컬 설정 상태 (폼 입력용)
   const [localSettings, setLocalSettings] = useState({
@@ -429,7 +433,30 @@ export default function SystemSettings() {
         </Box>
       </Box>
 
-      <Grid container spacing={1.2}>
+      {/* 권한 체크: 카테고리 보기만 있는 경우 */}
+      {canViewCategory && !canReadData ? (
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            gap: 2,
+            py: 8
+          }}
+        >
+          <Typography variant="h5" color="text.secondary">
+            이 페이지에 대한 데이터 조회 권한이 없습니다.
+          </Typography>
+          <Typography variant="body2" color="text.disabled">
+            관리자에게 권한을 요청하세요.
+          </Typography>
+        </Box>
+      ) : (
+        <>
+          {/* 기존 컨텐츠 시작 */}
+          <Grid container spacing={1.2}>
         {/* 페이지 헤더 */}
         <Grid size={12}>
           <Box
@@ -455,10 +482,30 @@ export default function SystemSettings() {
               <Tab icon={<Category2 size={18} />} iconPosition="start" label="메뉴 관리" sx={{ minHeight: 48 }} />
             </Tabs>
             <Box sx={{ display: 'flex', gap: 2 }}>
-              <Button variant="outlined" onClick={handleCancel}>
+              <Button
+                variant="outlined"
+                onClick={handleCancel}
+                disabled={!(canEditOwn || canEditOthers)}
+                sx={{
+                  '&.Mui-disabled': {
+                    borderColor: 'grey.300',
+                    color: 'grey.500'
+                  }
+                }}
+              >
                 취소
               </Button>
-              <Button variant="contained" onClick={handleSave} disabled={settingsLoading}>
+              <Button
+                variant="contained"
+                onClick={handleSave}
+                disabled={settingsLoading || !(canEditOwn || canEditOthers)}
+                sx={{
+                  '&.Mui-disabled': {
+                    backgroundColor: 'grey.300',
+                    color: 'grey.500'
+                  }
+                }}
+              >
                 설정 저장
               </Button>
             </Box>
@@ -551,13 +598,31 @@ export default function SystemSettings() {
                       variant="outlined"
                       startIcon={<Camera size={16} />}
                       onClick={() => fileInputRef.current?.click()}
-                      disabled={uploadLoading}
+                      disabled={uploadLoading || !(canEditOwn || canEditOthers)}
                       fullWidth
+                      sx={{
+                        '&.Mui-disabled': {
+                          borderColor: 'grey.300',
+                          color: 'grey.500'
+                        }
+                      }}
                     >
                       로고 업로드
                     </Button>
                     {systemSettings?.site_logo && (
-                      <Button variant="outlined" color="error" onClick={handleLogoRemove} disabled={uploadLoading} fullWidth>
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        onClick={handleLogoRemove}
+                        disabled={uploadLoading || !(canEditOwn || canEditOthers)}
+                        fullWidth
+                        sx={{
+                          '&.Mui-disabled': {
+                            borderColor: 'grey.300',
+                            color: 'grey.500'
+                          }
+                        }}
+                      >
                         로고 삭제
                       </Button>
                     )}
@@ -581,11 +646,19 @@ export default function SystemSettings() {
                 <CircularProgress />
               </Box>
             ) : (
-              <SystemMenuPermissionsTable ref={menuTableRef} />
+              <SystemMenuPermissionsTable
+                ref={menuTableRef}
+                canCreateData={canCreateData}
+                canEditOwn={canEditOwn}
+                canEditOthers={canEditOthers}
+              />
             )}
           </Grid>
         )}
       </Grid>
+          {/* 기존 컨텐츠 끝 */}
+        </>
+      )}
 
       {/* 스낵바 */}
       <Snackbar

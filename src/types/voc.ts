@@ -69,7 +69,16 @@ export interface VocData {
 
   // 파일 첨부
   attachments: any[];
+
+  // 권한 체크용
+  createdBy?: string; // 데이터 생성자 (권한 체크용)
 }
+
+// VOCTableData는 VocData의 alias (기존 코드 호환성을 위해)
+export type VOCTableData = VocData;
+
+// VOC 상태 타입
+export type VOCStatus = typeof VOC_STATUS[number];
 
 // VOC 타입 옵션
 export const VOC_TYPES = ['문의', '불만', '개선요청', '칭찬', '제안', '기타'];
@@ -77,8 +86,8 @@ export const VOC_TYPES = ['문의', '불만', '개선요청', '칭찬', '제안'
 // 채널 옵션
 export const VOC_CHANNELS = ['전화', '이메일', '채팅', '방문', 'SNS', '홈페이지'];
 
-// 상태 옵션
-export const VOC_STATUS = ['접수', '처리중', '완료', '보류', '취소'];
+// 상태 옵션 (DB 실제 값에 맞게 수정)
+export const VOC_STATUS = ['대기', '진행', '완료', '홀딩', '취소'];
 
 // 우선순위 옵션
 export const VOC_PRIORITIES = ['긴급', '높음', '보통', '낮음'];

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 
 // Material-UI
 import {
@@ -73,6 +74,9 @@ interface ChecklistTableProps {
   tasks?: TaskTableData[];
   setTasks?: React.Dispatch<React.SetStateAction<TaskTableData[]>>;
   addChangeLog?: (action: string, target: string, description: string, team?: string) => void;
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 export default function ChecklistTable({
@@ -82,7 +86,10 @@ export default function ChecklistTable({
   selectedAssignee = '전체',
   tasks,
   setTasks,
-  addChangeLog
+  addChangeLog,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: ChecklistTableProps) {
   const theme = useTheme();
 
@@ -91,6 +98,28 @@ export default function ChecklistTable({
 
   // 사용자 관리 훅 사용 (Auto-loading 패턴)
   const { users } = useSupabaseUsers();
+
+  // 현재 로그인한 사용자 정보
+  const { data: session } = useSession();
+
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || users.length === 0) return null;
+    const found = users.find((u) => u.email === session.user.email);
+    return found;
+  }, [session, users]);
+
+  // 데이터 소유자 확인 함수
+  const isDataOwner = useCallback((checklist: TaskTableData) => {
+    if (!currentUser) return false;
+    // createdBy 또는 assignee 중 하나라도 현재 사용자와 일치하면 소유자
+    return checklist.createdBy === currentUser.user_name ||
+           checklist.assignee === currentUser.user_name;
+  }, [currentUser]);
+
+  // 편집 가능 여부 확인 함수
+  const canEditData = useCallback((checklist: TaskTableData) => {
+    return canEditOthers || (canEditOwn && isDataOwner(checklist));
+  }, [canEditOthers, canEditOwn, isDataOwner]);
 
   // 마스터코드 훅 사용
   const { subCodes } = useSupabaseMasterCode3();
@@ -165,6 +194,16 @@ export default function ChecklistTable({
     }
   }, [tasks, supabaseChecklists, checklistLoading]);
   const [selected, setSelected] = useState<number[]>([]);
+
+  // 선택된 모든 레코드가 편집 가능한지 확인
+  const canEditAllSelected = useMemo(() => {
+    if (selected.length === 0) return false;
+    return selected.every(id => {
+      const checklist = data.find(t => t.id === id);
+      return checklist && canEditData(checklist);
+    });
+  }, [selected, data, canEditData]);
+
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [goToPage, setGoToPage] = useState('');
@@ -387,8 +426,11 @@ export default function ChecklistTable({
         const result = await createChecklist(updatedTask);
         success = result.success;
         createdId = result.data?.id || null;
-        if (createdId) {
-          updatedTask.id = createdId; // 생성된 ID를 task 객체에 설정
+        if (result.data) {
+          // 서버에서 생성된 ID와 code를 task 객체에 반영
+          updatedTask.id = result.data.id;
+          updatedTask.code = result.data.code;
+          console.log('✅ 서버에서 생성된 코드:', result.data.code);
         }
       } else {
         // 기존 체크리스트 수정
@@ -584,28 +626,41 @@ export default function ChecklistTable({
               Excel Down
             </Button>
           )}
-          {canWrite && (
-            <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={addNewTask} sx={{ px: 2 }}>
-              추가
-            </Button>
-          )}
-          {canFull && (
-            <Button
-              variant="outlined"
-              startIcon={<Trash size={16} />}
-              size="small"
-              color="error"
-              disabled={selected.length === 0}
-              onClick={handleDeleteSelected}
-              sx={{
-                px: 2,
-                borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
-                color: selected.length > 0 ? 'error.main' : 'grey.500'
-              }}
-            >
-              삭제 {selected.length > 0 && `(${selected.length})`}
-            </Button>
-          )}
+          <Button
+            variant="contained"
+            startIcon={<Add size={16} />}
+            size="small"
+            onClick={addNewTask}
+            disabled={!canCreateData}
+            sx={{
+              px: 2,
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
+            추가
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<Trash size={16} />}
+            size="small"
+            color="error"
+            disabled={!canEditAllSelected}
+            onClick={handleDeleteSelected}
+            sx={{
+              px: 2,
+              borderColor: canEditAllSelected ? 'error.main' : 'grey.300',
+              color: canEditAllSelected ? 'error.main' : 'grey.500',
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
+            삭제 {selected.length > 0 && `(${selected.length})`}
+          </Button>
         </Box>
       </Box>
 
@@ -680,6 +735,7 @@ export default function ChecklistTable({
                   <TableCell padding="checkbox">
                     <Checkbox
                       checked={selected.includes(task.id)}
+                      disabled={!canEditData(task)}
                       onChange={(event) => {
                         const selectedIndex = selected.indexOf(task.id);
                         let newSelected: number[] = [];
@@ -783,13 +839,11 @@ export default function ChecklistTable({
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      {canWrite && (
-                        <Tooltip title="수정">
-                          <IconButton size="small" onClick={() => handleEditTask(task)} sx={{ color: 'primary.main' }}>
-                            <Edit size={16} />
-                          </IconButton>
-                        </Tooltip>
-                      )}
+                      <Tooltip title="수정">
+                        <IconButton size="small" onClick={() => handleEditTask(task)} sx={{ color: 'primary.main' }}>
+                          <Edit size={16} />
+                        </IconButton>
+                      </Tooltip>
                     </Box>
                   </TableCell>
                 </TableRow>
@@ -961,6 +1015,9 @@ export default function ChecklistTable({
           statusOptions={taskStatusOptions}
           statusColors={taskStatusColors}
           teams={teams}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
 

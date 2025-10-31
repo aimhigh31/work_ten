@@ -251,7 +251,8 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
       responseContent: dbData.response_content || '',
       resolutionDate: dbData.resolution_date || '',
       satisfactionScore: dbData.satisfaction_score,
-      attachments: dbData.attachments || []
+      attachments: dbData.attachments || [],
+      createdBy: dbData.created_by // 데이터 생성자 (권한 체크용)
     };
   }, []);
 

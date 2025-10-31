@@ -98,8 +98,8 @@ const editSolutionReducer = (state: EditSolutionState, action: EditSolutionActio
         startDate: action.registrationDate,
         completedDate: '',
         team: '',
-        solutionType: '',
-        developmentType: '',
+        solutionType: '',  // 마스터코드 로드 후 useEffect에서 자동 설정
+        developmentType: '',  // 마스터코드 로드 후 useEffect에서 자동 설정
         progress: 0
       };
     case 'RESET':
@@ -130,7 +130,9 @@ const OverviewTab = memo(
     assignees,
     assigneeAvatars,
     statusOptions,
-    statusColors
+    statusColors,
+    solutionTypesFromDB,
+    developmentTypesFromDB
   }: {
     solutionState: EditSolutionState;
     onFieldChange: (field: keyof EditSolutionState, value: string) => void;
@@ -138,6 +140,8 @@ const OverviewTab = memo(
     assigneeAvatars: Record<string, string>;
     statusOptions: SolutionStatus[];
     statusColors: Record<SolutionStatus, any>;
+    solutionTypesFromDB: Array<{ subcode: string; subcode_name: string }>;
+    developmentTypesFromDB: Array<{ subcode: string; subcode_name: string }>;
   }) => {
     // TextField 직접 참조를 위한 ref
     const workContentRef = useRef<HTMLInputElement>(null);
@@ -151,35 +155,13 @@ const OverviewTab = memo(
       );
     }, []);
 
-    // DB에서 직접 가져온 마스터코드 목록 state
-    const [solutionTypesFromDB, setSolutionTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
-    const [developmentTypesFromDB, setDevelopmentTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+    // DB에서 직접 가져온 상태 마스터코드 목록 state
     const [statusTypesFromDB, setStatusTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
 
-    // Dialog가 열릴 때 DB에서 직접 조회
+    // Dialog가 열릴 때 DB에서 직접 조회 (상태만)
     useEffect(() => {
       const fetchMasterCodeData = async () => {
-        // GROUP021 솔루션유형 조회
-        const { data: group021Data } = await supabaseClient
-          .from('admin_mastercode_data')
-          .select('subcode, subcode_name, subcode_order')
-          .eq('codetype', 'subcode')
-          .eq('group_code', 'GROUP021')
-          .eq('is_active', true)
-          .order('subcode_order', { ascending: true });
-        setSolutionTypesFromDB(group021Data || []);
-
-        // GROUP022 개발유형 조회
-        const { data: group022Data } = await supabaseClient
-          .from('admin_mastercode_data')
-          .select('subcode, subcode_name, subcode_order')
-          .eq('codetype', 'subcode')
-          .eq('group_code', 'GROUP022')
-          .eq('is_active', true)
-          .order('subcode_order', { ascending: true });
-        setDevelopmentTypesFromDB(group022Data || []);
-
-        // GROUP002 상태 조회
+        // GROUP002 상태 조회만 수행 (솔루션유형, 개발유형은 props로 받음)
         const { data: group002Data } = await supabaseClient
           .from('admin_mastercode_data')
           .select('subcode, subcode_name, subcode_order')
@@ -203,20 +185,20 @@ const OverviewTab = memo(
     // 무한 루프 방지를 위한 ref
     const isUpdatingRef = useRef(false);
 
-    // debounced 값이 변경될 때마다 상위 컴포넌트에 알림 (onFieldChange 의존성 제거로 최적화)
+    // debounced 값이 변경될 때마다 상위 컴포넌트에 알림
     useEffect(() => {
       if (!isUpdatingRef.current && titleInput.debouncedValue !== solutionState.title) {
         onFieldChange('title', titleInput.debouncedValue);
       }
-    }, [titleInput.debouncedValue, solutionState.title]); // onFieldChange 제거
+    }, [titleInput.debouncedValue, solutionState.title, onFieldChange]);
 
     useEffect(() => {
       if (!isUpdatingRef.current && detailContentInput.debouncedValue !== solutionState.detailContent) {
         onFieldChange('detailContent', detailContentInput.debouncedValue);
       }
-    }, [detailContentInput.debouncedValue, solutionState.detailContent]); // onFieldChange 제거
+    }, [detailContentInput.debouncedValue, solutionState.detailContent, onFieldChange]);
 
-    // 외부에서 상태가 변경될 때 입력 값 동기화 (reset 함수 의존성 제거로 최적화)
+    // 외부에서 상태가 변경될 때 입력 값 동기화
     useEffect(() => {
       if (solutionState.title !== titleInput.inputValue && solutionState.title !== titleInput.debouncedValue) {
         isUpdatingRef.current = true;
@@ -225,7 +207,7 @@ const OverviewTab = memo(
           isUpdatingRef.current = false;
         }, 0);
       }
-    }, [solutionState.title, titleInput.inputValue, titleInput.debouncedValue]); // reset 제거
+    }, [solutionState.title, titleInput.inputValue, titleInput.debouncedValue, titleInput.reset]);
 
     useEffect(() => {
       if (
@@ -238,15 +220,15 @@ const OverviewTab = memo(
           isUpdatingRef.current = false;
         }, 0);
       }
-    }, [solutionState.detailContent, detailContentInput.inputValue, detailContentInput.debouncedValue]); // reset 제거
+    }, [solutionState.detailContent, detailContentInput.inputValue, detailContentInput.debouncedValue, detailContentInput.reset]);
 
     const handleFieldChange = useCallback(
       (field: keyof EditSolutionState) =>
         (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { value: string } }) => {
           onFieldChange(field, e.target.value);
         },
-      []
-    ); // onFieldChange 의존성 제거로 최적화
+      [onFieldChange]
+    );
 
     // 현재 입력 값들을 반환하는 함수 (의존성 배열 제거로 최적화)
     const getCurrentValues = useCallback(() => {
@@ -1026,7 +1008,7 @@ const RecordTab = memo(
 );
 
 // 자료 탭 컴포넌트 - DB 기반 파일 관리
-const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | string; currentUser?: any }) => {
+const MaterialTab = memo(({ recordId, currentUser, canEditOwn = true, canEditOthers = true }: { recordId?: number | string; currentUser?: any; canEditOwn?: boolean; canEditOthers?: boolean }) => {
   const {
     files,
     loading: filesLoading,
@@ -1175,26 +1157,37 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
             p: 3,
             textAlign: 'center',
             borderStyle: 'dashed',
-            borderColor: 'primary.main',
-            backgroundColor: 'primary.50',
-            cursor: 'pointer',
+            borderColor: (canEditOwn || canEditOthers) ? 'primary.main' : 'grey.300',
+            backgroundColor: (canEditOwn || canEditOthers) ? 'primary.50' : 'grey.100',
+            cursor: (canEditOwn || canEditOthers) ? 'pointer' : 'not-allowed',
             transition: 'all 0.2s ease-in-out',
             '&:hover': {
-              borderColor: 'primary.dark',
-              backgroundColor: 'primary.100'
+              borderColor: (canEditOwn || canEditOthers) ? 'primary.dark' : 'grey.300',
+              backgroundColor: (canEditOwn || canEditOthers) ? 'primary.100' : 'grey.100'
             }
           }}
-          onClick={handleUploadClick}
+          onClick={(canEditOwn || canEditOthers) ? handleUploadClick : undefined}
         >
           <Stack spacing={2} alignItems="center">
             <Typography fontSize="48px">📁</Typography>
-            <Typography variant="h6" color="primary.main">
+            <Typography variant="h6" color={(canEditOwn || canEditOthers) ? 'primary.main' : 'grey.500'}>
               {isUploading ? '파일 업로드 중...' : '파일을 업로드하세요'}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               클릭하거나 파일을 여기로 드래그하세요
             </Typography>
-            <Button variant="contained" size="small" startIcon={<Typography>📤</Typography>} disabled={isUploading || !recordId}>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<Typography>📤</Typography>}
+              disabled={isUploading || !recordId || !(canEditOwn || canEditOthers)}
+              sx={{
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               파일 선택
             </Button>
           </Stack>
@@ -1309,8 +1302,14 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                           size="small"
                           onClick={() => handleEditMaterial(file.id, file.file_name)}
                           color="primary"
-                          sx={{ p: 0.5 }}
+                          sx={{
+                            p: 0.5,
+                            '&.Mui-disabled': {
+                              color: 'grey.500'
+                            }
+                          }}
                           title="수정"
+                          disabled={!(canEditOwn || canEditOthers)}
                         >
                           <Typography fontSize="14px">✏️</Typography>
                         </IconButton>
@@ -1318,9 +1317,14 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                           size="small"
                           onClick={() => handleDeleteMaterial(file.id)}
                           color="error"
-                          sx={{ p: 0.5 }}
+                          sx={{
+                            p: 0.5,
+                            '&.Mui-disabled': {
+                              color: 'grey.500'
+                            }
+                          }}
                           title="삭제"
-                          disabled={isDeleting}
+                          disabled={isDeleting || !(canEditOwn || canEditOthers)}
                         >
                           <Typography fontSize="14px">🗑️</Typography>
                         </IconButton>
@@ -1376,10 +1380,13 @@ interface SolutionEditDialogProps {
   assigneeAvatars: Record<string, string>;
   statusOptions: SolutionStatus[];
   statusColors: Record<SolutionStatus, any>;
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 const SolutionEditDialog = memo(
-  ({ open, onClose, solution, onSave, assignees, assigneeAvatars, statusOptions, statusColors }: SolutionEditDialogProps) => {
+  ({ open, onClose, solution, onSave, assignees, assigneeAvatars, statusOptions, statusColors, canCreateData = true, canEditOwn = true, canEditOthers = true }: SolutionEditDialogProps) => {
     // 성능 모니터링
     // const { renderCount, logStats } = usePerformanceMonitor('SolutionEditDialog');
 
@@ -1399,8 +1406,31 @@ const SolutionEditDialog = memo(
       return found;
     }, [session, users]);
 
+    // 🔐 권한 체크: 데이터 소유자 확인
+    const isOwner = useMemo(() => {
+      if (!solution) return true; // 신규 생성인 경우 true
+      if (!currentUser) return false; // 로그인하지 않은 경우 false
+
+      const currentUserName = currentUser?.user_name;
+      const isCreator = solution.createdBy === currentUserName;
+      const isAssignee = solution.assignee === currentUserName;
+      const isOwnerResult = isCreator || isAssignee;
+
+      console.log('🔐 SolutionEditDialog - 소유자 확인:', {
+        solutionId: solution.id,
+        currentUserName,
+        createdBy: solution.createdBy,
+        assignee: solution.assignee,
+        isCreator,
+        isAssignee,
+        isOwner: isOwnerResult
+      });
+
+      return isOwnerResult;
+    }, [solution, currentUser]);
+
     // DB 연동 훅
-    const { getSolutionById, convertToSolutionData, convertToDbSolutionData } = useSupabaseSolution();
+    const { getSolutions, getSolutionById, convertToSolutionData, convertToDbSolutionData } = useSupabaseSolution();
 
     // 피드백 훅
     const {
@@ -1422,6 +1452,55 @@ const SolutionEditDialog = memo(
 
     const [editTab, setEditTab] = useState(0);
     const [draggedItemId, setDraggedItemId] = useState<number | null>(null);
+
+    // 마스터코드 데이터 로드를 위한 Supabase 클라이언트
+    const supabaseClient = useMemo(() => {
+      return createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+    }, []);
+
+    // 마스터코드 데이터 state
+    const [solutionTypesFromDB, setSolutionTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+    const [developmentTypesFromDB, setDevelopmentTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+
+    // 기본값 설정 완료 여부를 추적하는 ref
+    const defaultValuesSetRef = useRef(false);
+
+    // Dialog가 열릴 때 마스터코드 데이터 로드
+    useEffect(() => {
+      if (!open) {
+        // Dialog가 닫힐 때 초기화
+        defaultValuesSetRef.current = false;
+        return;
+      }
+
+      const fetchMasterCodeData = async () => {
+        // GROUP021 솔루션유형 조회
+        const { data: group021Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP021')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+        setSolutionTypesFromDB(group021Data || []);
+
+        // GROUP022 개발유형 조회
+        const { data: group022Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP022')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+        setDevelopmentTypesFromDB(group022Data || []);
+      };
+
+      fetchMasterCodeData();
+    }, [open, supabaseClient]);
+
     const [solutionState, dispatch] = useReducer(editSolutionReducer, {
       title: '',
       detailContent: '',
@@ -1437,17 +1516,37 @@ const SolutionEditDialog = memo(
       progress: 0
     });
 
-    // 코드 자동 생성 함수 - IT-SOL-25-001 형식
-    const generateSolutionCode = useCallback(() => {
+    // 코드 자동 생성 함수 - IT-SOL-25-001 형식 (년도별 일련번호 리셋)
+    const generateSolutionCode = useCallback(async () => {
       const currentYear = new Date().getFullYear();
       const currentYearStr = currentYear.toString().slice(-2); // 연도 뒤 2자리
 
-      // 현재 연도의 Solution 개수를 기반으로 순번 생성 (실제 구현에서는 서버에서 처리)
-      // 여기서는 간단히 현재 시간을 기반으로 순번 생성
-      const sequence = String(Date.now()).slice(-3).padStart(3, '0');
+      // DB에서 모든 솔루션 조회
+      const allSolutions = await getSolutions();
 
-      return `IT-SOL-${currentYearStr}-${sequence}`;
-    }, []);
+      // 현재 연도의 코드만 필터링 (IT-SOL-25-XXX 형식)
+      const currentYearSolutions = allSolutions.filter((sol) => {
+        const codePattern = `IT-SOL-${currentYearStr}-`;
+        return sol.code && sol.code.startsWith(codePattern);
+      });
+
+      // 일련번호 추출 및 최대값 찾기
+      let maxSequence = 0;
+      currentYearSolutions.forEach((sol) => {
+        const match = sol.code.match(/IT-SOL-\d{2}-(\d{3})$/);
+        if (match) {
+          const sequence = parseInt(match[1], 10);
+          if (sequence > maxSequence) {
+            maxSequence = sequence;
+          }
+        }
+      });
+
+      // 다음 일련번호 생성 (최대값 + 1, 3자리 패딩)
+      const nextSequence = (maxSequence + 1).toString().padStart(3, '0');
+
+      return `IT-SOL-${currentYearStr}-${nextSequence}`;
+    }, [getSolutions]);
 
     // 현재 날짜 생성 함수
     const getCurrentDate = useCallback(() => {
@@ -1457,21 +1556,35 @@ const SolutionEditDialog = memo(
 
     // Solution 변경 시 상태 업데이트
     React.useEffect(() => {
-      if (solution) {
-        dispatch({ type: 'SET_TASK', solution });
-      } else if (open) {
-        // 새 Solution 생성 시 자동으로 코드와 등록일 설정
-        const newCode = generateSolutionCode();
-        const newRegistrationDate = getCurrentDate();
-        dispatch({ type: 'INIT_NEW_TASK', code: newCode, registrationDate: newRegistrationDate });
+      const initializeNewSolution = async () => {
+        if (solution) {
+          dispatch({ type: 'SET_TASK', solution });
+        } else if (open) {
+          // 새 Solution 생성 시 자동으로 코드와 등록일 설정
+          const newCode = await generateSolutionCode();
+          const newRegistrationDate = getCurrentDate();
+          dispatch({ type: 'INIT_NEW_TASK', code: newCode, registrationDate: newRegistrationDate });
 
-        // 로그인한 사용자 정보로 팀과 담당자 자동 설정
-        if (currentUser) {
-          dispatch({ type: 'SET_FIELD', field: 'team', value: currentUser.department || '' });
-          dispatch({ type: 'SET_FIELD', field: 'assignee', value: currentUser.user_name || '' });
+          // 로그인한 사용자 정보로 팀과 담당자 자동 설정
+          if (currentUser) {
+            dispatch({ type: 'SET_FIELD', field: 'team', value: currentUser.department || '' });
+            dispatch({ type: 'SET_FIELD', field: 'assignee', value: currentUser.user_name || '' });
+          }
         }
-      }
+      };
+
+      initializeNewSolution();
     }, [solution, open, generateSolutionCode, getCurrentDate, currentUser]);
+
+    // 마스터코드 데이터가 로드되면 기본값 설정 (한 번만 실행)
+    React.useEffect(() => {
+      if (!solution && open && !defaultValuesSetRef.current &&
+          solutionTypesFromDB.length > 0 && developmentTypesFromDB.length > 0) {
+        dispatch({ type: 'SET_FIELD', field: 'solutionType', value: solutionTypesFromDB[0].subcode });
+        dispatch({ type: 'SET_FIELD', field: 'developmentType', value: developmentTypesFromDB[0].subcode });
+        defaultValuesSetRef.current = true;
+      }
+    }, [solution, open, solutionTypesFromDB, developmentTypesFromDB]);
 
     // 성능 모니터링 로그 제거 (프로덕션 준비)
     // useEffect(() => {
@@ -1935,9 +2048,11 @@ const SolutionEditDialog = memo(
         assignees,
         assigneeAvatars,
         statusOptions,
-        statusColors
+        statusColors,
+        solutionTypesFromDB,
+        developmentTypesFromDB
       }),
-      [solutionState, handleFieldChange, assignees, assigneeAvatars, statusOptions, statusColors]
+      [solutionState, handleFieldChange, assignees, assigneeAvatars, statusOptions, statusColors, solutionTypesFromDB, developmentTypesFromDB]
     );
 
     const recordTabProps = useMemo(
@@ -1998,12 +2113,36 @@ const SolutionEditDialog = memo(
             )}
           </Box>
 
-          {/* 취소, 저장 버튼을 오른쪽 상단으로 이동 */}
+          {/* 🔐 권한 체크: 취소, 저장 버튼을 오른쪽 상단으로 이동 */}
           <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-            <Button onClick={handleClose} variant="outlined" size="small" sx={{ minWidth: '60px' }}>
+            <Button
+              onClick={handleClose}
+              variant="outlined"
+              size="small"
+              disabled={!solution ? !(canCreateData || canEditOwn) : !(canEditOthers || (canEditOwn && isOwner))}
+              sx={{
+                minWidth: '60px',
+                '&.Mui-disabled': {
+                  borderColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               취소
             </Button>
-            <Button onClick={handleSave} variant="contained" size="small" sx={{ minWidth: '60px' }}>
+            <Button
+              onClick={handleSave}
+              variant="contained"
+              size="small"
+              disabled={!solution ? !(canCreateData || canEditOwn) : !(canEditOthers || (canEditOwn && isOwner))}
+              sx={{
+                minWidth: '60px',
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               저장
             </Button>
           </Box>
@@ -2020,7 +2159,7 @@ const SolutionEditDialog = memo(
         <DialogContent sx={{ p: 0, overflow: 'hidden' }}>
           {editTab === 0 && <OverviewTab {...overviewTabProps} />}
           {editTab === 1 && <RecordTab {...recordTabProps} />}
-          {editTab === 2 && <MaterialTab recordId={solution?.id} currentUser={currentUser} />}
+          {editTab === 2 && <MaterialTab recordId={solution?.id} currentUser={currentUser} canEditOwn={canEditOwn && isOwner} canEditOthers={canEditOthers} />}
         </DialogContent>
 
         {/* 에러 메시지 표시 */}

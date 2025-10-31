@@ -15,6 +15,16 @@ interface CommonData {
   isLoading: boolean;
   error: string | null;
   refreshCommonData: () => Promise<void>;
+  getSubCodesByGroup: (groupCode: string) => Array<{
+    id: number;
+    group_code: string;
+    subcode: string;
+    subcode_name: string;
+    subcode_description?: string;
+    subcode_status: 'active' | 'inactive';
+    subcode_remark?: string;
+    subcode_order: number;
+  }>;
 }
 
 // Context 생성
@@ -129,6 +139,23 @@ export function CommonDataProvider({ children }: CommonDataProviderProps) {
     loadCommonData();
   }, [loadCommonData]);
 
+  // 특정 그룹의 서브코드만 가져오기
+  const getSubCodesByGroup = useCallback((groupCode: string) => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === groupCode)
+      .map((item) => ({
+        id: item.id,
+        group_code: item.group_code,
+        subcode: item.subcode,
+        subcode_name: item.subcode_name,
+        subcode_description: item.subcode_description,
+        subcode_status: item.subcode_status,
+        subcode_remark: item.subcode_remark,
+        subcode_order: item.subcode_order
+      }))
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
   // Context 값
   const value: CommonData = {
     users,
@@ -136,7 +163,8 @@ export function CommonDataProvider({ children }: CommonDataProviderProps) {
     masterCodes,
     isLoading,
     error,
-    refreshCommonData: forceRefreshCommonData
+    refreshCommonData: forceRefreshCommonData,
+    getSubCodesByGroup
   };
 
   return <CommonDataContext.Provider value={value}>{children}</CommonDataContext.Provider>;

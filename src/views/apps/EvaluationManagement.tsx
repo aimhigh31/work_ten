@@ -56,6 +56,7 @@ import { ChangeLogData } from 'types/changelog';
 import { createClient } from '@/lib/supabase/client';
 import { useSession } from 'next-auth/react';
 import useUser from 'hooks/useUser';
+import { useMenuPermission } from 'hooks/usePermissions';
 
 // 변경로그 타입 정의 (UI용)
 interface ChangeLog {
@@ -128,6 +129,10 @@ interface KanbanViewProps {
   ) => void;
   generateInspectionCode?: () => Promise<string>;
   assigneeList?: any[];
+  users?: any[]; // 사용자 목록 추가
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 function KanbanView({
@@ -139,9 +144,30 @@ function KanbanView({
   setInspections,
   addChangeLog,
   generateInspectionCode,
-  assigneeList
+  assigneeList,
+  users = [],
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: KanbanViewProps) {
   const theme = useTheme();
+
+  // 현재 로그인한 사용자 정보
+  const { data: session } = useSession();
+  const user = useUser();
+
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || users.length === 0) return null;
+    const found = users.find((u) => u.email === session.user.email);
+    return found;
+  }, [session, users]);
+
+  // 데이터 소유자 확인 함수
+  const isDataOwner = useCallback((evaluation: InspectionTableData) => {
+    if (!currentUser) return false;
+    const dataOwner = evaluation.createdBy || evaluation.assignee;
+    return dataOwner === currentUser.user_name;
+  }, [currentUser]);
 
   // 상태 관리
   const [activeInspection, setActiveInspection] = useState<InspectionTableData | null>(null);
@@ -236,7 +262,7 @@ function KanbanView({
 
       if (changes.length > 0) {
         addChangeLog(
-          '점검 정보 수정',
+          '수정',
           inspectionCode,
           `${updatedInspection.inspectionTitle || '점검'} - ${changes.join(', ')}`,
           updatedInspection.team || '미분류',
@@ -278,7 +304,7 @@ function KanbanView({
       const description = `${inspectionTitle} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
 
       addChangeLog(
-        '점검 상태 변경',
+        '수정',
         inspectionCode,
         description,
         currentInspection.team || '미분류',
@@ -305,7 +331,7 @@ function KanbanView({
 
   // 점검대상별 색상 매핑
   const getTeamColor = (target: string) => {
-    return { color: '#333333' };
+    return 'transparent';
   };
 
   // 담당자별 배경색 매핑
@@ -357,7 +383,7 @@ function KanbanView({
   const getStatusTagColor = (status: string) => {
     switch (status) {
       case '대기':
-        return { backgroundColor: 'rgba(251, 191, 36, 0.15)', color: '#f59e0b' };
+        return { backgroundColor: 'rgba(156, 163, 175, 0.15)', color: '#6b7280' };
       case '진행':
         return { backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6' };
       case '완료':
@@ -371,17 +397,20 @@ function KanbanView({
 
   // 드래그 가능한 카드 컴포넌트
   function DraggableCard({ inspection }: { inspection: InspectionTableData }) {
+    // 드래그 가능 여부: canEditOthers가 있거나, canEditOwn이 있고 자신의 데이터인 경우
+    const isDragDisabled = !(canEditOthers || (canEditOwn && isDataOwner(inspection)));
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-      id: inspection.id
+      id: inspection.id,
+      disabled: isDragDisabled
     });
 
     const style = transform
       ? {
           transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
           opacity: isDragging ? 0.5 : 1,
-          cursor: isDragging ? 'grabbing' : 'pointer'
+          cursor: isDragging ? 'grabbing' : (isDragDisabled ? 'default' : 'grab')
         }
-      : { cursor: 'pointer' };
+      : { cursor: isDragDisabled ? 'default' : 'grab' };
 
     const statusTagColor = getStatusTagColor(inspection.status);
     const progress = getProgressFromStatus(inspection.status);
@@ -397,7 +426,7 @@ function KanbanView({
       <article
         ref={setNodeRef}
         style={style}
-        {...listeners}
+        {...(isDragDisabled ? {} : listeners)}
         {...attributes}
         className="kanban-card"
         onClick={(e) => {
@@ -413,11 +442,16 @@ function KanbanView({
           <span className="status-tag" style={statusTagColor}>
             {inspection.status}
           </span>
-          <span className="incident-type-tag">{inspection.inspectionTarget}</span>
+          {inspection.inspectionType && (
+            <span className="evaluation-type-tag">{inspection.inspectionType}</span>
+          )}
+          {inspection.inspectionTarget && (
+            <span className="management-category-tag">{inspection.inspectionTarget}</span>
+          )}
         </div>
 
         {/* 2. 카드 제목 */}
-        <h3 className="card-title">{inspection.inspectionContent || '점검내용 없음'}</h3>
+        <h3 className="card-title">{inspection.evaluationTitle || '평가내용 없음'}</h3>
 
         {/* 3. 정보 라인 */}
         <div className="card-info">
@@ -604,6 +638,22 @@ function KanbanView({
           font: 500 12px/1.2 "Inter", "Noto Sans KR", sans-serif;
         }
 
+        .evaluation-type-tag {
+          padding: 4px 12px;
+          border-radius: 20px;
+          background: rgba(156, 163, 175, 0.15);
+          color: #6b7280;
+          font: 500 12px/1.2 "Inter", "Noto Sans KR", sans-serif;
+        }
+
+        .management-category-tag {
+          padding: 4px 12px;
+          border-radius: 20px;
+          background: rgba(156, 163, 175, 0.15);
+          color: #6b7280;
+          font: 500 12px/1.2 "Inter", "Noto Sans KR", sans-serif;
+        }
+
         /* 2. 카드 제목 */
         .card-title {
           font: 600 16px/1.3 "Inter", "Noto Sans KR", sans-serif;
@@ -731,6 +781,9 @@ function KanbanView({
           evaluation={editingInspection}
           onSave={handleEditInspectionSave}
           generateEvaluationCode={generateInspectionCode}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>
@@ -877,7 +930,7 @@ function MonthlyScheduleView({
             {/* 월 헤더 - 상반기 */}
             {monthNames.slice(0, 6).map((month, index) => (
               <Box
-                key={index}
+                key={`month-header-first-${index}`}
                 sx={{
                   py: 1.5,
                   px: 1,
@@ -902,7 +955,7 @@ function MonthlyScheduleView({
 
               return (
                 <Box
-                  key={monthIndex}
+                  key={`month-content-first-${monthIndex}`}
                   sx={{
                     borderRight: monthIndex < 5 ? '1px solid' : 'none',
                     borderColor: 'divider',
@@ -925,7 +978,7 @@ function MonthlyScheduleView({
 
                       return (
                         <Box
-                          key={item.id}
+                          key={`month-${monthIndex}-item-${item.id}`}
                           onClick={() => onCardClick(item)}
                           sx={{
                             mb: itemIndex < items.length - 1 ? 0.8 : 0,
@@ -962,7 +1015,7 @@ function MonthlyScheduleView({
                             <span>{item.status}</span>
                           </Box>
 
-                          {/* 두 번째 줄: 점검내용 */}
+                          {/* 두 번째 줄: 평가내용 */}
                           <Typography
                             variant="body2"
                             sx={{
@@ -973,9 +1026,9 @@ function MonthlyScheduleView({
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap'
                             }}
-                            title={item.inspectionContent || '점검내용 없음'}
+                            title={item.evaluationTitle || '평가내용 없음'}
                           >
-                            {item.inspectionContent || '점검내용 없음'}
+                            {item.evaluationTitle || '평가내용 없음'}
                           </Typography>
                         </Box>
                       );
@@ -995,7 +1048,7 @@ function MonthlyScheduleView({
             {/* 월 헤더 - 하반기 */}
             {monthNames.slice(6, 12).map((month, index) => (
               <Box
-                key={index + 6}
+                key={`month-header-second-${index}`}
                 sx={{
                   py: 1.5,
                   px: 1,
@@ -1021,7 +1074,7 @@ function MonthlyScheduleView({
 
               return (
                 <Box
-                  key={monthIndex}
+                  key={`month-content-second-${index}`}
                   sx={{
                     borderRight: index < 5 ? '1px solid' : 'none',
                     borderColor: 'divider',
@@ -1044,7 +1097,7 @@ function MonthlyScheduleView({
 
                       return (
                         <Box
-                          key={item.id}
+                          key={`month-second-${index}-item-${item.id}`}
                           onClick={() => onCardClick(item)}
                           sx={{
                             mb: itemIndex < items.length - 1 ? 0.8 : 0,
@@ -1081,7 +1134,7 @@ function MonthlyScheduleView({
                             <span>{item.status}</span>
                           </Box>
 
-                          {/* 두 번째 줄: 점검내용 */}
+                          {/* 두 번째 줄: 평가내용 */}
                           <Typography
                             variant="body2"
                             sx={{
@@ -1092,9 +1145,9 @@ function MonthlyScheduleView({
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap'
                             }}
-                            title={item.inspectionContent || '점검내용 없음'}
+                            title={item.evaluationTitle || '평가내용 없음'}
                           >
-                            {item.inspectionContent || '점검내용 없음'}
+                            {item.evaluationTitle || '평가내용 없음'}
                           </Typography>
                         </Box>
                       );
@@ -1257,13 +1310,13 @@ function DashboardView({
   const getStatusColor = (status: string) => {
     switch (status) {
       case '대기':
-        return '#ED8936';
+        return '#90A4AE';
       case '진행':
-        return '#4267B2';
+        return '#7986CB';
       case '완료':
-        return '#4A5568';
+        return '#81C784';
       case '홀딩':
-        return '#E53E3E';
+        return '#E57373';
       default:
         return '#9e9e9e';
     }
@@ -1435,7 +1488,7 @@ function DashboardView({
         text: '점검 건수'
       }
     },
-    colors: ['#ED8936', '#4267B2', '#4A5568', '#E53E3E'],
+    colors: ['#90A4AE', '#7986CB', '#81C784', '#E57373'],
     legend: {
       position: 'top',
       horizontalAlign: 'right'
@@ -1596,7 +1649,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#48C4B7',
+              background: '#26C6DA',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1615,12 +1668,12 @@ function DashboardView({
           </Card>
         </Grid>
 
-        {/* 완료 */}
+        {/* 대기 */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
               p: 3,
-              background: '#4A5568',
+              background: '#90A4AE',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1628,13 +1681,13 @@ function DashboardView({
             }}
           >
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
-              완료
+              대기
             </Typography>
             <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusStats['완료'] || 0}
+              {statusStats['대기'] || 0}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              완료된 점검
+              대기중인 점검
             </Typography>
           </Card>
         </Grid>
@@ -1644,7 +1697,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#4267B2',
+              background: '#7986CB',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1663,12 +1716,36 @@ function DashboardView({
           </Card>
         </Grid>
 
+        {/* 완료 */}
+        <Grid item xs={12} sm={6} md={2.4}>
+          <Card
+            sx={{
+              p: 3,
+              background: '#81C784',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+              borderRadius: 2,
+              color: '#fff',
+              textAlign: 'center'
+            }}
+          >
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
+              완료
+            </Typography>
+            <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
+              {statusStats['완료'] || 0}
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
+              완료된 점검
+            </Typography>
+          </Card>
+        </Grid>
+
         {/* 홀딩 */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
               p: 3,
-              background: '#E53E3E',
+              background: '#E57373',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1683,30 +1760,6 @@ function DashboardView({
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
               보류중인 점검
-            </Typography>
-          </Card>
-        </Grid>
-
-        {/* 대기 */}
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              p: 3,
-              background: '#ED8936',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-              borderRadius: 2,
-              color: '#fff',
-              textAlign: 'center'
-            }}
-          >
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
-              대기
-            </Typography>
-            <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusStats['대기'] || 0}
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              대기중인 점검
             </Typography>
           </Card>
         </Grid>
@@ -1826,7 +1879,7 @@ function DashboardView({
                   <TableHead>
                     <TableRow>
                       <TableCell sx={{ py: 1, fontSize: '13px' }}>NO</TableCell>
-                      <TableCell sx={{ py: 1, fontSize: '13px' }}>점검내용</TableCell>
+                      <TableCell sx={{ py: 1, fontSize: '13px' }}>평가내용</TableCell>
                       <TableCell sx={{ py: 1, fontSize: '13px' }}>담당자</TableCell>
                       <TableCell sx={{ py: 1, fontSize: '13px' }}>완료일</TableCell>
                       <TableCell sx={{ py: 1, fontSize: '13px' }}>상태</TableCell>
@@ -1846,7 +1899,7 @@ function DashboardView({
                             whiteSpace: 'nowrap'
                           }}
                         >
-                          {inspection.inspectionContent || '점검내용 없음'}
+                          {inspection.evaluationTitle || '평가내용 없음'}
                         </TableCell>
                         <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{inspection.assignee || '-'}</TableCell>
                         <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{inspection.inspectionDate || '-'}</TableCell>
@@ -2002,6 +2055,9 @@ export default function EvaluationManagement() {
   const theme = useTheme();
   const [value, setValue] = useState(0);
 
+  // ✅ 권한 체크
+  const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers, loading: permissionLoading } = useMenuPermission('/hr/evaluation');
+
   // Supabase 인사평가 관리 훅
   const {
     loading: supabaseLoading,
@@ -2122,6 +2178,8 @@ export default function EvaluationManagement() {
         code: code,
         evaluationType: (getEvaluationTypeName(item.evaluation_type || '') || '직원평가') as any,
         managementCategory: (getManagementCategoryName(item.management_category || '') || '상반기') as any,
+        inspectionType: (getEvaluationTypeName(item.evaluation_type || '') || '직원평가') as any, // 칸반 뷰용
+        inspectionTarget: (getManagementCategoryName(item.management_category || '') || '상반기') as any, // 칸반 뷰용
         evaluationTitle: item.evaluation_title || '',
         team: (item.team || '개발팀') as any,
         assignee: item.manager || '',
@@ -2176,6 +2234,20 @@ export default function EvaluationManagement() {
     }
   }, [value, fetchChangeLogs]);
 
+  // 서브코드를 서브코드명으로 변환하는 함수
+  const convertSubcodeToName = React.useCallback((value: string) => {
+    if (!value || value === '-') return value;
+
+    // GROUP 패턴 체크 (예: GROUP002-SUB001)
+    const subcodePattern = /^(GROUP\d{3}-SUB\d{3})$/;
+    if (subcodePattern.test(value)) {
+      const masterCode = masterCodes.find(mc => mc.subcode === value && mc.is_active);
+      return masterCode?.subcode_name || value;
+    }
+
+    return value;
+  }, [masterCodes]);
+
   // DB 변경로그를 UI 형식으로 변환
   const changeLogs = React.useMemo(() => {
     return dbChangeLogs.map((log: ChangeLogData) => {
@@ -2199,13 +2271,13 @@ export default function EvaluationManagement() {
         action: log.action_type,
         changedField: log.changed_field || '-', // 변경필드
         description: log.description,
-        beforeValue: log.before_value,
-        afterValue: log.after_value,
+        beforeValue: convertSubcodeToName(log.before_value),
+        afterValue: convertSubcodeToName(log.after_value),
         team: log.team || log.user_department || '-',
         user: log.user_name
       };
     });
-  }, [dbChangeLogs, inspections]);
+  }, [dbChangeLogs, inspections, convertSubcodeToName]);
 
   // 보안점검 데이터 로드 함수 (재사용 가능)
   const loadInspectionsFromSupabase = useCallback(async () => {
@@ -2228,9 +2300,9 @@ export default function EvaluationManagement() {
           no: item.no || 0,
           registrationDate: item.registration_date || '',
           code: item.code || '',
-          inspectionType: item.inspection_type || '보안점검',
-          inspectionTarget: item.inspection_target || '고객사',
-          inspectionContent: item.inspection_content || '',
+          inspectionType: item.evaluation_type || item.inspection_type || '보안점검',
+          inspectionTarget: item.management_category || item.inspection_target || '고객사',
+          evaluationTitle: (item as any).evaluation_title || item.inspection_content || '',
           team: item.team || '',
           assignee: item.assignee || '',
           status: item.status || '대기',
@@ -2305,7 +2377,7 @@ export default function EvaluationManagement() {
 
   // 팀별 색상 매핑
   const getTeamColor = (team: string) => {
-    return { color: '#333333' };
+    return 'transparent';
   };
 
   // 변경로그 추가 함수
@@ -2347,7 +2419,13 @@ export default function EvaluationManagement() {
         const { data, error } = await supabase.from('common_log_data').insert(logData).select();
 
         if (error) {
-          console.error('❌ 변경로그 저장 실패:', error);
+          console.error('❌ 변경로그 저장 실패:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code,
+            error: error
+          });
         } else {
           console.log('✅ 변경로그 저장 성공:', description, data);
         }
@@ -2407,7 +2485,7 @@ export default function EvaluationManagement() {
 
           // 변경로그 추가
           addChangeLog(
-            '평가 정보 수정',
+            '수정',
             updatedInspection.code || `EVAL-${updatedInspection.id}`,
             `${updatedInspection.evaluationTitle} - 수정됨`,
             updatedInspection.team || '미분류'
@@ -2430,7 +2508,7 @@ export default function EvaluationManagement() {
 
           // 변경로그 추가
           addChangeLog(
-            '평가 생성',
+            '추가',
             updatedInspection.code || `EVAL-${result.id}`,
             `${updatedInspection.evaluationTitle} - 새로 생성됨`,
             updatedInspection.team || '미분류'
@@ -2496,6 +2574,17 @@ export default function EvaluationManagement() {
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
   };
+
+  // ✅ 권한 없음 - 카테고리 보기 권한도 없으면 완전 차단
+  if (!canViewCategory && !permissionLoading) {
+    return (
+      <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Typography variant="h6" color="error">
+          이 페이지에 접근할 권한이 없습니다.
+        </Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box
@@ -2579,7 +2668,29 @@ export default function EvaluationManagement() {
             </Box>
           </Box>
 
-          {/* 탭 네비게이션 및 필터 */}
+          {/* 권한 체크: 카테고리 보기만 있는 경우 */}
+          {canViewCategory && !canReadData ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 대한 데이터 조회 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              {/* 탭 네비게이션 및 필터 */}
           <Box
             sx={{
               borderBottom: 1,
@@ -2836,6 +2947,10 @@ export default function EvaluationManagement() {
                   onSave={handleEditInspectionSave}
                   onDelete={handleDeleteInspections}
                   generateEvaluationCode={generateEvaluationCode}
+                  canReadData={canReadData}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                 />
               </Box>
             </TabPanel>
@@ -2878,6 +2993,10 @@ export default function EvaluationManagement() {
                   addChangeLog={addChangeLog}
                   generateInspectionCode={generateInspectionCode}
                   assigneeList={users.filter((user) => user.status === 'active')}
+                  users={users}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                 />
               </Box>
             </TabPanel>
@@ -3040,9 +3159,9 @@ export default function EvaluationManagement() {
                       <TableHead>
                         <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
                           <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 110 }}>변경시간</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 180 }}>제목</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 140 }}>코드</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 150 }}>변경시간</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 140 }}>제목</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 110 }}>코드</TableCell>
                           <TableCell sx={{ fontWeight: 600, width: 70 }}>변경분류</TableCell>
                           <TableCell sx={{ fontWeight: 600, width: 70 }}>변경위치</TableCell>
                           <TableCell sx={{ fontWeight: 600, width: 90 }}>변경필드</TableCell>
@@ -3063,37 +3182,37 @@ export default function EvaluationManagement() {
                             }}
                           >
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                                 {changeLogs.length - (changeLogPage * changeLogRowsPerPage + index)}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                                 {log.dateTime}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                                 {log.target}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                                 {log.code}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                                 {log.action}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                                 {log.location}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                                 {log.changedField || '-'}
                               </Typography>
                             </TableCell>
@@ -3101,7 +3220,7 @@ export default function EvaluationManagement() {
                               <Typography
                                 variant="body2"
                                 sx={{
-                                  fontSize: '13px',
+                                  fontSize: '12px',
                                   color: 'text.primary',
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
@@ -3117,7 +3236,7 @@ export default function EvaluationManagement() {
                               <Typography
                                 variant="body2"
                                 sx={{
-                                  fontSize: '13px',
+                                  fontSize: '12px',
                                   color: 'text.primary',
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
@@ -3133,7 +3252,7 @@ export default function EvaluationManagement() {
                               <Typography
                                 variant="body2"
                                 sx={{
-                                  fontSize: '13px',
+                                  fontSize: '12px',
                                   color: 'text.primary',
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
@@ -3154,14 +3273,14 @@ export default function EvaluationManagement() {
                                 size="small"
                                 sx={{
                                   height: 22,
-                                  fontSize: '13px',
+                                  fontSize: '12px',
                                   backgroundColor: getTeamColor(log.team),
                                   color: '#333333'
                                 }}
                               />
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                                 {log.user}
                               </Typography>
                             </TableCell>
@@ -3311,6 +3430,8 @@ export default function EvaluationManagement() {
               </Box>
             </TabPanel>
           </Box>
+          </>
+          )}
         </CardContent>
       </Card>
 
@@ -3322,6 +3443,9 @@ export default function EvaluationManagement() {
           evaluation={editingInspection}
           onSave={handleEditInspectionSave}
           generateEvaluationCode={generateInspectionCode}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>

@@ -68,17 +68,44 @@ export async function POST(request: NextRequest) {
 
     const nextNo = maxNoData && maxNoData.length > 0 ? maxNoData[0].no + 1 : 1;
 
+    // 코드가 제공되지 않았거나 비어있으면 서버에서 생성
+    let code = body.code;
+    if (!code || code.trim() === '') {
+      const currentYear = new Date().getFullYear().toString().slice(-2);
+
+      // DB에서 현재 연도의 최대 코드 번호 조회
+      const { data: existingCodes } = await supabase
+        .from('admin_checklist_data')
+        .select('code')
+        .like('code', `ADMIN-CHECK-${currentYear}-%`)
+        .order('code', { ascending: false })
+        .limit(1);
+
+      let nextNumber = 1;
+      if (existingCodes && existingCodes.length > 0) {
+        const lastCode = existingCodes[0].code;
+        const match = lastCode.match(/ADMIN-CHECK-\d{2}-(\d{3})/);
+        if (match) {
+          nextNumber = parseInt(match[1], 10) + 1;
+        }
+      }
+
+      code = `ADMIN-CHECK-${currentYear}-${nextNumber.toString().padStart(3, '0')}`;
+      console.log('🔢 서버에서 생성된 코드:', code);
+    }
+
     // 데이터 삽입
     const { data, error: insertError } = await supabase
       .from('admin_checklist_data')
       .insert([
         {
           ...body,
+          code,
           no: body.no || nextNo,
           registration_date: body.registration_date || new Date().toISOString().split('T')[0],
           progress: body.progress || 0,
-          created_by: 'user',
-          updated_by: 'user',
+          created_by: body.created_by || body.assignee || 'unknown',
+          updated_by: body.updated_by || body.created_by || body.assignee || 'unknown',
           is_active: true
         }
       ])
@@ -148,7 +175,7 @@ export async function PUT(request: NextRequest) {
       .from('admin_checklist_data')
       .update({
         ...updateData,
-        updated_by: 'user',
+        updated_by: updateData.updated_by || 'unknown',
         updated_at: new Date().toISOString()
       })
       .eq('id', existingData.id)

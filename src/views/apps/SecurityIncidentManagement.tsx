@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 
 // third-party
 import ReactApexChart, { Props as ChartProps } from 'react-apexcharts';
@@ -54,6 +54,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useSession } from 'next-auth/react';
 import useUser from 'hooks/useUser';
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
+import { useMenuPermission } from '../../hooks/usePermissions';
 
 // 임시 데이터 매핑
 const teams = ['보안팀', 'IT팀', '운영팀', '관리팀'];
@@ -138,6 +139,9 @@ interface KanbanViewProps {
   ) => void;
   onCardClick?: (task: SecurityIncidentRecord) => void;
   assigneeList?: any[];
+  users?: any[];
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 function KanbanView({
@@ -149,9 +153,47 @@ function KanbanView({
   setTasks,
   addChangeLog,
   onCardClick,
-  assigneeList
+  assigneeList,
+  users = [],
+  canEditOwn = true,
+  canEditOthers = true
 }: KanbanViewProps) {
   const theme = useTheme();
+
+  // 공용 데이터 가져오기
+  const { masterCodes } = useCommonData();
+
+  // 마스터코드에서 사고유형 옵션 가져오기 (GROUP009)
+  const incidentTypesMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP009' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // subcode → subcode_name 변환 함수
+  const getIncidentTypeName = React.useCallback((subcode: string) => {
+    const found = incidentTypesMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [incidentTypesMap]);
+
+  // 현재 로그인한 사용자 정보
+  const { data: session } = useSession();
+  const user = useUser();
+
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || users.length === 0) return null;
+    const found = users.find((u) => u.email === session.user.email);
+    return found;
+  }, [session, users]);
+
+  // 데이터 소유자 확인 함수 - createdBy 또는 assignee가 본인인 경우
+  const isDataOwner = useCallback((incident: SecurityIncidentRecord) => {
+    if (!currentUser) return false;
+    return (
+      incident.createdBy === currentUser.user_name ||
+      incident.assignee === currentUser.user_name
+    );
+  }, [currentUser]);
 
   // 상태 관리
   const [activeTask, setActiveTask] = useState<SecurityIncidentRecord | null>(null);
@@ -217,7 +259,7 @@ function KanbanView({
       const mainContent = currentTask.mainContent || '사고내용 없음';
       const description = `${mainContent} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
 
-      addChangeLog('업무 상태 변경', taskCode, description, currentTask.team || '미분류', oldStatus, newStatus, '상태', mainContent);
+      addChangeLog('수정', taskCode, description, currentTask.team || '미분류', oldStatus, newStatus, '상태', mainContent);
     }
   };
 
@@ -318,17 +360,20 @@ function KanbanView({
 
   // 드래그 가능한 카드 컴포넌트
   function DraggableCard({ task }: { task: SecurityIncidentRecord }) {
+    // 드래그 가능 여부: canEditOthers가 있거나, canEditOwn이 있고 자신의 데이터인 경우
+    const isDragDisabled = !(canEditOthers || (canEditOwn && isDataOwner(task)));
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-      id: task.id
+      id: task.id,
+      disabled: isDragDisabled
     });
 
     const style = transform
       ? {
           transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
           opacity: isDragging ? 0.5 : 1,
-          cursor: isDragging ? 'grabbing' : 'pointer'
+          cursor: isDragging ? 'grabbing' : (isDragDisabled ? 'default' : 'grab')
         }
-      : { cursor: 'pointer' };
+      : { cursor: isDragDisabled ? 'default' : 'grab' };
 
     // 사용자 프로필 이미지 가져오기 (최적화: find 한 번만 호출)
     const assigneeUser = React.useMemo(() => {
@@ -341,7 +386,7 @@ function KanbanView({
       <article
         ref={setNodeRef}
         style={style}
-        {...listeners}
+        {...(isDragDisabled ? {} : listeners)}
         {...attributes}
         className="kanban-card"
         onClick={(e) => {
@@ -371,7 +416,7 @@ function KanbanView({
         {/* 상태 및 사고유형 태그 */}
         <div className="status-tags">
           <span className={`status-tag status-${task.status?.toLowerCase() || 'waiting'}`}>{task.status || '대기'}</span>
-          <span className="incident-type-tag">{task.incidentType || '악성코드'}</span>
+          <span className="incident-type-tag">{getIncidentTypeName(task.incidentType || '')}</span>
         </div>
 
         {/* 카드 제목 */}
@@ -948,7 +993,7 @@ function MonthlyScheduleView({
           {/* 월 헤더 - 상반기 */}
           {monthNames.slice(0, 6).map((month, index) => (
             <Box
-              key={index}
+              key={`month-header-first-${index}`}
               sx={{
                 py: 1.5,
                 px: 1,
@@ -973,7 +1018,7 @@ function MonthlyScheduleView({
 
             return (
               <Box
-                key={monthIndex}
+                key={`month-content-first-${monthIndex}`}
                 sx={{
                   borderRight: monthIndex < 5 ? '1px solid' : 'none',
                   borderColor: 'divider',
@@ -994,7 +1039,7 @@ function MonthlyScheduleView({
 
                   return (
                     <Box
-                      key={item.id}
+                      key={`month-${monthIndex}-item-${item.id}`}
                       onClick={() => onCardClick(item)}
                       sx={{
                         mb: itemIndex < items.length - 1 ? 0.8 : 0,
@@ -1055,7 +1100,7 @@ function MonthlyScheduleView({
           {/* 월 헤더 - 하반기 */}
           {monthNames.slice(6, 12).map((month, index) => (
             <Box
-              key={index + 6}
+              key={`month-header-second-${index}`}
               sx={{
                 py: 1.5,
                 px: 1,
@@ -1081,7 +1126,7 @@ function MonthlyScheduleView({
 
             return (
               <Box
-                key={monthIndex}
+                key={`month-content-second-${index}`}
                 sx={{
                   borderRight: index < 5 ? '1px solid' : 'none',
                   borderColor: 'divider',
@@ -1102,7 +1147,7 @@ function MonthlyScheduleView({
 
                   return (
                     <Box
-                      key={item.id}
+                      key={`month-second-${index}-item-${item.id}`}
                       onClick={() => onCardClick(item)}
                       sx={{
                         mb: itemIndex < items.length - 1 ? 0.8 : 0,
@@ -1185,6 +1230,22 @@ function DashboardView({
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
+  // 공용 데이터 가져오기
+  const { masterCodes } = useCommonData();
+
+  // 마스터코드에서 사고유형 옵션 가져오기 (GROUP009)
+  const incidentTypesMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP009' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // subcode → subcode_name 변환 함수
+  const getIncidentTypeName = React.useCallback((subcode: string) => {
+    const found = incidentTypesMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [incidentTypesMap]);
+
   // 날짜 범위 필터링 함수
   const filterByDateRange = (data: SecurityIncidentRecord[]) => {
     if (!startDate && !endDate) {
@@ -1239,7 +1300,8 @@ function DashboardView({
   // 사고유형별 통계 (원형차트용) - incidentType 필드 사용
   const categoryStats = filteredData.reduce(
     (acc, item) => {
-      const category = item.incidentType || '기타';
+      const subcode = item.incidentType || '기타';
+      const category = getIncidentTypeName(subcode);
       acc[category] = (acc[category] || 0) + 1;
       return acc;
     },
@@ -1637,7 +1699,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#48C4B7',
+              background: '#26C6DA',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -2059,6 +2121,7 @@ function DashboardView({
 export default function SecurityIncidentManagement() {
   const theme = useTheme();
   const [value, setValue] = useState(0);
+  const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers } = useMenuPermission('/security/incident');
 
   // Supabase 연동 (병렬 호출 최적화)
   const { items, error, fetchAccidents } = useSupabaseSecurityAccident();
@@ -2183,6 +2246,7 @@ export default function SecurityIncidentManagement() {
       status: item.status as '대기' | '진행' | '완료' | '홀딩',
       responseStage: item.response_stage as '사고 탐지' | '현황 분석' | '개선 조치 중' | '즉시 해결' | '근본개선' | undefined,
       assignee: item.assignee || '',
+      createdBy: item.created_by, // DB의 created_by 필드 매핑
       team: item.team || '',
       discoverer: item.discoverer || '',
       impactScope: item.impact_scope || '',
@@ -2507,7 +2571,48 @@ export default function SecurityIncidentManagement() {
             </Box>
           </Box>
 
-          {/* 탭 네비게이션 및 필터 */}
+          {/* 권한 체크 */}
+          {!canViewCategory ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 접근할 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : !canReadData ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 대한 데이터 조회 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              {/* 탭 네비게이션 및 필터 */}
           <Box
             sx={{
               borderBottom: 1,
@@ -2769,6 +2874,9 @@ export default function SecurityIncidentManagement() {
                   addChangeLog={addChangeLog}
                   error={error}
                   onDataRefresh={fetchAccidents}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                 />
               </Box>
             </TabPanel>
@@ -2811,6 +2919,9 @@ export default function SecurityIncidentManagement() {
                   addChangeLog={addChangeLog}
                   onCardClick={handleCardClick}
                   assigneeList={users.filter((user) => user.status === 'active')}
+                  users={users}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                 />
               </Box>
             </TabPanel>
@@ -3208,6 +3319,8 @@ export default function SecurityIncidentManagement() {
               </Box>
             </TabPanel>
           </Box>
+          </>
+          )}
         </CardContent>
       </Card>
 
@@ -3222,6 +3335,9 @@ export default function SecurityIncidentManagement() {
           assigneeAvatars={assigneeAvatars}
           statusOptions={taskStatusOptions}
           statusColors={{}}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>

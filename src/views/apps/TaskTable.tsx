@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import supabase from '../../lib/supabaseClient';
+import { useSession } from 'next-auth/react';
+import { useSupabaseUsers } from 'hooks/useSupabaseUsers';
 
 // Material-UI
 import {
@@ -81,6 +83,10 @@ interface TaskTableProps {
     changedField?: string,
     title?: string
   ) => void;
+  // 🔐 권한 관리
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 export default function TaskTable({
@@ -94,13 +100,48 @@ export default function TaskTable({
   users = [],
   onDeleteTasks,
   onAddTask,
-  addChangeLog
+  addChangeLog,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: TaskTableProps) {
   const theme = useTheme();
+
+  // 현재 로그인한 사용자 정보
+  const { data: session } = useSession();
+  const { users: allUsers } = useSupabaseUsers();
+
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || !allUsers || allUsers.length === 0) return null;
+    const found = allUsers.find((u) => u.email === session.user.email);
+    return found;
+  }, [session, allUsers]);
+
+  // 데이터 소유자 확인 함수
+  const isDataOwner = useCallback((task: TaskTableData) => {
+    if (!currentUser) return false;
+    // createdBy 또는 assignee 중 하나라도 현재 사용자와 일치하면 소유자
+    return task.createdBy === currentUser.user_name ||
+           task.assignee === currentUser.user_name;
+  }, [currentUser]);
+
+  // 편집 가능 여부 확인 함수
+  const canEditData = useCallback((task: TaskTableData) => {
+    return canEditOthers || (canEditOwn && isDataOwner(task));
+  }, [canEditOthers, canEditOwn, isDataOwner]);
 
   // ✅ KPI 패턴: props로 받은 tasks만 사용
   const [data, setData] = useState<TaskTableData[]>(tasks ? tasks : []);
   const [selected, setSelected] = useState<number[]>([]);
+
+  // 선택된 모든 레코드가 편집 가능한지 확인
+  const canEditAllSelected = useMemo(() => {
+    if (selected.length === 0) return false;
+    return selected.every(id => {
+      const task = data.find(t => t.id === id);
+      return task && canEditData(task);
+    });
+  }, [selected, data, canEditData]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [goToPage, setGoToPage] = useState('');
@@ -529,7 +570,20 @@ export default function TaskTable({
           >
             Excel Down
           </Button>
-          <Button variant="contained" startIcon={<Add size={16} />} size="small" onClick={addNewTask} sx={{ px: 2 }}>
+          <Button
+            variant="contained"
+            startIcon={<Add size={16} />}
+            size="small"
+            onClick={addNewTask}
+            disabled={!canCreateData}
+            sx={{
+              px: 2,
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             추가
           </Button>
           <Button
@@ -537,12 +591,16 @@ export default function TaskTable({
             startIcon={<Trash size={16} />}
             size="small"
             color="error"
-            disabled={selected.length === 0}
+            disabled={!canEditAllSelected}
             onClick={handleDeleteSelected}
             sx={{
               px: 2,
-              borderColor: selected.length > 0 ? 'error.main' : 'grey.300',
-              color: selected.length > 0 ? 'error.main' : 'grey.500'
+              borderColor: canEditAllSelected ? 'error.main' : 'grey.300',
+              color: canEditAllSelected ? 'error.main' : 'grey.500',
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
             }}
           >
             삭제 {selected.length > 0 && `(${selected.length})`}
@@ -623,6 +681,7 @@ export default function TaskTable({
                   <TableCell padding="checkbox">
                     <Checkbox
                       checked={selected.includes(task.id)}
+                      disabled={!canEditData(task)}
                       onChange={(event) => {
                         const selectedIndex = selected.indexOf(task.id);
                         let newSelected: number[] = [];
@@ -919,6 +978,9 @@ export default function TaskTable({
           teams={teams}
           kpiData={kpiData}
           tasks={data}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>

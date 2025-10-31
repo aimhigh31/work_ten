@@ -15,9 +15,17 @@ import { useSession } from 'next-auth/react';
 // ========================================
 
 interface Permission {
+  // 기존 3개 필드 (하위 호환성)
   canRead: boolean;
   canWrite: boolean;
   canFull: boolean;
+  // 새로운 5개 필드 (세밀한 권한 제어)
+  canViewCategory: boolean;
+  canReadData: boolean;
+  canCreateData: boolean;
+  canEditOwn: boolean;
+  canEditOthers: boolean;
+  // 메뉴 정보
   menuPage?: string;
   menuCategory?: string;
 }
@@ -59,12 +67,16 @@ export function usePermissions() {
   });
 
   useEffect(() => {
+    console.log('🔍 [usePermissions] useEffect 실행:', { status, hasSession: !!session });
+
     if (status === 'loading') {
+      console.log('⏳ [usePermissions] 세션 로딩 중...');
       setState((prev) => ({ ...prev, loading: true }));
       return;
     }
 
     if (status === 'unauthenticated' || !session) {
+      console.log('⚠️ [usePermissions] 인증되지 않은 상태 또는 세션 없음:', { status, hasSession: !!session });
       setState({
         loading: false,
         error: null, // ✅ 로그인 전에는 에러로 표시하지 않음
@@ -81,11 +93,19 @@ export function usePermissions() {
       return;
     }
 
+    console.log('✅ [usePermissions] 인증 완료, 권한 조회 시작');
+
     async function fetchPermissions() {
       try {
+        console.log('🌐 [usePermissions] API 호출 시작: /api/check-permission');
         setState((prev) => ({ ...prev, loading: true, error: null }));
 
         const response = await fetch('/api/check-permission');
+        console.log('📡 [usePermissions] API 응답 받음:', {
+          ok: response.ok,
+          status: response.status,
+          statusText: response.statusText
+        });
 
         // ✅ 응답 상태 체크 추가
         if (!response || !response.ok) {
@@ -111,8 +131,16 @@ export function usePermissions() {
         }
 
         const result = await response.json();
+        console.log('📦 [usePermissions] API 응답 데이터:', {
+          success: result.success,
+          roleId: result.roleId,
+          roleName: result.roleName,
+          permissionsCount: Object.keys(result.permissions || {}).length,
+          permissionsKeys: Object.keys(result.permissions || {}).slice(0, 10)
+        });
 
         if (!result.success) {
+          console.error('❌ [usePermissions] API 응답 success=false:', result.error);
           setState((prev) => ({
             ...prev,
             loading: false,
@@ -154,11 +182,22 @@ export function usePermissions() {
    * @returns Permission 객체
    */
   const getPermissionForMenu = (menuUrl: string): Permission => {
+    // permissions 객체가 menuId를 키로 사용하므로, URL로 찾기
+    const permissionArray = Object.values(state.permissions);
+    const found = permissionArray.find((p: any) => p.menuUrl === menuUrl);
+
     return (
-      state.permissions[menuUrl] || {
+      found || {
+        // 기존 3개 필드 (하위 호환성)
         canRead: false,
         canWrite: false,
-        canFull: false
+        canFull: false,
+        // 새로운 5개 필드
+        canViewCategory: false,
+        canReadData: false,
+        canCreateData: false,
+        canEditOwn: false,
+        canEditOthers: false
       }
     );
   };
@@ -167,20 +206,31 @@ export function usePermissions() {
    * 특정 액션 권한 확인
    *
    * @param menuUrl - 메뉴 URL
-   * @param action - 'read' | 'write' | 'full'
+   * @param action - 'read' | 'write' | 'full' | 'viewCategory' | 'readData' | 'createData' | 'editOwn' | 'editOthers'
    * @returns boolean - 권한 여부
    *
    * @example
    * const canEdit = hasPermission('/apps/education', 'write');
-   * if (canEdit) {
+   * const canEditOwn = hasPermission('/apps/education', 'editOwn');
+   * if (canEdit || canEditOwn) {
    *   // 편집 버튼 표시
    * }
    */
-  const hasPermission = (menuUrl: string, action: 'read' | 'write' | 'full'): boolean => {
+  const hasPermission = (
+    menuUrl: string,
+    action: 'read' | 'write' | 'full' | 'viewCategory' | 'readData' | 'createData' | 'editOwn' | 'editOthers'
+  ): boolean => {
     const permission = getPermissionForMenu(menuUrl);
+    // 기존 3개 (하위 호환성)
     if (action === 'read') return permission.canRead;
     if (action === 'write') return permission.canWrite;
     if (action === 'full') return permission.canFull;
+    // 새로운 5개
+    if (action === 'viewCategory') return permission.canViewCategory;
+    if (action === 'readData') return permission.canReadData;
+    if (action === 'createData') return permission.canCreateData;
+    if (action === 'editOwn') return permission.canEditOwn;
+    if (action === 'editOthers') return permission.canEditOthers;
     return false;
   };
 
@@ -193,8 +243,12 @@ export function usePermissions() {
    *
    * @example
    * const canAccess = hasAnyPermission('/apps/education', ['read', 'write']);
+   * const canEditAny = hasAnyPermission('/apps/education', ['editOwn', 'editOthers']);
    */
-  const hasAnyPermission = (menuUrl: string, actions: Array<'read' | 'write' | 'full'>): boolean => {
+  const hasAnyPermission = (
+    menuUrl: string,
+    actions: Array<'read' | 'write' | 'full' | 'viewCategory' | 'readData' | 'createData' | 'editOwn' | 'editOthers'>
+  ): boolean => {
     return actions.some((action) => hasPermission(menuUrl, action));
   };
 
@@ -228,10 +282,22 @@ export function usePermissions() {
  */
 export function useMenuPermission(menuUrl: string) {
   const { permissions, loading, error } = usePermissions();
-  const permission = permissions[menuUrl] || {
+
+  // permissions 객체가 menuId를 키로 사용하므로, URL로 찾기
+  const permissionArray = Object.values(permissions);
+  const found = permissionArray.find((p: any) => p.menuUrl === menuUrl);
+
+  const permission = found || {
+    // 기존 3개 필드 (하위 호환성)
     canRead: false,
     canWrite: false,
-    canFull: false
+    canFull: false,
+    // 새로운 5개 필드
+    canViewCategory: false,
+    canReadData: false,
+    canCreateData: false,
+    canEditOwn: false,
+    canEditOthers: false
   };
 
   return {

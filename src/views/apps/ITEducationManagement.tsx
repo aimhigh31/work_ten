@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 
 // third-party
 import ReactApexChart, { Props as ChartProps } from 'react-apexcharts';
@@ -55,6 +55,7 @@ import { ChangeLogData } from 'types/changelog';
 import { createClient } from '@/lib/supabase/client';
 import { useSession } from 'next-auth/react';
 import useUser from 'hooks/useUser';
+import { useMenuPermission } from 'hooks/usePermissions'; // 권한 관리
 
 // 변경로그 타입 정의 (UI용)
 interface ChangeLog {
@@ -117,6 +118,10 @@ interface KanbanViewProps {
   setTasks: React.Dispatch<React.SetStateAction<ITEducationTableData[]>>;
   addChangeLog: (action: string, target: string, description: string, team?: string) => void;
   assigneeList?: any[];
+  users?: any[];
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 function KanbanView({
@@ -127,9 +132,46 @@ function KanbanView({
   tasks,
   setTasks,
   addChangeLog,
-  assigneeList
+  assigneeList,
+  users = [],
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: KanbanViewProps) {
   const theme = useTheme();
+  const { data: session } = useSession();
+
+  // 공용 데이터 가져오기
+  const { masterCodes } = useCommonData();
+
+  // 마스터코드에서 교육유형 옵션 가져오기 (GROUP008)
+  const educationTypesMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP008' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // subcode → subcode_name 변환 함수
+  const getEducationTypeName = React.useCallback((subcode: string) => {
+    const found = educationTypesMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [educationTypesMap]);
+
+  // 🔐 권한 체크: 현재 사용자 정보
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || users.length === 0) return null;
+    const found = users.find((u) => u.email === session.user.email);
+    return found;
+  }, [session, users]);
+
+  // 🔐 권한 체크: 데이터 소유자 확인
+  const isDataOwner = useCallback((education: ITEducationTableData) => {
+    if (!currentUser) return false;
+    return (
+      education.createdBy === currentUser.user_name ||
+      education.assignee === currentUser.user_name
+    );
+  }, [currentUser]);
 
   // 상태 관리
   const [activeTask, setActiveTask] = useState<ITEducationTableData | null>(null);
@@ -288,9 +330,11 @@ function KanbanView({
   };
 
   // 드래그 가능한 카드 컴포넌트
-  function DraggableCard({ task }: { task: ITEducationTableData }) {
+  function DraggableCard({ task, canEditOwn = true, canEditOthers = true }: { task: ITEducationTableData; canEditOwn?: boolean; canEditOthers?: boolean }) {
+    const isDragDisabled = !(canEditOthers || (canEditOwn && isDataOwner(task)));
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-      id: task.id
+      id: task.id,
+      disabled: isDragDisabled
     });
 
     const style = transform
@@ -330,7 +374,7 @@ function KanbanView({
           <span className="status-tag" style={statusTagColor}>
             {task.status}
           </span>
-          <span className="incident-type-tag">{task.educationType}</span>
+          <span className="incident-type-tag">{getEducationTypeName(task.educationType || '')}</span>
         </div>
 
         {/* 2. 카드 제목 */}
@@ -617,7 +661,7 @@ function KanbanView({
             return (
               <DroppableColumn key={column.key} column={column}>
                 {items.map((item) => (
-                  <DraggableCard key={item.id} task={item} />
+                  <DraggableCard key={item.id} task={item} canEditOwn={canEditOwn} canEditOthers={canEditOthers} />
                 ))}
 
                 {/* 빈 칼럼 메시지 */}
@@ -641,7 +685,7 @@ function KanbanView({
           })}
         </div>
 
-        <DragOverlay>{activeTask ? <DraggableCard task={activeTask} /> : null}</DragOverlay>
+        <DragOverlay>{activeTask ? <DraggableCard task={activeTask} canEditOwn={canEditOwn} canEditOthers={canEditOthers} /> : null}</DragOverlay>
       </DndContext>
 
       {/* Task 편집 다이얼로그 */}
@@ -652,6 +696,9 @@ function KanbanView({
           recordId={editingTask?.id}
           tasks={tasks}
           onSave={handleEditTaskSave}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>
@@ -784,7 +831,7 @@ function MonthlyScheduleView({
           {/* 월 헤더 - 상반기 */}
           {monthNames.slice(0, 6).map((month, index) => (
             <Box
-              key={index}
+              key={`month-header-first-${index}`}
               sx={{
                 py: 1.5, // 상하 패딩 12px
                 px: 1, // 좌우 패딩 8px
@@ -809,7 +856,7 @@ function MonthlyScheduleView({
 
             return (
               <Box
-                key={monthIndex}
+                key={`month-content-first-${monthIndex}`}
                 sx={{
                   borderRight: monthIndex < 5 ? '1px solid' : 'none',
                   borderColor: 'divider',
@@ -850,7 +897,7 @@ function MonthlyScheduleView({
 
                   return (
                     <Box
-                      key={item.id}
+                      key={`month-${monthIndex}-item-${item.id}`}
                       onClick={() => onCardClick(item)}
                       sx={{
                         mb: itemIndex < items.length - 1 ? 0.8 : 0, // 카드 간격 6.4px (마지막 제외)
@@ -911,7 +958,7 @@ function MonthlyScheduleView({
           {/* 월 헤더 - 하반기 */}
           {monthNames.slice(6, 12).map((month, index) => (
             <Box
-              key={index + 6}
+              key={`month-header-second-${index}`}
               sx={{
                 py: 1.5, // 상하 패딩 12px
                 px: 1, // 좌우 패딩 8px
@@ -937,7 +984,7 @@ function MonthlyScheduleView({
 
             return (
               <Box
-                key={monthIndex}
+                key={`month-content-second-${index}`}
                 sx={{
                   borderRight: index < 5 ? '1px solid' : 'none',
                   borderColor: 'divider',
@@ -978,7 +1025,7 @@ function MonthlyScheduleView({
 
                   return (
                     <Box
-                      key={item.id}
+                      key={`month-second-${index}-item-${item.id}`}
                       onClick={() => onCardClick(item)}
                       sx={{
                         mb: itemIndex < items.length - 1 ? 0.8 : 0, // 카드 간격 6.4px (마지막 제외)
@@ -1059,6 +1106,34 @@ function DashboardView({
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
+  // 공용 데이터 가져오기
+  const { masterCodes } = useCommonData();
+
+  // 마스터코드에서 교육유형 옵션 가져오기 (GROUP008)
+  const educationTypesMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP008' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 마스터코드에서 상태 옵션 가져오기 (GROUP002)
+  const statusTypesMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // subcode → subcode_name 변환 함수
+  const getEducationTypeName = React.useCallback((subcode: string) => {
+    const found = educationTypesMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [educationTypesMap]);
+
+  const getStatusName = React.useCallback((subcode: string) => {
+    const found = statusTypesMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [statusTypesMap]);
+
   // 날짜 범위 필터링 함수
   const filterByDateRange = (data: ITEducationTableData[]) => {
     if (!startDate && !endDate) {
@@ -1111,7 +1186,8 @@ function DashboardView({
   // 교육유형별 통계 (원형차트용) - educationType 필드 사용
   const categoryStats = filteredData.reduce(
     (acc, item) => {
-      const category = item.educationType || '기타';
+      const subcode = item.educationType || '기타';
+      const category = getEducationTypeName(subcode);
       acc[category] = (acc[category] || 0) + 1;
       return acc;
     },
@@ -1138,7 +1214,7 @@ function DashboardView({
   // });
 
   // 월별 통계 (막대차트용)
-  const monthlyStats: { month: string; 계획: number; 진행중: number; 완료: number; 취소: number }[] = [];
+  const monthlyStats: { month: string; 대기: number; 진행: number; 완료: number; 홀딩: number }[] = [];
   const monthData: Record<string, Record<string, number>> = {};
 
   filteredData.forEach((item) => {
@@ -1146,7 +1222,7 @@ function DashboardView({
     const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
 
     if (!monthData[monthKey]) {
-      monthData[monthKey] = { 계획: 0, 진행중: 0, 완료: 0, 취소: 0 };
+      monthData[monthKey] = { 대기: 0, 진행: 0, 완료: 0, 홀딩: 0 };
     }
     monthData[monthKey][item.status] = (monthData[monthKey][item.status] || 0) + 1;
   });
@@ -1159,24 +1235,24 @@ function DashboardView({
       const yearShort = year.slice(-2); // 연도를 마지막 2자리로
       monthlyStats.push({
         month: `${yearShort}/${monthNum}`,
-        계획: monthData[month]['계획'] || 0,
-        진행중: monthData[month]['진행중'] || 0,
+        대기: monthData[month]['대기'] || 0,
+        진행: monthData[month]['진행'] || 0,
         완료: monthData[month]['완료'] || 0,
-        취소: monthData[month]['취소'] || 0
+        홀딩: monthData[month]['홀딩'] || 0
       });
     });
 
   // 상태별 색상
   const getStatusColor = (status: string) => {
     switch (status) {
-      case '계획':
-        return '#ED8936';
-      case '진행중':
-        return '#4267B2';
+      case '대기':
+        return '#90A4AE';
+      case '진행':
+        return '#7986CB';
       case '완료':
-        return '#4A5568';
-      case '취소':
-        return '#E53E3E';
+        return '#81C784';
+      case '홀딩':
+        return '#E57373';
       default:
         return '#9e9e9e';
     }
@@ -1348,7 +1424,7 @@ function DashboardView({
         text: '교육 건수'
       }
     },
-    colors: ['#ED8936', '#4267B2', '#4A5568', '#E53E3E'],
+    colors: ['#90A4AE', '#7986CB', '#81C784', '#E57373'],
     legend: {
       position: 'top',
       horizontalAlign: 'right'
@@ -1414,20 +1490,20 @@ function DashboardView({
 
   const barChartSeries = [
     {
-      name: '계획',
-      data: monthlyStats.map((item) => item.계획)
+      name: '대기',
+      data: monthlyStats.map((item) => item.대기)
     },
     {
-      name: '진행중',
-      data: monthlyStats.map((item) => item.진행중)
+      name: '진행',
+      data: monthlyStats.map((item) => item.진행)
     },
     {
       name: '완료',
       data: monthlyStats.map((item) => item.완료)
     },
     {
-      name: '취소',
-      data: monthlyStats.map((item) => item.취소)
+      name: '홀딩',
+      data: monthlyStats.map((item) => item.홀딩)
     }
   ];
 
@@ -1509,7 +1585,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#48C4B7',
+              background: '#26C6DA',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1528,12 +1604,60 @@ function DashboardView({
           </Card>
         </Grid>
 
+        {/* 대기 */}
+        <Grid item xs={12} sm={6} md={2.4}>
+          <Card
+            sx={{
+              p: 3,
+              background: '#90A4AE',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+              borderRadius: 2,
+              color: '#fff',
+              textAlign: 'center'
+            }}
+          >
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
+              대기
+            </Typography>
+            <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
+              {statusStats['대기'] || 0}
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
+              대기중인 교육
+            </Typography>
+          </Card>
+        </Grid>
+
+        {/* 진행 */}
+        <Grid item xs={12} sm={6} md={2.4}>
+          <Card
+            sx={{
+              p: 3,
+              background: '#7986CB',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+              borderRadius: 2,
+              color: '#fff',
+              textAlign: 'center'
+            }}
+          >
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
+              진행
+            </Typography>
+            <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
+              {statusStats['진행'] || 0}
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
+              진행중인 교육
+            </Typography>
+          </Card>
+        </Grid>
+
         {/* 완료 */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
               p: 3,
-              background: '#4A5568',
+              background: '#81C784',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1552,36 +1676,12 @@ function DashboardView({
           </Card>
         </Grid>
 
-        {/* 진행 */}
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              p: 3,
-              background: '#4267B2',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-              borderRadius: 2,
-              color: '#fff',
-              textAlign: 'center'
-            }}
-          >
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
-              진행중
-            </Typography>
-            <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusStats['진행중'] || 0}
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              진행중인 교육
-            </Typography>
-          </Card>
-        </Grid>
-
         {/* 홀딩 */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
               p: 3,
-              background: '#E53E3E',
+              background: '#E57373',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1589,37 +1689,13 @@ function DashboardView({
             }}
           >
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
-              취소
+              홀딩
             </Typography>
             <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusStats['취소'] || 0}
+              {statusStats['홀딩'] || 0}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              취소된 교육
-            </Typography>
-          </Card>
-        </Grid>
-
-        {/* 대기 */}
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              p: 3,
-              background: '#ED8936',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-              borderRadius: 2,
-              color: '#fff',
-              textAlign: 'center'
-            }}
-          >
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
-              계획
-            </Typography>
-            <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusStats['계획'] || 0}
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              계획중인 교육
+              홀딩된 교육
             </Typography>
           </Card>
         </Grid>
@@ -1765,10 +1841,10 @@ function DashboardView({
                         <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{task.executionDate || '-'}</TableCell>
                         <TableCell sx={{ py: 0.5 }}>
                           <Chip
-                            label={task.status}
+                            label={getStatusName(task.status)}
                             size="small"
                             sx={{
-                              bgcolor: getStatusColor(task.status),
+                              bgcolor: getStatusColor(getStatusName(task.status)),
                               color: 'white',
                               fontSize: '13px',
                               height: 18,
@@ -1921,6 +1997,9 @@ export default function ITEducationManagement() {
   const { loading, error, getItEducationData } = useSupabaseItEducation();
   const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 가져오기
 
+  // 🔐 권한 관리
+  const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers, loading: permissionLoading } = useMenuPermission('/it/education');
+
   // 🔍 디버깅: CommonData에서 받은 users 확인
   React.useEffect(() => {
     console.log('🔍 [ITEducationManagement] CommonData users:', users.length);
@@ -2054,6 +2133,7 @@ export default function ITEducationManagement() {
           assignee: item.assignee || '',
           team: item.team || '',
           department: undefined,
+          createdBy: item.created_by,
           attachments: []
         }));
         setTasks(convertedTasks);
@@ -2173,8 +2253,9 @@ export default function ITEducationManagement() {
         executionDate: item.execution_date || '',
         status: (item.status as any) || '계획',
         assignee: item.assignee || '',
-        team: undefined,
+        team: item.team || '',
         department: undefined,
+        createdBy: item.created_by,
         attachments: []
       }));
       setTasks(convertedTasks);
@@ -2207,14 +2288,14 @@ export default function ITEducationManagement() {
       }
 
       if (changes.length > 0) {
-        addChangeLog('교육 수정', updatedTask.code, changes.join(', '));
+        addChangeLog('수정', updatedTask.code, changes.join(', '));
       }
     } else {
       // 새로 생성
       setTasks((prevTasks) => [...prevTasks, updatedTask]);
       // Supabase 데이터 새로고침
       refreshData();
-      addChangeLog('교육 생성', updatedTask.code, `새로운 교육이 생성되었습니다: ${updatedTask.educationName}`);
+      addChangeLog('추가', updatedTask.code, `새로운 교육이 생성되었습니다: ${updatedTask.educationName}`);
     }
 
     handleEditDialogClose();
@@ -2306,7 +2387,48 @@ export default function ITEducationManagement() {
             </Box>
           </Box>
 
-          {/* 탭 네비게이션 및 필터 */}
+          {/* 권한 체크 */}
+          {!canViewCategory ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 접근할 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : !canReadData ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 대한 데이터 조회 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              {/* 탭 네비게이션 및 필터 */}
           <Box
             sx={{
               borderBottom: 1,
@@ -2559,6 +2681,9 @@ export default function ITEducationManagement() {
                   setTasks={setTasks}
                   addChangeLog={addChangeLog}
                   users={users}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                 />
               </Box>
             </TabPanel>
@@ -2600,6 +2725,10 @@ export default function ITEducationManagement() {
                   setTasks={setTasks}
                   addChangeLog={addChangeLog}
                   assigneeList={users.filter((user) => user.status === 'active')}
+                  users={users}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                 />
               </Box>
             </TabPanel>
@@ -3032,6 +3161,8 @@ export default function ITEducationManagement() {
               </Box>
             </TabPanel>
           </Box>
+          </>
+          )}
         </CardContent>
       </Card>
 
@@ -3043,6 +3174,9 @@ export default function ITEducationManagement() {
           recordId={editingTask?.id}
           tasks={tasks}
           onSave={handleEditTaskSave}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>

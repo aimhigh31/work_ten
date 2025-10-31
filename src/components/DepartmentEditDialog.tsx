@@ -75,9 +75,11 @@ interface DepartmentEditDialogProps {
   department: DepartmentData | null;
   onSave: (department: DepartmentData) => void;
   existingDepartments: DepartmentData[];
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
-export default function DepartmentEditDialog({ open, onClose, department, onSave, existingDepartments }: DepartmentEditDialogProps) {
+export default function DepartmentEditDialog({ open, onClose, department, onSave, existingDepartments, canEditOwn = true, canEditOthers = true }: DepartmentEditDialogProps) {
   const { data: session } = useSession();
   const { users } = useCommonData();
   const [tabValue, setTabValue] = useState(0);
@@ -232,10 +234,34 @@ export default function DepartmentEditDialog({ open, onClose, department, onSave
 
         {/* 취소, 저장 버튼을 오른쪽 상단으로 이동 */}
         <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-          <Button onClick={handleClose} variant="outlined" size="small" sx={{ minWidth: '60px' }}>
+          <Button
+            onClick={handleClose}
+            variant="outlined"
+            size="small"
+            disabled={!(canEditOwn || canEditOthers)}
+            sx={{
+              minWidth: '60px',
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             취소
           </Button>
-          <Button onClick={handleSave} variant="contained" size="small" sx={{ minWidth: '60px' }}>
+          <Button
+            onClick={handleSave}
+            variant="contained"
+            size="small"
+            disabled={!(canEditOwn || canEditOthers)}
+            sx={{
+              minWidth: '60px',
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             저장
           </Button>
         </Box>

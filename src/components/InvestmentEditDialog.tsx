@@ -671,6 +671,10 @@ interface InvestmentEditDialogProps {
   statusColors: Record<InvestmentStatus, any>;
   investmentTypes: string[];
   teams: string[];
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
+  users?: any[];
 }
 
 // 기록 탭 컴포넌트 (보안교육관리와 동일)
@@ -1012,7 +1016,7 @@ const InvestmentRecordTab = memo(
 InvestmentRecordTab.displayName = 'InvestmentRecordTab';
 
 // 자료 탭 컴포넌트 - DB 기반 파일 관리
-const InvestmentMaterialTab = memo(({ recordId, currentUser }: { recordId?: number | string; currentUser?: any }) => {
+const InvestmentMaterialTab = memo(({ recordId, currentUser, canEdit = true }: { recordId?: number | string; currentUser?: any; canEdit?: boolean }) => {
   const {
     files,
     loading: filesLoading,
@@ -1030,7 +1034,7 @@ const InvestmentMaterialTab = memo(({ recordId, currentUser }: { recordId?: numb
   const handleFileUpload = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
       if (!recordId) {
-        alert('파일을 업로드하려면 먼저 투자를 저장해주세요.');
+        setValidationError('파일을 업로드하려면 먼저 투자를 저장해주세요.');
         return;
       }
 
@@ -1047,7 +1051,7 @@ const InvestmentMaterialTab = memo(({ recordId, currentUser }: { recordId?: numb
         });
 
         if (!result.success) {
-          alert(`파일 업로드 실패: ${result.error}`);
+          setValidationError(`파일 업로드 실패: ${result.error}`);
         }
       });
 
@@ -1076,7 +1080,7 @@ const InvestmentMaterialTab = memo(({ recordId, currentUser }: { recordId?: numb
       setEditingMaterialText('');
     } catch (error) {
       console.error('파일명 수정 실패:', error);
-      alert('파일명 수정에 실패했습니다.');
+      setValidationError('파일명 수정에 실패했습니다.');
     }
   }, [editingMaterialText, editingMaterialId, updateFile]);
 
@@ -1093,7 +1097,7 @@ const InvestmentMaterialTab = memo(({ recordId, currentUser }: { recordId?: numb
         await deleteFile(fileId);
       } catch (error) {
         console.error('파일 삭제 실패:', error);
-        alert('파일 삭제에 실패했습니다.');
+        setValidationError('파일 삭제에 실패했습니다.');
       }
     },
     [deleteFile]
@@ -1113,13 +1117,13 @@ const InvestmentMaterialTab = memo(({ recordId, currentUser }: { recordId?: numb
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('파일 다운로드 실패:', error);
-      alert('파일 다운로드에 실패했습니다.');
+      setValidationError('파일 다운로드에 실패했습니다.');
     }
   }, []);
 
   const handleUploadClick = useCallback(() => {
     if (!recordId) {
-      alert('파일을 업로드하려면 먼저 투자를 저장해주세요.');
+      setValidationError('파일을 업로드하려면 먼저 투자를 저장해주세요.');
       return;
     }
     fileInputRef.current?.click();
@@ -1159,26 +1163,37 @@ const InvestmentMaterialTab = memo(({ recordId, currentUser }: { recordId?: numb
             p: 3,
             textAlign: 'center',
             borderStyle: 'dashed',
-            borderColor: 'primary.main',
-            backgroundColor: 'primary.50',
-            cursor: 'pointer',
+            borderColor: canEdit ? 'primary.main' : 'grey.300',
+            backgroundColor: canEdit ? 'primary.50' : 'grey.100',
+            cursor: canEdit ? 'pointer' : 'not-allowed',
             transition: 'all 0.2s ease-in-out',
             '&:hover': {
-              borderColor: 'primary.dark',
-              backgroundColor: 'primary.100'
+              borderColor: canEdit ? 'primary.dark' : 'grey.300',
+              backgroundColor: canEdit ? 'primary.100' : 'grey.100'
             }
           }}
-          onClick={handleUploadClick}
+          onClick={canEdit ? handleUploadClick : undefined}
         >
           <Stack spacing={2} alignItems="center">
             <Typography fontSize="48px">📁</Typography>
-            <Typography variant="h6" color="primary.main">
+            <Typography variant="h6" color={canEdit ? 'primary.main' : 'grey.500'}>
               {isUploading ? '파일 업로드 중...' : '파일을 업로드하세요'}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               클릭하거나 파일을 여기로 드래그하세요
             </Typography>
-            <Button variant="contained" size="small" startIcon={<Typography>📤</Typography>} disabled={isUploading || !recordId}>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<Typography>📤</Typography>}
+              disabled={isUploading || !recordId || !canEdit}
+              sx={{
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               파일 선택
             </Button>
           </Stack>
@@ -1293,8 +1308,14 @@ const InvestmentMaterialTab = memo(({ recordId, currentUser }: { recordId?: numb
                           size="small"
                           onClick={() => handleEditMaterial(file.id, file.file_name)}
                           color="primary"
-                          sx={{ p: 0.5 }}
+                          sx={{
+                            p: 0.5,
+                            '&.Mui-disabled': {
+                              color: 'grey.500'
+                            }
+                          }}
                           title="수정"
+                          disabled={!canEdit}
                         >
                           <Typography fontSize="14px">✏️</Typography>
                         </IconButton>
@@ -1302,9 +1323,14 @@ const InvestmentMaterialTab = memo(({ recordId, currentUser }: { recordId?: numb
                           size="small"
                           onClick={() => handleDeleteMaterial(file.id)}
                           color="error"
-                          sx={{ p: 0.5 }}
+                          sx={{
+                            p: 0.5,
+                            '&.Mui-disabled': {
+                              color: 'grey.500'
+                            }
+                          }}
                           title="삭제"
-                          disabled={isDeleting}
+                          disabled={isDeleting || !canEdit}
                         >
                           <Typography fontSize="14px">🗑️</Typography>
                         </IconButton>
@@ -1391,7 +1417,7 @@ class InvestmentAmountDataManager {
   }
 }
 
-const InvestmentAmountTab = memo(({ mode, investmentId }: { mode: 'add' | 'edit'; investmentId?: number }) => {
+const InvestmentAmountTab = memo(({ mode, investmentId, canEdit = true }: { mode: 'add' | 'edit'; investmentId?: number; canEdit?: boolean }) => {
   // 투자금액 DB 연동
   const { getFinanceItems, saveFinanceItems, deleteFinanceItem } = useSupabaseInvestmentFinance();
 
@@ -1879,10 +1905,34 @@ const InvestmentAmountTab = memo(({ mode, investmentId }: { mode: 'add' | 'edit'
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button variant="outlined" color="error" onClick={handleDeleteSelected} disabled={selectedRows.length === 0} size="small">
+          <Button
+            variant="outlined"
+            color="error"
+            onClick={handleDeleteSelected}
+            disabled={selectedRows.length === 0 || !canEdit}
+            size="small"
+            sx={{
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             삭제({selectedRows.length})
           </Button>
-          <Button variant="contained" onClick={handleAddItem} size="small" sx={{ fontSize: '12px' }}>
+          <Button
+            variant="contained"
+            onClick={handleAddItem}
+            disabled={!canEdit}
+            size="small"
+            sx={{
+              fontSize: '12px',
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             추가
           </Button>
         </Box>
@@ -2142,13 +2192,18 @@ function InvestmentEditDialog({
   statusOptions,
   statusColors,
   investmentTypes,
-  teams
+  teams,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true,
+  users: propsUsers = []
 }: InvestmentEditDialogProps) {
   // 세션 정보
   const { data: session } = useSession();
 
-  // ✅ 공용 창고에서 사용자 데이터 가져오기
-  const { users } = useCommonData();
+  // ✅ 공용 창고에서 사용자 데이터 가져오기 (fallback)
+  const { users: contextUsers } = useCommonData();
+  const users = propsUsers.length > 0 ? propsUsers : contextUsers;
 
   console.log('🔍 [InvestmentEditDialog] users:', users?.length);
 
@@ -2159,6 +2214,22 @@ function InvestmentEditDialog({
     console.log('🔍 [InvestmentEditDialog] currentUser:', found ? found.user_name : '없음');
     return found;
   }, [session, users]);
+
+  // 데이터 소유자 확인 (createdBy 또는 assignee)
+  const isDataOwner = useMemo(() => {
+    if (!investment || !currentUser) return false;
+    const isCreator = investment.createdBy === currentUser.user_name;
+    const isAssignee = investment.assignee === currentUser.user_name;
+    return isCreator || isAssignee;
+  }, [investment, currentUser]);
+
+  // 편집 가능 여부 확인
+  const canEdit = useMemo(() => {
+    // 신규 추가인 경우
+    if (!investment) return canCreateData;
+    // 편집인 경우
+    return canEditOthers || (canEditOwn && isDataOwner);
+  }, [investment, canCreateData, canEditOwn, canEditOthers, isDataOwner]);
 
   // 피드백 훅 사용 (DB 연동)
   const {
@@ -2440,10 +2511,34 @@ function InvestmentEditDialog({
 
         {/* 취소, 저장 버튼을 오른쪽 상단으로 이동 */}
         <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-          <Button onClick={handleClose} variant="outlined" size="small" sx={{ minWidth: '60px' }}>
+          <Button
+            onClick={handleClose}
+            variant="outlined"
+            size="small"
+            disabled={!canEdit}
+            sx={{
+              minWidth: '60px',
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             취소
           </Button>
-          <Button onClick={handleSave} variant="contained" size="small" sx={{ minWidth: '60px' }}>
+          <Button
+            onClick={handleSave}
+            variant="contained"
+            size="small"
+            disabled={!canEdit}
+            sx={{
+              minWidth: '60px',
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             저장
           </Button>
         </Box>
@@ -2481,7 +2576,7 @@ function InvestmentEditDialog({
               totalInvestmentAmount={totalInvestmentAmount}
             />
           )}
-          {tabValue === 1 && <InvestmentAmountTab mode={investment ? 'edit' : 'add'} investmentId={investment?.id} />}
+          {tabValue === 1 && <InvestmentAmountTab mode={investment ? 'edit' : 'add'} investmentId={investment?.id} canEdit={canEdit} />}
           {tabValue === 2 && (
             <InvestmentRecordTab
               comments={comments}
@@ -2501,7 +2596,7 @@ function InvestmentEditDialog({
               currentUserDepartment={currentUser?.department || ''}
             />
           )}
-          {tabValue === 3 && <InvestmentMaterialTab recordId={investment?.id} currentUser={currentUser} />}
+          {tabValue === 3 && <InvestmentMaterialTab recordId={investment?.id} currentUser={currentUser} canEdit={canEdit} />}
         </Box>
       </DialogContent>
 

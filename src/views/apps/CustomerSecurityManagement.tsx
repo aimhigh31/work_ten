@@ -36,6 +36,7 @@ import CustomerSecurityDataTable from 'views/apps/CustomerSecurityDataTable';
 import { departmentOptions, statusOptions, CustomerSecurityRecord } from 'types/customer-security';
 import { customerSecurityData } from 'data/customer-security';
 import { ThemeMode } from 'config';
+import { useMenuPermission } from '../../hooks/usePermissions';
 
 // Icons
 import { TableDocument, Chart, Calendar, Element, DocumentText } from '@wandersonalwes/iconsax-react';
@@ -518,7 +519,7 @@ function MonthlyScheduleView({ selectedDepartment, selectedStatus, selectedYear 
           {/* 월 헤더 - 상반기 */}
           {monthNames.slice(0, 6).map((month, index) => (
             <Box
-              key={index}
+              key={`month-header-first-${index}`}
               sx={{
                 p: 2,
                 textAlign: 'center',
@@ -543,7 +544,7 @@ function MonthlyScheduleView({ selectedDepartment, selectedStatus, selectedYear 
 
             return (
               <Box
-                key={monthIndex}
+                key={`month-content-first-${monthIndex}`}
                 sx={{
                   borderRight: monthIndex < 5 ? '1px solid' : 'none',
                   borderColor: 'divider',
@@ -560,7 +561,7 @@ function MonthlyScheduleView({ selectedDepartment, selectedStatus, selectedYear 
 
                   return (
                     <Box
-                      key={item.id}
+                      key={`month-${monthIndex}-item-${item.id}`}
                       sx={{
                         mb: itemIndex < items.length - 1 ? 1 : 0,
                         p: 0.75,
@@ -620,7 +621,7 @@ function MonthlyScheduleView({ selectedDepartment, selectedStatus, selectedYear 
           {/* 월 헤더 - 하반기 */}
           {monthNames.slice(6, 12).map((month, index) => (
             <Box
-              key={index + 6}
+              key={`month-header-second-${index}`}
               sx={{
                 p: 2,
                 textAlign: 'center',
@@ -646,7 +647,7 @@ function MonthlyScheduleView({ selectedDepartment, selectedStatus, selectedYear 
 
             return (
               <Box
-                key={monthIndex}
+                key={`month-content-second-${index}`}
                 sx={{
                   borderRight: index < 5 ? '1px solid' : 'none',
                   borderColor: 'divider',
@@ -663,7 +664,7 @@ function MonthlyScheduleView({ selectedDepartment, selectedStatus, selectedYear 
 
                   return (
                     <Box
-                      key={item.id}
+                      key={`month-second-${index}-item-${item.id}`}
                       sx={{
                         mb: itemIndex < items.length - 1 ? 1 : 0,
                         p: 0.75,
@@ -1545,6 +1546,9 @@ export default function CustomerSecurityManagement() {
   const theme = useTheme();
   const [value, setValue] = useState(0);
 
+  // 권한 체크
+  const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers, loading: permissionLoading } = useMenuPermission('/apps/customer-security');
+
   // 필터 상태
   const [selectedDepartment, setSelectedDepartment] = useState('전체');
   const [selectedStatus, setSelectedStatus] = useState('전체');
@@ -1638,8 +1642,30 @@ export default function CustomerSecurityManagement() {
         </Box>
       }
     >
-      {/* 탭 네비게이션 */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+      {/* 권한 체크: 카테고리 보기만 있는 경우 */}
+      {canViewCategory && !canReadData ? (
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            gap: 2,
+            py: 8
+          }}
+        >
+          <Typography variant="h5" color="text.secondary">
+            이 페이지에 대한 데이터 조회 권한이 없습니다.
+          </Typography>
+          <Typography variant="body2" color="text.disabled">
+            관리자에게 권한을 요청하세요.
+          </Typography>
+        </Box>
+      ) : (
+        <>
+          {/* 탭 네비게이션 */}
+          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs
           value={value}
           onChange={handleChange}
@@ -1756,6 +1782,8 @@ export default function CustomerSecurityManagement() {
           <ChangeLogView />
         </Box>
       </TabPanel>
+      </>
+      )}
     </MainCard>
   );
 }

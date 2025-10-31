@@ -14,6 +14,7 @@ export interface SolutionData {
   progress: number;
   completedDate: string;
   attachments: string[];
+  createdBy?: string; // 데이터 생성자 (권한 체크용)
 }
 
 export interface SolutionTableData extends SolutionData {

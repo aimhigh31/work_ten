@@ -1029,7 +1029,7 @@ const ExpandIcon = ({ expanded }: { expanded: boolean }) => (
 );
 
 // 자료 탭 컴포넌트 - DB 기반 (보안교육관리와 동일 패턴)
-const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | string; currentUser?: any }) => {
+const MaterialTab = memo(({ recordId, currentUser, canEditOwn = true, canEditOthers = true }: { recordId?: number | string; currentUser?: any; canEditOwn?: boolean; canEditOthers?: boolean }) => {
   // 파일 관리 훅
   const {
     files,
@@ -1164,26 +1164,37 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
             p: 3,
             textAlign: 'center',
             borderStyle: 'dashed',
-            borderColor: 'primary.main',
-            backgroundColor: 'primary.50',
-            cursor: 'pointer',
+            borderColor: (canEditOwn || canEditOthers) ? 'primary.main' : 'grey.300',
+            backgroundColor: (canEditOwn || canEditOthers) ? 'primary.50' : 'grey.100',
+            cursor: (canEditOwn || canEditOthers) ? 'pointer' : 'not-allowed',
             transition: 'all 0.2s ease-in-out',
-            '&:hover': {
+            '&:hover': (canEditOwn || canEditOthers) ? {
               borderColor: 'primary.dark',
               backgroundColor: 'primary.100'
-            }
+            } : {}
           }}
-          onClick={handleUploadClick}
+          onClick={(canEditOwn || canEditOthers) ? handleUploadClick : undefined}
         >
           <Stack spacing={2} alignItems="center">
             <Typography fontSize="48px">📁</Typography>
-            <Typography variant="h6" color="primary.main">
+            <Typography variant="h6" color={(canEditOwn || canEditOthers) ? 'primary.main' : 'grey.500'}>
               파일을 업로드하세요
             </Typography>
             <Typography variant="body2" color="text.secondary">
               클릭하거나 파일을 여기로 드래그하세요
             </Typography>
-            <Button variant="contained" size="small" startIcon={<Typography>📤</Typography>}>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<Typography>📤</Typography>}
+              disabled={!(canEditOwn || canEditOthers)}
+              sx={{
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               파일 선택
             </Button>
           </Stack>
@@ -1296,8 +1307,14 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                         size="small"
                         onClick={() => handleEditMaterial(fileData.id, fileData.file_name)}
                         color="primary"
-                        sx={{ p: 0.5 }}
+                        sx={{
+                          p: 0.5,
+                          '&.Mui-disabled': {
+                            color: 'grey.300'
+                          }
+                        }}
                         title="수정"
+                        disabled={!(canEditOwn || canEditOthers)}
                       >
                         <Typography fontSize="14px">✏️</Typography>
                       </IconButton>
@@ -1305,9 +1322,14 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                         size="small"
                         onClick={() => handleDeleteMaterial(fileData.id)}
                         color="error"
-                        sx={{ p: 0.5 }}
+                        sx={{
+                          p: 0.5,
+                          '&.Mui-disabled': {
+                            color: 'grey.300'
+                          }
+                        }}
                         title="삭제"
-                        disabled={isDeleting}
+                        disabled={isDeleting || !(canEditOwn || canEditOthers)}
                       >
                         <Typography fontSize="14px">🗑️</Typography>
                       </IconButton>
@@ -1372,12 +1394,16 @@ const UserHistoryTab = memo(
     softwareId,
     mode,
     userHistories: initialUserHistories,
-    onUserHistoriesChange
+    onUserHistoriesChange,
+    canEditOwn = true,
+    canEditOthers = true
   }: {
     softwareId: number;
     mode: 'add' | 'edit';
     userHistories: UserHistory[];
     onUserHistoriesChange: (histories: UserHistory[]) => void;
+    canEditOwn?: boolean;
+    canEditOthers?: boolean;
   }) => {
     const { getUserHistories, convertToUserHistory } = useSupabaseSoftwareUser();
 
@@ -1852,10 +1878,34 @@ const UserHistoryTab = memo(
             사용자 이력 관리
           </Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button variant="outlined" color="error" onClick={handleDeleteSelected} disabled={selectedRows.length === 0} size="small">
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={handleDeleteSelected}
+              disabled={selectedRows.length === 0 || !(canEditOwn || canEditOthers)}
+              size="small"
+              sx={{
+                '&.Mui-disabled': {
+                  borderColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               삭제({selectedRows.length})
             </Button>
-            <Button variant="contained" onClick={handleAddHistory} size="small" sx={{ fontSize: '12px' }}>
+            <Button
+              variant="contained"
+              onClick={handleAddHistory}
+              disabled={!(canEditOwn || canEditOthers)}
+              size="small"
+              sx={{
+                fontSize: '12px',
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               추가
             </Button>
           </Box>
@@ -2066,7 +2116,9 @@ const PurchaseMaintenanceTab = memo(
     onSavePurchaseHistoryEdit,
     onCancelPurchaseHistoryEdit,
     onDeletePurchaseHistory,
-    onEditPurchaseHistoryDataChange
+    onEditPurchaseHistoryDataChange,
+    canEditOwn = true,
+    canEditOthers = true
   }: {
     purchaseHistory: any[];
     historyTypes: string[];
@@ -2078,6 +2130,8 @@ const PurchaseMaintenanceTab = memo(
     onCancelPurchaseHistoryEdit: () => void;
     onDeletePurchaseHistory: (id: number) => void;
     onEditPurchaseHistoryDataChange: (data: any) => void;
+    canEditOwn?: boolean;
+    canEditOthers?: boolean;
   }) => {
     // Supabase 클라이언트 생성
     const supabaseClient = React.useMemo(() => {
@@ -2620,10 +2674,34 @@ const PurchaseMaintenanceTab = memo(
             구매/유지보수 이력
           </Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button variant="outlined" color="error" onClick={handleDeleteSelected} disabled={selectedRows.length === 0} size="small">
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={handleDeleteSelected}
+              disabled={selectedRows.length === 0 || !(canEditOwn || canEditOthers)}
+              size="small"
+              sx={{
+                '&.Mui-disabled': {
+                  borderColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               삭제({selectedRows.length})
             </Button>
-            <Button variant="contained" onClick={handleAddHistory} size="small" sx={{ fontSize: '12px' }}>
+            <Button
+              variant="contained"
+              onClick={handleAddHistory}
+              disabled={!(canEditOwn || canEditOthers)}
+              size="small"
+              sx={{
+                fontSize: '12px',
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               추가
             </Button>
           </Box>
@@ -2788,10 +2866,13 @@ interface SoftwareEditDialogProps {
   assigneeAvatars: Record<string, string>;
   statusOptions: SoftwareStatus[];
   statusColors: Record<SoftwareStatus, any>;
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 const SoftwareEditDialog = memo(
-  ({ open, onClose, task, onSave, assignees, assigneeAvatars, statusOptions, statusColors }: SoftwareEditDialogProps) => {
+  ({ open, onClose, task, onSave, assignees, assigneeAvatars, statusOptions, statusColors, canCreateData = true, canEditOwn = true, canEditOthers = true }: SoftwareEditDialogProps) => {
     // 성능 모니터링
     // const { renderCount, logStats } = usePerformanceMonitor('TaskEditDialog');
 
@@ -2813,6 +2894,40 @@ const SoftwareEditDialog = memo(
       if (!session?.user?.email || users.length === 0) return null;
       return users.find((u) => u.email === session.user.email);
     }, [session, users]);
+
+    // 🔐 권한 체크: 데이터 소유자 확인
+    const isOwner = React.useMemo(() => {
+      if (!task) {
+        console.log('🔐 SoftwareEditDialog - 신규 생성 모드: isOwner = true');
+        return true; // 신규 생성인 경우 true
+      }
+      if (!currentUser) {
+        console.log('🔐 SoftwareEditDialog - 현재 사용자 없음: isOwner = false');
+        return false; // 로그인하지 않은 경우 false
+      }
+
+      const currentUserName = currentUser?.user_name;
+      const softwareData = task as any;
+
+      const isCreator = softwareData.createdBy === currentUserName;
+      const isAssignee = task.assignee === currentUserName;
+      const isOwnerResult = isCreator || isAssignee;
+
+      console.log('🔐 SoftwareEditDialog - 소유자 확인:', {
+        taskId: task.id,
+        currentUserName,
+        createdBy: softwareData.createdBy,
+        assignee: task.assignee,
+        isCreator,
+        isAssignee,
+        isOwner: isOwnerResult,
+        canEditOwn,
+        canEditOthers,
+        finalCanEdit: canEditOthers || (canEditOwn && isOwnerResult)
+      });
+
+      return isOwnerResult;
+    }, [task, currentUser, canEditOwn, canEditOthers]);
 
     // GROUP002 상태 훅 사용
     const { statusOptions: masterStatusOptions, loading: statusLoading, error: statusError } = useGroup002();
@@ -3704,12 +3819,36 @@ const SoftwareEditDialog = memo(
             )}
           </Box>
 
-          {/* 취소, 저장 버튼을 오른쪽 상단으로 이동 */}
+          {/* 🔐 권한 체크: 새 소프트웨어(task null)는 canCreateData/canEditOwn, 기존 소프트웨어는 canEditOthers 또는 (canEditOwn && isOwner) */}
           <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-            <Button onClick={handleClose} variant="outlined" size="small" sx={{ minWidth: '60px' }}>
+            <Button
+              onClick={handleClose}
+              variant="outlined"
+              size="small"
+              disabled={!task ? !(canCreateData || canEditOwn) : !(canEditOthers || (canEditOwn && isOwner))}
+              sx={{
+                minWidth: '60px',
+                '&.Mui-disabled': {
+                  borderColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               취소
             </Button>
-            <Button onClick={handleSave} variant="contained" size="small" sx={{ minWidth: '60px' }}>
+            <Button
+              onClick={handleSave}
+              variant="contained"
+              size="small"
+              disabled={!task ? !(canCreateData || canEditOwn) : !(canEditOthers || (canEditOwn && isOwner))}
+              sx={{
+                minWidth: '60px',
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               저장
             </Button>
           </Box>
@@ -3727,10 +3866,10 @@ const SoftwareEditDialog = memo(
 
         <DialogContent sx={{ p: 0, overflow: 'hidden' }}>
           {editTab === 0 && <OverviewTab {...overviewTabProps} />}
-          {editTab === 1 && <UserHistoryTab {...userHistoryTabProps} />}
-          {editTab === 2 && <PurchaseMaintenanceTab {...purchaseMaintenanceTabProps} />}
+          {editTab === 1 && <UserHistoryTab {...userHistoryTabProps} canEditOwn={canEditOwn && isOwner} canEditOthers={canEditOthers} />}
+          {editTab === 2 && <PurchaseMaintenanceTab {...purchaseMaintenanceTabProps} canEditOwn={canEditOwn && isOwner} canEditOthers={canEditOthers} />}
           {editTab === 3 && <RecordTab {...recordTabProps} />}
-          {editTab === 4 && <MaterialTab recordId={task?.id} currentUser={currentUser} />}
+          {editTab === 4 && <MaterialTab recordId={task?.id} currentUser={currentUser} canEditOwn={canEditOwn && isOwner} canEditOthers={canEditOthers} />}
         </DialogContent>
 
         {/* 에러 메시지 표시 */}

@@ -52,6 +52,8 @@ import { ChangeLogData } from 'types/changelog';
 import { useSession } from 'next-auth/react';
 import useUser from 'hooks/useUser';
 import { createClient } from '@/lib/supabase/client';
+import { useMenuPermission } from 'hooks/usePermissions'; // 권한 관리
+import { useSupabaseUsers } from 'hooks/useSupabaseUsers';
 
 // 변경로그 타입 정의 (UI용)
 interface ChangeLog {
@@ -113,12 +115,17 @@ interface KanbanViewProps {
   tasks: TaskTableData[];
   setTasks: React.Dispatch<React.SetStateAction<TaskTableData[]>>;
   addChangeLog: (action: string, target: string, description: string, team?: string) => void;
+  fetchKpis?: () => Promise<void>;
   assigneeList?: any[];
   assignees: string[];
   assigneeAvatars: any;
   taskStatusOptions: string[];
   taskStatusColors: any;
   teams: string[];
+  // 🔐 권한 관리
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 function KanbanView({
@@ -129,14 +136,55 @@ function KanbanView({
   tasks,
   setTasks,
   addChangeLog,
+  fetchKpis,
   assigneeList,
   assignees,
   assigneeAvatars,
   taskStatusOptions,
   taskStatusColors,
-  teams
+  teams,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: KanbanViewProps) {
   const theme = useTheme();
+
+  // useSupabaseKpi 훅 사용
+  const { updateKpi } = useSupabaseKpi();
+
+  // CommonData에서 마스터코드 가져오기
+  const { getSubCodesByGroup } = useCommonData();
+
+  // GROUP002의 상태 목록 가져오기
+  const statusOptions = getSubCodesByGroup('GROUP002');
+
+  // 상태 코드를 이름으로 변환하는 함수
+  const getStatusName = React.useCallback((status: string) => {
+    if (!status) return '미분류';
+    // "GROUP002-SUB001" 형태에서 서브코드명 찾기
+    const statusOption = statusOptions.find(
+      (option) => option.subcode === status || `${option.group_code}-${option.subcode}` === status
+    );
+    return statusOption?.subcode_name || status;
+  }, [statusOptions]);
+
+  // 현재 로그인한 사용자 정보
+  const { data: session } = useSession();
+  const { users } = useSupabaseUsers();
+
+  const currentUser = React.useMemo(() => {
+    if (!session?.user?.email || users.length === 0) return null;
+    const found = users.find((u) => u.email === session.user.email);
+    return found;
+  }, [session, users]);
+
+  // 데이터 소유자 확인 함수
+  const isDataOwner = React.useCallback((task: TaskTableData) => {
+    if (!currentUser) return false;
+    // createdBy 또는 assignee 중 하나라도 현재 사용자와 일치하면 소유자
+    return task.createdBy === currentUser.user_name ||
+           task.assignee === currentUser.user_name;
+  }, [currentUser]);
 
   // 상태 관리
   const [activeTask, setActiveTask] = useState<TaskTableData | null>(null);
@@ -169,8 +217,8 @@ function KanbanView({
     // 담당자 필터
     if (selectedAssignee !== '전체' && task.assignee !== selectedAssignee) return false;
 
-    // 상태 필터
-    if (selectedStatus !== '전체' && task.status !== selectedStatus) return false;
+    // 상태 필터 (상태명으로 비교)
+    if (selectedStatus !== '전체' && getStatusName(task.status) !== selectedStatus) return false;
 
     return true;
   });
@@ -196,48 +244,88 @@ function KanbanView({
   };
 
   // Task 저장 핸들러
-  const handleEditTaskSave = (updatedTask: TaskTableData) => {
+  const handleEditTaskSave = async (updatedTask: TaskTableData) => {
     const originalTask = tasks.find((t) => t.id === updatedTask.id);
 
-    if (originalTask) {
-      // 업데이트
-      setTasks((prev) => prev.map((task) => (task.id === updatedTask.id ? updatedTask : task)));
+    console.log('📝 칸반뷰 - Task 저장 중:', updatedTask);
 
-      // 변경로그 추가 - 변경된 필드 확인
-      const changes: string[] = [];
-      const taskCode = updatedTask.code || `TASK-${updatedTask.id}`;
+    try {
+      if (originalTask) {
+        // DB 형식으로 변환
+        const kpiData: Partial<KpiData> = {
+          code: updatedTask.code,
+          work_content: updatedTask.workContent,
+          description: updatedTask.description,
+          selection_background: (updatedTask as any).selectionBackground,
+          impact: (updatedTask as any).impact,
+          evaluation_criteria_s: (updatedTask as any).evaluationCriteria?.S,
+          evaluation_criteria_a: (updatedTask as any).evaluationCriteria?.A,
+          evaluation_criteria_b: (updatedTask as any).evaluationCriteria?.B,
+          evaluation_criteria_c: (updatedTask as any).evaluationCriteria?.C,
+          evaluation_criteria_d: (updatedTask as any).evaluationCriteria?.D,
+          management_category: (updatedTask as any).managementCategory,
+          target_kpi: (updatedTask as any).targetKpi,
+          current_kpi: (updatedTask as any).currentKpi,
+          department: updatedTask.department,
+          progress: updatedTask.progress,
+          status: updatedTask.status,
+          start_date: (updatedTask as any).startDate,
+          completed_date: updatedTask.completedDate,
+          team: updatedTask.team,
+          assignee: updatedTask.assignee
+        };
 
-      if (originalTask.status !== updatedTask.status) {
-        changes.push(`상태: "${originalTask.status}" → "${updatedTask.status}"`);
-      }
-      if (originalTask.assignee !== updatedTask.assignee) {
-        changes.push(`담당자: "${originalTask.assignee || '미할당'}" → "${updatedTask.assignee || '미할당'}"`);
-      }
-      if (originalTask.workContent !== updatedTask.workContent) {
-        changes.push(`업무내용 수정`);
-      }
-      if (originalTask.progress !== updatedTask.progress) {
-        changes.push(`진행율: ${originalTask.progress || 0}% → ${updatedTask.progress || 0}%`);
-      }
-      if (originalTask.completedDate !== updatedTask.completedDate) {
-        changes.push(`완료일: "${originalTask.completedDate || '미정'}" → "${updatedTask.completedDate || '미정'}"`);
+        console.log('💾 칸반뷰 - DB 업데이트 데이터:', kpiData);
+
+        // DB에 업데이트
+        await updateKpi(updatedTask.id, kpiData);
+        console.log('✅ 칸반뷰 - DB 업데이트 성공');
+
+        // DB에서 최신 데이터 다시 가져오기
+        if (fetchKpis) {
+          await fetchKpis();
+          console.log('✅ 칸반뷰 - 데이터 새로고침 완료');
+        }
+
+        // 변경로그 추가 - 변경된 필드 확인
+        const changes: string[] = [];
+        const taskCode = updatedTask.code || `TASK-${updatedTask.id}`;
+
+        if (originalTask.status !== updatedTask.status) {
+          changes.push(`상태: "${getStatusName(originalTask.status)}" → "${getStatusName(updatedTask.status)}"`);
+        }
+        if (originalTask.assignee !== updatedTask.assignee) {
+          changes.push(`담당자: "${originalTask.assignee || '미할당'}" → "${updatedTask.assignee || '미할당'}"`);
+        }
+        if (originalTask.workContent !== updatedTask.workContent) {
+          changes.push(`업무내용 수정`);
+        }
+        if (originalTask.progress !== updatedTask.progress) {
+          changes.push(`진행율: ${originalTask.progress || 0}% → ${updatedTask.progress || 0}%`);
+        }
+        if (originalTask.completedDate !== updatedTask.completedDate) {
+          changes.push(`완료일: "${originalTask.completedDate || '미정'}" → "${updatedTask.completedDate || '미정'}"`);
+        }
+
+        if (changes.length > 0) {
+          addChangeLog(
+            '업무 정보 수정',
+            taskCode,
+            `${updatedTask.workContent || '업무'} - ${changes.join(', ')}`,
+            updatedTask.team || '미분류'
+          );
+        }
       }
 
-      if (changes.length > 0) {
-        addChangeLog(
-          '업무 정보 수정',
-          taskCode,
-          `${updatedTask.workContent || '업무'} - ${changes.join(', ')}`,
-          updatedTask.team || '미분류'
-        );
-      }
+      handleEditDialogClose();
+    } catch (error) {
+      console.error('❌ 칸반뷰 - Task 저장 실패:', error);
+      alert('업무 정보 저장에 실패했습니다.');
     }
-
-    handleEditDialogClose();
   };
 
   // 드래그 종료 핸들러
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveTask(null);
     setIsDraggingState(false);
@@ -245,21 +333,47 @@ function KanbanView({
     if (!over) return;
 
     const taskId = active.id;
-    const newStatus = over.id as TaskStatus;
+    const newStatusName = over.id as TaskStatus; // '대기', '진행', '완료', '홀딩'
 
     // 상태가 변경된 경우만 업데이트
     const currentTask = tasks.find((task) => task.id === taskId);
-    if (currentTask && currentTask.status !== newStatus) {
-      const oldStatus = currentTask.status;
+    if (currentTask) {
+      const currentStatusName = getStatusName(currentTask.status);
 
-      setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: newStatus } : task)));
+      // 상태명이 다른 경우만 업데이트
+      if (currentStatusName !== newStatusName) {
+        const oldStatus = currentTask.status;
+        const oldStatusName = currentStatusName;
 
-      // 변경로그 추가
-      const taskCode = currentTask.code || `TASK-${taskId}`;
-      const workContent = currentTask.workContent || '업무내용 없음';
-      const description = `${workContent} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
+        console.log('📝 칸반뷰 - KPI 상태 업데이트 중:', {
+          taskId,
+          oldStatus,
+          oldStatusName,
+          newStatusName
+        });
 
-      addChangeLog('업무 상태 변경', taskCode, description, currentTask.team || '미분류');
+        // DB에 업데이트 (상태명 그대로 저장)
+        try {
+          await updateKpi(taskId as number, { status: newStatusName });
+          console.log('✅ 칸반뷰 - DB 업데이트 성공');
+
+          // DB에서 최신 데이터 다시 가져오기
+          if (fetchKpis) {
+            await fetchKpis();
+            console.log('✅ 칸반뷰 - 드래그 후 데이터 새로고침 완료');
+          }
+
+          // 변경로그 추가
+          const taskCode = currentTask.code || `TASK-${taskId}`;
+          const workContent = currentTask.workContent || '업무내용 없음';
+          const description = `${workContent} 상태를 "${oldStatusName}"에서 "${newStatusName}"로 변경`;
+
+          addChangeLog('수정', taskCode, description, currentTask.team || '미분류');
+        } catch (error) {
+          console.error('❌ 칸반뷰 - DB 업데이트 실패:', error);
+          alert('상태 업데이트에 실패했습니다.');
+        }
+      }
     }
   };
 
@@ -273,7 +387,7 @@ function KanbanView({
 
   // 상태별 아이템 가져오기
   const getItemsByStatus = (status: string) => {
-    return filteredData.filter((item) => item.status === status);
+    return filteredData.filter((item) => getStatusName(item.status) === status);
   };
 
   // 팀별 색상 매핑 (데이터 테이블과 동일)
@@ -340,9 +454,10 @@ function KanbanView({
   };
 
   // 드래그 가능한 카드 컴포넌트 (사양에 맞춰 완전히 새로 작성)
-  function DraggableCard({ task }: { task: TaskTableData }) {
+  function DraggableCard({ task, canEditOwn = true, canEditOthers = true }: { task: TaskTableData; canEditOwn?: boolean; canEditOthers?: boolean }) {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-      id: task.id
+      id: task.id,
+      disabled: !(canEditOthers || (canEditOwn && isDataOwner(task)))
     });
 
     const style = transform
@@ -385,8 +500,8 @@ function KanbanView({
       >
         {/* 1. 상태 태그 영역 */}
         <div className="status-tags">
-          <span className="status-tag" style={getStatusTagStyle(task.status)}>
-            {task.status}
+          <span className="status-tag" style={getStatusTagStyle(getStatusName(task.status))}>
+            {getStatusName(task.status)}
           </span>
           <span className="incident-type-tag">{task.team || '일반'}</span>
         </div>
@@ -417,7 +532,7 @@ function KanbanView({
               <span className="progress-text">진행도</span>
               <span className="progress-stage">
                 {(() => {
-                  const progress = task.progress || getProgressFromStatus(task.status);
+                  const progress = task.progress || getProgressFromStatus(getStatusName(task.status));
                   if (progress >= 80) return '근본 개선';
                   if (progress >= 60) return '즉시 해결';
                   if (progress >= 40) return '개선 조치 중';
@@ -426,10 +541,10 @@ function KanbanView({
                 })()}
               </span>
             </div>
-            <span className="progress-percentage">{task.progress || getProgressFromStatus(task.status)}%</span>
+            <span className="progress-percentage">{task.progress || getProgressFromStatus(getStatusName(task.status))}%</span>
           </div>
           <div className="progress-bar">
-            <div className="progress-fill" style={{ width: `${task.progress || getProgressFromStatus(task.status)}%` }} />
+            <div className="progress-fill" style={{ width: `${task.progress || getProgressFromStatus(getStatusName(task.status))}%` }} />
           </div>
         </div>
 
@@ -754,7 +869,7 @@ function KanbanView({
             return (
               <DroppableColumn key={column.key} column={column}>
                 {items.map((item) => (
-                  <DraggableCard key={item.id} task={item} />
+                  <DraggableCard key={item.id} task={item} canEditOwn={canEditOwn} canEditOthers={canEditOthers} />
                 ))}
 
                 {/* 빈 칼럼 메시지 */}
@@ -778,7 +893,7 @@ function KanbanView({
           })}
         </div>
 
-        <DragOverlay>{activeTask ? <DraggableCard task={activeTask} /> : null}</DragOverlay>
+        <DragOverlay>{activeTask ? <DraggableCard task={activeTask} canEditOwn={canEditOwn} canEditOthers={canEditOthers} /> : null}</DragOverlay>
       </DndContext>
 
       {/* Task 편집 다이얼로그 */}
@@ -794,6 +909,9 @@ function KanbanView({
           statusColors={taskStatusColors}
           teams={teams}
           tasks={tasks}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>
@@ -834,8 +952,8 @@ function MonthlyScheduleView({
     // 담당자 필터
     if (selectedAssignee !== '전체' && task.assignee !== selectedAssignee) return false;
 
-    // 상태 필터
-    if (selectedStatus !== '전체' && task.status !== selectedStatus) return false;
+    // 상태 필터 (상태명으로 비교)
+    if (selectedStatus !== '전체' && getStatusName(task.status) !== selectedStatus) return false;
 
     return true;
   });
@@ -920,7 +1038,7 @@ function MonthlyScheduleView({
             {/* 월 헤더 - 상반기 */}
             {monthNames.slice(0, 6).map((month, index) => (
               <Box
-                key={index}
+                key={`month-header-first-${index}`}
                 sx={{
                   py: 1.5,
                   px: 1,
@@ -945,7 +1063,7 @@ function MonthlyScheduleView({
 
               return (
                 <Box
-                  key={monthIndex}
+                  key={`month-content-first-${monthIndex}`}
                   sx={{
                     borderRight: monthIndex < 5 ? '1px solid' : 'none',
                     borderColor: 'divider',
@@ -986,7 +1104,7 @@ function MonthlyScheduleView({
 
                     return (
                       <Box
-                        key={item.id}
+                        key={`month-${monthIndex}-item-${item.id}`}
                         onClick={() => onCardClick(item)}
                         sx={{
                           mb: itemIndex < items.length - 1 ? 0.8 : 0,
@@ -1047,7 +1165,7 @@ function MonthlyScheduleView({
             {/* 월 헤더 - 하반기 */}
             {monthNames.slice(6, 12).map((month, index) => (
               <Box
-                key={index + 6}
+                key={`month-header-second-${index}`}
                 sx={{
                   py: 1.5,
                   px: 1,
@@ -1073,7 +1191,7 @@ function MonthlyScheduleView({
 
               return (
                 <Box
-                  key={monthIndex}
+                  key={`month-content-second-${index}`}
                   sx={{
                     borderRight: index < 5 ? '1px solid' : 'none',
                     borderColor: 'divider',
@@ -1114,7 +1232,7 @@ function MonthlyScheduleView({
 
                     return (
                       <Box
-                        key={item.id}
+                        key={`month-second-${index}-item-${item.id}`}
                         onClick={() => onCardClick(item)}
                         sx={{
                           mb: itemIndex < items.length - 1 ? 0.8 : 0,
@@ -1667,13 +1785,13 @@ function DashboardView({
   const getStatusColor = (status: string) => {
     switch (status) {
       case '대기':
-        return '#ED8936';
+        return '#90A4AE';
       case '진행':
-        return '#4267B2';
+        return '#7986CB';
       case '완료':
-        return '#4A5568';
+        return '#81C784';
       case '홀딩':
-        return '#E53E3E';
+        return '#E57373';
       default:
         return '#9e9e9e';
     }
@@ -1845,7 +1963,7 @@ function DashboardView({
         text: '업무 건수'
       }
     },
-    colors: ['#ED8936', '#4267B2', '#4A5568', '#E53E3E'],
+    colors: ['#90A4AE', '#7986CB', '#81C784', '#E57373'],
     legend: {
       position: 'top',
       horizontalAlign: 'right'
@@ -2006,7 +2124,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#48C4B7',
+              background: '#26C6DA',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -2030,7 +2148,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#4A5568',
+              background: '#90A4AE',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -2054,7 +2172,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#4267B2',
+              background: '#7986CB',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -2078,7 +2196,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#E53E3E',
+              background: '#81C784',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -2102,7 +2220,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#ED8936',
+              background: '#E57373',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -2424,6 +2542,9 @@ export default function KpiManagement() {
   // 사용자 정보
   const { data: session } = useSession();
   const { user: currentUser } = useUser();
+
+  // 🔐 권한 관리
+  const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers, loading: permissionLoading } = useMenuPermission('/apps/kpi');
 
   // 변경로그탭이 활성화될 때 데이터 강제 새로고침
   React.useEffect(() => {
@@ -2901,7 +3022,29 @@ export default function KpiManagement() {
             </Box>
           </Box>
 
-          {/* 탭 네비게이션 및 필터 */}
+          {/* 권한 체크: 카테고리 보기만 있는 경우 */}
+          {canViewCategory && !canReadData ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 대한 데이터 조회 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              {/* 탭 네비게이션 및 필터 */}
           <Box
             sx={{
               borderBottom: 1,
@@ -3156,6 +3299,9 @@ export default function KpiManagement() {
                   users={users}
                   onDeleteKpis={deleteKpis}
                   onSaveKpi={handleEditTaskSave}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                 />
               </Box>
             </TabPanel>
@@ -3196,12 +3342,16 @@ export default function KpiManagement() {
                   tasks={tasks}
                   setTasks={setTasks}
                   addChangeLog={addChangeLog}
+                  fetchKpis={fetchKpis}
                   assigneeList={users.filter((user) => user.status === 'active')}
                   assignees={assignees}
                   assigneeAvatars={assigneeAvatars}
                   taskStatusOptions={taskStatusOptions}
                   taskStatusColors={taskStatusColors}
                   teams={teams}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                 />
               </Box>
             </TabPanel>
@@ -3324,6 +3474,8 @@ export default function KpiManagement() {
               </Box>
             </TabPanel>
           </Box>
+          </>
+          )}
         </CardContent>
       </Card>
 
@@ -3340,6 +3492,9 @@ export default function KpiManagement() {
           statusColors={taskStatusColors}
           teams={teams}
           tasks={tasks}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>

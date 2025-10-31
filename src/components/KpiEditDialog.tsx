@@ -239,6 +239,45 @@ const OverviewTab = memo(
       fetchMasterCodeData();
     }, [supabaseClient]);
 
+    // 마스터코드 로드 후 taskState의 서브코드를 서브코드명으로 변환
+    useEffect(() => {
+      if (managementCategoriesFromDB.length > 0 && taskState.managementCategory) {
+        // "GROUP040-SUB002" 형식이면 서브코드명으로 변환
+        if (taskState.managementCategory.includes('GROUP040-')) {
+          const subcode = taskState.managementCategory.split('-')[1];
+          const found = managementCategoriesFromDB.find(m => m.subcode === subcode);
+          if (found) {
+            console.log('🔄 [KPI] 관리분류 변환:', taskState.managementCategory, '→', found.subcode_name);
+            onFieldChange('managementCategory', found.subcode_name);
+          }
+        }
+      }
+
+      if (departmentsFromDB.length > 0 && taskState.department) {
+        // "GROUP031-SUB002" 형식이면 서브코드명으로 변환
+        if (taskState.department.includes('GROUP031-')) {
+          const subcode = taskState.department.split('-')[1];
+          const found = departmentsFromDB.find(d => d.subcode === subcode);
+          if (found) {
+            console.log('🔄 [KPI] 업무분류 변환:', taskState.department, '→', found.subcode_name);
+            onFieldChange('department', found.subcode_name);
+          }
+        }
+      }
+
+      if (statusTypesFromDB.length > 0 && taskState.status) {
+        // "GROUP002-SUB001" 형식이면 서브코드명으로 변환
+        if (taskState.status.includes('GROUP002-')) {
+          const subcode = taskState.status.split('-')[1];
+          const found = statusTypesFromDB.find(s => s.subcode === subcode);
+          if (found) {
+            console.log('🔄 [KPI] 상태 변환:', taskState.status, '→', found.subcode_name);
+            onFieldChange('status', found.subcode_name);
+          }
+        }
+      }
+    }, [managementCategoriesFromDB, departmentsFromDB, statusTypesFromDB, taskState.managementCategory, taskState.department, taskState.status, onFieldChange]);
+
     // users 배열 상태 로그
     console.log('👥 [KPI OverviewTab] users 배열:', {
       count: users?.length || 0,
@@ -601,13 +640,13 @@ const OverviewTab = memo(
                 notched
                 renderValue={(selected) => {
                   if (!selected) return '선택';
-                  const item = managementCategoriesFromDB.find(m => m.subcode === selected);
+                  const item = managementCategoriesFromDB.find(m => m.subcode_name === selected);
                   return item ? item.subcode_name : selected;
                 }}
               >
                 <MenuItem value="">선택</MenuItem>
                 {managementCategoriesFromDB.map((option) => (
-                  <MenuItem key={option.subcode} value={option.subcode}>
+                  <MenuItem key={option.subcode} value={option.subcode_name}>
                     {option.subcode_name}
                   </MenuItem>
                 ))}
@@ -658,13 +697,13 @@ const OverviewTab = memo(
                 notched
                 renderValue={(selected) => {
                   if (!selected) return '선택';
-                  const item = departmentsFromDB.find(d => d.subcode === selected);
+                  const item = departmentsFromDB.find(d => d.subcode_name === selected);
                   return item ? item.subcode_name : selected;
                 }}
               >
                 <MenuItem value="">선택</MenuItem>
                 {departmentsFromDB.map((option) => (
-                  <MenuItem key={option.subcode} value={option.subcode}>
+                  <MenuItem key={option.subcode} value={option.subcode_name}>
                     {option.subcode_name}
                   </MenuItem>
                 ))}
@@ -701,7 +740,7 @@ const OverviewTab = memo(
                 notched
                 renderValue={(selected) => {
                   if (!selected) return '';
-                  const item = statusTypesFromDB.find(s => s.subcode === selected);
+                  const item = statusTypesFromDB.find(s => s.subcode_name === selected);
                   const displayName = item ? item.subcode_name : selected;
 
                   const getStatusColor = (statusName: string) => {
@@ -754,7 +793,7 @@ const OverviewTab = memo(
                   };
 
                   return (
-                    <MenuItem key={option.subcode} value={option.subcode}>
+                    <MenuItem key={option.subcode} value={option.subcode_name}>
                       <Chip
                         label={option.subcode_name}
                         size="small"
@@ -2192,7 +2231,8 @@ const PlanTab = memo(
     setEditingProgressValue,
     departments = [],
     users = [],
-    priorityOptions = []
+    priorityOptions = [],
+    canEdit = true
   }: any) => {
     // 필터 및 뷰 모드 상태 관리
     const [filter, setFilter] = useState<string>('all');
@@ -3377,8 +3417,15 @@ const PlanTab = memo(
           <Button
             variant="contained"
             onClick={onAddChecklistItem}
-            disabled={viewMode === 'gantt' || !newChecklistText.trim()}
-            sx={{ minWidth: '80px', height: '40px' }}
+            disabled={viewMode === 'gantt' || !newChecklistText.trim() || !canEdit}
+            sx={{
+              minWidth: '80px',
+              height: '40px',
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
           >
             등록
           </Button>
@@ -3453,7 +3500,7 @@ const PlanTab = memo(
 
 PlanTab.displayName = 'PlanTab';
 // 자료 탭 컴포넌트 (DB 기반)
-const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | string; currentUser?: any }) => {
+const MaterialTab = memo(({ recordId, currentUser, canEdit = true }: { recordId?: number | string; currentUser?: any; canEdit?: boolean }) => {
   const {
     files,
     loading: filesLoading,
@@ -3607,26 +3654,37 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
             p: 3,
             textAlign: 'center',
             borderStyle: 'dashed',
-            borderColor: 'primary.main',
-            backgroundColor: 'primary.50',
-            cursor: 'pointer',
+            borderColor: canEdit ? 'primary.main' : 'grey.300',
+            backgroundColor: canEdit ? 'primary.50' : 'grey.100',
+            cursor: canEdit ? 'pointer' : 'not-allowed',
             transition: 'all 0.2s ease-in-out',
-            '&:hover': {
+            '&:hover': canEdit ? {
               borderColor: 'primary.dark',
               backgroundColor: 'primary.100'
-            }
+            } : {}
           }}
-          onClick={handleUploadClick}
+          onClick={canEdit ? handleUploadClick : undefined}
         >
           <Stack spacing={2} alignItems="center">
             <Typography fontSize="48px">📁</Typography>
-            <Typography variant="h6" color="primary.main">
+            <Typography variant="h6" color={canEdit ? 'primary.main' : 'grey.500'}>
               파일을 업로드하세요
             </Typography>
             <Typography variant="body2" color="text.secondary">
               클릭하거나 파일을 여기로 드래그하세요
             </Typography>
-            <Button variant="contained" size="small" startIcon={<Typography>📤</Typography>} disabled={isUploading}>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<Typography>📤</Typography>}
+              disabled={isUploading || !recordId || !canEdit}
+              sx={{
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               {isUploading ? '업로드 중...' : '파일 선택'}
             </Button>
           </Stack>
@@ -3741,7 +3799,13 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                           size="small"
                           onClick={() => handleEditMaterial(String(file.id), file.file_name)}
                           color="primary"
-                          sx={{ p: 0.5 }}
+                          disabled={!canEdit}
+                          sx={{
+                            p: 0.5,
+                            '&.Mui-disabled': {
+                              color: 'grey.400'
+                            }
+                          }}
                           title="수정"
                         >
                           <Typography fontSize="14px">✏️</Typography>
@@ -3750,9 +3814,14 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                           size="small"
                           onClick={() => handleDeleteMaterial(String(file.id))}
                           color="error"
-                          sx={{ p: 0.5 }}
+                          disabled={isDeleting || !(canEditOwn || canEditOthers)}
+                          sx={{
+                            p: 0.5,
+                            '&.Mui-disabled': {
+                              color: 'grey.400'
+                            }
+                          }}
                           title="삭제"
-                          disabled={isDeleting}
                         >
                           <Typography fontSize="14px">🗑️</Typography>
                         </IconButton>
@@ -3810,10 +3879,28 @@ interface TaskEditDialogProps {
   statusColors: Record<TaskStatus, any>;
   tasks: TaskTableData[];
   teams: string[];
+  // 🔐 권한 관리
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 const TaskEditDialog = memo(
-  ({ open, onClose, task, onSave, assignees, assigneeAvatars, statusOptions, statusColors, tasks, teams }: TaskEditDialogProps) => {
+  ({
+    open,
+    onClose,
+    task,
+    onSave,
+    assignees,
+    assigneeAvatars,
+    statusOptions,
+    statusColors,
+    tasks,
+    teams,
+    canCreateData = true,
+    canEditOwn = true,
+    canEditOthers = true
+  }: TaskEditDialogProps) => {
     // 성능 모니터링
     // const { renderCount, logStats } = usePerformanceMonitor('TaskEditDialog');
 
@@ -4135,6 +4222,17 @@ const TaskEditDialog = memo(
       });
       return foundUser;
     }, [session, users]);
+
+    // 데이터 소유자 확인 함수
+    const isOwner = useMemo(() => {
+      if (!currentUser || !task) return false;
+      // createdBy 또는 assignee 중 하나라도 현재 사용자와 일치하면 소유자
+      return task.createdBy === currentUser.user_name ||
+             task.assignee === currentUser.user_name;
+    }, [currentUser, task]);
+
+    // 편집 가능 여부
+    const canEdit = canEditOthers || (canEditOwn && isOwner);
 
     // 팀을 로그인한 사용자의 부서로 자동 설정
     useEffect(() => {
@@ -4924,7 +5022,8 @@ const TaskEditDialog = memo(
         setEditingProgressValue,
         departments,
         users,
-        priorityOptions
+        priorityOptions,
+        canEdit
       }),
       [
         checklistItems,
@@ -4955,7 +5054,8 @@ const TaskEditDialog = memo(
         editingProgressValue,
         departments,
         users,
-        priorityOptions
+        priorityOptions,
+        canEdit
       ]
     );
 
@@ -5035,11 +5135,36 @@ const TaskEditDialog = memo(
           </Box>
 
           {/* 취소, 저장 버튼을 오른쪽 상단으로 이동 */}
+          {/* 🔐 권한 체크: 새 KPI(task === null)는 canCreateData, 기존 KPI는 canEdit */}
           <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-            <Button onClick={handleClose} variant="outlined" size="small" sx={{ minWidth: '60px' }}>
+            <Button
+              onClick={handleClose}
+              variant="outlined"
+              size="small"
+              disabled={!task ? !canCreateData : !canEdit}
+              sx={{
+                minWidth: '60px',
+                '&.Mui-disabled': {
+                  borderColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               취소
             </Button>
-            <Button onClick={handleSave} variant="contained" size="small" sx={{ minWidth: '60px' }}>
+            <Button
+              onClick={handleSave}
+              variant="contained"
+              size="small"
+              disabled={!task ? !canCreateData : !canEdit}
+              sx={{
+                minWidth: '60px',
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               저장
             </Button>
           </Box>
@@ -5060,7 +5185,7 @@ const TaskEditDialog = memo(
           {editTab === 1 && <PlanTab {...planTabProps} />}
           {editTab === 2 && <PerformanceTab {...performanceTabProps} />}
           {editTab === 3 && <RecordTab {...recordTabProps} />}
-          {editTab === 4 && <MaterialTab recordId={task?.id} currentUser={user} />}
+          {editTab === 4 && <MaterialTab recordId={task?.id} currentUser={user} canEdit={canEdit} />}
         </DialogContent>
 
         {/* 에러 메시지 표시 */}

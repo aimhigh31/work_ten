@@ -58,6 +58,8 @@ import { useSession } from 'next-auth/react';
 import useUser from 'hooks/useUser';
 import { createClient } from '@/lib/supabase/client';
 import { startPageLoad, logPageEvent, endPageLoad } from 'utils/performanceLogger';
+import { useSupabaseUsers } from 'hooks/useSupabaseUsers';
+import { useMenuPermission } from 'hooks/usePermissions'; // 권한 관리
 
 // 변경로그 타입 정의 (UI용)
 interface ChangeLog {
@@ -129,6 +131,11 @@ interface KanbanViewProps {
     title?: string
   ) => Promise<void>;
   assigneeList?: any[];
+  kpiData?: any[];
+  // 🔐 권한 관리
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 function KanbanView({
@@ -139,9 +146,31 @@ function KanbanView({
   tasks,
   onUpdateTask,
   addChangeLog,
-  assigneeList
+  assigneeList,
+  kpiData = [],
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: KanbanViewProps) {
   const theme = useTheme();
+
+  // 현재 로그인한 사용자 정보
+  const { data: session } = useSession();
+  const { users } = useSupabaseUsers();
+
+  const currentUser = React.useMemo(() => {
+    if (!session?.user?.email || users.length === 0) return null;
+    const found = users.find((u) => u.email === session.user.email);
+    return found;
+  }, [session, users]);
+
+  // 데이터 소유자 확인 함수
+  const isDataOwner = React.useCallback((task: TaskTableData) => {
+    if (!currentUser) return false;
+    // createdBy 또는 assignee 중 하나라도 현재 사용자와 일치하면 소유자
+    return task.createdBy === currentUser.user_name ||
+           task.assignee === currentUser.user_name;
+  }, [currentUser]);
 
   // 상태 관리
   const [activeTask, setActiveTask] = useState<TaskTableData | null>(null);
@@ -205,8 +234,8 @@ function KanbanView({
 
   // 카드 클릭 핸들러
   const handleCardClick = (task: TaskTableData) => {
-    console.log('🔵 TaskManagement - 다이얼로그 열기 시 kpis:', kpis);
-    console.log('🔵 TaskManagement - 다이얼로그 열기 시 kpis 개수:', kpis?.length);
+    console.log('🔵 TaskManagement - 다이얼로그 열기 시 tasks:', tasks);
+    console.log('🔵 TaskManagement - 다이얼로그 열기 시 tasks 개수:', tasks?.length);
     setEditingTask(task);
     setEditDialog(true);
   };
@@ -389,9 +418,10 @@ function KanbanView({
   };
 
   // 드래그 가능한 카드 컴포넌트 (사양에 맞춰 완전히 새로 작성)
-  function DraggableCard({ task }: { task: TaskTableData }) {
+  function DraggableCard({ task, canEditOwn = true, canEditOthers = true }: { task: TaskTableData; canEditOwn?: boolean; canEditOthers?: boolean }) {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-      id: task.id
+      id: task.id,
+      disabled: !(canEditOthers || (canEditOwn && isDataOwner(task)))
     });
 
     const style = transform
@@ -811,7 +841,7 @@ function KanbanView({
             return (
               <DroppableColumn key={column.key} column={column}>
                 {items.map((item) => (
-                  <DraggableCard key={item.id} task={item} />
+                  <DraggableCard key={item.id} task={item} canEditOwn={canEditOwn} canEditOthers={canEditOthers} />
                 ))}
 
                 {/* 빈 칼럼 메시지 */}
@@ -835,7 +865,7 @@ function KanbanView({
           })}
         </div>
 
-        <DragOverlay>{activeTask ? <DraggableCard task={activeTask} /> : null}</DragOverlay>
+        <DragOverlay>{activeTask ? <DraggableCard task={activeTask} canEditOwn={canEditOwn} canEditOthers={canEditOthers} /> : null}</DragOverlay>
       </DndContext>
 
       {/* Task 편집 다이얼로그 */}
@@ -850,7 +880,10 @@ function KanbanView({
           statusOptions={taskStatusOptions}
           statusColors={taskStatusColors}
           teams={teams}
-          kpiData={kpiTasks}
+          kpiData={kpiData}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>
@@ -985,7 +1018,7 @@ function MonthlyScheduleView({
           {/* 월 헤더 - 상반기 */}
           {monthNames.slice(0, 6).map((month, index) => (
             <Box
-              key={index}
+              key={`month-header-first-${index}`}
               sx={{
                 py: 1.5,
                 px: 1,
@@ -1010,7 +1043,7 @@ function MonthlyScheduleView({
 
             return (
               <Box
-                key={monthIndex}
+                key={`month-content-first-${monthIndex}`}
                 sx={{
                   borderRight: monthIndex < 5 ? '1px solid' : 'none',
                   borderColor: 'divider',
@@ -1050,7 +1083,7 @@ function MonthlyScheduleView({
 
                   return (
                     <Box
-                      key={item.id}
+                      key={`month-${monthIndex}-item-${item.id}`}
                       onClick={() => onCardClick(item)}
                       sx={{
                         mb: itemIndex < items.length - 1 ? 0.8 : 0,
@@ -1111,7 +1144,7 @@ function MonthlyScheduleView({
           {/* 월 헤더 - 하반기 */}
           {monthNames.slice(6, 12).map((month, index) => (
             <Box
-              key={index + 6}
+              key={`month-header-second-${index}`}
               sx={{
                 py: 1.5,
                 px: 1,
@@ -1137,7 +1170,7 @@ function MonthlyScheduleView({
 
             return (
               <Box
-                key={monthIndex}
+                key={`month-content-second-${monthIndex}`}
                 sx={{
                   borderRight: index < 5 ? '1px solid' : 'none',
                   borderColor: 'divider',
@@ -1177,7 +1210,7 @@ function MonthlyScheduleView({
 
                   return (
                     <Box
-                      key={item.id}
+                      key={`month-second-${monthIndex}-item-${item.id}`}
                       onClick={() => onCardClick(item)}
                       sx={{
                         mb: itemIndex < items.length - 1 ? 0.8 : 0,
@@ -1724,13 +1757,13 @@ function DashboardView({
   const getStatusColor = (status: string) => {
     switch (status) {
       case '대기':
-        return { backgroundColor: '#F5F5F5', color: '#757575' };
+        return { backgroundColor: '#90A4AE', color: '#fff' };
       case '진행':
-        return { backgroundColor: '#E3F2FD', color: '#1976D2' };
+        return { backgroundColor: '#7986CB', color: '#fff' };
       case '완료':
-        return { backgroundColor: '#E8F5E9', color: '#388E3C' };
+        return { backgroundColor: '#81C784', color: '#fff' };
       case '홀딩':
-        return { backgroundColor: '#FFEBEE', color: '#D32F2F' };
+        return { backgroundColor: '#E57373', color: '#fff' };
       default:
         return { backgroundColor: '#F5F5F5', color: '#757575' };
     }
@@ -1902,7 +1935,7 @@ function DashboardView({
         text: '업무 건수'
       }
     },
-    colors: ['#ED8936', '#4267B2', '#4A5568', '#E53E3E'],
+    colors: ['#90A4AE', '#7986CB', '#81C784', '#E57373'],
     legend: {
       position: 'top',
       horizontalAlign: 'right'
@@ -2063,7 +2096,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#48C4B7',
+              background: '#26C6DA',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -2087,7 +2120,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#4A5568',
+              background: '#90A4AE',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -2111,7 +2144,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#4267B2',
+              background: '#7986CB',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -2135,7 +2168,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#E53E3E',
+              background: '#81C784',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -2159,7 +2192,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#ED8936',
+              background: '#E57373',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -2470,6 +2503,9 @@ export default function TaskManagement() {
   const searchParams = useSearchParams();
   const [value, setValue] = useState(0);
   const user = useUser(); // 사용자 정보
+
+  // 🔐 권한 관리
+  const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers, loading: permissionLoading } = useMenuPermission('/apps/task');
 
   // 🏪 공용 창고에서 재료 가져오기 (즉시 사용 가능!)
   const { users, departments, masterCodes, isLoading: commonDataLoading } = useCommonData();
@@ -2813,8 +2849,8 @@ export default function TaskManagement() {
 
   // 카드 클릭 핸들러
   const handleCardClick = (task: TaskTableData) => {
-    console.log('🔵 TaskManagement - 다이얼로그 열기 시 kpis:', kpis);
-    console.log('🔵 TaskManagement - 다이얼로그 열기 시 kpis 개수:', kpis?.length);
+    console.log('🔵 TaskManagement - 다이얼로그 열기 시 tasks:', tasks);
+    console.log('🔵 TaskManagement - 다이얼로그 열기 시 tasks 개수:', tasks?.length);
     setEditingTask(task);
     setEditDialog(true);
   };
@@ -3146,18 +3182,40 @@ export default function TaskManagement() {
             </Box>
           </Box>
 
-          {/* 탭 네비게이션 및 필터 */}
-          <Box
-            sx={{
-              borderBottom: 1,
-              borderColor: 'divider',
-              flexShrink: 0,
-              mt: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}
-          >
+          {/* 권한 체크: 카테고리 보기만 있는 경우 */}
+          {canViewCategory && !canReadData ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 대한 데이터 조회 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              {/* 탭 네비게이션 및 필터 */}
+              <Box
+                sx={{
+                  borderBottom: 1,
+                  borderColor: 'divider',
+                  flexShrink: 0,
+                  mt: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}
+              >
             <Tabs
               value={value}
               onChange={handleChange}
@@ -3402,6 +3460,9 @@ export default function TaskManagement() {
                   onDeleteTasks={handleDeleteTasks}
                   onAddTask={handleAddTask}
                   addChangeLog={addChangeLog}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                 />
               </Box>
             </TabPanel>
@@ -3443,6 +3504,10 @@ export default function TaskManagement() {
                   onUpdateTask={handleUpdateTask}
                   addChangeLog={addChangeLog}
                   assigneeList={users.filter((user) => user.status === 'active')}
+                  kpiData={kpiTasks}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                 />
               </Box>
             </TabPanel>
@@ -3565,6 +3630,8 @@ export default function TaskManagement() {
               </Box>
             </TabPanel>
           </Box>
+          </>
+          )}
         </CardContent>
       </Card>
 
@@ -3581,6 +3648,9 @@ export default function TaskManagement() {
           statusColors={taskStatusColors}
           teams={teams}
           kpiData={kpiTasks}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>

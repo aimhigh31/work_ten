@@ -1008,7 +1008,7 @@ const RecordTab = memo(
 RecordTab.displayName = 'RecordTab';
 
 // 자료 탭 컴포넌트 - DB 기반 파일 관리
-const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | string; currentUser?: any }) => {
+const MaterialTab = memo(({ recordId, currentUser, canEditOwn = true, canEditOthers = true, canEdit = true }: { recordId?: number | string; currentUser?: any; canEditOwn?: boolean; canEditOthers?: boolean; canEdit?: boolean }) => {
   const {
     files,
     loading: filesLoading,
@@ -1026,7 +1026,7 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
   const handleFileUpload = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
       if (!recordId) {
-        alert('파일을 업로드하려면 먼저 Education를 저장해주세요.');
+        setValidationError('파일을 업로드하려면 먼저 Education를 저장해주세요.');
         return;
       }
 
@@ -1043,7 +1043,7 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
         });
 
         if (!result.success) {
-          alert(`파일 업로드 실패: ${result.error}`);
+          setValidationError(`파일 업로드 실패: ${result.error}`);
         }
       });
 
@@ -1073,7 +1073,7 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
       setEditingMaterialText('');
     } catch (error) {
       console.error('파일명 수정 실패:', error);
-      alert('파일명 수정에 실패했습니다.');
+      setValidationError('파일명 수정에 실패했습니다.');
     }
   }, [editingMaterialText, editingMaterialId, updateFile]);
 
@@ -1090,7 +1090,7 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
         await deleteFile(fileId);
       } catch (error) {
         console.error('파일 삭제 실패:', error);
-        alert('파일 삭제에 실패했습니다.');
+        setValidationError('파일 삭제에 실패했습니다.');
       }
     },
     [deleteFile]
@@ -1110,13 +1110,13 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('파일 다운로드 실패:', error);
-      alert('파일 다운로드에 실패했습니다.');
+      setValidationError('파일 다운로드에 실패했습니다.');
     }
   }, []);
 
   const handleUploadClick = useCallback(() => {
     if (!recordId) {
-      alert('파일을 업로드하려면 먼저 Education를 저장해주세요.');
+      setValidationError('파일을 업로드하려면 먼저 Education를 저장해주세요.');
       return;
     }
     fileInputRef.current?.click();
@@ -1156,26 +1156,37 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
             p: 3,
             textAlign: 'center',
             borderStyle: 'dashed',
-            borderColor: 'primary.main',
-            backgroundColor: 'primary.50',
-            cursor: 'pointer',
+            borderColor: canEdit ? 'primary.main' : 'grey.300',
+            backgroundColor: canEdit ? 'primary.50' : 'grey.100',
+            cursor: canEdit ? 'pointer' : 'not-allowed',
             transition: 'all 0.2s ease-in-out',
-            '&:hover': {
+            '&:hover': canEdit ? {
               borderColor: 'primary.dark',
               backgroundColor: 'primary.100'
-            }
+            } : {}
           }}
-          onClick={handleUploadClick}
+          onClick={canEdit ? handleUploadClick : undefined}
         >
           <Stack spacing={2} alignItems="center">
             <Typography fontSize="48px">📁</Typography>
-            <Typography variant="h6" color="primary.main">
+            <Typography variant="h6" color={canEdit ? 'primary.main' : 'grey.500'}>
               {isUploading ? '파일 업로드 중...' : '파일을 업로드하세요'}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               클릭하거나 파일을 여기로 드래그하세요
             </Typography>
-            <Button variant="contained" size="small" startIcon={<Typography>📤</Typography>} disabled={isUploading || !recordId}>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<Typography>📤</Typography>}
+              disabled={isUploading || !recordId || !canEdit}
+              sx={{
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               파일 선택
             </Button>
           </Stack>
@@ -1290,7 +1301,13 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                           size="small"
                           onClick={() => handleEditMaterial(file.id, file.file_name)}
                           color="primary"
-                          sx={{ p: 0.5 }}
+                          disabled={!canEdit}
+                          sx={{
+                            p: 0.5,
+                            '&.Mui-disabled': {
+                              color: 'grey.400'
+                            }
+                          }}
                           title="수정"
                         >
                           <Typography fontSize="14px">✏️</Typography>
@@ -1299,9 +1316,14 @@ const MaterialTab = memo(({ recordId, currentUser }: { recordId?: number | strin
                           size="small"
                           onClick={() => handleDeleteMaterial(file.id)}
                           color="error"
-                          sx={{ p: 0.5 }}
+                          disabled={isDeleting || !canEdit}
+                          sx={{
+                            p: 0.5,
+                            '&.Mui-disabled': {
+                              color: 'grey.400'
+                            }
+                          }}
                           title="삭제"
-                          disabled={isDeleting}
                         >
                           <Typography fontSize="14px">🗑️</Typography>
                         </IconButton>
@@ -1358,10 +1380,27 @@ interface EducationEditDialogProps {
   statusOptions: string[];
   statusColors: Record<string, any>;
   teams?: string[];
+  // 🔐 권한 관리
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 const EducationEditDialog = memo(
-  ({ open, onClose, education, onSave, assignees, assigneeAvatars, statusOptions, statusColors, teams }: EducationEditDialogProps) => {
+  ({
+    open,
+    onClose,
+    education,
+    onSave,
+    assignees,
+    assigneeAvatars,
+    statusOptions,
+    statusColors,
+    teams,
+    canCreateData = true,
+    canEditOwn = true,
+    canEditOthers = true
+  }: EducationEditDialogProps) => {
     // 성능 모니터링
     // const { renderCount, logStats } = usePerformanceMonitor('EducationEditDialog');
 
@@ -1384,6 +1423,17 @@ const EducationEditDialog = memo(
       return foundUser;
     }, [session, users]);
 
+    // 데이터 소유자 확인 함수
+    const isOwner = useMemo(() => {
+      if (!currentUser || !education) return false;
+      // createdBy 또는 assignee 중 하나라도 현재 사용자와 일치하면 소유자
+      return education.createdBy === currentUser.user_name ||
+             education.assignee === currentUser.user_name;
+    }, [currentUser, education]);
+
+    // 편집 가능 여부
+    const canEdit = canEditOthers || (canEditOwn && isOwner);
+
     // 피드백 훅 사용 (DB 연동)
     const {
       feedbacks,
@@ -1403,6 +1453,7 @@ const EducationEditDialog = memo(
 
     const [editTab, setEditTab] = useState(0);
     const [draggedItemId, setDraggedItemId] = useState<number | null>(null);
+    const [validationError, setValidationError] = useState<string>('');
     const [educationState, dispatch] = useReducer(editEducationReducer, {
       customerName: '',
       companyName: '',
@@ -1513,9 +1564,6 @@ const EducationEditDialog = memo(
     const [newComment, setNewComment] = useState('');
     const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
     const [editingCommentText, setEditingCommentText] = useState('');
-
-    // 에러 상태
-    const [validationError, setValidationError] = useState<string>('');
 
     // Education 변경 시 상태 업데이트
     React.useEffect(() => {
@@ -1639,7 +1687,9 @@ const EducationEditDialog = memo(
             responseContent: currentValues.responseContent,
             resolutionDate: educationState.resolutionDate,
             satisfactionScore: null,
-            attachments: []
+            attachments: [],
+            createdBy: currentUser?.user_name || '',
+            updatedBy: currentUser?.user_name || ''
           };
 
           console.log('🚀 새 Education 생성 중:', newEducation);
@@ -1657,7 +1707,8 @@ const EducationEditDialog = memo(
             status: educationState.status,
             priority: educationState.priority,
             responseContent: currentValues.responseContent,
-            resolutionDate: educationState.resolutionDate
+            resolutionDate: educationState.resolutionDate,
+            updatedBy: currentUser?.user_name || ''
           };
 
           console.log('📝 기존 Education 수정 중:', updatedEducation);
@@ -1823,11 +1874,36 @@ const EducationEditDialog = memo(
           </Box>
 
           {/* 취소, 저장 버튼을 오른쪽 상단으로 이동 */}
+          {/* 🔐 권한 체크: 새 개인교육관리(education === null)는 canCreateData, 기존 개인교육관리는 canEdit */}
           <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-            <Button onClick={handleClose} variant="outlined" size="small" sx={{ minWidth: '60px' }}>
+            <Button
+              onClick={handleClose}
+              variant="outlined"
+              size="small"
+              disabled={!education ? !canCreateData : !canEdit}
+              sx={{
+                minWidth: '60px',
+                '&.Mui-disabled': {
+                  borderColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               취소
             </Button>
-            <Button onClick={handleSave} variant="contained" size="small" sx={{ minWidth: '60px' }}>
+            <Button
+              onClick={handleSave}
+              variant="contained"
+              size="small"
+              disabled={!education ? !canCreateData : !canEdit}
+              sx={{
+                minWidth: '60px',
+                '&.Mui-disabled': {
+                  backgroundColor: 'grey.300',
+                  color: 'grey.500'
+                }
+              }}
+            >
               저장
             </Button>
           </Box>
@@ -1841,10 +1917,19 @@ const EducationEditDialog = memo(
           </Tabs>
         </Box>
 
-        <DialogContent sx={{ p: 1, pt: 1 }}>
+        <DialogContent
+          sx={{
+            p: 1,
+            pt: 1,
+            pb: 1,
+            height: 'calc(840px - 80px - 60px)',
+            maxHeight: 'calc(840px - 80px - 60px)',
+            overflow: 'auto'
+          }}
+        >
           {editTab === 0 && <OverviewTab {...overviewTabProps} />}
           {editTab === 1 && <RecordTab {...recordTabProps} />}
-          {editTab === 2 && <MaterialTab recordId={education?.id} currentUser={currentUser} />}
+          {editTab === 2 && <MaterialTab recordId={education?.id} currentUser={currentUser} canEditOwn={canEditOwn} canEditOthers={canEditOthers} canEdit={canEdit} />}
         </DialogContent>
 
         {/* 에러 메시지 표시 */}

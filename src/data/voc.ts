@@ -277,12 +277,12 @@ export const vocData: VOCData[] = [
   }
 ];
 
-// 상태별 색상 매핑
+// 상태별 색상 매핑 (DB 실제 값에 맞게 수정)
 const statusColors = {
-  접수: '#FFF3E0',
-  진행중: '#E3F2FD',
+  대기: '#FFF3E0',
+  진행: '#E3F2FD',
   완료: '#E8F5E8',
-  보류: '#FCE4EC'
+  홀딩: '#FCE4EC'
 } as const;
 
 // 팀 색상 매핑
@@ -304,8 +304,8 @@ const requestTypeColors = {
 // 팀 목록
 export const teams = ['개발팀', '디자인팀', '기획팀', '마케팅팀'] as const;
 
-// 상태 옵션 목록
-export const vocStatusOptions = ['접수', '진행중', '완료', '보류'] as const;
+// 상태 옵션 목록 (DB 실제 값에 맞게 수정)
+export const vocStatusOptions = ['대기', '진행', '완료', '홀딩'] as const;
 
 // 요청유형 옵션 목록
 export const requestTypeOptions = ['기능개선', '오류신고', '문의', '기타'] as const;

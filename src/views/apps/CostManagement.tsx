@@ -54,6 +54,7 @@ import { ChangeLogData } from 'types/changelog';
 import { createClient } from '@/lib/supabase/client';
 import { useSession } from 'next-auth/react';
 import useUser from 'hooks/useUser';
+import { useMenuPermission } from '../../hooks/usePermissions';
 
 // Icons
 import { TableDocument, Chart, Calendar, Element, DocumentText } from '@wandersonalwes/iconsax-react';
@@ -126,6 +127,9 @@ interface CostKanbanViewProps {
   ) => void;
   checkCodeExists: (code: string, excludeId?: number) => Promise<boolean>;
   assigneeList?: any[];
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 function CostKanbanView({
@@ -137,8 +141,28 @@ function CostKanbanView({
   updateCostRecord,
   addChangeLog,
   checkCodeExists,
-  assigneeList
+  assigneeList,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: CostKanbanViewProps) {
+  const { data: session } = useSession();
+  const { users } = useCommonData();
+
+  // 현재 로그인한 사용자 정보
+  const currentUser = React.useMemo(() => {
+    if (!session?.user?.email || !users || users.length === 0) return null;
+    const found = users.find((u: any) => u.email === session.user.email);
+    return found;
+  }, [session, users]);
+
+  // 데이터 소유자 확인 함수
+  const isDataOwner = React.useCallback((cost: CostRecord) => {
+    if (!currentUser) return false;
+    const dataOwner = cost.createdBy || cost.assignee;
+    return dataOwner === currentUser.user_name;
+  }, [currentUser]);
+
   const [activeCost, setActiveCost] = useState<CostRecord | null>(null);
   const [isDraggingState, setIsDraggingState] = useState(false);
 
@@ -279,9 +303,16 @@ function CostKanbanView({
   };
 
   // 드래그 가능한 카드 컴포넌트 (사양에 맞춰 완전히 새로 작성)
-  function DraggableCard({ cost }: { cost: CostRecord }) {
+  function DraggableCard({ cost, canEditOwn = true, canEditOthers = true }: { cost: CostRecord; canEditOwn?: boolean; canEditOthers?: boolean }) {
+    // 공통 데이터 가져오기
+    const { masterCodes } = useCommonData();
+
+    // 드래그 가능 여부: canEditOthers가 있거나, canEditOwn이 있고 자신의 데이터인 경우
+    const isDragDisabled = !(canEditOthers || (canEditOwn && isDataOwner(cost)));
+
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-      id: cost.id
+      id: cost.id,
+      disabled: isDragDisabled
     });
 
     const style = transform
@@ -291,6 +322,14 @@ function CostKanbanView({
           cursor: isDragging ? 'grabbing' : 'pointer'
         }
       : { cursor: 'pointer' };
+
+    // 비용유형 서브코드명 변환
+    const getCostTypeName = (subcode: string) => {
+      const found = masterCodes.find(
+        (item) => item.codetype === 'subcode' && item.group_code === 'GROUP027' && item.subcode === subcode && item.is_active
+      );
+      return found ? found.subcode_name : subcode;
+    };
 
     // 상태별 태그 색상 (비용관리 전용)
     const getStatusTagStyle = (status: string) => {
@@ -337,7 +376,7 @@ function CostKanbanView({
           <span className="status-tag" style={getStatusTagStyle(cost.status)}>
             {cost.status}
           </span>
-          <span className="incident-type-tag">{cost.costType || '일반비용'}</span>
+          <span className="incident-type-tag">{cost.costType ? getCostTypeName(cost.costType) : '일반비용'}</span>
         </div>
 
         {/* 2. 카드 제목 */}
@@ -671,7 +710,7 @@ function CostKanbanView({
             return (
               <DroppableColumn key={column.key} column={column}>
                 {items.map((item) => (
-                  <DraggableCard key={item.id} cost={item} />
+                  <DraggableCard key={`kanban-${column.key}-${item.id}`} cost={item} canEditOwn={canEditOwn} canEditOthers={canEditOthers} />
                 ))}
                 {/* 빈 칼럼 메시지 */}
                 {items.length === 0 && (
@@ -706,6 +745,9 @@ function CostKanbanView({
           costs={costs}
           setCosts={() => {}}
           checkCodeExists={checkCodeExists}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
           externalDialogControl={{
             open: editDialog.open,
             recordId: editDialog.recordId,
@@ -842,7 +884,7 @@ function CostMonthlyScheduleView({
             {/* 월 헤더 - 상반기 */}
             {monthNames.slice(0, 6).map((month, index) => (
               <Box
-                key={index}
+                key={`month-header-first-${index}`}
                 sx={{
                   py: 1.5,
                   px: 1,
@@ -867,7 +909,7 @@ function CostMonthlyScheduleView({
 
               return (
                 <Box
-                  key={monthIndex}
+                  key={`month-content-first-${monthIndex}`}
                   sx={{
                     borderRight: monthIndex < 5 ? '1px solid' : 'none',
                     borderColor: 'divider',
@@ -908,7 +950,7 @@ function CostMonthlyScheduleView({
 
                     return (
                       <Box
-                        key={item.id}
+                        key={`month-${monthIndex}-item-${item.id}`}
                         onClick={() => onCardClick(item)}
                         sx={{
                           mb: itemIndex < items.length - 1 ? 0.8 : 0,
@@ -969,7 +1011,7 @@ function CostMonthlyScheduleView({
             {/* 월 헤더 - 하반기 */}
             {monthNames.slice(6, 12).map((month, index) => (
               <Box
-                key={index + 6}
+                key={`month-header-second-${index}`}
                 sx={{
                   py: 1.5,
                   px: 1,
@@ -994,7 +1036,7 @@ function CostMonthlyScheduleView({
 
               return (
                 <Box
-                  key={monthIndex + 6}
+                  key={`month-content-second-${monthIndex}`}
                   sx={{
                     borderRight: monthIndex < 5 ? '1px solid' : 'none',
                     borderColor: 'divider',
@@ -1035,7 +1077,7 @@ function CostMonthlyScheduleView({
 
                     return (
                       <Box
-                        key={item.id}
+                        key={`month-second-${monthIndex}-item-${item.id}`}
                         onClick={() => onCardClick(item)}
                         sx={{
                           mb: itemIndex < items.length - 1 ? 0.8 : 0,
@@ -1106,6 +1148,17 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
+  // 공용 데이터 가져오기
+  const { masterCodes } = useCommonData();
+
+  // 비용유형 서브코드명 변환
+  const getCostTypeName = (subcode: string) => {
+    const found = masterCodes.find(
+      (item) => item.codetype === 'subcode' && item.group_code === 'GROUP027' && item.subcode === subcode && item.is_active
+    );
+    return found ? found.subcode_name : subcode;
+  };
+
   // 날짜 범위 필터링 함수
   const filterByDateRange = (data: CostRecord[]) => {
     if (!startDate && !endDate) {
@@ -1145,6 +1198,17 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
   // 통계 계산
   const totalCount = filteredData.length;
   const totalAmount = filteredData.reduce((sum, item) => sum + item.amount, 0);
+
+  // 상태별 건수 통계
+  const statusCountStats = filteredData.reduce(
+    (acc, item) => {
+      acc[item.status] = (acc[item.status] || 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>
+  );
+
+  // 상태별 금액 통계
   const statusStats = filteredData.reduce(
     (acc, item) => {
       acc[item.status] = (acc[item.status] || 0) + item.amount;
@@ -1156,12 +1220,13 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
   // 비용유형별 통계 (원형차트용)
   const typeStats = filteredData.reduce(
     (acc, item) => {
-      const type = item.costType || '기타';
-      if (!acc[type]) {
-        acc[type] = { count: 0, amount: 0 };
+      const typeSubcode = item.costType || '기타';
+      // 서브코드를 키로 사용 (고유성 보장)
+      if (!acc[typeSubcode]) {
+        acc[typeSubcode] = { count: 0, amount: 0 };
       }
-      acc[type].count++;
-      acc[type].amount += item.amount;
+      acc[typeSubcode].count++;
+      acc[typeSubcode].amount += item.amount;
       return acc;
     },
     {} as Record<string, { count: number; amount: number }>
@@ -1212,8 +1277,9 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
   };
 
   // 라벨과 값 배열 미리 생성
-  const typeLabels = Object.keys(typeStats);
+  const typeLabels = Object.keys(typeStats); // 서브코드 배열
   const typeValues = typeLabels.map((label) => typeStats[label].amount);
+  const typeLabelNames = typeLabels.map((subcode) => getCostTypeName(subcode)); // 서브코드명 배열
 
   // 원형차트 옵션
   const pieChartOptions: ApexOptions = {
@@ -1221,7 +1287,7 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
       type: 'pie',
       toolbar: { show: false }
     },
-    labels: typeLabels,
+    labels: typeLabelNames,
     colors: ['#01439C', '#389CD7', '#59B8D5', '#BCE3EC', '#E0D8D2', '#F2E8E2'],
     legend: {
       show: false
@@ -1314,7 +1380,7 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
         }
       }
     },
-    colors: ['#ED8936', '#4267B2', '#4A5568', '#E53E3E'],
+    colors: ['#90A4AE', '#7986CB', '#81C784', '#E57373'],
     legend: {
       position: 'top',
       horizontalAlign: 'right'
@@ -1354,13 +1420,13 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
   const getStatusColor = (status: string) => {
     switch (status) {
       case '대기':
-        return '#ED8936';
+        return '#90A4AE';
       case '진행':
-        return '#4267B2';
+        return '#7986CB';
       case '완료':
-        return '#4A5568';
+        return '#81C784';
       case '취소':
-        return '#E53E3E';
+        return '#E57373';
       default:
         return '#6E6E75';
     }
@@ -1413,7 +1479,7 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
           <Card
             sx={{
               p: 3,
-              background: '#48C4B7',
+              background: '#26C6DA',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1421,13 +1487,13 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
             }}
           >
             <Typography variant="h6" sx={{ fontWeight: 600, color: '#fff', mb: 1 }}>
-              총금액
+              총건수
             </Typography>
             <Typography variant="h5" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {formatAmount(totalAmount)}원
+              {totalCount}건
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              총 {totalCount}건
+              {formatAmount(totalAmount)}원
             </Typography>
           </Card>
         </Grid>
@@ -1436,7 +1502,7 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
           <Card
             sx={{
               p: 3,
-              background: '#4A5568',
+              background: '#90A4AE',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1447,10 +1513,10 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
               완료
             </Typography>
             <Typography variant="h5" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {formatAmount(statusStats['완료'] || 0)}원
+              {statusCountStats['완료'] || 0}건
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              완료된 비용
+              {formatAmount(statusStats['완료'] || 0)}원
             </Typography>
           </Card>
         </Grid>
@@ -1459,7 +1525,7 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
           <Card
             sx={{
               p: 3,
-              background: '#4267B2',
+              background: '#7986CB',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1470,10 +1536,10 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
               진행
             </Typography>
             <Typography variant="h5" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {formatAmount(statusStats['진행'] || 0)}원
+              {statusCountStats['진행'] || 0}건
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              진행중인 비용
+              {formatAmount(statusStats['진행'] || 0)}원
             </Typography>
           </Card>
         </Grid>
@@ -1482,7 +1548,7 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
           <Card
             sx={{
               p: 3,
-              background: '#E53E3E',
+              background: '#81C784',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1493,10 +1559,10 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
               취소
             </Typography>
             <Typography variant="h5" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {formatAmount(statusStats['취소'] || 0)}원
+              {statusCountStats['취소'] || 0}건
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              취소된 비용
+              {formatAmount(statusStats['취소'] || 0)}원
             </Typography>
           </Card>
         </Grid>
@@ -1505,7 +1571,7 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
           <Card
             sx={{
               p: 3,
-              background: '#ED8936',
+              background: '#E57373',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1516,10 +1582,10 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
               대기
             </Typography>
             <Typography variant="h5" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {formatAmount(statusStats['대기'] || 0)}원
+              {statusCountStats['대기'] || 0}건
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              대기중인 비용
+              {formatAmount(statusStats['대기'] || 0)}원
             </Typography>
           </Card>
         </Grid>
@@ -1574,7 +1640,7 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
                     }}
                   >
                     {typeLabels.map((label, index) => (
-                      <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box key={`cost-type-${index}`} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Box
                           sx={{
                             width: 12,
@@ -1583,7 +1649,7 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
                             backgroundColor: pieChartOptions.colors?.[index % pieChartOptions.colors.length]
                           }}
                         />
-                        <Typography sx={{ flex: 1, fontSize: '13px' }}>{label}</Typography>
+                        <Typography sx={{ flex: 1, fontSize: '13px' }}>{getCostTypeName(label)}</Typography>
                         <Typography sx={{ fontSize: '13px', fontWeight: 600 }}>{formatAmount(typeValues[index])}원</Typography>
                       </Box>
                     ))}
@@ -1624,7 +1690,7 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
                   </TableHead>
                   <TableBody>
                     {paginatedData.map((cost) => (
-                      <TableRow key={cost.id} hover>
+                      <TableRow key={`cost-list-${cost.id}`} hover>
                         <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{cost.code}</TableCell>
                         <TableCell
                           sx={{
@@ -1638,7 +1704,7 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
                         >
                           {cost.content || '비용내용 없음'}
                         </TableCell>
-                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{cost.costType}</TableCell>
+                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{getCostTypeName(cost.costType)}</TableCell>
                         <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{formatAmount(cost.amount)}원</TableCell>
                         <TableCell sx={{ py: 0.5 }}>
                           <Chip
@@ -1723,7 +1789,7 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
                     }}
                   >
                     {teamLabels.map((label, index) => (
-                      <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box key={`team-${index}`} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Box
                           sx={{
                             width: 12,
@@ -1887,7 +1953,7 @@ function CostChangeLogView({
           <TableBody>
             {paginatedLogs.map((log, index) => (
               <TableRow
-                key={log.id}
+                key={`changelog-${log.id}`}
                 hover
                 sx={{
                   '&:hover': { backgroundColor: 'action.hover' }
@@ -2112,6 +2178,7 @@ function CostChangeLogView({
 export default function CostManagement() {
   const searchParams = useSearchParams();
   const [value, setValue] = useState(0);
+  const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers } = useMenuPermission('/apps/cost');
 
   // Supabase 비용 데이터 연동
   const { getCosts, createCost, updateCost, deleteCost, checkCodeExists, loading, error } = useSupabaseCost();
@@ -2422,23 +2489,65 @@ export default function CostManagement() {
               )}
             </Box>
           </Box>
-          {/* 탭 네비게이션 및 필터 */}
-          <Box
-            sx={{
-              borderBottom: 1,
-              borderColor: 'divider',
-              flexShrink: 0,
-              mt: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}
-          >
-            {/* 탭 네비게이션 */}
-            <Tabs
-              value={value}
-              onChange={handleChange}
-              aria-label="비용관리 탭"
+
+          {/* 권한 체크 */}
+          {!canViewCategory ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 접근할 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : !canReadData ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 대한 데이터 조회 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              {/* 탭 네비게이션 및 필터 */}
+              <Box
+                sx={{
+                  borderBottom: 1,
+                  borderColor: 'divider',
+                  flexShrink: 0,
+                  mt: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}
+              >
+                {/* 탭 네비게이션 */}
+                <Tabs
+                  value={value}
+                  onChange={handleChange}
+                  aria-label="비용관리 탭"
               sx={{
                 '& .MuiTab-root': {
                   minHeight: 48,
@@ -2526,8 +2635,8 @@ export default function CostManagement() {
                   }}
                 >
                   <MenuItem value="전체">전체</MenuItem>
-                  {yearOptions.map((year) => (
-                    <MenuItem key={year} value={year}>
+                  {yearOptions.map((year, index) => (
+                    <MenuItem key={`year-${index}`} value={year}>
                       {year}
                     </MenuItem>
                   ))}
@@ -2551,7 +2660,7 @@ export default function CostManagement() {
                   {departments
                     .filter((dept) => dept.is_active)
                     .map((dept) => (
-                      <MenuItem key={dept.id} value={dept.department_name}>
+                      <MenuItem key={`dept-${dept.id}`} value={dept.department_name}>
                         {dept.department_name}
                       </MenuItem>
                     ))}
@@ -2575,7 +2684,7 @@ export default function CostManagement() {
                   {users
                     .filter((user) => user.status === 'active')
                     .map((user) => (
-                      <MenuItem key={user.id} value={user.user_name}>
+                      <MenuItem key={`user-${user.id}`} value={user.user_name}>
                         {user.user_name}
                       </MenuItem>
                     ))}
@@ -2597,7 +2706,7 @@ export default function CostManagement() {
                 >
                   <MenuItem value="전체">전체</MenuItem>
                   {statusTypes.map((statusItem) => (
-                    <MenuItem key={statusItem.id} value={statusItem.subcode_name}>
+                    <MenuItem key={`status-${statusItem.id}`} value={statusItem.subcode_name}>
                       {statusItem.subcode_name}
                     </MenuItem>
                   ))}
@@ -2670,6 +2779,9 @@ export default function CostManagement() {
                   selectedAssignee={selectedAssignee}
                   costs={costRecords}
                   setCosts={setCostRecords}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                   createCostRecord={async (record) => {
                     const created = await createCost(record);
                     if (created) {
@@ -2749,6 +2861,9 @@ export default function CostManagement() {
                   addChangeLog={addChangeLog}
                   checkCodeExists={checkCodeExists}
                   assigneeList={users.filter((user) => user.status === 'active')}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                 />
               </Box>
             </TabPanel>
@@ -2869,6 +2984,8 @@ export default function CostManagement() {
               </Box>
             </TabPanel>
           </Box>
+          </>
+          )}
         </CardContent>
       </Card>
 

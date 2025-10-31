@@ -90,9 +90,11 @@ interface RoleEditDialogProps {
   onClose: () => void;
   role: RoleData | null;
   onSave: (role: RoleData) => void;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
-export default function RoleEditDialog({ open, onClose, role, onSave }: RoleEditDialogProps) {
+export default function RoleEditDialog({ open, onClose, role, onSave, canEditOwn = true, canEditOthers = true }: RoleEditDialogProps) {
   const { data: session } = useSession();
   const { users } = useCommonData();
   const [tabValue, setTabValue] = useState(0);
@@ -185,9 +187,16 @@ export default function RoleEditDialog({ open, onClose, role, onSave }: RoleEdit
                 page: menu.menu_page || '',
                 url: menu.menu_url || '',
                 description: menu.menu_description || '',
+                // 기존 3개 필드 유지 (DB 저장용)
                 read: permission?.can_read || false,
                 write: permission?.can_write || false,
-                full: permission?.can_full || false
+                full: permission?.can_full || false,
+                // 새로운 5개 필드 (UI 표시용 - 개별 DB 컬럼)
+                viewCategory: permission?.can_view_category || false,
+                readData: permission?.can_read_data || false,
+                createData: permission?.can_create_data || false,
+                editOwn: permission?.can_edit_own || false,
+                editOthers: permission?.can_edit_others || false
               };
             });
           } else {
@@ -215,9 +224,16 @@ export default function RoleEditDialog({ open, onClose, role, onSave }: RoleEdit
                 page: menu.menu_page || '',
                 url: menu.menu_url || '',
                 description: menu.menu_description || '',
+                // 기존 3개 필드 유지 (DB 저장용)
                 read: false,
                 write: false,
-                full: false
+                full: false,
+                // 새로운 6개 필드 (UI 표시용)
+                viewCategory: false,
+                readData: false,
+                createData: false,
+                editOwn: false,
+                editOthers: false
               };
             });
           }
@@ -305,7 +321,7 @@ export default function RoleEditDialog({ open, onClose, role, onSave }: RoleEdit
   };
 
   // 권한 체크박스 변경 핸들러
-  const handlePermissionChange = (id: string, type: 'read' | 'write' | 'full') => {
+  const handlePermissionChange = (id: string, type: 'viewCategory' | 'readData' | 'createData' | 'editOwn' | 'editOthers' | 'full') => {
     setPermissions((prev) => {
       // 클릭된 항목 찾기
       const clickedItem = prev.find((p) => p.id === id);
@@ -318,32 +334,113 @@ export default function RoleEditDialog({ open, onClose, role, onSave }: RoleEdit
         // 클릭된 항목 처리
         if (perm.id === id) {
           if (type === 'full') {
-            // 전체 클릭 시 읽기/쓰기도 함께 변경
+            // 전체 클릭 시 모든 권한 함께 변경
             const newFullValue = !perm.full;
             return {
               ...perm,
               full: newFullValue,
               read: newFullValue,
-              write: newFullValue
+              write: newFullValue,
+              viewCategory: newFullValue,
+              readData: newFullValue,
+              createData: newFullValue,
+              editOwn: newFullValue,
+              editOthers: newFullValue
             };
-          } else {
-            // 읽기/쓰기 클릭 시
-            const newValue = !perm[type];
-            const updates: any = { [type]: newValue };
-
-            // 읽기나 쓰기 중 하나라도 false면 전체도 false
-            if (type === 'read' && !newValue) {
-              updates.full = false;
-            } else if (type === 'write' && !newValue) {
-              updates.full = false;
-            }
-            // 읽기와 쓰기가 모두 true면 전체도 true
-            else if ((type === 'read' && newValue && perm.write) || (type === 'write' && newValue && perm.read)) {
-              updates.full = true;
-            }
-
-            return { ...perm, ...updates };
+          } else if (type === 'viewCategory') {
+            // 카테고리 보기 클릭 시 개별 토글
+            const newViewCategoryValue = !perm.viewCategory;
+            // ✅ 카테고리 보기 해제 시 → 모든 하위 권한도 해제
+            const newReadDataValue = newViewCategoryValue ? perm.readData : false;
+            const newCreateDataValue = newViewCategoryValue ? perm.createData : false;
+            const newEditOwnValue = newViewCategoryValue ? perm.editOwn : false;
+            const newEditOthersValue = newViewCategoryValue ? perm.editOthers : false;
+            const newReadValue = newViewCategoryValue || newReadDataValue;
+            const newWriteValue = newCreateDataValue || newEditOwnValue;
+            const allPermissionsTrue = newViewCategoryValue && newReadDataValue && newCreateDataValue && newEditOwnValue && newEditOthersValue;
+            return {
+              ...perm,
+              viewCategory: newViewCategoryValue,
+              readData: newReadDataValue,
+              createData: newCreateDataValue,
+              editOwn: newEditOwnValue,
+              editOthers: newEditOthersValue,
+              read: newReadValue,
+              write: newWriteValue,
+              full: allPermissionsTrue
+            };
+          } else if (type === 'readData') {
+            // 데이터 조회 클릭 시 개별 토글
+            const newReadDataValue = !perm.readData;
+            // ✅ 데이터 조회 체크 시 → 카테고리 보기 자동 선택
+            // ✅ 데이터 조회 해제 시 → 나의 데이터 추가/편집, 타인 데이터 편집 자동 해제
+            const newViewCategoryValue = newReadDataValue ? true : perm.viewCategory;
+            const newCreateDataValue = newReadDataValue ? perm.createData : false;
+            const newEditOwnValue = newReadDataValue ? perm.editOwn : false;
+            const newEditOthersValue = newReadDataValue ? perm.editOthers : false;
+            const newReadValue = newViewCategoryValue || newReadDataValue;
+            const newWriteValue = newCreateDataValue || newEditOwnValue;
+            const allPermissionsTrue = newViewCategoryValue && newReadDataValue && newCreateDataValue && newEditOwnValue && newEditOthersValue;
+            return {
+              ...perm,
+              viewCategory: newViewCategoryValue,
+              readData: newReadDataValue,
+              createData: newCreateDataValue,
+              editOwn: newEditOwnValue,
+              editOthers: newEditOthersValue,
+              read: newReadValue,
+              write: newWriteValue,
+              full: allPermissionsTrue
+            };
+          } else if (type === 'createData') {
+            // 데이터 새로쓰기 클릭 시 개별 토글
+            const newCreateDataValue = !perm.createData;
+            const newWriteValue = newCreateDataValue || perm.editOwn; // 둘 중 하나라도 true면 write true
+            const allPermissionsTrue = perm.viewCategory && perm.readData && newCreateDataValue && perm.editOwn && perm.editOthers;
+            return {
+              ...perm,
+              createData: newCreateDataValue,
+              write: newWriteValue,
+              full: allPermissionsTrue
+            };
+          } else if (type === 'editOwn') {
+            // 나의 데이터 편집 클릭 시 개별 토글
+            const newEditOwnValue = !perm.editOwn;
+            const newWriteValue = perm.createData || newEditOwnValue; // 둘 중 하나라도 true면 write true
+            const allPermissionsTrue = perm.viewCategory && perm.readData && perm.createData && newEditOwnValue && perm.editOthers;
+            return {
+              ...perm,
+              editOwn: newEditOwnValue,
+              write: newWriteValue,
+              full: allPermissionsTrue
+            };
+          } else if (type === 'editOthers') {
+            // 타인데이터 편집 클릭 시 개별 토글
+            const newEditOthersValue = !perm.editOthers;
+            // ✅ 타인데이터 편집 체크 시 → 나의 데이터 추가/편집, 데이터 조회, 카테고리 보기 자동 선택
+            // ✅ 타인데이터 편집 해제 시 → 그대로 (다른 권한은 유지)
+            const newCreateDataValue = newEditOthersValue ? true : perm.createData;
+            const newEditOwnValue = newEditOthersValue ? true : perm.editOwn;
+            const newReadDataValue = newEditOthersValue ? true : perm.readData;
+            const newViewCategoryValue = newEditOthersValue ? true : perm.viewCategory;
+            const newWriteValue = newCreateDataValue || newEditOwnValue;
+            const newReadValue = newViewCategoryValue || newReadDataValue;
+            // full은 모든 권한이 true일 때만 true
+            const allPermissionsTrue = newViewCategoryValue && newReadDataValue && newCreateDataValue && newEditOwnValue && newEditOthersValue;
+            return {
+              ...perm,
+              viewCategory: newViewCategoryValue,
+              readData: newReadDataValue,
+              createData: newCreateDataValue,
+              editOwn: newEditOwnValue,
+              editOthers: newEditOthersValue,
+              read: newReadValue,
+              write: newWriteValue,
+              full: allPermissionsTrue
+            };
           }
+          // 기본 반환 (변경 없음)
+          return perm;
         }
 
         // 레벨 0 항목의 권한 클릭 시 하위 항목들도 변경
@@ -357,34 +454,103 @@ export default function RoleEditDialog({ open, onClose, role, onSave }: RoleEdit
                 ...perm,
                 full: newFullValue,
                 read: newFullValue,
-                write: newFullValue
+                write: newFullValue,
+                viewCategory: newFullValue,
+                readData: newFullValue,
+                createData: newFullValue,
+                editOwn: newFullValue,
+                editOthers: newFullValue
               };
-            } else if (type === 'read') {
-              // 읽기 클릭 시 하위 항목의 읽기만 연동
-              const newReadValue = !clickedItem.read;
-              const updates: any = { read: newReadValue };
-              // 읽기가 false면 전체도 false
-              if (!newReadValue) {
-                updates.full = false;
-              }
-              // 읽기와 쓰기가 모두 true면 전체도 true
-              else if (newReadValue && perm.write) {
-                updates.full = true;
-              }
-              return { ...perm, ...updates };
-            } else if (type === 'write') {
-              // 쓰기 클릭 시 하위 항목의 쓰기만 연동
-              const newWriteValue = !clickedItem.write;
-              const updates: any = { write: newWriteValue };
-              // 쓰기가 false면 전체도 false
-              if (!newWriteValue) {
-                updates.full = false;
-              }
-              // 읽기와 쓰기가 모두 true면 전체도 true
-              else if (perm.read && newWriteValue) {
-                updates.full = true;
-              }
-              return { ...perm, ...updates };
+            } else if (type === 'editOthers') {
+              // 타인데이터 편집 클릭 시 (레벨 0 항목 → 하위 항목들에 적용)
+              const newEditOthersValue = !clickedItem.editOthers;
+              // ✅ 타인데이터 편집 체크 시 → 나의 데이터 추가/편집, 데이터 조회, 카테고리 보기 자동 선택
+              // ✅ 타인데이터 편집 해제 시 → 그대로 (다른 권한은 유지)
+              const newCreateDataValue = newEditOthersValue ? true : perm.createData;
+              const newEditOwnValue = newEditOthersValue ? true : perm.editOwn;
+              const newReadDataValue = newEditOthersValue ? true : perm.readData;
+              const newViewCategoryValue = newEditOthersValue ? true : perm.viewCategory;
+              const newWriteValue = newCreateDataValue || newEditOwnValue;
+              const newReadValue = newViewCategoryValue || newReadDataValue;
+              const allPermissionsTrue = newViewCategoryValue && newReadDataValue && newCreateDataValue && newEditOwnValue && newEditOthersValue;
+              return {
+                ...perm,
+                viewCategory: newViewCategoryValue,
+                readData: newReadDataValue,
+                createData: newCreateDataValue,
+                editOwn: newEditOwnValue,
+                editOthers: newEditOthersValue,
+                read: newReadValue,
+                write: newWriteValue,
+                full: allPermissionsTrue
+              };
+            } else if (type === 'viewCategory') {
+              // 카테고리 보기 클릭 시 (레벨 0 항목 → 하위 항목들에 적용)
+              const newViewCategoryValue = !clickedItem.viewCategory;
+              // ✅ 카테고리 보기 해제 시 → 모든 하위 권한도 해제
+              const newReadDataValue = newViewCategoryValue ? perm.readData : false;
+              const newCreateDataValue = newViewCategoryValue ? perm.createData : false;
+              const newEditOwnValue = newViewCategoryValue ? perm.editOwn : false;
+              const newEditOthersValue = newViewCategoryValue ? perm.editOthers : false;
+              const newReadValue = newViewCategoryValue || newReadDataValue;
+              const newWriteValue = newCreateDataValue || newEditOwnValue;
+              const allPermissionsTrue = newViewCategoryValue && newReadDataValue && newCreateDataValue && newEditOwnValue && newEditOthersValue;
+              return {
+                ...perm,
+                viewCategory: newViewCategoryValue,
+                readData: newReadDataValue,
+                createData: newCreateDataValue,
+                editOwn: newEditOwnValue,
+                editOthers: newEditOthersValue,
+                read: newReadValue,
+                write: newWriteValue,
+                full: allPermissionsTrue
+              };
+            } else if (type === 'readData') {
+              // 데이터 조회 클릭 시 (레벨 0 항목 → 하위 항목들에 적용)
+              const newReadDataValue = !clickedItem.readData;
+              // ✅ 데이터 조회 체크 시 → 카테고리 보기 자동 선택
+              // ✅ 데이터 조회 해제 시 → 나의 데이터 추가/편집, 타인 데이터 편집 자동 해제
+              const newViewCategoryValue = newReadDataValue ? true : perm.viewCategory;
+              const newCreateDataValue = newReadDataValue ? perm.createData : false;
+              const newEditOwnValue = newReadDataValue ? perm.editOwn : false;
+              const newEditOthersValue = newReadDataValue ? perm.editOthers : false;
+              const newReadValue = newViewCategoryValue || newReadDataValue;
+              const newWriteValue = newCreateDataValue || newEditOwnValue;
+              const allPermissionsTrue = newViewCategoryValue && newReadDataValue && newCreateDataValue && newEditOwnValue && newEditOthersValue;
+              return {
+                ...perm,
+                viewCategory: newViewCategoryValue,
+                readData: newReadDataValue,
+                createData: newCreateDataValue,
+                editOwn: newEditOwnValue,
+                editOthers: newEditOthersValue,
+                read: newReadValue,
+                write: newWriteValue,
+                full: allPermissionsTrue
+              };
+            } else if (type === 'createData') {
+              // 데이터 새로쓰기 클릭 시
+              const newCreateDataValue = !clickedItem.createData;
+              const newWriteValue = newCreateDataValue || perm.editOwn;
+              const allPermissionsTrue = perm.viewCategory && perm.readData && newCreateDataValue && perm.editOwn && perm.editOthers;
+              return {
+                ...perm,
+                createData: newCreateDataValue,
+                write: newWriteValue,
+                full: allPermissionsTrue
+              };
+            } else if (type === 'editOwn') {
+              // 나의 데이터 편집 클릭 시
+              const newEditOwnValue = !clickedItem.editOwn;
+              const newWriteValue = perm.createData || newEditOwnValue;
+              const allPermissionsTrue = perm.viewCategory && perm.readData && perm.createData && newEditOwnValue && perm.editOthers;
+              return {
+                ...perm,
+                editOwn: newEditOwnValue,
+                write: newWriteValue,
+                full: allPermissionsTrue
+              };
             }
           }
         }
@@ -430,12 +596,19 @@ export default function RoleEditDialog({ open, onClose, role, onSave }: RoleEdit
         console.log('🔄 기존 역할 권한 저장 시작...');
 
         const permissionData = permissions.map((perm) => {
-          console.log(`🔍 메뉴 ${perm.id} (${perm.category}): read=${perm.read}, write=${perm.write}, full=${perm.full}`);
+          console.log(`🔍 메뉴 ${perm.id} (${perm.category}): read=${perm.read}, write=${perm.write}, full=${perm.full}, viewCategory=${perm.viewCategory}, readData=${perm.readData}, createData=${perm.createData}, editOwn=${perm.editOwn}, editOthers=${perm.editOthers}`);
           return {
             menuId: perm.id,
+            // 기존 3개 필드 (하위 호환성)
             canRead: perm.read,
             canWrite: perm.write,
-            canFull: perm.full
+            canFull: perm.full,
+            // 새로운 5개 필드 (세밀한 권한 제어)
+            canViewCategory: perm.viewCategory,
+            canReadData: perm.readData,
+            canCreateData: perm.createData,
+            canEditOwn: perm.editOwn,
+            canEditOthers: perm.editOthers
           };
         });
 
@@ -490,13 +663,11 @@ export default function RoleEditDialog({ open, onClose, role, onSave }: RoleEdit
       onClose={handleClose}
       maxWidth="lg"
       fullWidth
-      sx={{
-        '& .MuiDialog-paper': {
-          height: '80vh',
-          maxHeight: '800px',
-          width: '90vw',
-          maxWidth: '1200px',
-          overflow: 'visible'
+      PaperProps={{
+        sx: {
+          height: '840px',
+          maxHeight: '840px',
+          overflowY: 'auto'
         }
       }}
     >
@@ -521,10 +692,34 @@ export default function RoleEditDialog({ open, onClose, role, onSave }: RoleEdit
 
         {/* 취소, 저장 버튼을 오른쪽 상단으로 이동 */}
         <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-          <Button onClick={handleClose} variant="outlined" size="small" sx={{ minWidth: '60px' }}>
+          <Button
+            onClick={handleClose}
+            variant="outlined"
+            size="small"
+            disabled={!(canEditOwn || canEditOthers)}
+            sx={{
+              minWidth: '60px',
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             취소
           </Button>
-          <Button onClick={handleSave} variant="contained" size="small" sx={{ minWidth: '60px' }}>
+          <Button
+            onClick={handleSave}
+            variant="contained"
+            size="small"
+            disabled={!(canEditOwn || canEditOthers)}
+            sx={{
+              minWidth: '60px',
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             저장
           </Button>
         </Box>
@@ -879,10 +1074,11 @@ export default function RoleEditDialog({ open, onClose, role, onSave }: RoleEdit
                           borderBottom: '1px solid #e0e0e0',
                           position: 'sticky',
                           top: 0,
-                          zIndex: 2
+                          zIndex: 2,
+                          fontSize: '11px'
                         }}
                       >
-                        읽기
+                        카테고리<br/>보기
                       </TableCell>
                       <TableCell
                         align="center"
@@ -895,10 +1091,45 @@ export default function RoleEditDialog({ open, onClose, role, onSave }: RoleEdit
                           borderBottom: '1px solid #e0e0e0',
                           position: 'sticky',
                           top: 0,
-                          zIndex: 2
+                          zIndex: 2,
+                          fontSize: '11px'
                         }}
                       >
-                        쓰기
+                        데이터<br/>조회
+                      </TableCell>
+                      <TableCell
+                        align="center"
+                        sx={{
+                          fontWeight: 'bold',
+                          bgcolor: '#f8f9fa',
+                          py: 1.5,
+                          width: 85,
+                          borderTop: '1px solid #e0e0e0',
+                          borderBottom: '1px solid #e0e0e0',
+                          position: 'sticky',
+                          top: 0,
+                          zIndex: 2,
+                          fontSize: '11px'
+                        }}
+                      >
+                        나의 데이터<br/>추가/편집
+                      </TableCell>
+                      <TableCell
+                        align="center"
+                        sx={{
+                          fontWeight: 'bold',
+                          bgcolor: '#f8f9fa',
+                          py: 1.5,
+                          width: 85,
+                          borderTop: '1px solid #e0e0e0',
+                          borderBottom: '1px solid #e0e0e0',
+                          position: 'sticky',
+                          top: 0,
+                          zIndex: 2,
+                          fontSize: '11px'
+                        }}
+                      >
+                        타인데이터<br/>편집
                       </TableCell>
                       <TableCell
                         align="center"
@@ -911,7 +1142,8 @@ export default function RoleEditDialog({ open, onClose, role, onSave }: RoleEdit
                           borderBottom: '1px solid #e0e0e0',
                           position: 'sticky',
                           top: 0,
-                          zIndex: 2
+                          zIndex: 2,
+                          fontSize: '11px'
                         }}
                       >
                         전체
@@ -963,8 +1195,8 @@ export default function RoleEditDialog({ open, onClose, role, onSave }: RoleEdit
                           </TableCell>
                           <TableCell align="center" sx={{ py: 0.625 }}>
                             <Checkbox
-                              checked={menu.read}
-                              onChange={() => handlePermissionChange(menu.id, 'read')}
+                              checked={menu.viewCategory}
+                              onChange={() => handlePermissionChange(menu.id, 'viewCategory')}
                               size="small"
                               color="primary"
                               sx={{
@@ -977,8 +1209,94 @@ export default function RoleEditDialog({ open, onClose, role, onSave }: RoleEdit
                           </TableCell>
                           <TableCell align="center" sx={{ py: 0.625 }}>
                             <Checkbox
-                              checked={menu.write}
-                              onChange={() => handlePermissionChange(menu.id, 'write')}
+                              checked={menu.readData}
+                              onChange={() => handlePermissionChange(menu.id, 'readData')}
+                              size="small"
+                              color="primary"
+                              sx={{
+                                transform: 'scale(0.91)',
+                                '& .MuiSvgIcon-root': {
+                                  fontSize: 16
+                                }
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell align="center" sx={{ py: 0.625 }}>
+                            <Checkbox
+                              checked={menu.createData && menu.editOwn}
+                              onChange={() => {
+                                // ✅ createData와 editOwn을 동시에 토글
+                                setPermissions((prev) => {
+                                  const clickedItem = prev.find((p) => p.id === menu.id);
+                                  if (!clickedItem) return prev;
+
+                                  const isLevel0Item = clickedItem.level === 0;
+                                  const newValue = !(clickedItem.createData && clickedItem.editOwn);
+
+                                  return prev.map((perm) => {
+                                    // 클릭된 항목 처리
+                                    if (perm.id === menu.id) {
+                                      // ✅ 나의 데이터 추가/편집 체크 시 → 데이터 조회, 카테고리 보기 자동 선택
+                                      // ✅ 나의 데이터 추가/편집 해제 시 → 타인 데이터 편집 자동 해제
+                                      const newReadDataValue = newValue ? true : perm.readData;
+                                      const newViewCategoryValue = newValue ? true : perm.viewCategory;
+                                      const newEditOthersValue = newValue ? perm.editOthers : false;
+                                      const newWriteValue = newValue; // createData와 editOwn이 같은 값
+                                      const newReadValue = newViewCategoryValue || newReadDataValue;
+                                      const allPermissionsTrue = newViewCategoryValue && newReadDataValue && newValue && newValue && newEditOthersValue;
+                                      return {
+                                        ...perm,
+                                        viewCategory: newViewCategoryValue,
+                                        readData: newReadDataValue,
+                                        createData: newValue,
+                                        editOwn: newValue,
+                                        editOthers: newEditOthersValue,
+                                        read: newReadValue,
+                                        write: newWriteValue,
+                                        full: allPermissionsTrue
+                                      };
+                                    }
+
+                                    // 레벨 0 항목의 권한 클릭 시 하위 항목들도 변경
+                                    if (isLevel0Item && perm.level === 1 && perm.category === clickedItem.category) {
+                                      // ✅ 하위 항목도 동일하게 자동 선택/해제
+                                      const newReadDataValue = newValue ? true : perm.readData;
+                                      const newViewCategoryValue = newValue ? true : perm.viewCategory;
+                                      const newEditOthersValue = newValue ? perm.editOthers : false;
+                                      const newWriteValue = newValue;
+                                      const newReadValue = newViewCategoryValue || newReadDataValue;
+                                      const allPermissionsTrue = newViewCategoryValue && newReadDataValue && newValue && newValue && newEditOthersValue;
+                                      return {
+                                        ...perm,
+                                        viewCategory: newViewCategoryValue,
+                                        readData: newReadDataValue,
+                                        createData: newValue,
+                                        editOwn: newValue,
+                                        editOthers: newEditOthersValue,
+                                        read: newReadValue,
+                                        write: newWriteValue,
+                                        full: allPermissionsTrue
+                                      };
+                                    }
+
+                                    return perm;
+                                  });
+                                });
+                              }}
+                              size="small"
+                              color="primary"
+                              sx={{
+                                transform: 'scale(0.91)',
+                                '& .MuiSvgIcon-root': {
+                                  fontSize: 16
+                                }
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell align="center" sx={{ py: 0.625 }}>
+                            <Checkbox
+                              checked={menu.editOthers}
+                              onChange={() => handlePermissionChange(menu.id, 'editOthers')}
                               size="small"
                               color="primary"
                               sx={{

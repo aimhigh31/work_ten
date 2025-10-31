@@ -19,6 +19,7 @@ export interface ITEducationRecord {
   assignee: string;
   team: string; // 필수 필드로 변경 (비용관리 패턴)
   department?: ITEducationDepartment;
+  createdBy?: string; // 데이터 생성자 (권한 체크용)
   attachment?: boolean;
   attachmentCount?: number;
   attachments?: string[];

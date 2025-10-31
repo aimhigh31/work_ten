@@ -275,7 +275,8 @@ export const useSupabaseInvestment = (): UseSupabaseInvestmentReturn => {
       expectedReturn: dbData.expected_return,
       actualReturn: dbData.actual_return,
       riskLevel: dbData.risk_level,
-      attachments: attachments
+      attachments: attachments,
+      createdBy: dbData.created_by // 데이터 생성자 (권한 체크용)
     };
   }, []);
 

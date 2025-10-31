@@ -27,6 +27,7 @@ import { useSupabaseTaskManagement } from 'hooks/useSupabaseTaskManagement';
 import { useSupabaseEducation } from 'hooks/useSupabaseEducation';
 import { useSupabaseCalendar } from 'hooks/useSupabaseCalendar';
 import { useSupabaseCost } from 'hooks/useSupabaseCost';
+import { useMenuPermission } from 'hooks/usePermissions';
 
 // assets
 import { ArrowUp2, Task, Book, Calendar, DollarCircle } from '@wandersonalwes/iconsax-react';
@@ -36,6 +37,7 @@ import { ArrowUp2, Task, Book, Calendar, DollarCircle } from '@wandersonalwes/ic
 export default function DashboardDefault() {
   const theme = useTheme();
   const user = useUser();
+  const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers, loading: permissionLoading } = useMenuPermission('/dashboard/default');
 
   // ⭐ Investment 패턴: 데이터 로딩 함수만 가져오기
   const { getTasks } = useSupabaseTaskManagement();
@@ -180,11 +182,34 @@ export default function DashboardDefault() {
 
   return (
     <Box sx={{ height: '100%', overflow: 'auto', p: 3 }}>
-      <Grid container spacing={GRID_COMMON_SPACING}>
-        <Grid size={12}>
-          <WelcomeBanner />
-        </Grid>
-        {/* row 1 - 개인 업무 통계 카드 */}
+      {/* 권한 체크: 카테고리 보기만 있는 경우 */}
+      {canViewCategory && !canReadData ? (
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            gap: 2,
+            py: 8
+          }}
+        >
+          <Typography variant="h5" color="text.secondary">
+            이 페이지에 대한 데이터 조회 권한이 없습니다.
+          </Typography>
+          <Typography variant="body2" color="text.disabled">
+            관리자에게 권한을 요청하세요.
+          </Typography>
+        </Box>
+      ) : (
+        <>
+          {/* 기존 컨텐츠 시작 */}
+          <Grid container spacing={GRID_COMMON_SPACING}>
+            <Grid size={12}>
+              <WelcomeBanner />
+            </Grid>
+            {/* row 1 - 개인 업무 통계 카드 */}
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <EcommerceDataCard
             title="업무관리"
@@ -341,9 +366,12 @@ export default function DashboardDefault() {
         </Grid>
         {/* row 4 - Project Analytics */}
         <Grid size={12}>
-          <ProjectAnalytics />
+          <ProjectAnalytics costs={costs} userName={user?.name || ''} />
         </Grid>
       </Grid>
+          {/* 기존 컨텐츠 끝 */}
+        </>
+      )}
     </Box>
   );
 }

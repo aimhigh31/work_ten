@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 
 // third-party
 import ReactApexChart, { Props as ChartProps } from 'react-apexcharts';
@@ -58,6 +58,7 @@ import { ChangeLogData } from 'types/changelog';
 import { createClient } from '@/lib/supabase/client';
 import { useSession } from 'next-auth/react';
 import useUser from 'hooks/useUser';
+import { useMenuPermission } from '../../hooks/usePermissions';
 
 // Icons
 import { TableDocument, Calendar, Element, DocumentText, Chart } from '@wandersonalwes/iconsax-react';
@@ -107,6 +108,9 @@ interface KanbanViewProps {
   addChangeLog: (category: string, code: string, description: string, team: string) => void;
   onCardClick: (investment: InvestmentTableData) => void;
   assigneeList?: any[];
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
+  users?: any[];
 }
 
 function KanbanView({
@@ -117,9 +121,30 @@ function KanbanView({
   setInvestments,
   addChangeLog,
   onCardClick,
-  assigneeList
+  assigneeList,
+  canEditOwn = true,
+  canEditOthers = true,
+  users = []
 }: KanbanViewProps) {
   const theme = useTheme();
+
+  // 세션 정보 가져오기
+  const { data: session } = useSession();
+
+  // 권한 체크 - 현재 사용자 확인
+  const currentUser = useMemo(() => {
+    if (!session?.user?.email || !users || users.length === 0) return null;
+    const found = users.find((u) => u.email === session.user.email);
+    return found;
+  }, [session, users]);
+
+  // 데이터 소유자 확인 (createdBy 또는 assignee)
+  const isDataOwner = useCallback((investment: InvestmentTableData) => {
+    if (!currentUser) return false;
+    const isCreator = investment.createdBy === currentUser.user_name;
+    const isAssignee = investment.assignee === currentUser.user_name;
+    return isCreator || isAssignee;
+  }, [currentUser]);
 
   // 칸반 관련 상태
   const [activeInvestment, setActiveInvestment] = useState<any>(null);
@@ -194,7 +219,7 @@ function KanbanView({
       // 변경로그 추가 - 칸반에서 상태 변경
       const investmentCode = currentInvestment.code || `PLAN-INV-25-${String(currentInvestment.id).padStart(3, '0')}`;
       const description = `${currentInvestment.investmentName || '투자'} 상태를 "${currentInvestment.status}"에서 "${newStatus}"로 변경`;
-      addChangeLog('상태 변경', investmentCode, description, currentInvestment.team || '미분류');
+      addChangeLog('수정', investmentCode, description, currentInvestment.team || '미분류');
     }
   };
 
@@ -252,24 +277,28 @@ function KanbanView({
   };
 
   // 드래그 가능한 투자 카드 컴포넌트 (5단계 구조)
-  function DraggableInvestmentCard({ investment }: { investment: any }) {
+  function DraggableInvestmentCard({ investment, canEditOwn = true, canEditOthers = true }: { investment: any; canEditOwn?: boolean; canEditOthers?: boolean }) {
+    // 드래그 가능 여부: canEditOthers가 있거나, canEditOwn이 있고 자신의 데이터인 경우
+    const isDragDisabled = !(canEditOthers || (canEditOwn && isDataOwner(investment)));
+
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-      id: investment.id
+      id: investment.id,
+      disabled: isDragDisabled
     });
 
     const style = transform
       ? {
           transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
           opacity: isDragging ? 0.5 : 1,
-          cursor: isDragging ? 'grabbing' : 'pointer'
+          cursor: isDragging ? 'grabbing' : (isDragDisabled ? 'default' : 'grab')
         }
-      : { cursor: 'pointer' };
+      : { cursor: isDragDisabled ? 'default' : 'grab' };
 
     return (
       <article
         ref={setNodeRef}
         style={style}
-        {...listeners}
+        {...(isDragDisabled ? {} : listeners)}
         {...attributes}
         className="kanban-card"
         onClick={(e) => {
@@ -549,7 +578,7 @@ function KanbanView({
             return (
               <DroppableColumn key={column.key} column={column}>
                 {investments.map((investment) => (
-                  <DraggableInvestmentCard key={investment.id} investment={investment} />
+                  <DraggableInvestmentCard key={investment.id} investment={investment} canEditOwn={canEditOwn} canEditOthers={canEditOthers} />
                 ))}
 
                 {/* 빈 칼럼 메시지 */}
@@ -573,7 +602,7 @@ function KanbanView({
           })}
         </div>
 
-        <DragOverlay>{activeInvestment ? <DraggableInvestmentCard investment={activeInvestment} /> : null}</DragOverlay>
+        <DragOverlay>{activeInvestment ? <DraggableInvestmentCard investment={activeInvestment} canEditOwn={canEditOwn} canEditOthers={canEditOthers} /> : null}</DragOverlay>
       </DndContext>
     </Box>
   );
@@ -698,7 +727,7 @@ function MonthlyScheduleView({
             {/* 월 헤더 - 상반기 */}
             {monthNames.slice(0, 6).map((month, index) => (
               <Box
-                key={index}
+                key={`month-header-first-${index}`}
                 sx={{
                   py: 1.5,
                   px: 1,
@@ -723,7 +752,7 @@ function MonthlyScheduleView({
 
               return (
                 <Box
-                  key={monthIndex}
+                  key={`month-content-first-${monthIndex}`}
                   sx={{
                     borderRight: monthIndex < 5 ? '1px solid' : 'none',
                     borderColor: 'divider',
@@ -764,7 +793,7 @@ function MonthlyScheduleView({
 
                     return (
                       <Box
-                        key={item.id}
+                        key={`month-${monthIndex}-item-${item.id}`}
                         onClick={() => onCardClick(item)}
                         sx={{
                           mb: itemIndex < items.length - 1 ? 0.8 : 0,
@@ -825,7 +854,7 @@ function MonthlyScheduleView({
             {/* 월 헤더 - 하반기 */}
             {monthNames.slice(6, 12).map((month, index) => (
               <Box
-                key={index + 6}
+                key={`month-header-second-${index}`}
                 sx={{
                   py: 1.5,
                   px: 1,
@@ -891,7 +920,7 @@ function MonthlyScheduleView({
 
                     return (
                       <Box
-                        key={item.id}
+                        key={`month-second-${index}-item-${item.id}`}
                         onClick={() => onCardClick(item)}
                         sx={{
                           mb: itemIndex < items.length - 1 ? 0.8 : 0,
@@ -1071,13 +1100,13 @@ function InvestmentDashboardView({
   const getStatusColor = (status: string) => {
     switch (status) {
       case '대기':
-        return '#ED8936';
+        return '#90A4AE';
       case '진행':
-        return '#4267B2';
+        return '#7986CB';
       case '완료':
-        return '#4A5568';
+        return '#81C784';
       case '홀딩':
-        return '#E53E3E';
+        return '#E57373';
       default:
         return '#9e9e9e';
     }
@@ -1227,7 +1256,7 @@ function InvestmentDashboardView({
         text: '투자 건수'
       }
     },
-    colors: ['#ED8936', '#4267B2', '#4A5568', '#E53E3E'],
+    colors: ['#90A4AE', '#7986CB', '#81C784', '#E57373'],
     legend: {
       position: 'top',
       horizontalAlign: 'right'
@@ -1347,7 +1376,7 @@ function InvestmentDashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#48C4B7',
+              background: '#26C6DA',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1371,7 +1400,7 @@ function InvestmentDashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#4A5568',
+              background: '#90A4AE',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1395,7 +1424,7 @@ function InvestmentDashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#4267B2',
+              background: '#7986CB',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1419,7 +1448,7 @@ function InvestmentDashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#E53E3E',
+              background: '#81C784',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1443,7 +1472,7 @@ function InvestmentDashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#ED8936',
+              background: '#E57373',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -2117,6 +2146,7 @@ export default function InvestmentManagement() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [value, setValue] = useState(0);
+  const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers } = useMenuPermission('/planning/investment');
 
   // 🏪 공용 창고에서 재료 가져오기
   const { users, departments, masterCodes } = useCommonData();
@@ -2164,17 +2194,26 @@ export default function InvestmentManagement() {
 
   // subcode → subcode_name 변환 함수들
   const getInvestmentTypeName = React.useCallback((subcode: string) => {
-    const found = investmentTypesMap.find(item => item.subcode === subcode);
+    if (!subcode) return '미분류';
+    const found = investmentTypesMap.find(
+      item => item.subcode === subcode || `${item.group_code}-${item.subcode}` === subcode
+    );
     return found ? found.subcode_name : subcode;
   }, [investmentTypesMap]);
 
   const getInvestmentDetailTypeName = React.useCallback((subcode: string) => {
-    const found = investmentDetailTypesMap.find(item => item.subcode === subcode);
+    if (!subcode) return '미분류';
+    const found = investmentDetailTypesMap.find(
+      item => item.subcode === subcode || `${item.group_code}-${item.subcode}` === subcode
+    );
     return found ? found.subcode_name : subcode;
   }, [investmentDetailTypesMap]);
 
   const getStatusName = React.useCallback((subcode: string) => {
-    const found = statusTypes.find(item => item.subcode === subcode);
+    if (!subcode) return '미분류';
+    const found = statusTypes.find(
+      item => item.subcode === subcode || `${item.group_code}-${item.subcode}` === subcode
+    );
     return found ? found.subcode_name : subcode;
   }, [statusTypes]);
 
@@ -2292,7 +2331,17 @@ export default function InvestmentManagement() {
     const loadInvestments = async () => {
       try {
         const dbInvestments = await getInvestments();
-        const convertedInvestments = dbInvestments.map(convertToInvestmentData);
+        const convertedInvestments = dbInvestments.map((dbInv) => {
+          const converted = convertToInvestmentData(dbInv);
+
+          // subcode를 subcode_name으로 변환
+          return {
+            ...converted,
+            investmentType: getInvestmentTypeName(converted.investmentType) || converted.investmentType,
+            investmentDetailType: getInvestmentDetailTypeName(converted.investmentDetailType) || converted.investmentDetailType,
+            status: getStatusName(converted.status) || converted.status
+          };
+        });
 
         // NO 필드를 프론트엔드에서 역순으로 할당 (최신이 1번)
         setInvestments(assignNoToInvestments(convertedInvestments));
@@ -2302,7 +2351,7 @@ export default function InvestmentManagement() {
     };
 
     loadInvestments();
-  }, [getInvestments, convertToInvestmentData]);
+  }, [getInvestments, convertToInvestmentData, getInvestmentTypeName, getInvestmentDetailTypeName, getStatusName]);
 
   // NO 할당 헬퍼 함수
   const assignNoToInvestments = (investments: InvestmentData[]) => {
@@ -2536,7 +2585,15 @@ export default function InvestmentManagement() {
 
           // 데이터 새로고침 및 NO 재할당
           const dbInvestments = await getInvestments();
-          const convertedInvestments = dbInvestments.map(convertToInvestmentData);
+          const convertedInvestments = dbInvestments.map((dbInv) => {
+            const converted = convertToInvestmentData(dbInv);
+            return {
+              ...converted,
+              investmentType: getInvestmentTypeName(converted.investmentType) || converted.investmentType,
+              investmentDetailType: getInvestmentDetailTypeName(converted.investmentDetailType) || converted.investmentDetailType,
+              status: getStatusName(converted.status) || converted.status
+            };
+          });
 
           setInvestments(assignNoToInvestments(convertedInvestments));
         }
@@ -2584,7 +2641,15 @@ export default function InvestmentManagement() {
 
           // 데이터 새로고침 및 NO 재할당
           const updatedDbInvestments = await getInvestments();
-          const convertedInvestments = updatedDbInvestments.map(convertToInvestmentData);
+          const convertedInvestments = updatedDbInvestments.map((dbInv) => {
+            const converted = convertToInvestmentData(dbInv);
+            return {
+              ...converted,
+              investmentType: getInvestmentTypeName(converted.investmentType) || converted.investmentType,
+              investmentDetailType: getInvestmentDetailTypeName(converted.investmentDetailType) || converted.investmentDetailType,
+              status: getStatusName(converted.status) || converted.status
+            };
+          });
 
           setInvestments(assignNoToInvestments(convertedInvestments));
 
@@ -2637,7 +2702,15 @@ export default function InvestmentManagement() {
       if (success) {
         // 데이터 새로고침 및 NO 재할당
         const dbInvestments = await getInvestments();
-        const convertedInvestments = dbInvestments.map(convertToInvestmentData);
+        const convertedInvestments = dbInvestments.map((dbInv) => {
+          const converted = convertToInvestmentData(dbInv);
+          return {
+            ...converted,
+            investmentType: getInvestmentTypeName(converted.investmentType) || converted.investmentType,
+            investmentDetailType: getInvestmentDetailTypeName(converted.investmentDetailType) || converted.investmentDetailType,
+            status: getStatusName(converted.status) || converted.status
+          };
+        });
 
         setInvestments(assignNoToInvestments(convertedInvestments));
       }
@@ -2752,22 +2825,63 @@ export default function InvestmentManagement() {
             </Box>
           </Box>
 
-          {/* 탭 네비게이션 및 필터 */}
-          <Box
-            sx={{
-              borderBottom: 1,
-              borderColor: 'divider',
-              flexShrink: 0,
-              mt: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}
-          >
-            <Tabs
-              value={value}
-              onChange={handleTabChange}
-              aria-label="투자관리 탭"
+          {/* 권한 체크 */}
+          {!canViewCategory ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 접근할 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : !canReadData ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 대한 데이터 조회 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              {/* 탭 네비게이션 및 필터 */}
+              <Box
+                sx={{
+                  borderBottom: 1,
+                  borderColor: 'divider',
+                  flexShrink: 0,
+                  mt: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}
+              >
+                <Tabs
+                  value={value}
+                  onChange={handleTabChange}
+                  aria-label="투자관리 탭"
               sx={{
                 '& .MuiTab-root': {
                   minHeight: 48,
@@ -2975,6 +3089,10 @@ export default function InvestmentManagement() {
                 selectedAssignee={selectedAssignee}
                 investments={investments}
                 setInvestments={setInvestments}
+                canCreateData={canCreateData}
+                canEditOwn={canEditOwn}
+                canEditOthers={canEditOthers}
+                users={users}
                 onEditInvestment={(investment) => {
                   setCurrentInvestment(investment);
                   setEditDialogOpen(true);
@@ -3007,6 +3125,9 @@ export default function InvestmentManagement() {
                   setCurrentInvestment(investment);
                   setEditDialogOpen(true);
                 }}
+                canEditOwn={canEditOwn}
+                canEditOthers={canEditOthers}
+                users={users}
               />
             </TabPanel>
 
@@ -3070,6 +3191,8 @@ export default function InvestmentManagement() {
               </Box>
             </TabPanel>
           </Box>
+          </>
+          )}
         </CardContent>
       </Card>
 
@@ -3089,6 +3212,10 @@ export default function InvestmentManagement() {
           statusColors={investmentStatusColors}
           investmentTypes={[]}
           teams={[]}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
+          users={users}
         />
       )}
     </Box>

@@ -51,6 +51,7 @@ import { ChangeLogData } from 'types/changelog';
 import { createClient } from '@/lib/supabase/client';
 import { useSession } from 'next-auth/react';
 import useUser from 'hooks/useUser';
+import { useMenuPermission } from 'hooks/usePermissions'; // 권한 관리
 
 // 변경로그 타입 정의
 interface ChangeLog {
@@ -122,6 +123,10 @@ interface KanbanViewProps {
     title?: string
   ) => void;
   assigneeList?: any[];
+  // 🔐 권한 관리
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
 }
 
 function KanbanView({
@@ -132,10 +137,45 @@ function KanbanView({
   educations,
   setEducations,
   addChangeLog,
-  assigneeList
+  assigneeList,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true
 }: KanbanViewProps) {
   // useSupabaseEducation 훅 사용
   const { updateEducation, convertToDbEducationData } = useSupabaseEducation();
+
+  // 현재 로그인한 사용자 정보
+  const { data: session } = useSession();
+  const { users, getSubCodesByGroup } = useCommonData();
+
+  const currentUser = React.useMemo(() => {
+    if (!session?.user?.email || users.length === 0) return null;
+    const found = users.find((u) => u.email === session.user.email);
+    return found;
+  }, [session, users]);
+
+  // GROUP008의 교육방식 목록 가져오기
+  const educationMethodOptions = getSubCodesByGroup('GROUP008');
+
+  // 교육방식 코드를 이름으로 변환하는 함수
+  const getEducationMethodName = React.useCallback((educationType: string) => {
+    if (!educationType) return '미분류';
+    // "GROUP008-SUB003" 형태에서 서브코드명 찾기
+    const method = educationMethodOptions.find(
+      (option) => option.subcode === educationType || `${option.group_code}-${option.subcode}` === educationType
+    );
+    return method?.subcode_name || educationType;
+  }, [educationMethodOptions]);
+
+  // 데이터 소유자 확인 함수
+  const isDataOwner = React.useCallback((education: EducationTableData) => {
+    if (!currentUser) return false;
+    // createdBy 또는 assignee 중 하나라도 현재 사용자와 일치하면 소유자
+    return education.createdBy === currentUser.user_name ||
+           education.assignee === currentUser.user_name;
+  }, [currentUser]);
+
   // 상태 관리
   const [activeEducation, setActiveEducation] = useState<EducationTableData | null>(null);
   const [isDraggingState, setIsDraggingState] = useState(false);
@@ -409,9 +449,10 @@ function KanbanView({
   };
 
   // 드래그 가능한 카드 컴포넌트
-  function DraggableCard({ education }: { education: EducationTableData }) {
+  function DraggableCard({ education, canEditOwn = true, canEditOthers = true }: { education: EducationTableData; canEditOwn?: boolean; canEditOthers?: boolean }) {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-      id: education.id
+      id: education.id,
+      disabled: !(canEditOthers || (canEditOwn && isDataOwner(education)))
     });
 
     // 담당자 정보 최적화 (useMemo로 중복 find 방지)
@@ -448,7 +489,7 @@ function KanbanView({
           <span className="status-tag" style={getStatusTagStyle(education.status)}>
             {education.status}
           </span>
-          <span className="incident-type-tag">{education.educationType || '일반요청'}</span>
+          <span className="incident-type-tag">{getEducationMethodName(education.educationType) || '일반요청'}</span>
         </div>
 
         {/* 2. 카드 제목 */}
@@ -463,8 +504,8 @@ function KanbanView({
             </span>
           </div>
           <div className="info-line">
-            <span className="info-label">교육유형:</span>
-            <span className="info-value">{education.educationType || '미설정'}</span>
+            <span className="info-label">교육방식:</span>
+            <span className="info-value">{getEducationMethodName(education.educationType) || '미설정'}</span>
           </div>
           <div className="info-line">
             <span className="info-label">시작일:</span>
@@ -737,7 +778,7 @@ function KanbanView({
             return (
               <DroppableColumn key={column.key} column={column}>
                 {items.map((item) => (
-                  <DraggableCard key={item.id} education={item} />
+                  <DraggableCard key={item.id} education={item} canEditOwn={canEditOwn} canEditOthers={canEditOthers} />
                 ))}
 
                 {/* 빈 칼럼 메시지 */}
@@ -761,7 +802,7 @@ function KanbanView({
           })}
         </div>
 
-        <DragOverlay>{activeEducation ? <DraggableCard education={activeEducation} /> : null}</DragOverlay>
+        <DragOverlay>{activeEducation ? <DraggableCard education={activeEducation} canEditOwn={canEditOwn} canEditOthers={canEditOthers} /> : null}</DragOverlay>
       </DndContext>
 
       {/* Education 편집 다이얼로그 */}
@@ -776,6 +817,9 @@ function KanbanView({
           statusOptions={educationStatusOptions}
           statusColors={educationStatusColors}
           teams={teams}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>
@@ -916,7 +960,7 @@ function MonthlyScheduleView({
           {/* 월 헤더 - 상반기 */}
           {monthNames.slice(0, 6).map((month, index) => (
             <Box
-              key={index}
+              key={`month-header-first-${index}`}
               sx={{
                 py: 1.5,
                 px: 1,
@@ -941,7 +985,7 @@ function MonthlyScheduleView({
 
             return (
               <Box
-                key={monthIndex}
+                key={`month-content-first-${monthIndex}`}
                 sx={{
                   borderRight: monthIndex < 5 ? '1px solid' : 'none',
                   borderColor: 'divider',
@@ -962,7 +1006,7 @@ function MonthlyScheduleView({
 
                   return (
                     <Box
-                      key={item.id}
+                      key={`month-${monthIndex}-item-${item.id}`}
                       onClick={() => onCardClick(item)}
                       sx={{
                         mb: itemIndex < items.length - 1 ? 0.8 : 0,
@@ -1023,7 +1067,7 @@ function MonthlyScheduleView({
           {/* 월 헤더 - 하반기 */}
           {monthNames.slice(6, 12).map((month, index) => (
             <Box
-              key={index + 6}
+              key={`month-header-second-${index}`}
               sx={{
                 py: 1.5,
                 px: 1,
@@ -1049,7 +1093,7 @@ function MonthlyScheduleView({
 
             return (
               <Box
-                key={monthIndex}
+                key={`month-content-second-${index}`}
                 sx={{
                   borderRight: index < 5 ? '1px solid' : 'none',
                   borderColor: 'divider',
@@ -1070,7 +1114,7 @@ function MonthlyScheduleView({
 
                   return (
                     <Box
-                      key={item.id}
+                      key={`month-second-${index}-item-${item.id}`}
                       onClick={() => onCardClick(item)}
                       sx={{
                         mb: itemIndex < items.length - 1 ? 0.8 : 0,
@@ -1626,13 +1670,13 @@ function DashboardView({
   const getStatusColor = (status: string) => {
     switch (status) {
       case '대기':
-        return '#ED8936';
+        return '#90A4AE';
       case '진행':
-        return '#4267B2';
+        return '#7986CB';
       case '완료':
-        return '#4A5568';
+        return '#81C784';
       case '홀딩':
-        return '#E53E3E';
+        return '#E57373';
       default:
         return '#9e9e9e';
     }
@@ -1804,7 +1848,7 @@ function DashboardView({
         text: '개인교육 건수'
       }
     },
-    colors: ['#ED8936', '#4267B2', '#4A5568', '#E53E3E'],
+    colors: ['#90A4AE', '#7986CB', '#81C784', '#E57373'],
     legend: {
       position: 'top',
       horizontalAlign: 'right'
@@ -1960,7 +2004,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#48C4B7',
+              background: '#26C6DA',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1984,7 +2028,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#4A5568',
+              background: '#90A4AE',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -2008,7 +2052,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#4267B2',
+              background: '#7986CB',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -2032,7 +2076,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#E53E3E',
+              background: '#81C784',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -2056,7 +2100,7 @@ function DashboardView({
           <Card
             sx={{
               p: 3,
-              background: '#ED8936',
+              background: '#E57373',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -2374,6 +2418,9 @@ export default function EducationManagement() {
   const { data: session } = useSession();
   const user = useUser();
   const userName = user?.name || session?.user?.name || '시스템';
+
+  // 🔐 권한 관리
+  const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers, loading: permissionLoading } = useMenuPermission('/apps/education');
 
   // Supabase 훅 사용 (즉시 렌더링 - loading 상태 제거)
   const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 가져오기
@@ -2752,22 +2799,44 @@ export default function EducationManagement() {
             </Box>
           </Box>
 
-          {/* 탭 네비게이션 및 필터 */}
-          <Box
-            sx={{
-              borderBottom: 1,
-              borderColor: 'divider',
-              flexShrink: 0,
-              mt: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}
-          >
-            <Tabs
-              value={value}
-              onChange={handleChange}
-              aria-label="개인교육관리 탭"
+          {/* 권한 체크: 카테고리 보기만 있는 경우 */}
+          {canViewCategory && !canReadData ? (
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 2,
+                py: 8
+              }}
+            >
+              <Typography variant="h5" color="text.secondary">
+                이 페이지에 대한 데이터 조회 권한이 없습니다.
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                관리자에게 권한을 요청하세요.
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              {/* 탭 네비게이션 및 필터 */}
+              <Box
+                sx={{
+                  borderBottom: 1,
+                  borderColor: 'divider',
+                  flexShrink: 0,
+                  mt: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}
+              >
+                <Tabs
+                  value={value}
+                  onChange={handleChange}
+                  aria-label="개인교육관리 탭"
               sx={{
                 '& .MuiTab-root': {
                   minHeight: 48,
@@ -3004,6 +3073,9 @@ export default function EducationManagement() {
                   educations={educations}
                   setEducations={setEducations}
                   addChangeLog={addChangeLog}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                 />
               </Box>
             </TabPanel>
@@ -3045,6 +3117,9 @@ export default function EducationManagement() {
                   setEducations={setEducations}
                   addChangeLog={addChangeLog}
                   assigneeList={users}
+                  canCreateData={canCreateData}
+                  canEditOwn={canEditOwn}
+                  canEditOthers={canEditOthers}
                 />
               </Box>
             </TabPanel>
@@ -3167,6 +3242,8 @@ export default function EducationManagement() {
               </Box>
             </TabPanel>
           </Box>
+          </>
+          )}
         </CardContent>
       </Card>
 
@@ -3182,6 +3259,9 @@ export default function EducationManagement() {
           statusOptions={educationStatusOptions}
           statusColors={educationStatusColors}
           teams={teams}
+          canCreateData={canCreateData}
+          canEditOwn={canEditOwn}
+          canEditOthers={canEditOthers}
         />
       )}
     </Box>

@@ -67,10 +67,18 @@ export interface SystemMenuPermissionsTableRef {
   hasPendingChanges: () => boolean;
 }
 
+// Props 타입 정의
+interface SystemMenuPermissionsTableProps {
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
+}
+
 // 메뉴 아이템 import (아이콘 렌더링용)
 import menuItems from 'menu-items';
 
-const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((props, ref) => {
+const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef, SystemMenuPermissionsTableProps>(
+  ({ canCreateData = true, canEditOwn = true, canEditOthers = true }, ref) => {
   const { menus, loading, error, updateMenu, addMenu, deleteMenu, toggleMenuEnabled, clearError } = useSupabaseMenuManagement();
 
   // 선택된 메뉴들
@@ -452,16 +460,34 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button variant="contained" startIcon={<Add size={16} />} onClick={handleAddMenu} size="small">
+          <Button
+            variant="contained"
+            startIcon={<Add size={16} />}
+            onClick={handleAddMenu}
+            size="small"
+            disabled={!canCreateData}
+            sx={{
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             메뉴 추가
           </Button>
           <Button
             variant="outlined"
             startIcon={<Trash size={16} />}
             onClick={handleDeleteSelected}
-            disabled={selectedMenus.length === 0}
+            disabled={selectedMenus.length === 0 || !(canEditOwn || canEditOthers)}
             color="error"
             size="small"
+            sx={{
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
           >
             삭제 ({selectedMenus.length})
           </Button>
@@ -726,10 +752,14 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
                       onChange={() => handleToggleEnabled(menu.id)}
                       size="small"
                       color="primary"
+                      disabled={!(canEditOwn || canEditOthers)}
                       sx={{
                         transform: 'scale(0.91)',
                         '& .MuiSvgIcon-root': {
                           fontSize: 16
+                        },
+                        '&.Mui-disabled': {
+                          color: 'grey.400'
                         }
                       }}
                     />
@@ -1064,8 +1094,28 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAddDialogOpen(false)}>취소</Button>
-          <Button onClick={handleSaveNewMenu} variant="contained">
+          <Button
+            onClick={() => setAddDialogOpen(false)}
+            disabled={!canCreateData}
+            sx={{
+              '&.Mui-disabled': {
+                color: 'grey.500'
+              }
+            }}
+          >
+            취소
+          </Button>
+          <Button
+            onClick={handleSaveNewMenu}
+            variant="contained"
+            disabled={!canCreateData}
+            sx={{
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             추가
           </Button>
         </DialogActions>
@@ -1388,8 +1438,28 @@ const SystemMenuPermissionsTable = forwardRef<SystemMenuPermissionsTableRef>((pr
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEditDialogOpen(false)}>취소</Button>
-          <Button onClick={handleSaveEditMenu} variant="contained">
+          <Button
+            onClick={() => setEditDialogOpen(false)}
+            disabled={!(canEditOwn || canEditOthers)}
+            sx={{
+              '&.Mui-disabled': {
+                color: 'grey.500'
+              }
+            }}
+          >
+            취소
+          </Button>
+          <Button
+            onClick={handleSaveEditMenu}
+            variant="contained"
+            disabled={!(canEditOwn || canEditOthers)}
+            sx={{
+              '&.Mui-disabled': {
+                backgroundColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
             저장
           </Button>
         </DialogActions>
