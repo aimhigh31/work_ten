@@ -176,6 +176,15 @@ function KanbanView({
     return found ? found.subcode_name : subcode;
   }, [incidentTypesMap]);
 
+  // 상태 코드를 이름으로 변환하는 함수
+  const getStatusName = React.useCallback((subcode: string) => {
+    if (!subcode) return '대기';
+    const statusItem = masterCodes.find(
+      (code) => code.codetype === 'subcode' && code.group_code === 'GROUP002' && code.subcode === subcode
+    );
+    return statusItem?.subcode_name || subcode;
+  }, [masterCodes]);
+
   // 현재 로그인한 사용자 정보
   const { data: session } = useSession();
   const user = useUser();
@@ -222,8 +231,8 @@ function KanbanView({
     // 담당자 필터
     if (selectedAssignee !== '전체' && task.assignee !== selectedAssignee) return false;
 
-    // 상태 필터
-    if (selectedStatus !== '전체' && task.status !== selectedStatus) return false;
+    // 상태 필터 - 서브코드를 서브코드명으로 변환해서 비교
+    if (selectedStatus !== '전체' && getStatusName(task.status) !== selectedStatus) return false;
 
     return true;
   });
@@ -259,7 +268,7 @@ function KanbanView({
       const mainContent = currentTask.mainContent || '사고내용 없음';
       const description = `${mainContent} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
 
-      addChangeLog('수정', taskCode, description, currentTask.team || '미분류', oldStatus, newStatus, '상태', mainContent);
+      addChangeLog('수정', taskCode, description, currentTask.team || '미분류', oldStatus, newStatus, '상태', mainContent, '칸반탭');
     }
   };
 
@@ -342,22 +351,6 @@ function KanbanView({
     return iconMap[incidentType] || '⚠';
   };
 
-  // 상태별 진행률 계산
-  const getProgressFromStatus = (status: string) => {
-    switch (status) {
-      case '대기':
-        return 0;
-      case '진행':
-        return 50;
-      case '완료':
-        return 100;
-      case '홀딩':
-        return 0;
-      default:
-        return 0;
-    }
-  };
-
   // 드래그 가능한 카드 컴포넌트
   function DraggableCard({ task }: { task: SecurityIncidentRecord }) {
     // 드래그 가능 여부: canEditOthers가 있거나, canEditOwn이 있고 자신의 데이터인 경우
@@ -435,60 +428,6 @@ function KanbanView({
           <div className="info-line">
             <span className="info-label">완료일:</span>
             <span className="info-value">{task.completedDate || '-'}</span>
-          </div>
-        </div>
-
-        {/* 사고대응단계 진행도 */}
-        <div className="progress-section">
-          <div className="progress-info">
-            <div className="progress-left">
-              <span className="progress-text">
-                {(() => {
-                  const stageMap: { [key: string]: number } = {
-                    '사고 탐지': 1,
-                    '현황 분석': 2,
-                    '개선 조치 중': 3,
-                    '즉시 해결': 4,
-                    '근본 개선': 5
-                  };
-                  const currentStageNum = stageMap[task.responseStage || '사고 탐지'] || 1;
-                  return `${currentStageNum}/5`;
-                })()}
-              </span>
-              <span className="progress-stage">{task.responseStage || '사고 탐지'}</span>
-            </div>
-            <span className="progress-percentage">
-              진행율{' '}
-              {(() => {
-                const stageMap: { [key: string]: number } = {
-                  '사고 탐지': 20,
-                  '현황 분석': 40,
-                  '개선 조치 중': 60,
-                  '즉시 해결': 80,
-                  '근본 개선': 100
-                };
-                return stageMap[task.responseStage || '사고 탐지'] || 20;
-              })()}
-              %
-            </span>
-          </div>
-          <div className="progress-bar">
-            <div
-              className="progress-fill"
-              style={{
-                width: `${(() => {
-                  const stageMap: { [key: string]: number } = {
-                    '사고 탐지': 20,
-                    '현황 분석': 40,
-                    '개선 조치 중': 60,
-                    '즉시 해결': 80,
-                    '근본 개선': 100
-                  };
-                  return stageMap[task.responseStage || '사고 탐지'] || 20;
-                })()}%`,
-                background: '#3b82f6'
-              }}
-            ></div>
           </div>
         </div>
 
@@ -704,54 +643,7 @@ function KanbanView({
           text-overflow: ellipsis;
           white-space: nowrap;
         }
-        
-        .progress-section {
-          margin-bottom: 16px;
-        }
-        
-        .progress-info {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 8px;
-        }
-        
-        .progress-text {
-          font: 600 12px/1 "Inter", "Noto Sans KR", sans-serif;
-          color: #374151;
-        }
-        
-        .progress-left {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        
-        .progress-stage {
-          font: 400 11px/1 "Inter", "Noto Sans KR", sans-serif;
-          color: #6b7280;
-        }
-        
-        .progress-percentage {
-          font: 500 11px/1 "Inter", "Noto Sans KR", sans-serif;
-          color: #3b82f6;
-        }
-        
-        .progress-bar {
-          width: 100%;
-          height: 6px;
-          background: #f3f4f6;
-          border-radius: 3px;
-          overflow: hidden;
-        }
-        
-        .progress-fill {
-          height: 100%;
-          background: #3b82f6;
-          border-radius: 3px;
-          transition: width 0.3s ease;
-        }
-        
+
         .card-footer {
           display: flex;
           align-items: center;
@@ -880,6 +772,16 @@ function MonthlyScheduleView({
 }: MonthlyScheduleViewProps) {
   const theme = useTheme();
   const [viewYear, setViewYear] = useState(new Date().getFullYear().toString());
+  const { masterCodes } = useCommonData();
+
+  // 상태 코드를 이름으로 변환하는 함수
+  const getStatusName = React.useCallback((subcode: string) => {
+    if (!subcode) return '대기';
+    const statusItem = masterCodes.find(
+      (code) => code.codetype === 'subcode' && code.group_code === 'GROUP002' && code.subcode === subcode
+    );
+    return statusItem?.subcode_name || subcode;
+  }, [masterCodes]);
 
   // 데이터 필터링
   const filteredData = tasks.filter((task) => {
@@ -894,8 +796,8 @@ function MonthlyScheduleView({
     // 담당자 필터
     if (selectedAssignee !== '전체' && task.assignee !== selectedAssignee) return false;
 
-    // 상태 필터
-    if (selectedStatus !== '전체' && task.status !== selectedStatus) return false;
+    // 상태 필터 - 서브코드를 서브코드명으로 변환해서 비교
+    if (selectedStatus !== '전체' && getStatusName(task.status) !== selectedStatus) return false;
 
     return true;
   });
@@ -1045,7 +947,7 @@ function MonthlyScheduleView({
                         mb: itemIndex < items.length - 1 ? 0.8 : 0,
                         p: 0.6,
                         borderRadius: 1,
-                        backgroundColor: getStatusColor(item.status),
+                        backgroundColor: getStatusColor(getStatusName(item.status)),
                         cursor: 'pointer',
                         transition: 'all 0.2s ease',
                         '&:hover': {
@@ -1058,7 +960,7 @@ function MonthlyScheduleView({
                         variant="body2"
                         sx={{
                           fontSize: '13px',
-                          color: getStatusTextColor(item.status),
+                          color: getStatusTextColor(getStatusName(item.status)),
                           fontWeight: 500,
                           display: 'flex',
                           alignItems: 'center',
@@ -1066,7 +968,7 @@ function MonthlyScheduleView({
                         }}
                       >
                         <span>{`${month}-${day}`}</span>
-                        <span>{item.status}</span>
+                        <span>{getStatusName(item.status)}</span>
                       </Typography>
                       <Typography
                         variant="body2"
@@ -1153,7 +1055,7 @@ function MonthlyScheduleView({
                         mb: itemIndex < items.length - 1 ? 0.8 : 0,
                         p: 0.6,
                         borderRadius: 1,
-                        backgroundColor: getStatusColor(item.status),
+                        backgroundColor: getStatusColor(getStatusName(item.status)),
                         cursor: 'pointer',
                         transition: 'all 0.2s ease',
                         '&:hover': {
@@ -1166,7 +1068,7 @@ function MonthlyScheduleView({
                         variant="body2"
                         sx={{
                           fontSize: '13px',
-                          color: getStatusTextColor(item.status),
+                          color: getStatusTextColor(getStatusName(item.status)),
                           fontWeight: 500,
                           display: 'flex',
                           alignItems: 'center',
@@ -1174,7 +1076,7 @@ function MonthlyScheduleView({
                         }}
                       >
                         <span>{`${month}-${day}`}</span>
-                        <span>{item.status}</span>
+                        <span>{getStatusName(item.status)}</span>
                       </Typography>
                       <Typography
                         variant="body2"
@@ -1246,6 +1148,15 @@ function DashboardView({
     return found ? found.subcode_name : subcode;
   }, [incidentTypesMap]);
 
+  // 상태 코드를 이름으로 변환하는 함수
+  const getStatusName = React.useCallback((subcode: string) => {
+    if (!subcode) return '대기';
+    const statusItem = masterCodes.find(
+      (code) => code.codetype === 'subcode' && code.group_code === 'GROUP002' && code.subcode === subcode
+    );
+    return statusItem?.subcode_name || subcode;
+  }, [masterCodes]);
+
   // 날짜 범위 필터링 함수
   const filterByDateRange = (data: SecurityIncidentRecord[]) => {
     if (!startDate && !endDate) {
@@ -1282,7 +1193,8 @@ function DashboardView({
 
       if (selectedTeam !== '전체' && task.team !== selectedTeam) return false;
       if (selectedAssignee !== '전체' && task.assignee !== selectedAssignee) return false;
-      if (selectedStatus !== '전체' && task.status !== selectedStatus) return false;
+      // 상태 필터 - 서브코드를 서브코드명으로 변환해서 비교
+      if (selectedStatus !== '전체' && getStatusName(task.status) !== selectedStatus) return false;
       return true;
     })
     .sort((a, b) => (b.no || 0) - (a.no || 0)); // No 기준 역순 정렬
@@ -1957,11 +1869,12 @@ function DashboardView({
                         <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{task.completedDate || '-'}</TableCell>
                         <TableCell sx={{ py: 0.5 }}>
                           <Chip
-                            label={task.status}
+                            label={getStatusName(task.status)}
                             size="small"
                             sx={{
                               bgcolor: (() => {
-                                switch (task.status) {
+                                const statusName = getStatusName(task.status);
+                                switch (statusName) {
                                   case '대기':
                                     return '#90A4AE';
                                   case '진행':
@@ -2308,22 +2221,44 @@ export default function SecurityIncidentManagement() {
       const minute = String(date.getMinutes()).padStart(2, '0');
       const formattedDateTime = `${year}.${month}.${day} ${hour}:${minute}`;
 
+      // 서브코드를 서브코드명으로 변환하는 함수
+      const getSubcodeName = (value: string | null | undefined): string => {
+        if (!value) return '-';
+
+        // GROUP 또는 하이픈이 포함된 경우 서브코드로 판단
+        if (value.includes('GROUP') || value.includes('-')) {
+          // MasterCodeFlat는 flat 배열 구조이므로 codetype으로 필터링
+          const allSubcodes = masterCodes?.filter(item => item.codetype === 'subcode') || [];
+
+          // 해당 서브코드 찾기
+          const subcode = allSubcodes.find(sub => sub.subcode === value);
+
+          if (subcode) {
+            return subcode.subcode_name;
+          } else {
+            return value; // 찾지 못하면 원본 반환
+          }
+        }
+
+        return value; // 일반 텍스트는 그대로 반환
+      };
+
       return {
         id: log.id,
         dateTime: formattedDateTime,
         code: log.record_id, // record_id가 이미 코드임
         target: log.title || incident?.mainContent || log.record_id, // title 우선 사용
-        location: '개요탭', // 변경위치
+        location: log.change_location || '-', // 변경위치
         action: log.action_type,
         changedField: log.changed_field || '-', // 변경필드
         description: log.description,
-        beforeValue: log.before_value,
-        afterValue: log.after_value,
+        beforeValue: getSubcodeName(log.before_value),
+        afterValue: getSubcodeName(log.after_value),
         team: log.team || log.user_department || '-',
         user: log.user_name
       };
     });
-  }, [dbChangeLogs, tasks]);
+  }, [dbChangeLogs, tasks, masterCodes]);
 
   // 변경로그 페이지네이션 적용된 데이터
   const paginatedChangeLogs = React.useMemo(() => {
@@ -2377,7 +2312,8 @@ export default function SecurityIncidentManagement() {
       beforeValue?: string,
       afterValue?: string,
       changedField?: string,
-      title?: string
+      title?: string,
+      location?: string
     ) => {
       try {
         const userName = currentUser?.user_name || currentUser?.name || user?.name || '시스템';
@@ -2391,6 +2327,7 @@ export default function SecurityIncidentManagement() {
           before_value: beforeValue || null,
           after_value: afterValue || null,
           changed_field: changedField || null,
+          change_location: location || '개요탭',
           user_name: userName,
           team: currentUser?.department || '시스템', // 로그인한 사용자의 부서
           user_department: currentUser?.department,
@@ -3055,18 +2992,18 @@ export default function SecurityIncidentManagement() {
                   <Table size="small">
                     <TableHead>
                       <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
-                        <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 150 }}>변경시간</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 180 }}>제목</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 140 }}>코드</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 70 }}>변경분류</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 70 }}>변경위치</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 90 }}>변경필드</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 100 }}>변경전</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 100 }}>변경후</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 400 }}>변경 세부내용</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 50, fontSize: '12px' }}>NO</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 150, fontSize: '12px' }}>변경시간</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 140, fontSize: '12px' }}>코드</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 180, fontSize: '12px' }}>제목</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경분류</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경위치</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경필드</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경전</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경후</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 400, fontSize: '12px' }}>변경세부내용</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>팀</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경자</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -3079,37 +3016,37 @@ export default function SecurityIncidentManagement() {
                           }}
                         >
                           <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                            <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                               {changeLogs.length - (changeLogPage * changeLogRowsPerPage + index)}
                             </Typography>
                           </TableCell>
                           <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                            <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                               {log.dateTime}
                             </Typography>
                           </TableCell>
                           <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                              {log.target}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                            <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                               {log.code}
                             </Typography>
                           </TableCell>
                           <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                            <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                              {log.target}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                               {log.action}
                             </Typography>
                           </TableCell>
                           <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                            <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                               {log.location}
                             </Typography>
                           </TableCell>
                           <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                            <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                               {log.changedField || '-'}
                             </Typography>
                           </TableCell>
@@ -3117,7 +3054,7 @@ export default function SecurityIncidentManagement() {
                             <Typography
                               variant="body2"
                               sx={{
-                                fontSize: '13px',
+                                fontSize: '12px',
                                 color: 'text.primary',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
@@ -3133,7 +3070,7 @@ export default function SecurityIncidentManagement() {
                             <Typography
                               variant="body2"
                               sx={{
-                                fontSize: '13px',
+                                fontSize: '12px',
                                 color: 'text.primary',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
@@ -3149,7 +3086,7 @@ export default function SecurityIncidentManagement() {
                             <Typography
                               variant="body2"
                               sx={{
-                                fontSize: '13px',
+                                fontSize: '12px',
                                 color: 'text.primary',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
@@ -3165,12 +3102,12 @@ export default function SecurityIncidentManagement() {
                             </Typography>
                           </TableCell>
                           <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                            <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                               {log.team}
                             </Typography>
                           </TableCell>
                           <TableCell>
-                            <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                            <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                               {log.user}
                             </Typography>
                           </TableCell>

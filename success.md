@@ -5662,3 +5662,138 @@ const forceRefreshCommonData = useCallback(async () => {
 ---
 
 **인사평가관리 평가유형 코드명 분리 방식 적용 완료! 🎉**
+
+# 2025-11-01: 업무관리 목업 데이터 완전 제거
+
+## 📌 문제 상황
+
+업무관리 페이지에서 목업 데이터가 지속적으로 나타나는 문제 발생:
+
+1. **탭 전환 시 목업 데이터 표시**
+   - 처음 페이지 로드 시: DB 데이터 정상 표시
+   - 데이터 탭 → 칸반 탭 → 데이터 탭 이동 시: 목업 데이터 표시
+   - 0.3초 정도 목업 데이터가 보였다가 실제 데이터로 전환
+
+2. **캐시 삭제로도 해결 안됨**
+   - sessionStorage에서 캐시 삭제 시도
+   - 교육관리 패턴(캐시 우선) 적용
+   - 그럼에도 목업 데이터 계속 표시
+
+3. **근본 원인**
+   - `src/data/task.ts`에 목업 데이터가 하드코딩되어 있음
+   - `TaskTable.tsx`에서 목업 데이터를 import하여 초기값으로 사용
+   - useEffect에서 taskData를 setData로 설정하는 로직 존재
+
+---
+
+## ✅ 해결 방법
+
+### 1. 목업 데이터 소스 제거
+
+**src/data/task.ts**
+```typescript
+// 변경 전
+export const taskData: TaskData[] = [
+  {
+    id: 1,
+    no: 15,
+    registrationDate: '2025-01-20',
+    // ... 15개의 목업 데이터
+  }
+];
+
+// 변경 후
+export const taskData: TaskData[] = []; // 빈 배열로 변경
+```
+
+### 2. 컴포넌트에서 목업 데이터 import 제거
+
+**src/views/apps/TaskManagement.tsx**
+```typescript
+// 변경 전
+import { taskData, taskStatusColors, taskStatusOptions, teams } from 'data/task';
+
+// 변경 후
+import { taskStatusColors, taskStatusOptions, teams } from 'data/task';
+```
+
+**src/views/apps/TaskTable.tsx**
+```typescript
+// 변경 전
+import { taskData, teams, assignees, taskStatusOptions, taskStatusColors, assigneeAvatars } from 'data/task';
+
+// 변경 후
+import { teams, assignees, taskStatusOptions, taskStatusColors, assigneeAvatars } from 'data/task';
+```
+
+### 3. 불필요한 useEffect 제거
+
+**src/views/apps/TaskTable.tsx**
+```typescript
+// 삭제된 코드
+useEffect(() => {
+  setData(taskData);
+}, [taskData]);
+```
+
+이 useEffect가 목업 데이터를 주입하는 주범이었음
+
+---
+
+## 🎯 결과
+
+### Before
+- 페이지 로드 → DB 데이터 표시
+- 탭 전환 → 목업 데이터 깜빡임 (0.3초)
+- 다시 전환 → 실제 데이터 복원
+
+### After  
+- 페이지 로드 → DB 데이터만 표시
+- 탭 전환 → DB 데이터 유지 (깜빡임 없음)
+- 목업 데이터 완전히 사라짐
+
+---
+
+## 📝 관련 파일
+
+### 수정된 파일
+
+1. **src/data/task.ts**
+   - taskData 배열을 빈 배열로 변경
+   - 15개의 목업 데이터 완전 제거
+
+2. **src/views/apps/TaskManagement.tsx**
+   - taskData import 제거
+   - Supabase에서만 데이터 가져옴
+
+3. **src/views/apps/TaskTable.tsx**
+   - taskData import 제거
+   - taskData를 setData하는 useEffect 제거
+   - props로 받은 실제 데이터만 사용
+
+---
+
+## 🎯 교훈
+
+1. **목업 데이터 관리**
+   - 개발 중에도 목업 데이터는 별도 파일로 분리
+   - 프로덕션 코드에서 쉽게 제거 가능하도록 구조화
+   - import만 제거하면 되도록 설계
+
+2. **캐시만으로는 부족**
+   - 캐시 전략만으로는 하드코딩된 데이터 해결 불가
+   - 데이터 소스 자체를 정리해야 근본 해결
+   - useEffect 의존성 배열 확인 필요
+
+3. **데이터 흐름 추적의 중요성**
+   - props → state → useEffect → 렌더링 전체 흐름 파악
+   - 각 단계에서 데이터가 어디서 오는지 명확히 추적
+   - 불필요한 데이터 주입 지점 제거
+
+4. **일관성 있는 패턴**
+   - 다른 관리 페이지(KPI, 교육 등)와 동일한 패턴 적용
+   - props로 데이터 받고, DB에서만 조회
+   - 목업 데이터는 초기 개발 시에만 임시 사용
+
+---
+

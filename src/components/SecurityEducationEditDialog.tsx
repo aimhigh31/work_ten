@@ -224,7 +224,10 @@ const edsecurityEducationReducer = (state: SecurityEducationEditState, action: S
     case 'SET_FIELD':
       return { ...state, [action.field!]: action.value! };
     case 'SET_EDUCATION':
-      return {
+      console.log('🔍 [Reducer] SET_EDUCATION 실행');
+      console.log('🔍 action.education.educationType:', action.education!.educationType);
+      console.log('🔍 action.education.status:', action.education!.status);
+      const newState = {
         educationName: action.education!.educationName || '',
         description: action.education!.description || '',
         educationType: action.education!.educationType || '',
@@ -237,6 +240,8 @@ const edsecurityEducationReducer = (state: SecurityEducationEditState, action: S
         code: action.education!.code || '',
         team: action.education!.team || ''
       };
+      console.log('🔍 [Reducer] 새 상태:', newState);
+      return newState;
     case 'INIT_NEW_EDUCATION':
       return {
         educationName: '',
@@ -402,7 +407,18 @@ const OverviewTab = memo(
                     교육유형 <span style={{ color: 'red' }}>*</span>
                   </span>
                 </InputLabel>
-                <Select value={educationState.educationType} onChange={handleFieldChange('educationType')} label=" " displayEmpty>
+                <Select
+                  value={educationState.educationType}
+                  onChange={handleFieldChange('educationType')}
+                  label=" "
+                  displayEmpty
+                  onOpen={() => {
+                    console.log('🔍 [교육유형 Select] 열림');
+                    console.log('🔍 현재 value:', educationState.educationType);
+                    console.log('🔍 educationTypes 개수:', educationTypes?.length);
+                    console.log('🔍 educationTypes:', educationTypes);
+                  }}
+                >
                   <MenuItem value="">선택</MenuItem>
                   {educationTypes && educationTypes.length > 0
                     ? educationTypes.map((type) => (
@@ -472,7 +488,17 @@ const OverviewTab = memo(
 
             <FormControl fullWidth>
               <InputLabel shrink>상태</InputLabel>
-              <Select value={educationState.status} onChange={handleFieldChange('status')} label="상태">
+              <Select
+                value={educationState.status}
+                onChange={handleFieldChange('status')}
+                label="상태"
+                onOpen={() => {
+                  console.log('🔍 [상태 Select] 열림');
+                  console.log('🔍 현재 value:', educationState.status);
+                  console.log('🔍 statusTypes 개수:', statusTypes?.length);
+                  console.log('🔍 statusTypes:', statusTypes);
+                }}
+              >
                 {statusTypes && statusTypes.length > 0
                   ? statusTypes.map((type) => (
                       <MenuItem key={type.subcode} value={type.subcode}>
@@ -3214,9 +3240,23 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
   const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
   // ✅ 공용 창고에서 사용자 데이터 가져오기 (캐싱된 데이터 사용)
-  const { users } = useCommonData();
+  const { users, masterCodes } = useCommonData();
 
   console.log('🔍 [SecurityEducationEditDialog] CommonData users 개수:', users?.length);
+
+  // 서브코드명 변환 함수 (상태)
+  const getStatusName = React.useCallback((subcode: string) => {
+    if (!subcode) return '';
+    const found = masterCodes.find(item => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [masterCodes]);
+
+  // 서브코드명 변환 함수 (교육유형)
+  const getEducationTypeName = React.useCallback((subcode: string) => {
+    if (!subcode) return '';
+    const found = masterCodes.find(item => item.codetype === 'subcode' && item.group_code === 'GROUP008' && item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [masterCodes]);
 
   // 세션 email로 DB에서 사용자 찾기 (InspectionEditDialog 패턴)
   const currentUser = React.useMemo(() => {
@@ -3503,6 +3543,10 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
   useEffect(() => {
     if (open) {
       if (mode === 'edit' && data) {
+        console.log('🔍 [팝업열림] SET_EDUCATION 실행');
+        console.log('🔍 data.educationType:', data.educationType, '(타입:', typeof data.educationType, ')');
+        console.log('🔍 data.status:', data.status, '(타입:', typeof data.status, ')');
+        console.log('🔍 data 전체:', data);
         dispatch({ type: 'SET_EDUCATION', education: data });
         // 편집 모드에서 기존 교육실적보고 데이터 로드
         // 임시 저장된 데이터 확인
@@ -3868,7 +3912,20 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
 
         if (oldValue !== newValue) {
           console.log(`✅ 변경 감지! 필드: ${field}, 이전값: ${oldValue}, 새값: ${newValue}`);
-          queueChangeLog(action, oldValue, newValue, {
+
+          // 상태와 교육유형은 서브코드명으로 변환해서 로그 저장
+          let oldValueDisplay = oldValue;
+          let newValueDisplay = newValue;
+
+          if (field === 'status') {
+            oldValueDisplay = getStatusName(oldValue) || oldValue;
+            newValueDisplay = getStatusName(newValue) || newValue;
+          } else if (field === 'educationType') {
+            oldValueDisplay = getEducationTypeName(oldValue) || oldValue;
+            newValueDisplay = getEducationTypeName(newValue) || newValue;
+          }
+
+          queueChangeLog(action, oldValueDisplay, newValueDisplay, {
             changeType: 'update',
             fieldName: field
           });
@@ -4328,7 +4385,9 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
     initialDataSnapshot,
     queueChangeLog,
     addChangeLog,
-    pendingChangeLogs
+    pendingChangeLogs,
+    getStatusName,
+    getEducationTypeName
   ]);
 
   const handleClose = useCallback(() => {

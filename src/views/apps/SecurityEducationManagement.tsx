@@ -186,6 +186,41 @@ function KanbanView({
   const theme = useTheme();
   const supabase = createClient(); // Supabase client 생성
 
+  // masterCodes 가져오기
+  const { masterCodes } = useCommonData();
+
+  // GROUP008 교육유형 서브코드 목록
+  const educationTypesList = useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP008' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // GROUP002 상태 서브코드 목록
+  const statusTypesList = useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // subcode → subcode_name 변환 헬퍼 함수 (교육유형용)
+  const getEducationTypeName = useCallback((subcode: string) => {
+    const found = educationTypesList.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [educationTypesList]);
+
+  // subcode → subcode_name 변환 헬퍼 함수 (상태용)
+  const getStatusName = useCallback((subcode: string) => {
+    const found = statusTypesList.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [statusTypesList]);
+
+  // subcode_name → subcode 역변환 헬퍼 함수 (상태용)
+  const getStatusCode = useCallback((subcodeName: string) => {
+    const found = statusTypesList.find(item => item.subcode_name === subcodeName);
+    return found ? found.subcode : subcodeName;
+  }, [statusTypesList]);
+
   // 현재 로그인한 사용자 정보
   const { data: session } = useSession();
   const user = useUser();
@@ -293,7 +328,7 @@ function KanbanView({
   // Task 저장 핸들러는 2434번 줄의 데이터베이스 연동 함수로 통합됨
 
   // 드래그 종료 핸들러
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveTask(null);
     setIsDraggingState(false);
@@ -301,29 +336,55 @@ function KanbanView({
     if (!over) return;
 
     const taskId = active.id;
-    const newStatus = over.id as SecurityEducationStatus;
+    const newStatusName = over.id as string; // 서브코드명 (예: '대기', '진행')
+    const newStatusCode = getStatusCode(newStatusName); // 서브코드로 변환 (예: 'GROUP002-SUB001')
 
     // 상태가 변경된 경우만 업데이트
     const currentTask = tasks.find((task) => task.id === taskId);
-    if (currentTask && currentTask.status !== newStatus) {
-      const oldStatus = currentTask.status;
+    if (currentTask && currentTask.status !== newStatusCode) {
+      const oldStatusCode = currentTask.status;
+      const oldStatusName = getStatusName(oldStatusCode);
 
-      setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: newStatus } : task)));
+      // 메모리 상태 업데이트
+      setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: newStatusCode } : task)));
+
+      // DB 업데이트
+      try {
+        const { error } = await supabase
+          .from('security_education_data')
+          .update({ status: newStatusCode })
+          .eq('id', taskId);
+
+        if (error) {
+          console.error('❌ 칸반 상태 변경 DB 저장 실패:', error);
+          // 실패 시 원래 상태로 되돌리기
+          setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: oldStatusCode } : task)));
+          return;
+        }
+
+        console.log(`✅ 칸반 상태 변경 성공: ID ${taskId}, ${oldStatusName} → ${newStatusName}`);
+      } catch (err) {
+        console.error('❌ 칸반 상태 변경 오류:', err);
+        // 오류 시 원래 상태로 되돌리기
+        setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: oldStatusCode } : task)));
+        return;
+      }
 
       // 변경로그 추가
       const taskCode = currentTask.code || `EDU-${taskId}`;
       const educationName = currentTask.educationName || '교육명 없음';
-      const description = `${educationName} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
+      const description = `${educationName} 상태를 "${oldStatusName}"에서 "${newStatusName}"로 변경`;
 
       addChangeLog(
         '교육 상태 변경',
         taskCode,
         description,
         currentTask.educationType || '미분류',
-        oldStatus,
-        newStatus,
+        oldStatusName,
+        newStatusName,
         '상태',
-        educationName
+        educationName,
+        '칸반탭'
       );
     }
   };
@@ -336,9 +397,9 @@ function KanbanView({
     { key: '홀딩', title: '홀딩', pillColor: '#FFEBEE', textColor: '#D32F2F' }
   ];
 
-  // 상태별 아이템 가져오기
+  // 상태별 아이템 가져오기 - 서브코드를 서브코드명으로 변환해서 비교
   const getItemsByStatus = (status: string) => {
-    return filteredData.filter((item) => item.status === status);
+    return filteredData.filter((item) => getStatusName(item.status) === status);
   };
 
   // 교육유형별 색상 매핑
@@ -458,8 +519,8 @@ function KanbanView({
       >
         {/* 상태 및 교육유형 태그 */}
         <div className="status-tags">
-          <span className={`status-tag status-${task.status?.toLowerCase() || 'waiting'}`}>{task.status || '대기'}</span>
-          <span className="education-type-tag">{task.educationType || 'IT기술교육'}</span>
+          <span className={`status-tag status-${getStatusName(task.status) || '대기'}`}>{getStatusName(task.status) || '대기'}</span>
+          <span className="education-type-tag">{getEducationTypeName(task.educationType) || 'IT기술교육'}</span>
         </div>
 
         {/* 카드 제목 */}
@@ -896,6 +957,22 @@ function MonthlyScheduleView({
   const theme = useTheme();
   const [viewYear, setViewYear] = useState(new Date().getFullYear().toString());
 
+  // masterCodes 가져오기
+  const { masterCodes } = useCommonData();
+
+  // GROUP002 상태 서브코드 목록
+  const statusTypesList = useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // subcode → subcode_name 변환 헬퍼 함수 (상태용)
+  const getStatusName = useCallback((subcode: string) => {
+    const found = statusTypesList.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [statusTypesList]);
+
   // 데이터 필터링
   const filteredData = tasks.filter((task) => {
     // 연도 필터 (메인 필터가 전체가 아니면 메인 필터 우선, 아니면 뷰 필터 사용)
@@ -1079,7 +1156,7 @@ function MonthlyScheduleView({
                         mb: itemIndex < items.length - 1 ? 0.8 : 0,
                         p: 0.6,
                         borderRadius: 1,
-                        backgroundColor: getStatusColor(item.status),
+                        backgroundColor: getStatusColor(getStatusName(item.status)),
                         cursor: 'pointer',
                         transition: 'all 0.2s ease',
                         '&:hover': {
@@ -1092,7 +1169,7 @@ function MonthlyScheduleView({
                         variant="body2"
                         sx={{
                           fontSize: '13px',
-                          color: getStatusTextColor(item.status),
+                          color: getStatusTextColor(getStatusName(item.status)),
                           fontWeight: 500,
                           display: 'flex',
                           alignItems: 'center',
@@ -1100,7 +1177,7 @@ function MonthlyScheduleView({
                         }}
                       >
                         <span>{`${month}-${day}`}</span>
-                        <span>{item.status}</span>
+                        <span>{getStatusName(item.status)}</span>
                       </Typography>
                       <Typography
                         variant="body2"
@@ -1206,7 +1283,7 @@ function MonthlyScheduleView({
                         mb: itemIndex < items.length - 1 ? 0.8 : 0,
                         p: 0.6,
                         borderRadius: 1,
-                        backgroundColor: getStatusColor(item.status),
+                        backgroundColor: getStatusColor(getStatusName(item.status)),
                         cursor: 'pointer',
                         transition: 'all 0.2s ease',
                         '&:hover': {
@@ -1219,7 +1296,7 @@ function MonthlyScheduleView({
                         variant="body2"
                         sx={{
                           fontSize: '13px',
-                          color: getStatusTextColor(item.status),
+                          color: getStatusTextColor(getStatusName(item.status)),
                           fontWeight: 500,
                           display: 'flex',
                           alignItems: 'center',
@@ -1227,7 +1304,7 @@ function MonthlyScheduleView({
                         }}
                       >
                         <span>{`${month}-${day}`}</span>
-                        <span>{item.status}</span>
+                        <span>{getStatusName(item.status)}</span>
                       </Typography>
                       <Typography
                         variant="body2"
@@ -1354,18 +1431,18 @@ function ChangeLogView({
         <Table size="small">
           <TableHead>
             <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
-              <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 130 }}>변경시간</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 180 }}>제목</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 140 }}>코드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경분류</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경위치</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>변경필드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 100 }}>변경전</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 100 }}>변경후</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 300 }}>변경 세부내용</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 50, fontSize: '12px' }}>NO</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 130, fontSize: '12px' }}>변경시간</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 140, fontSize: '12px' }}>코드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 180, fontSize: '12px' }}>제목</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경분류</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경위치</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경필드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경전</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경후</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 300, fontSize: '12px' }}>변경세부내용</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>팀</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경자</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -1378,37 +1455,37 @@ function ChangeLogView({
                 }}
               >
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {changeLogs.length - (page * rowsPerPage + index)}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {log.dateTime}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                    {log.title}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {log.code}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                    {log.title}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {log.action}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {log.location}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {log.changedField || '-'}
                   </Typography>
                 </TableCell>
@@ -1416,7 +1493,7 @@ function ChangeLogView({
                   <Typography
                     variant="body2"
                     sx={{
-                      fontSize: '13px',
+                      fontSize: '12px',
                       color: 'text.primary',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -1432,7 +1509,7 @@ function ChangeLogView({
                   <Typography
                     variant="body2"
                     sx={{
-                      fontSize: '13px',
+                      fontSize: '12px',
                       color: 'text.primary',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -1448,7 +1525,7 @@ function ChangeLogView({
                   <Typography
                     variant="body2"
                     sx={{
-                      fontSize: '13px',
+                      fontSize: '12px',
                       color: 'text.primary',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -1464,12 +1541,12 @@ function ChangeLogView({
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {log.team}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {log.user}
                   </Typography>
                 </TableCell>
@@ -1640,6 +1717,35 @@ function DashboardView({
   const [endDate, setEndDate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
+  const { masterCodes } = useCommonData();
+
+  // 마스터코드에서 상태 옵션 가져오기 (GROUP002)
+  const statusTypes = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // 마스터코드에서 교육유형 옵션 가져오기 (GROUP008)
+  const educationTypesForDashboard = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP008' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // subcode → subcode_name 변환 함수 (상태)
+  const getStatusName = React.useCallback((subcode: string) => {
+    if (!subcode) return '';
+    const found = statusTypes.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [statusTypes]);
+
+  // subcode → subcode_name 변환 함수 (교육유형)
+  const getEducationTypeName = React.useCallback((subcode: string) => {
+    if (!subcode) return '';
+    const found = educationTypesForDashboard.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [educationTypesForDashboard]);
 
   // 날짜 범위 필터링 함수
   const filterByDateRange = (data: SecurityEducationTableData[]) => {
@@ -1684,16 +1790,17 @@ function DashboardView({
   const totalCount = filteredData.length;
   const statusStats = filteredData.reduce(
     (acc, item) => {
-      acc[item.status] = (acc[item.status] || 0) + 1;
+      const statusName = getStatusName(item.status);
+      acc[statusName] = (acc[statusName] || 0) + 1;
       return acc;
     },
     {} as Record<string, number>
   );
 
-  // 교육유형별 통계 (원형차트용) - educationType 필드 사용
+  // 교육유형별 통계 (원형차트용) - educationType 필드를 서브코드명으로 변환
   const categoryStats = filteredData.reduce(
     (acc, item) => {
-      const category = item.educationType || '기타';
+      const category = getEducationTypeName(item.educationType) || '기타';
       acc[category] = (acc[category] || 0) + 1;
       return acc;
     },
@@ -1720,7 +1827,7 @@ function DashboardView({
   // });
 
   // 월별 통계 (막대차트용)
-  const monthlyStats: { month: string; 계획: number; 진행중: number; 완료: number; 취소: number }[] = [];
+  const monthlyStats: { month: string; 대기: number; 진행: number; 완료: number; 홀딩: number }[] = [];
   const monthData: Record<string, Record<string, number>> = {};
 
   filteredData.forEach((item) => {
@@ -1728,9 +1835,10 @@ function DashboardView({
     const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
 
     if (!monthData[monthKey]) {
-      monthData[monthKey] = { 계획: 0, 진행중: 0, 완료: 0, 취소: 0 };
+      monthData[monthKey] = { 대기: 0, 진행: 0, 완료: 0, 홀딩: 0 };
     }
-    monthData[monthKey][item.status] = (monthData[monthKey][item.status] || 0) + 1;
+    const statusName = getStatusName(item.status);
+    monthData[monthKey][statusName] = (monthData[monthKey][statusName] || 0) + 1;
   });
 
   // 정렬된 월별 데이터 생성
@@ -1741,23 +1849,23 @@ function DashboardView({
       const yearShort = year.slice(-2); // 연도를 마지막 2자리로
       monthlyStats.push({
         month: `${yearShort}/${monthNum}`,
-        계획: monthData[month]['계획'] || 0,
-        진행중: monthData[month]['진행중'] || 0,
+        대기: monthData[month]['대기'] || 0,
+        진행: monthData[month]['진행'] || 0,
         완료: monthData[month]['완료'] || 0,
-        취소: monthData[month]['취소'] || 0
+        홀딩: monthData[month]['홀딩'] || 0
       });
     });
 
   // 상태별 색상
   const getStatusColor = (status: string) => {
     switch (status) {
-      case '계획':
+      case '대기':
         return '#90A4AE';
-      case '진행중':
+      case '진행':
         return '#7986CB';
       case '완료':
         return '#81C784';
-      case '취소':
+      case '홀딩':
         return '#E57373';
       default:
         return '#9e9e9e';
@@ -1944,14 +2052,14 @@ function DashboardView({
     annotations: {
       points: monthlyStats.map((item, index) => {
         // 각 상태별 실제 값을 합산하여 정확한 총합 계산 (안전한 숫자 변환)
-        const 계획 = Number(item.계획) || 0;
-        const 진행중 = Number(item.진행중) || 0;
+        const 대기 = Number(item.대기) || 0;
+        const 진행 = Number(item.진행) || 0;
         const 완료 = Number(item.완료) || 0;
-        const 취소 = Number(item.취소) || 0;
-        const total = 계획 + 진행중 + 완료 + 취소;
+        const 홀딩 = Number(item.홀딩) || 0;
+        const total = 대기 + 진행 + 완료 + 홀딩;
 
         // 디버깅: 각 월의 데이터 확인
-        console.log(`${item.month}: 계획=${계획}, 진행중=${진행중}, 완료=${완료}, 취소=${취소}, total=${total}`);
+        console.log(`${item.month}: 대기=${대기}, 진행=${진행}, 완료=${완료}, 홀딩=${홀딩}, total=${total}`);
 
         // 6월, 8월 특별 확인
         if (item.month === '06월' || item.month === '08월') {
@@ -1996,20 +2104,20 @@ function DashboardView({
 
   const barChartSeries = [
     {
-      name: '계획',
-      data: monthlyStats.map((item) => item.계획)
+      name: '대기',
+      data: monthlyStats.map((item) => item.대기)
     },
     {
-      name: '진행중',
-      data: monthlyStats.map((item) => item.진행중)
+      name: '진행',
+      data: monthlyStats.map((item) => item.진행)
     },
     {
       name: '완료',
       data: monthlyStats.map((item) => item.완료)
     },
     {
-      name: '취소',
-      data: monthlyStats.map((item) => item.취소)
+      name: '홀딩',
+      data: monthlyStats.map((item) => item.홀딩)
     }
   ];
 
@@ -2123,13 +2231,13 @@ function DashboardView({
             }}
           >
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
-              계획
+              대기
             </Typography>
             <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusStats['계획'] || 0}
+              {statusStats['대기'] || 0}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              계획된 교육
+              대기중인 교육
             </Typography>
           </Card>
         </Grid>
@@ -2147,10 +2255,10 @@ function DashboardView({
             }}
           >
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
-              진행중
+              진행
             </Typography>
             <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusStats['진행중'] || 0}
+              {statusStats['진행'] || 0}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
               진행중인 교육
@@ -2195,13 +2303,13 @@ function DashboardView({
             }}
           >
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
-              취소
+              홀딩
             </Typography>
             <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusStats['취소'] || 0}
+              {statusStats['홀딩'] || 0}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              취소된 교육
+              보류중인 교육
             </Typography>
           </Card>
         </Grid>
@@ -2328,9 +2436,9 @@ function DashboardView({
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {paginatedData.map((task) => (
+                    {paginatedData.map((task, index) => (
                       <TableRow key={task.id} hover>
-                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{task.no}</TableCell>
+                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{filteredData.length - (startIndex + index)}</TableCell>
                         <TableCell
                           sx={{
                             py: 0.5,
@@ -2347,10 +2455,10 @@ function DashboardView({
                         <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{task.executionDate || '-'}</TableCell>
                         <TableCell sx={{ py: 0.5 }}>
                           <Chip
-                            label={task.status}
+                            label={getStatusName(task.status)}
                             size="small"
                             sx={{
-                              bgcolor: getStatusColor(task.status),
+                              bgcolor: getStatusColor(getStatusName(task.status)),
                               color: 'white',
                               fontSize: '13px',
                               height: 18,
@@ -2573,14 +2681,14 @@ export default function SecurityEducationManagement() {
         no: education.no || education.id,
         title: education.education_name,
         educationName: education.education_name || '교육명 없음',
-        educationType: getEducationTypeName(education.education_type || '') || '온라인',
+        educationType: education.education_type || '', // 서브코드 그대로 유지
         assignee: education.assignee || '미정',
         createdBy: education.created_by, // DB의 created_by 필드 매핑
         team: education.team || '보안팀', // DB에서 팀 정보 로드
         executionDate: education.execution_date || new Date().toISOString().split('T')[0],
         attendeeCount: education.participant_count || 0,
         participantCount: education.participant_count || 0,
-        status: (getStatusName(education.status || '') as SecurityEducationStatus) || '계획',
+        status: education.status || '', // 서브코드 그대로 유지
         description: education.description || '',
         location: education.location || '',
         code: convertedCode,
@@ -2706,6 +2814,31 @@ export default function SecurityEducationManagement() {
     }
   }, [value, fetchChangeLogs]);
 
+  // 변경분류를 표준화하는 함수
+  const normalizeActionType = React.useCallback((actionType: string) => {
+    if (!actionType) return '-';
+
+    const action = actionType.toLowerCase().trim();
+
+    // 추가 관련
+    if (action.includes('추가') || action.includes('생성') || action.includes('create') || action.includes('add') || action.includes('등록')) {
+      return '추가';
+    }
+
+    // 삭제 관련
+    if (action.includes('삭제') || action.includes('제거') || action.includes('delete') || action.includes('remove')) {
+      return '삭제';
+    }
+
+    // 수정 관련 (기본값)
+    if (action.includes('수정') || action.includes('변경') || action.includes('편집') || action.includes('update') || action.includes('edit') || action.includes('modify')) {
+      return '수정';
+    }
+
+    // 기본값: 수정
+    return '수정';
+  }, []);
+
   // DB 변경로그를 UI 형식으로 변환
   const changeLogs = React.useMemo(() => {
     return dbChangeLogs.map((log: ChangeLogData) => {
@@ -2725,8 +2858,8 @@ export default function SecurityEducationManagement() {
         dateTime: formattedDateTime,
         title: log.title || education?.educationName || log.record_id,
         code: log.record_id,
-        action: log.action_type,
-        location: log.description.includes('개요탭') ? '개요탭' : log.description.includes('데이터탭') ? '데이터탭' : '-',
+        action: normalizeActionType(log.action_type),
+        location: log.change_location || '-',
         changedField: log.changed_field || '-',
         beforeValue: log.before_value || '-',
         afterValue: log.after_value || '-',
@@ -2735,7 +2868,7 @@ export default function SecurityEducationManagement() {
         user: log.user_name
       };
     });
-  }, [dbChangeLogs, tasks]);
+  }, [dbChangeLogs, tasks, normalizeActionType]);
 
   // 필터 상태
   const [selectedYear, setSelectedYear] = useState('전체');
@@ -2761,7 +2894,8 @@ export default function SecurityEducationManagement() {
       beforeValue?: string,
       afterValue?: string,
       changedField?: string,
-      title?: string
+      title?: string,
+      location?: string
     ) => {
       try {
         const userName = currentUser?.user_name || currentUser?.name || user?.name || '시스템';
@@ -2775,6 +2909,7 @@ export default function SecurityEducationManagement() {
           after_value: afterValue || null,
           changed_field: changedField || null,
           title: title || null,
+          change_location: location || '개요탭',
           user_name: userName,
           team: currentUser?.department || team, // 로그인한 사용자의 부서
           user_department: currentUser?.department,
@@ -2790,7 +2925,17 @@ export default function SecurityEducationManagement() {
         const { data, error } = await supabase.from('common_log_data').insert(logData).select();
 
         if (error) {
-          console.error('❌ 변경로그 저장 실패:', error);
+          console.error('❌ 변경로그 저장 실패 - Error 객체:', error);
+          console.error('❌ Error.message:', error.message);
+          console.error('❌ Error.details:', error.details);
+          console.error('❌ Error.hint:', error.hint);
+          console.error('❌ Error.code:', error.code);
+          console.error('❌ Error의 모든 키:', Object.keys(error));
+          console.error('❌ Error의 모든 속성값:');
+          for (const key in error) {
+            console.error(`   ${key}:`, error[key]);
+          }
+          console.error('❌ 저장하려던 데이터:', logData);
         } else {
           console.log('✅ 변경로그 저장 성공:', data);
           await fetchChangeLogs();

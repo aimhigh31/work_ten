@@ -155,6 +155,23 @@ function KanbanView({
 }: KanbanViewProps) {
   const theme = useTheme();
   const { data: session } = useSession();
+  const { masterCodes } = useCommonData();
+
+  // 서브코드를 서브코드명으로 변환하는 함수
+  const getStatusName = React.useCallback((subcode: string) => {
+    if (!subcode) return '';
+    const found = statusTypes.find((item) => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [statusTypes]);
+
+  // 자산분류 서브코드를 서브코드명으로 변환하는 함수 (GROUP018)
+  const getAssetCategoryName = React.useCallback((subcode: string) => {
+    if (!subcode) return '';
+    const found = masterCodes.find(
+      (item) => item.codetype === 'subcode' && item.group_code === 'GROUP018' && item.subcode === subcode && item.is_active
+    );
+    return found ? found.subcode_name : subcode;
+  }, [masterCodes]);
 
   // 🔐 권한 체크: 현재 사용자 정보
   const currentUser = React.useMemo(() => {
@@ -254,7 +271,7 @@ function KanbanView({
       const workContent = currentHardware.workContent || '업무내용 없음';
       const description = `${workContent} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
 
-      addChangeLog('수정', taskCode, description, currentHardware.team || '미분류');
+      addChangeLog('수정', taskCode, description, currentHardware.team || '미분류', oldStatus, newStatus, '상태', workContent, '칸반탭');
     }
   };
 
@@ -286,9 +303,9 @@ function KanbanView({
     }));
   }, [statusTypes]);
 
-  // 상태별 아이템 가져오기
+  // 상태별 아이템 가져오기 (서브코드를 서브코드명으로 변환해서 비교)
   const getItemsByStatus = (status: string) => {
-    return filteredData.filter((item) => item.status === status);
+    return filteredData.filter((item) => getStatusName(item.status) === status);
   };
 
   // 팀별 색상 매핑 (데이터 테이블과 동일)
@@ -398,10 +415,12 @@ function KanbanView({
       >
         {/* 1. 상태 태그 영역 */}
         <div className="status-tags">
-          <span className="status-tag" style={getStatusTagStyle(task.status)}>
-            {task.status}
+          <span className="status-tag" style={getStatusTagStyle(getStatusName(task.status))}>
+            {getStatusName(task.status)}
           </span>
-          <span className="incident-type-tag">하드웨어</span>
+          <span className="incident-type-tag">
+            {getAssetCategoryName(task.assetCategory || task.asset_category) || '하드웨어'}
+          </span>
         </div>
 
         {/* 2. 카드 제목 */}
@@ -410,16 +429,16 @@ function KanbanView({
         {/* 3. 정보 라인 */}
         <div className="card-info">
           <div className="info-line">
-            <span className="info-label">팀:</span>
-            <span className="info-value">{task.team}</span>
+            <span className="info-label">사용자:</span>
+            <span className="info-value">{task.currentUser || task.assigned_user || '-'}</span>
           </div>
           <div className="info-line">
-            <span className="info-label">시작일:</span>
-            <span className="info-value">{task.startDate}</span>
+            <span className="info-label">위치:</span>
+            <span className="info-value">{task.location || '-'}</span>
           </div>
           <div className="info-line">
-            <span className="info-label">완료일:</span>
-            <span className="info-value">{task.completedDate || '미정'}</span>
+            <span className="info-label">구매일:</span>
+            <span className="info-value">{task.purchaseDate || task.purchase_date || '-'}</span>
           </div>
         </div>
 
@@ -811,6 +830,16 @@ function MonthlyScheduleView({
 }: MonthlyScheduleViewProps) {
   const theme = useTheme();
   const [viewYear, setViewYear] = useState(new Date().getFullYear().toString());
+  const { masterCodes } = useCommonData();
+
+  // 서브코드를 서브코드명으로 변환하는 함수 (GROUP002 - 상태)
+  const getStatusName = React.useCallback((subcode: string) => {
+    if (!subcode) return '';
+    const found = masterCodes.find(
+      (item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.subcode === subcode && item.is_active
+    );
+    return found ? found.subcode_name : subcode;
+  }, [masterCodes]);
 
   // 데이터 필터링
   const filteredData = hardware.filter((task) => {
@@ -968,6 +997,7 @@ function MonthlyScheduleView({
                   const date = new Date(item.startDate);
                   const month = (date.getMonth() + 1).toString().padStart(2, '0');
                   const day = date.getDate().toString().padStart(2, '0');
+                  const statusName = getStatusName(item.status);
 
                   return (
                     <Box
@@ -977,7 +1007,7 @@ function MonthlyScheduleView({
                         mb: itemIndex < items.length - 1 ? 0.8 : 0,
                         p: 0.6,
                         borderRadius: 1,
-                        backgroundColor: getStatusColor(item.status),
+                        backgroundColor: getStatusColor(statusName),
                         cursor: 'pointer',
                         transition: 'all 0.2s ease',
                         '&:hover': {
@@ -990,7 +1020,7 @@ function MonthlyScheduleView({
                         variant="body2"
                         sx={{
                           fontSize: '13px',
-                          color: getStatusTextColor(item.status),
+                          color: getStatusTextColor(statusName),
                           fontWeight: 500,
                           display: 'flex',
                           alignItems: 'center',
@@ -998,7 +1028,7 @@ function MonthlyScheduleView({
                         }}
                       >
                         <span>{`${month}-${day}`}</span>
-                        <span>{item.status}</span>
+                        <span>{statusName}</span>
                       </Typography>
                       <Typography
                         variant="body2"
@@ -1076,6 +1106,7 @@ function MonthlyScheduleView({
                   const date = new Date(item.startDate);
                   const month = (date.getMonth() + 1).toString().padStart(2, '0');
                   const day = date.getDate().toString().padStart(2, '0');
+                  const statusName = getStatusName(item.status);
 
                   return (
                     <Box
@@ -1085,7 +1116,7 @@ function MonthlyScheduleView({
                         mb: itemIndex < items.length - 1 ? 0.8 : 0,
                         p: 0.6,
                         borderRadius: 1,
-                        backgroundColor: getStatusColor(item.status),
+                        backgroundColor: getStatusColor(statusName),
                         cursor: 'pointer',
                         transition: 'all 0.2s ease',
                         '&:hover': {
@@ -1098,7 +1129,7 @@ function MonthlyScheduleView({
                         variant="body2"
                         sx={{
                           fontSize: '13px',
-                          color: getStatusTextColor(item.status),
+                          color: getStatusTextColor(statusName),
                           fontWeight: 500,
                           display: 'flex',
                           alignItems: 'center',
@@ -1106,7 +1137,7 @@ function MonthlyScheduleView({
                         }}
                       >
                         <span>{`${month}-${day}`}</span>
-                        <span>{item.status}</span>
+                        <span>{statusName}</span>
                       </Typography>
                       <Typography
                         variant="body2"
@@ -1170,11 +1201,25 @@ function DashboardView({
       .sort((a, b) => a.subcode_order - b.subcode_order);
   }, [masterCodes]);
 
-  // subcode → subcode_name 변환 함수
+  // 마스터코드에서 자산분류 옵션 가져오기 (GROUP018)
+  const assetCategoriesMap = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP018' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // subcode → subcode_name 변환 함수 (상태)
   const getStatusName = React.useCallback((subcode: string) => {
     const found = statusTypesMap.find(item => item.subcode === subcode);
     return found ? found.subcode_name : subcode;
   }, [statusTypesMap]);
+
+  // subcode → subcode_name 변환 함수 (자산분류)
+  const getAssetCategoryName = React.useCallback((subcode: string) => {
+    if (!subcode) return '';
+    const found = assetCategoriesMap.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [assetCategoriesMap]);
 
   // 날짜 범위 필터링 함수
   const filterByDateRange = (data: HardwareTableData[]) => {
@@ -1225,10 +1270,11 @@ function DashboardView({
     {} as Record<string, number>
   );
 
-  // 업무분류별 통계 (원형차트용) - department 필드 사용 (핵심 수정!)
+  // 업무분류별 통계 (원형차트용) - 자산분류 필드 사용
   const categoryStats = filteredData.reduce(
     (acc, item) => {
-      const category = item.department || '기타';
+      const categorySubcode = item.assetCategory || item.asset_category || '';
+      const category = getAssetCategoryName(categorySubcode) || '기타';
       acc[category] = (acc[category] || 0) + 1;
       return acc;
     },
@@ -1265,7 +1311,9 @@ function DashboardView({
     if (!monthData[monthKey]) {
       monthData[monthKey] = { 대기: 0, 진행: 0, 완료: 0, 홀딩: 0 };
     }
-    monthData[monthKey][item.status] = (monthData[monthKey][item.status] || 0) + 1;
+    // 서브코드를 서브코드명으로 변환
+    const statusName = getStatusName(item.status);
+    monthData[monthKey][statusName] = (monthData[monthKey][statusName] || 0) + 1;
   });
 
   // 정렬된 월별 데이터 생성
@@ -1310,7 +1358,8 @@ function DashboardView({
     categoryLabels,
     categoryValues,
     sampleData: filteredData.slice(0, 3).map((item) => ({
-      department: item.department,
+      assetCategory: item.assetCategory || item.asset_category,
+      assetCategoryName: getAssetCategoryName(item.assetCategory || item.asset_category || ''),
       team: item.team,
       assignee: item.assignee
     }))
@@ -1858,14 +1907,14 @@ function DashboardView({
                       <TableCell sx={{ py: 1, fontSize: '13px' }}>NO</TableCell>
                       <TableCell sx={{ py: 1, fontSize: '13px' }}>업무내용</TableCell>
                       <TableCell sx={{ py: 1, fontSize: '13px' }}>담당자</TableCell>
-                      <TableCell sx={{ py: 1, fontSize: '13px' }}>완료일</TableCell>
+                      <TableCell sx={{ py: 1, fontSize: '13px' }}>구매일</TableCell>
                       <TableCell sx={{ py: 1, fontSize: '13px' }}>상태</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {paginatedData.map((task) => (
+                    {paginatedData.map((task, index) => (
                       <TableRow key={task.id} hover>
-                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{task.no}</TableCell>
+                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{filteredData.length - (startIndex + index)}</TableCell>
                         <TableCell
                           sx={{
                             py: 0.5,
@@ -1879,13 +1928,13 @@ function DashboardView({
                           {task.workContent || '업무내용 없음'}
                         </TableCell>
                         <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{task.assignee || '-'}</TableCell>
-                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{task.completedDate || '-'}</TableCell>
+                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{task.purchaseDate || task.purchase_date || '-'}</TableCell>
                         <TableCell sx={{ py: 0.5 }}>
                           <Chip
-                            label={task.status}
+                            label={getStatusName(task.status)}
                             size="small"
                             sx={{
-                              bgcolor: getStatusColor(task.status),
+                              bgcolor: getStatusColor(getStatusName(task.status)),
                               color: 'white',
                               fontSize: '13px',
                               height: 18,
@@ -2243,7 +2292,8 @@ export default function HardwareManagement() {
     beforeValue?: string,
     afterValue?: string,
     changedField?: string,
-    title?: string
+    title?: string,
+    location?: string
   ) => {
     try {
       const supabase = createClient();
@@ -2258,6 +2308,7 @@ export default function HardwareManagement() {
         after_value: afterValue || null,
         changed_field: changedField || null,
         title: title || null,
+        change_location: location || '개요탭',
         user_name: userName,
         team: currentUser?.department || '시스템',
         user_department: currentUser?.department,

@@ -103,6 +103,15 @@ export default function SolutionTable({
   // 공통 데이터 가져오기
   const { masterCodes } = useCommonData();
 
+  // 상태 서브코드명 변환 함수 (GROUP002)
+  const getStatusName = useCallback((subcode: string) => {
+    if (!subcode) return '';
+    const found = masterCodes.find(
+      (item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.subcode === subcode && item.is_active
+    );
+    return found ? found.subcode_name : subcode;
+  }, [masterCodes]);
+
   // 솔루션유형 서브코드명 변환 함수 (GROUP021)
   const getSolutionTypeName = useCallback((subcode: string) => {
     if (!subcode) return '';
@@ -119,6 +128,31 @@ export default function SolutionTable({
       (item) => item.codetype === 'subcode' && item.group_code === 'GROUP022' && item.subcode === subcode && item.is_active
     );
     return found ? found.subcode_name : subcode;
+  }, [masterCodes]);
+
+  // 서브코드명 → 서브코드 변환 함수들 (DB 저장용)
+  const getStatusSubcode = useCallback((subcodeName: string) => {
+    if (!subcodeName) return '';
+    const found = masterCodes.find(
+      (item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.subcode_name === subcodeName && item.is_active
+    );
+    return found ? found.subcode : subcodeName;
+  }, [masterCodes]);
+
+  const getSolutionTypeSubcode = useCallback((subcodeName: string) => {
+    if (!subcodeName) return '';
+    const found = masterCodes.find(
+      (item) => item.codetype === 'subcode' && item.group_code === 'GROUP021' && item.subcode_name === subcodeName && item.is_active
+    );
+    return found ? found.subcode : subcodeName;
+  }, [masterCodes]);
+
+  const getDevelopmentTypeSubcode = useCallback((subcodeName: string) => {
+    if (!subcodeName) return '';
+    const found = masterCodes.find(
+      (item) => item.codetype === 'subcode' && item.group_code === 'GROUP022' && item.subcode_name === subcodeName && item.is_active
+    );
+    return found ? found.subcode : subcodeName;
   }, [masterCodes]);
 
   // Supabase 연동 훅
@@ -364,6 +398,7 @@ export default function SolutionTable({
       console.log('📝 기존 솔루션 업데이트 시작:', existingIndex);
 
       try {
+        // SolutionEditDialog에서 받은 데이터는 이미 subcode_name 형태
         // 변경로그 추가 - 필드별 상세 추적 (개요탭 전체 필드) - DB 저장 전에 실행
         if (addChangeLog) {
           const originalSolution = data[existingIndex];
@@ -513,8 +548,16 @@ export default function SolutionTable({
           }
         }
 
-        // 이제 DB 저장 작업 수행
-        const dbData = convertToDbSolutionData(updatedSolution);
+        // DB 저장 작업 수행
+        // subcode_name을 subcode로 변환
+        const solutionWithSubcodes = {
+          ...updatedSolution,
+          status: getStatusSubcode(updatedSolution.status),
+          solutionType: getSolutionTypeSubcode(updatedSolution.solutionType),
+          developmentType: getDevelopmentTypeSubcode(updatedSolution.developmentType)
+        };
+
+        const dbData = convertToDbSolutionData(solutionWithSubcodes);
         console.log('🔄 DB 형식으로 변환된 데이터:', dbData);
         console.log('📝 업데이트할 솔루션 ID:', updatedSolution.id);
 
@@ -523,7 +566,7 @@ export default function SolutionTable({
 
         if (success) {
           console.log('✅ 솔루션 업데이트 성공 - UI 업데이트 시작');
-          // UI 업데이트
+          // UI 업데이트 (subcode_name 형태 그대로)
           const updatedData = [...data];
           updatedData[existingIndex] = updatedSolution;
           setData(updatedData);
@@ -568,15 +611,31 @@ export default function SolutionTable({
 
         console.log('📋 입력 데이터 검증 완료');
 
-        const dbData = convertToDbSolutionData(updatedSolution);
+        // DB 저장 작업 수행
+        // subcode_name을 subcode로 변환
+        const solutionWithSubcodes = {
+          ...updatedSolution,
+          status: getStatusSubcode(updatedSolution.status),
+          solutionType: getSolutionTypeSubcode(updatedSolution.solutionType),
+          developmentType: getDevelopmentTypeSubcode(updatedSolution.developmentType)
+        };
+
+        const dbData = convertToDbSolutionData(solutionWithSubcodes);
         console.log('🔄 DB 형식으로 변환된 데이터:', dbData);
 
         const createdDbSolution = await createSolution(dbData);
         console.log('📤 createSolution 결과:', createdDbSolution);
 
         if (createdDbSolution) {
+          // DB에서 받은 데이터를 프론트엔드 형식으로 변환
+          const converted = convertToSolutionData(createdDbSolution);
+
+          // UI 표시를 위해 subcode → subcode_name으로 변환
           const createdSolution = {
-            ...convertToSolutionData(createdDbSolution),
+            ...converted,
+            status: getStatusName(converted.status),
+            solutionType: getSolutionTypeName(converted.solutionType),
+            developmentType: getDevelopmentTypeName(converted.developmentType),
             isEditing: false
           };
 
@@ -635,6 +694,7 @@ export default function SolutionTable({
 
   // 편집 핸들러 (IT교육관리 스타일)
   const handleEditSolution = (solution: SolutionTableData) => {
+    // SolutionEditDialog는 subcode_name을 사용하므로 그대로 전달
     setEditingSolution(solution);
     setEditingSolutionId(solution.id);
     setEditDialog(true);

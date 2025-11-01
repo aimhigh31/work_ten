@@ -226,16 +226,53 @@ export function useSupabaseSecurityAccident() {
         setError(null);
         console.log('🔵 updateAccident 시작');
         console.log('🔵 ID:', id, '타입:', typeof id);
-        console.log('🔵 updateData:', updateData);
+        console.log('🔵 updateData (원본):', updateData);
         console.log('🔵 updateData keys:', Object.keys(updateData));
 
-        const { data, error } = await supabase.from('security_accident_data').update(updateData).eq('id', id).select();
+        // 테이블에 존재하는 컬럼만 필터링
+        const allowedFields = [
+          'no', 'registration_date', 'code', 'incident_type', 'request_content',
+          'main_content', 'response_action', 'description', 'severity', 'status',
+          'response_stage', 'assignee', 'team', 'discoverer', 'impact_scope',
+          'cause_analysis', 'prevention_plan', 'occurrence_date', 'completed_date',
+          'start_date', 'progress', 'attachment', 'attachment_count', 'attachments',
+          'likes', 'liked_by', 'views', 'viewed_by', 'comments', 'incident_report',
+          'post_measures', 'updated_at', 'updated_by', 'is_active'
+        ];
+
+        const filteredData: any = {};
+        for (const key of Object.keys(updateData)) {
+          if (allowedFields.includes(key)) {
+            filteredData[key] = (updateData as any)[key];
+          } else {
+            console.warn(`⚠️ 테이블에 없는 필드 제외됨: ${key}`);
+          }
+        }
+
+        console.log('🔵 filteredData (필터링 후):', filteredData);
+        console.log('🔵 filteredData keys:', Object.keys(filteredData));
+
+        const { data, error } = await supabase.from('security_accident_data').update(filteredData).eq('id', id).select();
 
         console.log('🔵 Supabase 쿼리 결과:', { data, error });
 
         if (error) {
-          console.error('수정 실패:', error);
-          setError(error.message || '수정에 실패했습니다.');
+          console.error('🔴 수정 실패 - 전체 에러 객체:', error);
+          console.error('🔴 수정 실패 - error.message:', error.message);
+          console.error('🔴 수정 실패 - error.details:', error.details);
+          console.error('🔴 수정 실패 - error.hint:', error.hint);
+          console.error('🔴 수정 실패 - error.code:', error.code);
+          console.error('🔴 수정 실패 - JSON:', JSON.stringify(error, null, 2));
+          console.error('🔴 수정하려던 데이터:', updateData);
+          console.error('🔴 대상 ID:', id);
+
+          // 에러 속성 순회
+          console.error('🔴 에러 객체의 모든 속성:');
+          for (const key in error) {
+            console.error(`  ${key}:`, error[key]);
+          }
+
+          setError(error.message || error.details || error.hint || '수정에 실패했습니다.');
           return false;
         }
 

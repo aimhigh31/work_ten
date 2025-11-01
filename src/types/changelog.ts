@@ -12,6 +12,7 @@ export interface ChangeLogData {
   before_value?: string;
   after_value?: string;
   changed_field?: string;
+  change_location?: string;
   title?: string;
   user_id?: string;
   user_name: string;
@@ -41,6 +42,7 @@ export interface CreateChangeLogInput {
   before_value?: string;
   after_value?: string;
   changed_field?: string;
+  change_location?: string;
   title?: string;
   user_id?: string;
   user_name: string;

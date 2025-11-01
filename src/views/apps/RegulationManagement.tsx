@@ -75,6 +75,8 @@ import useUser from 'hooks/useUser';
 import { useSupabaseFeedback } from 'hooks/useSupabaseFeedback';
 import { PAGE_IDENTIFIERS, FeedbackData } from 'types/feedback';
 import { useMenuPermission } from '../../hooks/usePermissions';
+import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
+import { ChangeLogData } from 'types/changelog';
 
 // 변경로그 타입 정의
 interface ChangeLog {
@@ -2705,7 +2707,7 @@ function KanbanView({
       const workContent = currentTask.workContent || '문서내용 없음';
       const description = `${workContent} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
 
-      addChangeLog('수정', taskCode, description, currentTask.team || '미분류');
+      addChangeLog('수정', taskCode, description, currentTask.team || '미분류', '칸반탭');
     }
   };
 
@@ -3639,6 +3641,7 @@ interface ChangeLogViewProps {
   page: number;
   rowsPerPage: number;
   goToPage: string;
+  loading?: boolean;
   onPageChange: (page: number) => void;
   onRowsPerPageChange: (rowsPerPage: number) => void;
   onGoToPageChange: (page: string) => void;
@@ -3650,6 +3653,7 @@ function ChangeLogView({
   page,
   rowsPerPage,
   goToPage,
+  loading = false,
   onPageChange,
   onRowsPerPageChange,
   onGoToPageChange
@@ -3713,22 +3717,40 @@ function ChangeLogView({
         <Table size="small">
           <TableHead>
             <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
-              <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 150 }}>변경시간</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 110 }}>코드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 140 }}>제목</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경분류</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경위치</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>변경필드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 100 }}>변경전</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 100 }}>변경후</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 400 }}>변경세부내용</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 50, fontSize: '12px' }}>NO</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 150, fontSize: '12px' }}>변경시간</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 110, fontSize: '12px' }}>코드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 140, fontSize: '12px' }}>제목</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경분류</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경위치</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경필드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경전</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경후</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 400, fontSize: '12px' }}>변경세부내용</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>팀</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경자</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {paginatedLogs.map((log, index) => (
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={12} align="center" sx={{ py: 4 }}>
+                  <CircularProgress size={40} />
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                    변경로그를 불러오는 중...
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            ) : paginatedLogs.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={12} align="center" sx={{ py: 4 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    변경로그가 없습니다.
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            ) : (
+              paginatedLogs.map((log, index) => (
               <TableRow
                 key={log.id}
                 hover
@@ -3840,7 +3862,8 @@ function ChangeLogView({
                   </Typography>
                 </TableCell>
               </TableRow>
-            ))}
+              ))
+            )}
           </TableBody>
         </Table>
       </TableContainer>
@@ -4753,7 +4776,9 @@ function DashboardView({
                   <TableBody>
                     {paginatedData.map((item: any, index) => (
                       <TableRow key={item.id || index} hover>
-                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{folderData ? index + startIndex + 1 : item.no}</TableCell>
+                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>
+                          {dataForPagination.length - (startIndex + index)}
+                        </TableCell>
                         <TableCell
                           sx={{
                             py: 0.5,
@@ -5165,54 +5190,59 @@ export default function RegulationManagement() {
   const [changeLogRowsPerPage, setChangeLogRowsPerPage] = useState(10);
   const [changeLogGoToPage, setChangeLogGoToPage] = useState('');
 
-  // 변경로그 상태 - 초기 데이터는 기존 샘플 데이터 사용
-  const [changeLogs, setChangeLogs] = useState<ChangeLog[]>([
-    {
-      id: 1,
-      dateTime: '2024-12-15 14:30',
-      team: '개발팀',
-      user: '김철수',
-      action: '업무 상태 변경',
-      target: 'TASK-24-010',
-      description: '웹사이트 리뉴얼 프로젝트 상태를 "진행"에서 "완료"로 변경'
-    },
-    {
-      id: 2,
-      dateTime: '2024-12-14 10:15',
-      team: '기획팀',
-      user: '이영희',
-      action: '새 업무 생성',
-      target: 'TASK-24-011',
-      description: '모바일 앱 UI/UX 개선 업무 신규 등록'
-    },
-    {
-      id: 3,
-      dateTime: '2024-12-13 16:45',
-      team: '마케팅팀',
-      user: '박민수',
-      action: '담당자 변경',
-      target: 'TASK-24-009',
-      description: '마케팅 캠페인 기획 담당자를 "최지연"에서 "박민수"로 변경'
-    },
-    {
-      id: 4,
-      dateTime: '2024-12-12 09:30',
-      team: '디자인팀',
-      user: '강민정',
-      action: '완료일 수정',
-      target: 'TASK-24-008',
-      description: '로고 디자인 작업의 완료 예정일을 2024-12-20으로 수정'
-    },
-    {
-      id: 5,
-      dateTime: '2024-12-11 15:20',
-      team: '개발팀',
-      user: '정현우',
-      action: '업무 삭제',
-      target: 'TASK-24-007',
-      description: '중복된 데이터베이스 최적화 업무 삭제'
+  // 변경로그 Hook (전체 보안규정의 변경 이력)
+  const { logs: dbChangeLogs, loading: changeLogsLoading, fetchChangeLogs } = useSupabaseChangeLog('security_regulation');
+
+  // 변경로그탭이 활성화될 때 데이터 강제 새로고침
+  useEffect(() => {
+    if (value === 4 && fetchChangeLogs) {
+      console.log('🔄 변경로그탭 활성화 - 데이터 새로고침');
+      fetchChangeLogs();
     }
-  ]);
+  }, [value, fetchChangeLogs]);
+
+  // 변경분류를 표준화하는 함수
+  const normalizeActionType = useCallback((actionType: string) => {
+    if (!actionType) return '-';
+
+    const action = actionType.toLowerCase().trim();
+
+    // 추가 관련
+    if (action.includes('추가') || action.includes('생성') || action.includes('create') || action.includes('add') || action.includes('등록')) {
+      return '추가';
+    }
+
+    // 삭제 관련
+    if (action.includes('삭제') || action.includes('제거') || action.includes('delete') || action.includes('remove')) {
+      return '삭제';
+    }
+
+    // 수정 관련 (기본값)
+    if (action.includes('수정') || action.includes('변경') || action.includes('편집') || action.includes('update') || action.includes('edit') || action.includes('modify')) {
+      return '수정';
+    }
+
+    // 기본값: 수정
+    return '수정';
+  }, []);
+
+  // DB 변경로그를 UI 변경로그 형식으로 변환
+  const changeLogs: ChangeLog[] = useMemo(() => {
+    return dbChangeLogs.map((log: ChangeLogData) => ({
+      id: log.id,
+      dateTime: log.change_datetime || '',
+      code: log.regulation_code || '',
+      target: log.regulation_title || '',
+      location: log.change_location || '',
+      action: normalizeActionType(log.change_type || ''),
+      changedField: log.field_name || '',
+      description: log.change_description || '',
+      beforeValue: log.before_value || '',
+      afterValue: log.after_value || '',
+      team: log.team || '',
+      user: log.user_name || ''
+    }));
+  }, [dbChangeLogs, normalizeActionType]);
 
   // 필터 상태
   const [selectedYear, setSelectedYear] = useState('전체');
@@ -5228,22 +5258,10 @@ export default function RegulationManagement() {
     yearOptions.push(i.toString());
   }
 
-  // 변경로그 추가 함수
-  const addChangeLog = (action: string, target: string, description: string, team: string = '시스템') => {
-    const now = new Date();
-    const dateTime = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-
-    const newLog: ChangeLog = {
-      id: Math.max(...changeLogs.map((log) => log.id), 0) + 1,
-      dateTime,
-      team,
-      user: '시스템', // 임시로 시스템으로 설정, 나중에 실제 사용자 정보로 교체 가능
-      action,
-      target,
-      description
-    };
-
-    setChangeLogs((prev) => [newLog, ...prev]); // 최신순으로 정렬
+  // 변경로그 추가 함수 (현재는 빈 함수로 처리, 향후 Supabase 연동 예정)
+  const addChangeLog = (action: string, target: string, description: string, team: string = '시스템', location?: string) => {
+    // TODO: Supabase에 변경로그 저장 기능 구현 필요
+    console.log('📝 변경로그:', { action, target, description, team, location: location || '개요탭' });
   };
 
   // 파일 업데이트 핸들러 (칸반 드래그 앤 드롭용)
@@ -6052,6 +6070,7 @@ export default function RegulationManagement() {
                   page={changeLogPage}
                   rowsPerPage={changeLogRowsPerPage}
                   goToPage={changeLogGoToPage}
+                  loading={changeLogsLoading}
                   onPageChange={setChangeLogPage}
                   onRowsPerPageChange={setChangeLogRowsPerPage}
                   onGoToPageChange={setChangeLogGoToPage}

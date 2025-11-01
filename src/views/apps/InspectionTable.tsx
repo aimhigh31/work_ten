@@ -178,7 +178,7 @@ export default function InspectionTable({
     try {
       // 필터링된 데이터를 Excel 형식으로 변환 (테이블과 동일한 컬럼 순서)
       const excelData = filteredData.map((inspection, index) => ({
-        NO: index + 1,
+        NO: filteredData.length - index,
         등록일: inspection.registrationDate,
         코드: inspection.code,
         점검유형: inspection.inspectionType,
@@ -232,9 +232,9 @@ export default function InspectionTable({
     }
   }, [inspections]);
 
-  // 필터링된 데이터 (역순 정렬 추가)
+  // 필터링된 데이터
   const filteredData = useMemo(() => {
-    const filtered = data.filter((inspection) => {
+    return data.filter((inspection) => {
       // 연도 필터
       if (selectedYear !== '전체') {
         const inspectionYear = new Date(inspection.startDate).getFullYear().toString();
@@ -247,8 +247,6 @@ export default function InspectionTable({
 
       return teamMatch && statusMatch && assigneeMatch;
     });
-    // NO 기준 역순 정렬
-    return filtered.sort((a, b) => (b.no || 0) - (a.no || 0));
   }, [data, selectedYear || '전체', selectedTeam, selectedStatus, selectedAssignee]);
 
   // 페이지네이션 적용된 데이터
@@ -867,7 +865,7 @@ export default function InspectionTable({
           </TableHead>
           <TableBody>
             {paginatedData.length > 0 ? (
-              paginatedData.map((inspection) => (
+              paginatedData.map((inspection, index) => (
                 <TableRow
                   key={inspection.id}
                   hover
@@ -899,7 +897,7 @@ export default function InspectionTable({
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                      {inspection.no}
+                      {filteredData.length - (page * rowsPerPage + index)}
                     </Typography>
                   </TableCell>
                   <TableCell>

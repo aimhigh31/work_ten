@@ -135,6 +135,16 @@ export default function SecurityIncidentTable({
     return type?.subcode_name || incidentType;
   }, [masterCodes]);
 
+  // 상태 코드를 이름으로 변환하는 함수
+  const getStatusName = useCallback((status: string) => {
+    if (!status) return '미분류';
+    // "GROUP002-SUB001" 형태에서 서브코드명 찾기
+    const statusItem = masterCodes.find(
+      (code) => code.codetype === 'subcode' && code.group_code === 'GROUP002' && (code.subcode === status || `${code.group_code}-${code.subcode}` === status)
+    );
+    return statusItem?.subcode_name || status;
+  }, [masterCodes]);
+
   // 현재 로그인한 사용자 정보
   const { data: session } = useSession();
   const user = useUser();
@@ -397,10 +407,12 @@ export default function SecurityIncidentTable({
 
             // 상태 변경
             if (originalIncident.status !== updatedIncident.status) {
+              const originalStatusName = getStatusName(originalIncident.status);
+              const updatedStatusName = getStatusName(updatedIncident.status);
               addChangeLog(
                 '수정',
                 incidentCode,
-                `보안사고관리 ${incidentTitle}(${incidentCode}) 정보 개요탭 상태가 ${originalIncident.status} → ${updatedIncident.status} 수정 되었습니다.`,
+                `보안사고관리 ${incidentTitle}(${incidentCode}) 정보 개요탭 상태가 ${originalStatusName} → ${updatedStatusName} 수정 되었습니다.`,
                 updatedIncident.team || '미분류',
                 originalIncident.status,
                 updatedIncident.status,
@@ -467,10 +479,12 @@ export default function SecurityIncidentTable({
 
             // 사고유형 변경
             if (originalIncident.incidentType !== updatedIncident.incidentType) {
+              const originalTypeName = getIncidentTypeName(originalIncident.incidentType);
+              const updatedTypeName = getIncidentTypeName(updatedIncident.incidentType);
               addChangeLog(
                 '수정',
                 incidentCode,
-                `보안사고관리 ${incidentTitle}(${incidentCode}) 정보 개요탭 사고유형이 ${originalIncident.incidentType} → ${updatedIncident.incidentType} 수정 되었습니다.`,
+                `보안사고관리 ${incidentTitle}(${incidentCode}) 정보 개요탭 사고유형이 ${originalTypeName} → ${updatedTypeName} 수정 되었습니다.`,
                 updatedIncident.team || '미분류',
                 originalIncident.incidentType,
                 updatedIncident.incidentType,
@@ -901,10 +915,10 @@ export default function SecurityIncidentTable({
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={task.status}
+                      label={getStatusName(task.status)}
                       size="small"
                       sx={{
-                        ...getStatusColor(task.status),
+                        ...getStatusColor(getStatusName(task.status)),
                         fontWeight: 500,
                         fontSize: '13px'
                       }}

@@ -312,7 +312,8 @@ function KanbanView({
         oldStatus,
         newStatus,
         '상태',
-        inspectionContent
+        inspectionContent,
+        '칸반탭'
       );
     }
   };
@@ -1865,9 +1866,9 @@ function DashboardView({
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {paginatedData.map((inspection) => (
+                    {paginatedData.map((inspection, index) => (
                       <TableRow key={inspection.id} hover>
-                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{inspection.no}</TableCell>
+                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{filteredData.length - (startIndex + index)}</TableCell>
                         <TableCell
                           sx={{
                             py: 0.5,
@@ -2244,7 +2245,8 @@ export default function InspectionManagement() {
       beforeValue?: string,
       afterValue?: string,
       changedField?: string,
-      title?: string
+      title?: string,
+      location?: string
     ) => {
       try {
         const userName = currentUser?.user_name || currentUser?.name || user?.name || '시스템';
@@ -2258,6 +2260,7 @@ export default function InspectionManagement() {
           before_value: beforeValue || null,
           after_value: afterValue || null,
           changed_field: changedField || null,
+          change_location: location || '개요탭',
           user_name: userName,
           team: currentUser?.department || '시스템', // 로그인한 사용자의 부서
           user_department: currentUser?.department,
@@ -3029,18 +3032,18 @@ export default function InspectionManagement() {
                     <Table size="small">
                       <TableHead>
                         <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
-                          <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 110 }}>변경시간</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 180 }}>제목</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 140 }}>코드</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 70 }}>변경분류</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 70 }}>변경위치</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 90 }}>변경필드</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 100 }}>변경전</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 100 }}>변경후</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 400 }}>변경 세부내용</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 50, fontSize: '12px' }}>NO</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 110, fontSize: '12px' }}>변경시간</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 140, fontSize: '12px' }}>코드</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 180, fontSize: '12px' }}>제목</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경분류</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경위치</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경필드</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경전</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경후</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 400, fontSize: '12px' }}>변경세부내용</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>팀</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경자</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -3053,37 +3056,37 @@ export default function InspectionManagement() {
                             }}
                           >
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                                 {changeLogs.length - (changeLogPage * changeLogRowsPerPage + index)}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                                 {log.dateTime}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                                {log.target}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                                 {log.code}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                                {log.target}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                                 {log.action}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                                 {log.location}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                                 {log.changedField || '-'}
                               </Typography>
                             </TableCell>
@@ -3091,7 +3094,7 @@ export default function InspectionManagement() {
                               <Typography
                                 variant="body2"
                                 sx={{
-                                  fontSize: '13px',
+                                  fontSize: '12px',
                                   color: 'text.primary',
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
@@ -3107,7 +3110,7 @@ export default function InspectionManagement() {
                               <Typography
                                 variant="body2"
                                 sx={{
-                                  fontSize: '13px',
+                                  fontSize: '12px',
                                   color: 'text.primary',
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
@@ -3123,7 +3126,7 @@ export default function InspectionManagement() {
                               <Typography
                                 variant="body2"
                                 sx={{
-                                  fontSize: '13px',
+                                  fontSize: '12px',
                                   color: 'text.primary',
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
@@ -3144,14 +3147,14 @@ export default function InspectionManagement() {
                                 size="small"
                                 sx={{
                                   height: 22,
-                                  fontSize: '13px',
+                                  fontSize: '12px',
                                   backgroundColor: getTeamColor(log.team),
                                   color: '#333333'
                                 }}
                               />
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                                 {log.user}
                               </Typography>
                             </TableCell>

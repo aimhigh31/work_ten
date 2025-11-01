@@ -278,7 +278,7 @@ function KanbanView({
       const workContent = currentSolution.detailContent || '업무내용 없음';
       const description = `${workContent} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
 
-      addChangeLog('수정', solutionCode, description, currentSolution.team || '미분류');
+      addChangeLog('수정', solutionCode, description, currentSolution.team || '미분류', oldStatus, newStatus, '상태', workContent, '칸반탭');
     }
   };
 
@@ -2191,9 +2191,9 @@ function DashboardView({
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {paginatedData.map((solution) => (
+                    {paginatedData.map((solution, index) => (
                       <TableRow key={solution.id} hover>
-                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{solution.no}</TableCell>
+                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{filteredData.length - (startIndex + index)}</TableCell>
                         <TableCell
                           sx={{
                             py: 0.5,
@@ -2413,6 +2413,22 @@ export default function SolutionManagement() {
     return found ? found.subcode_name : subcode;
   }, [statusTypes]);
 
+  // 서브코드명 → 서브코드 변환 (DB 저장용)
+  const getStatusSubcode = React.useCallback((subcodeName: string) => {
+    const found = statusTypes.find(item => item.subcode_name === subcodeName);
+    return found ? found.subcode : subcodeName;
+  }, [statusTypes]);
+
+  const getSolutionTypeSubcode = React.useCallback((subcodeName: string) => {
+    const found = solutionTypesMap.find(item => item.subcode_name === subcodeName);
+    return found ? found.subcode : subcodeName;
+  }, [solutionTypesMap]);
+
+  const getDevelopmentTypeSubcode = React.useCallback((subcodeName: string) => {
+    const found = developmentTypesMap.find(item => item.subcode_name === subcodeName);
+    return found ? found.subcode : subcodeName;
+  }, [developmentTypesMap]);
+
   // currentUser 찾기 (email 기반)
   const currentUser = React.useMemo(() => {
     if (!session?.user?.email || users.length === 0) return null;
@@ -2469,11 +2485,18 @@ export default function SolutionManagement() {
         const dbSolutions = await getSolutions();
         console.log('📊 DB에서 로드된 솔루션:', dbSolutions.length + '개');
 
-        const convertedSolutions = dbSolutions.map((dbSolution: DbSolutionData) => ({
-          ...convertToSolutionData(dbSolution),
-          createdBy: dbSolution.created_by, // 데이터 생성자 (권한 체크용)
-          isEditing: false
-        }));
+        const convertedSolutions = dbSolutions.map((dbSolution: DbSolutionData) => {
+          const converted = convertToSolutionData(dbSolution);
+          // 서브코드를 서브코드명으로 변환
+          return {
+            ...converted,
+            status: getStatusName(converted.status),
+            solutionType: getSolutionTypeName(converted.solutionType),
+            developmentType: getDevelopmentTypeName(converted.developmentType),
+            createdBy: dbSolution.created_by, // 데이터 생성자 (권한 체크용)
+            isEditing: false
+          };
+        });
 
         setSolutions(convertedSolutions);
         console.log('✅ 솔루션 데이터 로드 완료');
@@ -2485,7 +2508,7 @@ export default function SolutionManagement() {
     };
 
     loadSolutions();
-  }, [getSolutions, convertToSolutionData]);
+  }, [getSolutions, convertToSolutionData, getStatusName, getSolutionTypeName, getDevelopmentTypeName]);
 
   // URL 쿼리 파라미터 처리
   useEffect(() => {
@@ -2538,7 +2561,8 @@ export default function SolutionManagement() {
     beforeValue?: string,
     afterValue?: string,
     changedField?: string,
-    title?: string
+    title?: string,
+    location?: string
   ) => {
     try {
       const supabase = createClient();
@@ -2553,6 +2577,7 @@ export default function SolutionManagement() {
         after_value: afterValue || null,
         changed_field: changedField || null,
         title: title || null,
+        change_location: location || '개요탭',
         user_name: userName,
         team: currentUser?.department || team,
         user_department: currentUser?.department,
@@ -2598,14 +2623,33 @@ export default function SolutionManagement() {
       console.log('📝 기존 솔루션 업데이트 시작:', originalSolution.id);
 
       try {
-        const dbData = convertToDbSolutionData(updatedSolution);
+        // 팀 필드 검증 - 유효하지 않으면 빈 문자열로 대체
+        const isTeamValid = updatedSolution.team && departments.some(dept => dept.department_name === updatedSolution.team && dept.is_active);
+        const validatedTeam = isTeamValid ? updatedSolution.team : '';
+
+        if (!isTeamValid && updatedSolution.team) {
+          console.warn('⚠️ [SolutionManagement] 저장 시점 팀 필드 검증 실패:', updatedSolution.team, '→ 빈 문자열로 대체');
+        }
+
+        // 서브코드명을 서브코드로 변환 (DB 저장용)
+        const solutionWithSubcodes = {
+          ...updatedSolution,
+          team: validatedTeam,
+          status: getStatusSubcode(updatedSolution.status),
+          solutionType: getSolutionTypeSubcode(updatedSolution.solutionType),
+          developmentType: getDevelopmentTypeSubcode(updatedSolution.developmentType)
+        };
+
+        const dbData = convertToDbSolutionData(solutionWithSubcodes);
         console.log('🔄 DB 형식으로 변환된 데이터:', dbData);
 
         const success = await updateSolution(updatedSolution.id, dbData);
 
         if (success) {
+          // UI 업데이트 시 검증된 팀 값 사용
+          const updatedSolutionForUI = { ...updatedSolution, team: validatedTeam };
           setSolutions((prevSolutions) =>
-            prevSolutions.map((solution) => (solution.id === updatedSolution.id ? { ...updatedSolution } : solution))
+            prevSolutions.map((solution) => (solution.id === updatedSolution.id ? updatedSolutionForUI : solution))
           );
           console.log('✅ 솔루션 업데이트 성공');
           alert('솔루션이 성공적으로 업데이트되었습니다.');
@@ -2640,15 +2684,36 @@ export default function SolutionManagement() {
 
         console.log('📋 입력 데이터 검증 완료');
 
-        const dbData = convertToDbSolutionData(updatedSolution);
+        // 팀 필드 검증 - 유효하지 않으면 빈 문자열로 대체
+        const isTeamValid = updatedSolution.team && departments.some(dept => dept.department_name === updatedSolution.team && dept.is_active);
+        const validatedTeam = isTeamValid ? updatedSolution.team : '';
+
+        if (!isTeamValid && updatedSolution.team) {
+          console.warn('⚠️ [SolutionManagement] 새 솔루션 생성 시 팀 필드 검증 실패:', updatedSolution.team, '→ 빈 문자열로 대체');
+        }
+
+        // 서브코드명을 서브코드로 변환 (DB 저장용)
+        const solutionWithSubcodes = {
+          ...updatedSolution,
+          team: validatedTeam,
+          status: getStatusSubcode(updatedSolution.status),
+          solutionType: getSolutionTypeSubcode(updatedSolution.solutionType),
+          developmentType: getDevelopmentTypeSubcode(updatedSolution.developmentType)
+        };
+
+        const dbData = convertToDbSolutionData(solutionWithSubcodes);
         console.log('🔄 DB 형식으로 변환된 데이터:', dbData);
 
         const createdDbSolution = await createSolution(dbData);
         console.log('📤 createSolution 결과:', createdDbSolution);
 
         if (createdDbSolution) {
+          const converted = convertToSolutionData(createdDbSolution);
           const createdSolution = {
-            ...convertToSolutionData(createdDbSolution),
+            ...converted,
+            status: getStatusName(converted.status),
+            solutionType: getSolutionTypeName(converted.solutionType),
+            developmentType: getDevelopmentTypeName(converted.developmentType),
             isEditing: false
           };
 

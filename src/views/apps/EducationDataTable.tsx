@@ -244,18 +244,21 @@ export default function EducationDataTable({
   const handleExcelDownload = () => {
     try {
       // 필터링된 데이터를 Excel 형식으로 변환 (테이블과 동일한 컬럼 순서)
-      const excelData = filteredData.map((education) => ({
-        NO: education.no,
-        등록일: education.registrationDate,
-        코드: `MAIN-EDU-${new Date(education.registrationDate).getFullYear().toString().slice(-2)}-${String(education.no).padStart(3, '0')}`,
-        교육방식: getEducationMethodName(education.educationType),
-        요청내용: education.content || '',
-        처리내용: education.responseContent || '',
-        우선순위: education.priority || '보통',
-        상태: education.status || '대기',
-        완료일: education.resolutionDate || '',
-        등록자: education.assignee || ''
-      }));
+      const excelData = filteredData.map((education, index) => {
+        const displayNo = filteredData.length - index;
+        return {
+          NO: displayNo,
+          등록일: education.registrationDate,
+          코드: `MAIN-EDU-${new Date(education.registrationDate).getFullYear().toString().slice(-2)}-${String(displayNo).padStart(3, '0')}`,
+          교육방식: getEducationMethodName(education.educationType),
+          요청내용: education.content || '',
+          처리내용: education.responseContent || '',
+          우선순위: education.priority || '보통',
+          상태: education.status || '대기',
+          완료일: education.resolutionDate || '',
+          등록자: education.assignee || ''
+        };
+      });
 
       // CSV 형식으로 데이터 변환 (Excel에서 열 수 있음)
       const csvContent = [
@@ -858,7 +861,7 @@ export default function EducationDataTable({
               </TableHead>
               <TableBody>
                 {paginatedData.length > 0 ? (
-                  paginatedData.map((education) => (
+                  paginatedData.map((education, index) => (
                     <TableRow
                       key={education.id}
                       hover
@@ -889,7 +892,7 @@ export default function EducationDataTable({
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
-                          {education.no}
+                          {filteredData.length - (page * rowsPerPage + index)}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -900,7 +903,7 @@ export default function EducationDataTable({
                       <TableCell>
                         <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                           MAIN-EDU-{new Date(education.registrationDate).getFullYear().toString().slice(-2)}-
-                          {String(education.no).padStart(3, '0')}
+                          {String(filteredData.length - (page * rowsPerPage + index)).padStart(3, '0')}
                         </Typography>
                       </TableCell>
                       <TableCell>

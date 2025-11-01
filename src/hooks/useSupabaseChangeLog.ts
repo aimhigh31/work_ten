@@ -51,7 +51,7 @@ export function useSupabaseChangeLog(page: string, recordId?: string | number) {
       let query = supabase
         .from('common_log_data')
         .select(
-          'id, page, record_id, action_type, title, description, before_value, after_value, changed_field, user_name, team, user_department, created_at'
+          'id, page, record_id, action_type, title, description, before_value, after_value, changed_field, change_location, user_name, team, user_department, created_at'
         )
         .eq('page', page)
         .order('created_at', { ascending: false })

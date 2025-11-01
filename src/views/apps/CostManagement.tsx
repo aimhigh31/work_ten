@@ -284,8 +284,8 @@ function CostKanbanView({
         // 변경로그 추가
         const costCode = currentCost.code || `COST-${costId}`;
         const content = currentCost.content || '비용내용 없음';
-        const description = `비용관리 ${content}(${costCode}) 정보의 개요탭 상태가 ${oldStatus} → ${newStatus} 로 수정 되었습니다.`;
-        await addChangeLog('수정', costCode, description, currentCost.team || '미분류', oldStatus, newStatus, '상태', content);
+        const description = `비용관리 ${content}(${costCode}) 정보의 칸반탭 상태가 ${oldStatus} → ${newStatus} 로 수정 되었습니다.`;
+        await addChangeLog('수정', costCode, description, currentCost.team || '미분류', oldStatus, newStatus, '상태', content, '칸반탭');
       } catch (error) {
         console.error('드래그 상태 업데이트 실패:', error);
       }
@@ -767,6 +767,7 @@ interface CostMonthlyScheduleViewProps {
   selectedAssignee: string;
   costs: CostRecord[];
   onCardClick: (cost: CostRecord) => void;
+  getStatusName: (subcode: string) => string;
 }
 
 function CostMonthlyScheduleView({
@@ -775,7 +776,8 @@ function CostMonthlyScheduleView({
   selectedStatus,
   selectedAssignee,
   costs,
-  onCardClick
+  onCardClick,
+  getStatusName
 }: CostMonthlyScheduleViewProps) {
   const theme = useTheme();
 
@@ -956,7 +958,7 @@ function CostMonthlyScheduleView({
                           mb: itemIndex < items.length - 1 ? 0.8 : 0,
                           p: 0.6,
                           borderRadius: 1,
-                          backgroundColor: getStatusColor(item.status),
+                          backgroundColor: getStatusColor(getStatusName(item.status)),
                           cursor: 'pointer',
                           transition: 'all 0.2s ease',
                           '&:hover': {
@@ -969,7 +971,7 @@ function CostMonthlyScheduleView({
                           variant="body2"
                           sx={{
                             fontSize: '13px',
-                            color: getStatusTextColor(item.status),
+                            color: getStatusTextColor(getStatusName(item.status)),
                             fontWeight: 500,
                             display: 'flex',
                             alignItems: 'center',
@@ -977,7 +979,7 @@ function CostMonthlyScheduleView({
                           }}
                         >
                           <span>{`${month}-${day}`}</span>
-                          <span>{item.status}</span>
+                          <span>{getStatusName(item.status)}</span>
                         </Typography>
                         <Typography
                           variant="body2"
@@ -1083,7 +1085,7 @@ function CostMonthlyScheduleView({
                           mb: itemIndex < items.length - 1 ? 0.8 : 0,
                           p: 0.6,
                           borderRadius: 1,
-                          backgroundColor: getStatusColor(item.status),
+                          backgroundColor: getStatusColor(getStatusName(item.status)),
                           cursor: 'pointer',
                           transition: 'all 0.2s ease',
                           '&:hover': {
@@ -1096,7 +1098,7 @@ function CostMonthlyScheduleView({
                           variant="body2"
                           sx={{
                             fontSize: '13px',
-                            color: getStatusTextColor(item.status),
+                            color: getStatusTextColor(getStatusName(item.status)),
                             fontWeight: 500,
                             display: 'flex',
                             alignItems: 'center',
@@ -1104,7 +1106,7 @@ function CostMonthlyScheduleView({
                           }}
                         >
                           <span>{`${month}-${day}`}</span>
-                          <span>{item.status}</span>
+                          <span>{getStatusName(item.status)}</span>
                         </Typography>
                         <Typography
                           variant="body2"
@@ -1140,9 +1142,10 @@ interface CostDashboardViewProps {
   selectedStatus: string;
   selectedAssignee: string;
   costs: CostRecord[];
+  getStatusName: (subcode: string) => string;
 }
 
-function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selectedAssignee, costs }: CostDashboardViewProps) {
+function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selectedAssignee, costs, getStatusName }: CostDashboardViewProps) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -1270,7 +1273,8 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
 
   // 페이지네이션
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-  const paginatedData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedData = filteredData.slice(startIndex, currentPage * itemsPerPage);
 
   const handlePageChange = (event: React.ChangeEvent<unknown>, newPage: number) => {
     setCurrentPage(newPage);
@@ -1681,7 +1685,7 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell sx={{ py: 1, fontSize: '13px' }}>코드</TableCell>
+                      <TableCell sx={{ py: 1, fontSize: '13px' }}>NO</TableCell>
                       <TableCell sx={{ py: 1, fontSize: '13px' }}>내용</TableCell>
                       <TableCell sx={{ py: 1, fontSize: '13px' }}>유형</TableCell>
                       <TableCell sx={{ py: 1, fontSize: '13px' }}>금액</TableCell>
@@ -1689,9 +1693,9 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {paginatedData.map((cost) => (
+                    {paginatedData.map((cost, index) => (
                       <TableRow key={`cost-list-${cost.id}`} hover>
-                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{cost.code}</TableCell>
+                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{filteredData.length - (startIndex + index)}</TableCell>
                         <TableCell
                           sx={{
                             py: 0.5,
@@ -1708,10 +1712,10 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
                         <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{formatAmount(cost.amount)}원</TableCell>
                         <TableCell sx={{ py: 0.5 }}>
                           <Chip
-                            label={cost.status}
+                            label={getStatusName(cost.status)}
                             size="small"
                             sx={{
-                              bgcolor: getStatusColor(cost.status),
+                              bgcolor: getStatusColor(getStatusName(cost.status)),
                               color: 'white',
                               fontSize: '11px',
                               height: 20
@@ -1784,22 +1788,39 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 0.5,
-                      minWidth: 180,
-                      maxWidth: 180
+                      minWidth: 200,
+                      maxWidth: 200
                     }}
                   >
                     {teamLabels.map((label, index) => (
-                      <Box key={`team-${index}`} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box key={`team-${index}`} sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
                         <Box
                           sx={{
                             width: 12,
                             height: 12,
                             borderRadius: '50%',
-                            backgroundColor: teamPieChartOptions.colors?.[index % teamPieChartOptions.colors.length]
+                            backgroundColor: teamPieChartOptions.colors?.[index % teamPieChartOptions.colors.length],
+                            flexShrink: 0
                           }}
                         />
-                        <Typography sx={{ flex: 1, fontSize: '13px' }}>{label}</Typography>
-                        <Typography sx={{ fontSize: '13px', fontWeight: 600 }}>{formatAmount(teamValues[index])}원</Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flex: 1, minWidth: 0 }}>
+                          <Typography
+                            sx={{
+                              fontSize: '13px',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              maxWidth: '80px',
+                              flexShrink: 0
+                            }}
+                            title={label}
+                          >
+                            {label}
+                          </Typography>
+                          <Typography sx={{ fontSize: '13px', fontWeight: 600, flexShrink: 0, ml: 1 }}>
+                            {formatAmount(teamValues[index])}원
+                          </Typography>
+                        </Box>
                       </Box>
                     ))}
                   </Box>
@@ -2297,7 +2318,7 @@ export default function CostManagement() {
       title: log.title || '',
       code: log.record_id,
       action: log.action_type,
-      location: log.description.includes('개요탭') ? '개요탭' : log.description.includes('데이터탭') ? '데이터탭' : '-',
+      location: log.change_location || '-',
       changedField: log.changed_field || '-',
       beforeValue: log.before_value || '-',
       afterValue: log.after_value || '-',
@@ -2341,7 +2362,8 @@ export default function CostManagement() {
       beforeValue?: string,
       afterValue?: string,
       changedField?: string,
-      title?: string
+      title?: string,
+      location?: string
     ) => {
       const logData = {
         page: 'main_cost',
@@ -2352,6 +2374,7 @@ export default function CostManagement() {
         after_value: afterValue || null,
         changed_field: changedField || null,
         title: title || null,
+        change_location: location || '개요탭',
         user_name: userName,
         team: currentUser?.department || team,
         user_department: currentUser?.department,
@@ -2904,6 +2927,7 @@ export default function CostManagement() {
                   selectedAssignee={selectedAssignee}
                   costs={costRecords}
                   onCardClick={handleMonthlyCardClick}
+                  getStatusName={getStatusName}
                 />
               </Box>
             </TabPanel>
@@ -2943,6 +2967,7 @@ export default function CostManagement() {
                   selectedStatus={selectedStatus}
                   selectedAssignee={selectedAssignee}
                   costs={costRecords}
+                  getStatusName={getStatusName}
                 />
               </Box>
             </TabPanel>

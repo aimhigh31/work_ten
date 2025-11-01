@@ -219,7 +219,7 @@ function KanbanView({
       // 변경로그 추가 - 칸반에서 상태 변경
       const investmentCode = currentInvestment.code || `PLAN-INV-25-${String(currentInvestment.id).padStart(3, '0')}`;
       const description = `${currentInvestment.investmentName || '투자'} 상태를 "${currentInvestment.status}"에서 "${newStatus}"로 변경`;
-      addChangeLog('수정', investmentCode, description, currentInvestment.team || '미분류');
+      addChangeLog('수정', investmentCode, description, currentInvestment.team || '미분류', currentInvestment.status, newStatus, '상태', currentInvestment.investmentName, '칸반탭');
     }
   };
 
@@ -920,7 +920,7 @@ function MonthlyScheduleView({
 
                     return (
                       <Box
-                        key={`month-second-${index}-item-${item.id}`}
+                        key={`month-second-${monthIndex}-item-${item.id}`}
                         onClick={() => onCardClick(item)}
                         sx={{
                           mb: itemIndex < items.length - 1 ? 0.8 : 0,
@@ -1613,9 +1613,9 @@ function InvestmentDashboardView({
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {paginatedData.map((investment) => (
+                    {paginatedData.map((investment, index) => (
                       <TableRow key={investment.id} hover>
-                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{investment.no}</TableCell>
+                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{filteredData.length - (startIndex + index)}</TableCell>
                         <TableCell
                           sx={{
                             py: 0.5,
@@ -2262,7 +2262,7 @@ export default function InvestmentManagement() {
       title: log.title || '',
       code: log.record_id,
       action: log.action_type,
-      location: log.description.includes('개요탭') ? '개요탭' : log.description.includes('데이터탭') ? '데이터탭' : '-',
+      location: log.change_location || '-',
       changedField: log.changed_field || '-',
       beforeValue: log.before_value || '-',
       afterValue: log.after_value || '-',
@@ -2282,7 +2282,8 @@ export default function InvestmentManagement() {
       beforeValue?: string,
       afterValue?: string,
       changedField?: string,
-      title?: string
+      title?: string,
+      location?: string
     ) => {
       const logData = {
         page: 'plan_investment',
@@ -2293,6 +2294,7 @@ export default function InvestmentManagement() {
         after_value: afterValue || null,
         changed_field: changedField || null,
         title: title || null,
+        change_location: location || '개요탭',
         user_name: userName,
         team: currentUser?.department || '시스템',
         user_department: currentUser?.department,

@@ -46,7 +46,7 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 // Project imports
 import TaskTable from 'views/apps/TaskTable';
 import TaskEditDialog from 'components/TaskEditDialog';
-import { taskData, taskStatusColors, taskStatusOptions, teams } from 'data/task';
+import { taskStatusColors, taskStatusOptions, teams } from 'data/task';
 import { TaskTableData, TaskStatus } from 'types/task';
 import { ThemeMode } from 'config';
 import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
@@ -350,7 +350,7 @@ function KanbanView({
       const workContent = currentTask.workContent || '업무내용 없음';
       const description = `업무관리 ${workContent}(${taskCode}) 정보의 칸반탭 상태가 ${oldStatus} → ${newStatus} 로 수정 되었습니다.`;
 
-      await addChangeLog('수정', taskCode, description, currentTask.team || '시스템', oldStatus, newStatus, '상태', workContent);
+      await addChangeLog('수정', taskCode, description, currentTask.team || '시스템', oldStatus, newStatus, '상태', workContent, '칸반탭');
     }
   };
 
@@ -364,7 +364,21 @@ function KanbanView({
 
   // 상태별 아이템 가져오기
   const getItemsByStatus = (status: string) => {
-    return filteredData.filter((item) => item.status === status);
+    const items = filteredData.filter((item) => item.status === status);
+
+    // 중복 id 제거 (같은 id의 마지막 항목만 유지)
+    const uniqueItems = items.reduce((acc, current) => {
+      const existingIndex = acc.findIndex(item => item.id === current.id);
+      if (existingIndex >= 0) {
+        console.warn(`⚠️ 중복 ID 제거됨: ${current.id} (상태: ${status})`);
+        acc[existingIndex] = current; // 기존 항목을 최신 항목으로 교체
+      } else {
+        acc.push(current);
+      }
+      return acc;
+    }, [] as TaskTableData[]);
+
+    return uniqueItems;
   };
 
   // 팀별 색상 매핑 (데이터 테이블과 동일)
@@ -401,22 +415,6 @@ function KanbanView({
     return colorMap[assignee] || '#E0E0E0';
   };
 
-  // 상태별 진행률 계산
-  const getProgressFromStatus = (status: string) => {
-    switch (status) {
-      case '대기':
-        return 0;
-      case '진행':
-        return 50;
-      case '완료':
-        return 100;
-      case '홀딩':
-        return 0;
-      default:
-        return 0;
-    }
-  };
-
   // 드래그 가능한 카드 컴포넌트 (사양에 맞춰 완전히 새로 작성)
   function DraggableCard({ task, canEditOwn = true, canEditOthers = true }: { task: TaskTableData; canEditOwn?: boolean; canEditOthers?: boolean }) {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -448,8 +446,8 @@ function KanbanView({
       }
     };
 
-    // 진행도 계산
-    const progress = task.progress || getProgressFromStatus(task.status);
+    // 진행도 - 실제 저장된 값만 사용 (상태별 자동 계산 제거)
+    const progress = task.progress || 0;
     const progressStage = (() => {
       if (progress >= 80) return '근본 개선';
       if (progress >= 60) return '즉시 해결';
@@ -2279,7 +2277,7 @@ function DashboardView({
                       const total = Object.values(categoryStats).reduce((sum, val) => sum + val, 0);
                       const percentage = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
                       return (
-                        <Box key={key} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box key={`category-${key}`} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Box
                             sx={{
                               width: 12,
@@ -2450,7 +2448,7 @@ function DashboardView({
                       const total = Object.values(assigneeStats).reduce((sum, val) => sum + val, 0);
                       const percentage = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
                       return (
-                        <Box key={key} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box key={`assignee-${key}`} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Box
                             sx={{
                               width: 12,
@@ -2528,37 +2526,49 @@ export default function TaskManagement() {
   // ⚡ useRef로 초기화 플래그 관리 (Hot Reload 안정성)
   const isInitializedRef = useRef(false);
 
-  // ⚡ 병렬 로딩: CommonData 기다리지 않고 즉시 시작!
+  // ⚡ 초기화 및 데이터 로드
   React.useEffect(() => {
+    console.log('🚀 [TaskManagement] useEffect 실행됨, isInitializedRef:', isInitializedRef.current);
+
     // ✅ 이미 초기화되었으면 중복 실행 방지
-    if (isInitializedRef.current) return;
+    if (isInitializedRef.current) {
+      console.log('⏭️ [TaskManagement] 이미 초기화됨, 스킵');
+      return;
+    }
+
+    // ⚠️ 목업 캐시 완전 삭제
+    try {
+      const cacheKey = 'nexwork_cache_v3_task_management_tasks';
+      const timestampKey = `${cacheKey}_timestamp`;
+
+      if (sessionStorage.getItem(cacheKey)) {
+        console.log('🗑️ [TaskManagement] 목업 캐시 삭제');
+        sessionStorage.removeItem(cacheKey);
+        sessionStorage.removeItem(timestampKey);
+      }
+    } catch (e) {
+      console.error('캐시 삭제 실패:', e);
+    }
 
     startPageLoad('TaskManagement'); // 🚀 성능 측정 시작
-    logPageEvent('TaskManagement', 'useEffect 시작');
+    logPageEvent('TaskManagement', '페이지 초기화 시작');
 
-    const loadPageData = async () => {
+    // ✅ 초기 데이터 로드 (첫 로드는 항상 DB에서)
+    const loadInitialData = async () => {
       try {
-        logPageEvent('TaskManagement', 'loadPageData 함수 시작');
-        setIsLoading(true);
-
-        // ⚡ CommonData 로딩 완료를 기다리지 않고 즉시 시작!
-        logPageEvent('TaskManagement', 'getTasks() 호출 전');
-        await getTasks(); // ✅ 훅 내부에서 setTasks 호출됨 (KPI 패턴)
-        logPageEvent('TaskManagement', 'getTasks() 완료');
-
-        console.log('✅ TaskManagement 로딩 완료 (병렬)');
-
-        endPageLoad('TaskManagement'); // 🏁 성능 측정 종료
+        console.log('📥 [TaskManagement] 초기 데이터 로드 시작');
+        await getTasks(true); // 처음에는 강제로 DB에서 가져오기
+        console.log('✅ [TaskManagement] 초기 데이터 로드 완료');
       } catch (error) {
-        console.error('❌ 데이터 로딩 실패:', error);
-        endPageLoad('TaskManagement');
+        console.error('❌ 초기 데이터 로드 실패:', error);
       } finally {
-        setIsLoading(false);
-        isInitializedRef.current = true; // ✅ 초기화 완료 표시
+        isInitializedRef.current = true;
+        console.log('🏁 [TaskManagement] 초기화 완료, isInitializedRef:', isInitializedRef.current);
+        endPageLoad('TaskManagement'); // 🏁 성능 측정 종료
       }
     };
 
-    loadPageData(); // ⚡ 즉시 실행! (대기 없음)
+    loadInitialData();
   }, []); // ✅ 빈 배열 유지 (Hot Reload 안정성)
 
   // 사용자별 KPI Task 로드 (독립적 실행)
@@ -2740,7 +2750,7 @@ export default function TaskManagement() {
         title: log.title || '',
         code: log.record_id,
         action: log.action_type,
-        location: log.description.includes('개요탭') ? '개요탭' : log.description.includes('데이터탭') ? '데이터탭' : '-',
+        location: log.change_location || '-',
         changedField: log.changed_field || '-',
         beforeValue: log.before_value || '-',
         afterValue: log.after_value || '-',
@@ -2775,7 +2785,8 @@ export default function TaskManagement() {
       beforeValue?: string,
       afterValue?: string,
       changedField?: string,
-      title?: string
+      title?: string,
+      location?: string
     ) => {
       try {
         const supabase = createClient();
@@ -2815,6 +2826,7 @@ export default function TaskManagement() {
           after_value: afterValue || null,
           changed_field: changedField || null,
           title: title || null,
+          change_location: location || '개요탭',
           user_name: userName,
           team: userDepartment || team || '시스템',
           user_department: userDepartment,
@@ -3081,8 +3093,8 @@ export default function TaskManagement() {
 
           console.log('✅ 업무 추가 완료:', taskCode);
 
-          // ✅ 백그라운드에서 최신 데이터 동기화 (await 없이)
-          getTasks();
+          // ✅ 백그라운드에서 최신 데이터 동기화 (강제 새로고침)
+          getTasks(true);
 
           return true;
         }
@@ -3098,6 +3110,7 @@ export default function TaskManagement() {
 
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
+    // 개인교육관리처럼 탭 전환 시 특별한 처리 없음 (캐시된 데이터 사용)
   };
 
   return (

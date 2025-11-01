@@ -357,16 +357,19 @@ export default function SoftwareTable({
         await deleteMultipleSoftware(selected);
         console.log('✅ 선택삭제 완료');
 
-        // 선택 초기화
-        setSelected([]);
+        // 즉시 로컬 상태 업데이트 (화면에서 바로 제거)
+        const updatedData = data.filter((task) => !selected.includes(task.id));
+        setData(updatedData);
 
-        // 데이터는 deleteMultipleSoftware 내부에서 fetchSoftware()를 호출하여 자동 갱신됨
+        // 부모 컴포넌트로 동기화
+        if (setTasks) {
+          setTasks(updatedData);
+        }
       } else {
         // Supabase 연결이 없는 경우 로컬에서만 삭제 (개발용)
         console.warn('⚠️ deleteMultipleSoftware 함수가 없습니다. 로컬 상태만 업데이트합니다.');
         const updatedData = data.filter((task) => !selected.includes(task.id));
         setData(updatedData);
-        setSelected([]);
 
         // 부모 컴포넌트로 동기화
         if (setTasks) {
@@ -375,6 +378,10 @@ export default function SoftwareTable({
       }
     } catch (error) {
       console.error('❌ 삭제 중 오류 발생:', error);
+      alert('삭제 중 오류가 발생했습니다.');
+    } finally {
+      // 선택 초기화 (성공/실패 관계없이)
+      setSelected([]);
     }
   };
 

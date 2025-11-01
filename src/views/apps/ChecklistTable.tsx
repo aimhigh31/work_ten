@@ -225,7 +225,7 @@ export default function ChecklistTable({
     try {
       // 필터링된 데이터를 Excel 형식으로 변환 (테이블과 동일한 컬럼 순서)
       const excelData = filteredData.map((task, index) => ({
-        NO: index + 1,
+        NO: filteredData.length - index,
         등록일: task.registrationDate,
         코드: task.code,
         체크리스트분류: getSubCodeName(task.department) || '분류없음',
@@ -278,9 +278,9 @@ export default function ChecklistTable({
     }
   }, [tasks]);
 
-  // 필터링된 데이터 (역순 정렬 추가)
+  // 필터링된 데이터
   const filteredData = useMemo(() => {
-    const filtered = data.filter((task) => {
+    return data.filter((task) => {
       // 연도 필터
       if (selectedYear !== '전체') {
         const taskYear = new Date(task.startDate).getFullYear().toString();
@@ -293,8 +293,6 @@ export default function ChecklistTable({
 
       return teamMatch && statusMatch && assigneeMatch;
     });
-    // NO 기준 역순 정렬
-    return filtered.sort((a, b) => (b.no || 0) - (a.no || 0));
   }, [data, selectedYear || '전체', selectedTeam, selectedStatus, selectedAssignee]);
 
   // 페이지네이션 적용된 데이터
@@ -724,7 +722,7 @@ export default function ChecklistTable({
           </TableHead>
           <TableBody>
             {paginatedData.length > 0 ? (
-              paginatedData.map((task) => (
+              paginatedData.map((task, index) => (
                 <TableRow
                   key={task.id}
                   hover
@@ -756,7 +754,7 @@ export default function ChecklistTable({
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                      {task.no}
+                      {filteredData.length - (page * rowsPerPage + index)}
                     </Typography>
                   </TableCell>
                   <TableCell>

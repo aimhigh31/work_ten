@@ -68,7 +68,8 @@ const columnWidths = {
   team: 100,
   assignee: 120,
   status: 90,
-  inspectionDate: 100,
+  startDate: 100,
+  endDate: 100,
   action: 80
 };
 
@@ -182,7 +183,8 @@ export default function EvaluationTable({
         팀: evaluation.team,
         담당자: evaluation.assignee,
         상태: evaluation.status,
-        점검일: evaluation.inspectionDate
+        시작일: evaluation.startDate,
+        종료일: evaluation.endDate
       }));
 
       // CSV 형식으로 데이터 변환 (Excel에서 열 수 있음)
@@ -867,7 +869,8 @@ export default function EvaluationTable({
               <TableCell sx={{ width: columnWidths.team, fontWeight: 600 }}>팀</TableCell>
               <TableCell sx={{ width: columnWidths.assignee, fontWeight: 600 }}>담당자</TableCell>
               <TableCell sx={{ width: columnWidths.status, fontWeight: 600 }}>상태</TableCell>
-              <TableCell sx={{ width: columnWidths.inspectionDate, fontWeight: 600 }}>점검일</TableCell>
+              <TableCell sx={{ width: columnWidths.startDate, fontWeight: 600 }}>시작일</TableCell>
+              <TableCell sx={{ width: columnWidths.endDate, fontWeight: 600 }}>종료일</TableCell>
               <TableCell sx={{ width: columnWidths.action, fontWeight: 600 }}>Action</TableCell>
             </TableRow>
           </TableHead>
@@ -975,7 +978,12 @@ export default function EvaluationTable({
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                      {evaluation.inspectionDate}
+                      {evaluation.startDate || '-'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                      {evaluation.endDate || '-'}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -991,7 +999,7 @@ export default function EvaluationTable({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={12} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={13} align="center" sx={{ py: 4 }}>
                   <Typography variant="body2" color="text.secondary">
                     검색 결과가 없습니다.
                   </Typography>

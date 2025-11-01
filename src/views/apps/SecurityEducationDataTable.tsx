@@ -210,7 +210,7 @@ export default function SecurityEducationTable({
 
   // Supabase 훅
   const { createEducation, updateEducation, deleteEducation } = useSupabaseSecurityEducation();
-  const { users } = useCommonData();
+  const { users, masterCodes } = useCommonData();
   const { generateNextId, syncMaxId } = useIdGenerator();
 
   // 현재 로그인한 사용자 정보
@@ -222,6 +222,32 @@ export default function SecurityEducationTable({
     const found = users.find((u) => u.email === session.user.email);
     return found;
   }, [session, users]);
+
+  // GROUP008 교육유형 서브코드 목록
+  const educationTypes = useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP008' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // GROUP002 상태 서브코드 목록
+  const statusTypes = useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // subcode → subcode_name 변환 헬퍼 함수 (교육유형용)
+  const getEducationTypeName = useCallback((subcode: string) => {
+    const found = educationTypes.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [educationTypes]);
+
+  // subcode → subcode_name 변환 헬퍼 함수 (상태용)
+  const getStatusName = useCallback((subcode: string) => {
+    const found = statusTypes.find(item => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [statusTypes]);
 
   // 데이터 소유자 확인 함수
   const isDataOwner = (education: SecurityEducationTableData) => {
@@ -281,18 +307,18 @@ export default function SecurityEducationTable({
   const handleExcelDownload = () => {
     try {
       // 필터링된 데이터를 Excel 형식으로 변환 (테이블과 동일한 컬럼 순서)
-      const excelData = filteredData.map((task, index) => ({
-        NO: index + 1,
+      const excelData = filteredData.map((task) => ({
+        NO: task.no || task.id,
         등록일: task.registrationDate,
         코드: task.code,
-        업무분류: task.department || '분류없음',
-        업무내용: task.workContent,
+        교육유형: getEducationTypeName(task.educationType),
+        교육명: task.educationName,
+        장소: task.location,
+        참석수: task.attendeeCount,
         팀: task.team,
         담당자: task.assignee,
-        진행율: `${task.progress || 0}%`,
-        상태: task.status,
-        시작일: task.startDate || '미정',
-        완료일: task.completedDate || '미정'
+        상태: getStatusName(task.status),
+        실행일: task.executionDate
       }));
 
       // CSV 형식으로 데이터 변환 (Excel에서 열 수 있음)
@@ -318,7 +344,7 @@ export default function SecurityEducationTable({
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
-      link.setAttribute('download', `업무관리_${new Date().toISOString().slice(0, 10)}.csv`);
+      link.setAttribute('download', `보안교육관리_${new Date().toISOString().slice(0, 10)}.csv`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
@@ -337,7 +363,7 @@ export default function SecurityEducationTable({
     }
   }, [tasks]);
 
-  // 필터링된 데이터 (역순 정렬 추가)
+  // 필터링 및 정렬된 데이터 (신규 데이터가 위로 오도록 NO 기준 내림차순 정렬)
   const filteredData = useMemo(() => {
     const filtered = data.filter((task) => {
       // 연도 필터
@@ -352,7 +378,8 @@ export default function SecurityEducationTable({
 
       return teamMatch && statusMatch && assigneeMatch;
     });
-    // NO 기준 역순 정렬
+
+    // NO 기준 내림차순 정렬 (큰 번호가 위로)
     return filtered.sort((a, b) => (b.no || 0) - (a.no || 0));
   }, [data, selectedYear || '전체', selectedTeam, selectedStatus, selectedAssignee]);
 
@@ -585,11 +612,23 @@ export default function SecurityEducationTable({
 
               // 값이 다른 경우만 추가
               if (beforeVal !== afterVal) {
+                // 상태와 교육유형은 서브코드명으로 변환
+                let beforeDisplay = beforeVal || '';
+                let afterDisplay = afterVal || '';
+
+                if (field === 'status') {
+                  beforeDisplay = getStatusName(beforeVal) || beforeVal || '';
+                  afterDisplay = getStatusName(afterVal) || afterVal || '';
+                } else if (field === 'educationType') {
+                  beforeDisplay = getEducationTypeName(beforeVal) || beforeVal || '';
+                  afterDisplay = getEducationTypeName(afterVal) || afterVal || '';
+                }
+
                 changes.push({
                   field,
                   fieldKorean: fieldNameMap[field],
-                  before: beforeVal || '',
-                  after: afterVal || ''
+                  before: beforeDisplay,
+                  after: afterDisplay
                 });
               }
             });
@@ -969,7 +1008,7 @@ export default function SecurityEducationTable({
           </TableHead>
           <TableBody>
             {paginatedData.length > 0 ? (
-              paginatedData.map((task) => (
+              paginatedData.map((task, index) => (
                 <TableRow
                   key={task.id}
                   hover
@@ -1001,7 +1040,7 @@ export default function SecurityEducationTable({
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                      {task.no}
+                      {task.no || task.id}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -1016,7 +1055,7 @@ export default function SecurityEducationTable({
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                      {task.educationType || '유형없음'}
+                      {getEducationTypeName(task.educationType) || '유형없음'}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -1065,10 +1104,10 @@ export default function SecurityEducationTable({
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={task.status}
+                      label={getStatusName(task.status)}
                       size="small"
                       sx={{
-                        ...getStatusColor(task.status),
+                        ...getStatusColor(getStatusName(task.status) as SecurityEducationStatus),
                         fontWeight: 500,
                         fontSize: '13px'
                       }}

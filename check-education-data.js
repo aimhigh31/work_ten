@@ -1,38 +1,30 @@
 const { createClient } = require('@supabase/supabase-js');
-require('dotenv').config({ path: '.env.local' });
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  'https://exxumujwufzqnovhzvif.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV4eHVtdWp3dWZ6cW5vdmh6dmlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2NTYwMDksImV4cCI6MjA3MzIzMjAwOX0.zTU0q24c72ewx8DKHqD5lUB1VuuuwBY0jLzWel9DIME'
 );
 
-async function checkEducationData() {
-  console.log('🔍 개인교육관리 데이터 확인 중...\n');
+(async () => {
+  console.log('🔍 security_education_data 테이블 확인...\n');
 
   const { data, error } = await supabase
-    .from('main_education_data')
-    .select('id, no, code, title, assignee_name, created_by, updated_by')
-    .eq('is_active', true)
-    .order('id', { ascending: false })
-    .limit(10);
+    .from('security_education_data')
+    .select('id, no, code, education_name, education_type, status')
+    .order('no', { ascending: false })
+    .limit(5);
 
   if (error) {
-    console.error('❌ 오류:', error);
+    console.error('❌ 에러:', error);
     return;
   }
 
-  console.log('✅ 조회 결과:\n');
-  data.forEach(item => {
-    console.log(`ID: ${item.id}, NO: ${item.no}`);
-    console.log(`  코드: ${item.code}`);
-    console.log(`  제목: ${item.title}`);
-    console.log(`  담당자(assignee_name): "${item.assignee_name}"`);
-    console.log(`  작성자(created_by): "${item.created_by}"`);
-    console.log(`  수정자(updated_by): "${item.updated_by}"`);
-    console.log('  ---');
+  console.log('✅ 최근 5건 데이터:\n');
+  data.forEach(row => {
+    console.log(`ID: ${row.id}, NO: ${row.no}, Code: ${row.code}`);
+    console.log(`  교육명: ${row.education_name}`);
+    console.log(`  교육유형: "${row.education_type}" (길이: ${row.education_type?.length})`);
+    console.log(`  상태: "${row.status}" (길이: ${row.status?.length})`);
+    console.log('');
   });
-
-  console.log(`\n총 ${data.length}개 데이터 조회됨`);
-}
-
-checkEducationData();
+})();

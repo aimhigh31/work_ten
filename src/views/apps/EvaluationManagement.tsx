@@ -189,15 +189,18 @@ function KanbanView({
   // 데이터 필터링
   const filteredData = inspections.filter((inspection) => {
     // 안전 체크: inspection 객체와 필수 필드 존재 확인
-    if (!inspection || !inspection.inspectionDate || !inspection.status) {
+    if (!inspection || !inspection.status) {
       console.warn('⚠️ 유효하지 않은 inspection 데이터:', inspection);
       return false;
     }
 
-    // 연도 필터
+    // 연도 필터 (startDate 사용 - 데이터탭과 동일)
     if (selectedYear !== '전체') {
-      const inspectionYear = new Date(inspection.inspectionDate).getFullYear().toString();
-      if (inspectionYear !== selectedYear) return false;
+      const dateToCheck = inspection.startDate || inspection.inspectionDate;
+      if (dateToCheck) {
+        const inspectionYear = new Date(dateToCheck).getFullYear().toString();
+        if (inspectionYear !== selectedYear) return false;
+      }
     }
 
     // 팀 필터
@@ -311,7 +314,8 @@ function KanbanView({
         oldStatus,
         newStatus,
         '상태',
-        inspectionContent
+        inspectionContent,
+        '칸반탭'
       );
     }
   };
@@ -814,15 +818,18 @@ function MonthlyScheduleView({
   // 데이터 필터링
   const filteredData = inspections.filter((inspection) => {
     // 안전 체크: inspection 객체와 필수 필드 존재 확인
-    if (!inspection || !inspection.inspectionDate || !inspection.status) {
+    if (!inspection || !inspection.status) {
       console.warn('⚠️ 유효하지 않은 inspection 데이터:', inspection);
       return false;
     }
 
     // 연도 필터 (메인 필터가 전체가 아니면 메인 필터 우선, 아니면 뷰 필터 사용)
     const useYear = selectedYear !== '전체' ? selectedYear : viewYear;
-    const inspectionYear = new Date(inspection.inspectionDate).getFullYear().toString();
-    if (inspectionYear !== useYear) return false;
+    const dateToCheck = inspection.startDate || inspection.inspectionDate;
+    if (dateToCheck) {
+      const inspectionYear = new Date(dateToCheck).getFullYear().toString();
+      if (inspectionYear !== useYear) return false;
+    }
 
     // 팀 필터
     if (selectedTeam !== '전체' && inspection.team !== selectedTeam) return false;
@@ -839,7 +846,8 @@ function MonthlyScheduleView({
   // 월별로 데이터 그룹화 (시작일 기준)
   const monthlyData: { [key: number]: InspectionTableData[] } = {};
   filteredData.forEach((item) => {
-    const date = new Date(item.inspectionDate);
+    const dateToUse = item.startDate || item.inspectionDate || new Date().toISOString().split('T')[0];
+    const date = new Date(dateToUse);
     const month = date.getMonth();
     if (!monthlyData[month]) {
       monthlyData[month] = [];
@@ -1195,12 +1203,17 @@ function DashboardView({
     }
 
     return data.filter((inspection) => {
-      // 안전 체크: inspection 객체와 inspectionDate 필드 존재 확인
-      if (!inspection || !inspection.inspectionDate) {
+      // 안전 체크: inspection 객체 존재 확인
+      if (!inspection) {
         return false;
       }
 
-      const inspectionDate = new Date(inspection.inspectionDate);
+      const dateToCheck = inspection.startDate || inspection.inspectionDate;
+      if (!dateToCheck) {
+        return false;
+      }
+
+      const inspectionDate = new Date(dateToCheck);
 
       if (startDate && endDate) {
         const start = new Date(startDate);
@@ -1221,15 +1234,18 @@ function DashboardView({
   // 데이터 필터링
   const filteredData = filterByDateRange(inspections).filter((inspection) => {
     // 안전 체크: inspection 객체와 필수 필드 존재 확인
-    if (!inspection || !inspection.inspectionDate || !inspection.status) {
+    if (!inspection || !inspection.status) {
       console.warn('⚠️ 유효하지 않은 inspection 데이터:', inspection);
       return false;
     }
 
     // 연도 필터
     if (selectedYear !== '전체') {
-      const inspectionYear = new Date(inspection.inspectionDate).getFullYear().toString();
-      if (inspectionYear !== selectedYear) return false;
+      const dateToCheck = inspection.startDate || inspection.inspectionDate;
+      if (dateToCheck) {
+        const inspectionYear = new Date(dateToCheck).getFullYear().toString();
+        if (inspectionYear !== selectedYear) return false;
+      }
     }
 
     if (selectedTeam !== '전체' && inspection.team !== selectedTeam) return false;
@@ -1277,12 +1293,16 @@ function DashboardView({
   //   categoryValues: Object.values(categoryStats)
   // });
 
-  // 월별 통계 (막대차트용)
+  // 월별 통계 (막대차트용) - 완료일 기준
   const monthlyStats: { month: string; 대기: number; 진행: number; 완료: number; 홀딩: number }[] = [];
   const monthData: Record<string, Record<string, number>> = {};
 
   filteredData.forEach((item) => {
-    const date = new Date(item.inspectionDate);
+    // 완료일 기준으로 변경
+    const dateToUse = item.endDate || item.inspectionDate;
+    if (!dateToUse) return;
+
+    const date = new Date(dateToUse);
     const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
 
     if (!monthData[monthKey]) {
@@ -2248,6 +2268,31 @@ export default function EvaluationManagement() {
     return value;
   }, [masterCodes]);
 
+  // 변경분류를 표준화하는 함수
+  const normalizeActionType = React.useCallback((actionType: string) => {
+    if (!actionType) return '-';
+
+    const action = actionType.toLowerCase().trim();
+
+    // 추가 관련
+    if (action.includes('추가') || action.includes('생성') || action.includes('create') || action.includes('add') || action.includes('등록')) {
+      return '추가';
+    }
+
+    // 삭제 관련
+    if (action.includes('삭제') || action.includes('제거') || action.includes('delete') || action.includes('remove')) {
+      return '삭제';
+    }
+
+    // 수정 관련 (기본값)
+    if (action.includes('수정') || action.includes('변경') || action.includes('편집') || action.includes('update') || action.includes('edit') || action.includes('modify')) {
+      return '수정';
+    }
+
+    // 기본값: 수정
+    return '수정';
+  }, []);
+
   // DB 변경로그를 UI 형식으로 변환
   const changeLogs = React.useMemo(() => {
     return dbChangeLogs.map((log: ChangeLogData) => {
@@ -2268,7 +2313,7 @@ export default function EvaluationManagement() {
         code: log.record_id, // record_id가 이미 코드임
         target: log.title || inspection?.inspectionContent || log.record_id,
         location: '개요탭', // 변경위치
-        action: log.action_type,
+        action: normalizeActionType(log.action_type),
         changedField: log.changed_field || '-', // 변경필드
         description: log.description,
         beforeValue: convertSubcodeToName(log.before_value),
@@ -2277,7 +2322,7 @@ export default function EvaluationManagement() {
         user: log.user_name
       };
     });
-  }, [dbChangeLogs, inspections, convertSubcodeToName]);
+  }, [dbChangeLogs, inspections, convertSubcodeToName, normalizeActionType]);
 
   // 보안점검 데이터 로드 함수 (재사용 가능)
   const loadInspectionsFromSupabase = useCallback(async () => {
@@ -2390,7 +2435,8 @@ export default function EvaluationManagement() {
       beforeValue?: string,
       afterValue?: string,
       changedField?: string,
-      title?: string
+      title?: string,
+      location?: string
     ) => {
       try {
         const userName = currentUser?.user_name || currentUser?.name || user?.name || '시스템';
@@ -2404,6 +2450,7 @@ export default function EvaluationManagement() {
           before_value: beforeValue || null,
           after_value: afterValue || null,
           changed_field: changedField || null,
+          change_location: location || '개요탭',
           user_name: userName,
           team: currentUser?.department || '시스템', // 로그인한 사용자의 부서
           user_department: currentUser?.department,
@@ -3158,18 +3205,18 @@ export default function EvaluationManagement() {
                     <Table size="small">
                       <TableHead>
                         <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
-                          <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 150 }}>변경시간</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 140 }}>제목</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 110 }}>코드</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 70 }}>변경분류</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 70 }}>변경위치</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 90 }}>변경필드</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 100 }}>변경전</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 100 }}>변경후</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 400 }}>변경 세부내용</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 50, fontSize: '12px' }}>NO</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 150, fontSize: '12px' }}>변경시간</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 110, fontSize: '12px' }}>코드</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 140, fontSize: '12px' }}>제목</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경분류</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경위치</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경필드</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경전</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경후</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 400, fontSize: '12px' }}>변경세부내용</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>팀</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경자</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -3193,12 +3240,12 @@ export default function EvaluationManagement() {
                             </TableCell>
                             <TableCell>
                               <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
-                                {log.target}
+                                {log.code}
                               </Typography>
                             </TableCell>
                             <TableCell>
                               <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
-                                {log.code}
+                                {log.target}
                               </Typography>
                             </TableCell>
                             <TableCell>

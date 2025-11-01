@@ -368,7 +368,7 @@ function KanbanView({
           const workContent = currentTask.workContent || '업무내용 없음';
           const description = `${workContent} 상태를 "${oldStatusName}"에서 "${newStatusName}"로 변경`;
 
-          addChangeLog('수정', taskCode, description, currentTask.team || '미분류');
+          addChangeLog('수정', taskCode, description, currentTask.team || '미분류', oldStatusName, newStatusName, '상태', workContent, '칸반탭');
         } catch (error) {
           console.error('❌ 칸반뷰 - DB 업데이트 실패:', error);
           alert('상태 업데이트에 실패했습니다.');
@@ -2677,7 +2677,7 @@ export default function KpiManagement() {
         title: log.title || '',
         code: log.record_id,
         action: log.action_type,
-        location: log.description.includes('개요탭') ? '개요탭' : log.description.includes('데이터탭') ? '데이터탭' : '-',
+        location: log.change_location || '-',
         changedField: log.changed_field || '-',
         beforeValue: log.before_value || '-',
         afterValue: log.after_value || '-',
@@ -2712,7 +2712,8 @@ export default function KpiManagement() {
       beforeValue?: string,
       afterValue?: string,
       changedField?: string,
-      title?: string
+      title?: string,
+      location?: string
     ) => {
       try {
         const supabase = createClient();
@@ -2727,6 +2728,7 @@ export default function KpiManagement() {
           after_value: afterValue || null,
           changed_field: changedField || null,
           title: title || null,
+          change_location: location || '개요탭',
           user_name: userName, // changed_by → user_name
           team: currentUser?.department || team || '시스템',
           user_department: currentUser?.department,

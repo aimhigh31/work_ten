@@ -873,6 +873,29 @@ const OverviewTab = memo(
             />
           </Stack>
 
+          {/* 시작일과 완료일 - 좌우 배치 */}
+          <Stack direction="row" spacing={2}>
+            <TextField
+              fullWidth
+              label="시작일"
+              type="date"
+              value={softwareState.startDate}
+              onChange={handleFieldChange('startDate')}
+              variant="outlined"
+              InputLabelProps={{ shrink: true }}
+            />
+
+            <TextField
+              fullWidth
+              label="완료일"
+              type="date"
+              value={softwareState.completedDate}
+              onChange={handleFieldChange('completedDate')}
+              variant="outlined"
+              InputLabelProps={{ shrink: true }}
+            />
+          </Stack>
+
           {/* 팀과 담당자 - 좌우 배치 */}
           <Stack direction="row" spacing={2}>
             <TextField

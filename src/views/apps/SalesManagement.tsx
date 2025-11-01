@@ -598,11 +598,11 @@ function SalesDashboardView({
     tooltip: {
       custom: function ({ series, seriesIndex, w }: any) {
         // able-pro 표준 스타일 적용
-        const capturedLabels = [...categoryLabels];
+        const capturedLabelNames = [...categoryLabelNames];
         const capturedValues = [...categoryValues];
 
         const value = capturedValues[seriesIndex] || 0;
-        const label = capturedLabels[seriesIndex] || '분류';
+        const label = capturedLabelNames[seriesIndex] || '분류';
         const total = capturedValues.reduce((sum: number, val: number) => sum + val, 0);
         const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
 
@@ -1106,9 +1106,9 @@ function SalesDashboardView({
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {paginatedData.map((sale) => (
+                    {paginatedData.map((sale, index) => (
                       <TableRow key={sale.id} hover>
-                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{sale.id}</TableCell>
+                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{filteredData.length - (startIndex + index)}</TableCell>
                         <TableCell
                           sx={{
                             py: 0.5,
@@ -1821,7 +1821,7 @@ export default function SalesManagement() {
       title: log.title || '',
       code: log.record_id,
       action: log.action_type,
-      location: log.description.includes('개요탭') ? '개요탭' : log.description.includes('데이터탭') ? '데이터탭' : '-',
+      location: log.change_location || '-',
       changedField: log.changed_field || '-',
       beforeValue: log.before_value || '-',
       afterValue: log.after_value || '-',
@@ -1866,7 +1866,8 @@ export default function SalesManagement() {
       beforeValue?: string,
       afterValue?: string,
       changedField?: string,
-      title?: string
+      title?: string,
+      location?: string
     ) => {
       const logData = {
         page: 'plan_sales',
@@ -1877,6 +1878,7 @@ export default function SalesManagement() {
         after_value: afterValue || null,
         changed_field: changedField || null,
         title: title || null,
+        change_location: location || '개요탭',
         user_name: userName,
         team: currentUser?.department || '시스템',
         user_department: currentUser?.department,
@@ -3157,7 +3159,7 @@ function SalesKanbanView({
             const businessUnitName = getCodeName('GROUP035', currentSales.businessUnit) || '미분류';
             const description = `${customerName} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
 
-            addChangeLog('수정', salesCode, description, businessUnitName).catch((logError) => {
+            addChangeLog('수정', salesCode, description, businessUnitName, oldStatus, newStatus, '상태', customerName, '칸반탭').catch((logError) => {
               console.error('변경로그 추가 중 비동기 오류:', logError);
             });
           } catch (logError) {

@@ -289,7 +289,7 @@ function KanbanView({
       const requestContent = currentVOC.requestContent || 'VOC내용 없음';
       const description = `${requestContent} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
 
-      addChangeLog('수정', vocCode, description, currentVOC.team || '미분류');
+      addChangeLog('수정', vocCode, description, currentVOC.team || '미분류', oldStatus, newStatus, '상태', requestContent, '칸반탭');
     }
   };
 
@@ -997,9 +997,9 @@ function MonthlyScheduleView({
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap'
                         }}
-                        title={item.requestContent || 'VOC내용 없음'}
+                        title={item.content || 'VOC내용 없음'}
                       >
-                        {item.requestContent || 'VOC내용 없음'}
+                        {item.content || 'VOC내용 없음'}
                       </Typography>
                     </Box>
                   );
@@ -1105,9 +1105,9 @@ function MonthlyScheduleView({
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap'
                         }}
-                        title={item.requestContent || 'VOC내용 없음'}
+                        title={item.content || 'VOC내용 없음'}
                       >
-                        {item.requestContent || 'VOC내용 없음'}
+                        {item.content || 'VOC내용 없음'}
                       </Typography>
                     </Box>
                   );
@@ -1566,10 +1566,10 @@ function DashboardView({
     {} as Record<string, number>
   );
 
-  // VOC분류별 통계 (원형차트용) - requestType 필드 사용 (VOC용 수정!)
+  // VOC분류별 통계 (원형차트용) - vocType 필드 사용, 서브코드명으로 변환
   const categoryStats = filteredData.reduce(
     (acc, item) => {
-      const category = item.requestType || '기타';
+      const category = getVocTypeName(item.vocType) || '기타';
       acc[category] = (acc[category] || 0) + 1;
       return acc;
     },
@@ -1651,7 +1651,7 @@ function DashboardView({
     categoryLabels,
     categoryValues,
     sampleData: filteredData.slice(0, 3).map((item) => ({
-      requestType: item.requestType,
+      vocType: item.vocType,
       team: item.team,
       assignee: item.assignee
     }))
@@ -2199,9 +2199,9 @@ function DashboardView({
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {paginatedData.map((voc) => (
+                    {paginatedData.map((voc, index) => (
                       <TableRow key={voc.id} hover>
-                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{voc.no}</TableCell>
+                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{filteredData.length - (startIndex + index)}</TableCell>
                         <TableCell
                           sx={{
                             py: 0.5,
@@ -2525,7 +2525,8 @@ export default function VOCManagement() {
       beforeValue?: string,
       afterValue?: string,
       changedField?: string,
-      title?: string
+      title?: string,
+      location?: string
     ) => {
       const logData = {
         page: 'it_voc',
@@ -2536,6 +2537,7 @@ export default function VOCManagement() {
         after_value: afterValue || null,
         changed_field: changedField || null,
         title: title || null,
+        change_location: location || '개요탭',
         user_name: userName,
         team: currentUser?.department || '시스템',
         user_department: currentUser?.department,

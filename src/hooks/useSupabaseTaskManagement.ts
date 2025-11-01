@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import supabase from '../lib/supabaseClient';
 import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
@@ -72,21 +72,25 @@ export const useSupabaseTaskManagement = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 업무 목록 조회 (KPI 방식: 캐시 표시 후 항상 DB 조회)
-  const getTasks = useCallback(async (): Promise<TaskRecord[]> => {
+  // 업무 목록 조회 (Education 패턴: 캐시 우선, DB는 필요시만)
+  const getTasks = useCallback(async (forceRefresh: boolean = false): Promise<TaskRecord[]> => {
     try {
-      console.log('📞 getTasks 호출');
-      setLoading(true);
-      setError(null);
+      console.log('📞 getTasks 호출', { forceRefresh });
 
-      // 1. 캐시가 있으면 먼저 표시 (깜빡임 방지)
-      const cachedData = loadFromCache<TaskRecord[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
-      if (cachedData) {
-        console.log('⚡ [TaskManagement] 캐시 데이터 먼저 표시 (깜빡임 방지)');
-        setTasks(cachedData); // ✅ 캐시 데이터로 즉시 표시
+      // 1. 강제 새로고침이 아니면 캐시 확인
+      if (!forceRefresh) {
+        const cachedData = loadFromCache<TaskRecord[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
+        if (cachedData) {
+          console.log('⚡ [TaskManagement] 캐시 데이터 반환 (깜빡임 방지)');
+          setTasks(cachedData); // 상태 업데이트
+          setLoading(false);
+          return cachedData; // 캐시가 있으면 즉시 반환
+        }
       }
 
-      // 2. 항상 DB 조회 (최신 데이터 보장)
+      // 2. 캐시가 없거나 강제 새로고침일 때만 DB 조회
+      setLoading(true);
+      setError(null);
       const { data, error: fetchError } = await supabase
         .from('main_task_data')
         .select('*')
@@ -291,6 +295,12 @@ export const useSupabaseTaskManagement = () => {
       return false;
     }
   }, []);
+
+  // 초기화 - 캐시 로드하지 않음 (목업 데이터 방지)
+  useEffect(() => {
+    // 캐시를 로드하지 않음 - 컴포넌트에서 getTasks(true)로 DB 직접 조회
+    console.log('⚡ [TaskManagement] 훅 초기화 - 캐시 로드 스킵');
+  }, []); // 빈 배열로 변경 (초기 1회만)
 
   return {
     tasks,

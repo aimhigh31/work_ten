@@ -132,7 +132,9 @@ const OverviewTab = memo(
     statusOptions,
     statusColors,
     solutionTypesFromDB,
-    developmentTypesFromDB
+    developmentTypesFromDB,
+    users,
+    departments
   }: {
     solutionState: EditSolutionState;
     onFieldChange: (field: keyof EditSolutionState, value: string) => void;
@@ -142,6 +144,8 @@ const OverviewTab = memo(
     statusColors: Record<SolutionStatus, any>;
     solutionTypesFromDB: Array<{ subcode: string; subcode_name: string }>;
     developmentTypesFromDB: Array<{ subcode: string; subcode_name: string }>;
+    users: any[];
+    departments: any[];
   }) => {
     // TextField 직접 참조를 위한 ref
     const workContentRef = useRef<HTMLInputElement>(null);
@@ -174,9 +178,6 @@ const OverviewTab = memo(
 
       fetchMasterCodeData();
     }, [supabaseClient]);
-
-    // ✅ 공용 창고에서 부서, 사용자 데이터 가져오기
-    const { departments, users } = useCommonData();
 
     // 텍스트 필드용 최적화된 입력 관리
     const titleInput = useOptimizedInput(solutionState.title, 150);
@@ -293,13 +294,12 @@ const OverviewTab = memo(
                 notched
                 renderValue={(selected) => {
                   if (!selected) return '선택';
-                  const item = solutionTypesFromDB.find(t => t.subcode === selected);
-                  return item ? item.subcode_name : selected;
+                  return selected;
                 }}
               >
                 <MenuItem value="">선택</MenuItem>
                 {solutionTypesFromDB.map((option) => (
-                  <MenuItem key={option.subcode} value={option.subcode}>
+                  <MenuItem key={option.subcode} value={option.subcode_name}>
                     {option.subcode_name}
                   </MenuItem>
                 ))}
@@ -320,13 +320,12 @@ const OverviewTab = memo(
                 notched
                 renderValue={(selected) => {
                   if (!selected) return '선택';
-                  const item = developmentTypesFromDB.find(t => t.subcode === selected);
-                  return item ? item.subcode_name : selected;
+                  return selected;
                 }}
               >
                 <MenuItem value="">선택</MenuItem>
                 {developmentTypesFromDB.map((option) => (
-                  <MenuItem key={option.subcode} value={option.subcode}>
+                  <MenuItem key={option.subcode} value={option.subcode_name}>
                     {option.subcode_name}
                   </MenuItem>
                 ))}
@@ -357,9 +356,6 @@ const OverviewTab = memo(
                 onChange={handleFieldChange('status')}
                 notched
                 renderValue={(selected) => {
-                  const item = statusTypesFromDB.find(s => s.subcode === selected);
-                  const displayName = item ? item.subcode_name : selected;
-
                   const getStatusStyle = (status: string) => {
                     switch (status) {
                       case '대기':
@@ -399,10 +395,10 @@ const OverviewTab = memo(
                   };
                   return (
                     <Chip
-                      label={displayName}
+                      label={selected}
                       size="small"
                       sx={{
-                        ...getStatusStyle(displayName),
+                        ...getStatusStyle(selected),
                         fontSize: '13px',
                         fontWeight: 400
                       }}
@@ -429,7 +425,7 @@ const OverviewTab = memo(
                     }
                   };
                   return (
-                    <MenuItem key={option.subcode} value={option.subcode}>
+                    <MenuItem key={option.subcode} value={option.subcode_name}>
                       <Chip
                         label={option.subcode_name}
                         size="small"
@@ -527,7 +523,24 @@ const OverviewTab = memo(
               <Select
                 value={solutionState.assignee}
                 label="담당자 *"
-                onChange={handleFieldChange('assignee')}
+                onChange={(e) => {
+                  const newAssignee = e.target.value;
+                  onFieldChange('assignee', newAssignee);
+
+                  // 담당자 변경 시 자동으로 팀도 업데이트
+                  const assigneeUser = users.find(u => u.user_name === newAssignee);
+                  if (assigneeUser && assigneeUser.department) {
+                    // 부서가 유효한지 확인
+                    const isValidDepartment = departments.some(dept => dept.department_name === assigneeUser.department && dept.is_active);
+                    if (isValidDepartment) {
+                      onFieldChange('team', assigneeUser.department);
+                    } else {
+                      // 유효하지 않은 부서면 빈 문자열로 설정
+                      console.warn('⚠️ 유효하지 않은 부서:', assigneeUser.department);
+                      onFieldChange('team', '');
+                    }
+                  }
+                }}
                 disabled={true}
                 sx={{
                   '& .MuiOutlinedInput-notchedOutline': {
@@ -1393,8 +1406,8 @@ const SolutionEditDialog = memo(
     // 세션 정보
     const { data: session } = useSession();
 
-    // ✅ 공용 창고에서 사용자 데이터 가져오기
-    const { users } = useCommonData();
+    // ✅ 공용 창고에서 사용자 및 부서 데이터 가져오기
+    const { users, departments } = useCommonData();
 
     console.log('🔍 [SolutionEditDialog] users:', users?.length);
 
@@ -1465,14 +1478,9 @@ const SolutionEditDialog = memo(
     const [solutionTypesFromDB, setSolutionTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
     const [developmentTypesFromDB, setDevelopmentTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
 
-    // 기본값 설정 완료 여부를 추적하는 ref
-    const defaultValuesSetRef = useRef(false);
-
     // Dialog가 열릴 때 마스터코드 데이터 로드
     useEffect(() => {
       if (!open) {
-        // Dialog가 닫힐 때 초기화
-        defaultValuesSetRef.current = false;
         return;
       }
 
@@ -1558,7 +1566,31 @@ const SolutionEditDialog = memo(
     React.useEffect(() => {
       const initializeNewSolution = async () => {
         if (solution) {
-          dispatch({ type: 'SET_TASK', solution });
+          // 기존 솔루션 편집 시: 먼저 팀 정보를 검증하고 수정
+          let correctedSolution = { ...solution };
+
+          if (solution.assignee && users && users.length > 0) {
+            const assigneeUser = users.find(u => u.user_name === solution.assignee);
+            if (assigneeUser && assigneeUser.department) {
+              // 현재 팀 정보가 유효한지 확인
+              const isCurrentTeamValid = solution.team && departments.some(dept => dept.department_name === solution.team && dept.is_active);
+              // 담당자의 부서가 유효한지 확인
+              const isAssigneeDeptValid = departments.some(dept => dept.department_name === assigneeUser.department && dept.is_active);
+
+              // 팀이 비어있거나 유효하지 않으면 교체
+              if (!isCurrentTeamValid) {
+                if (isAssigneeDeptValid) {
+                  console.log('🔧 팀 필드 자동 수정:', solution.team, '→', assigneeUser.department);
+                  correctedSolution.team = assigneeUser.department;
+                } else {
+                  console.warn('⚠️ 담당자의 부서도 유효하지 않음:', assigneeUser.department, '→ 빈 문자열로 설정');
+                  correctedSolution.team = '';
+                }
+              }
+            }
+          }
+
+          dispatch({ type: 'SET_TASK', solution: correctedSolution });
         } else if (open) {
           // 새 Solution 생성 시 자동으로 코드와 등록일 설정
           const newCode = await generateSolutionCode();
@@ -1567,24 +1599,32 @@ const SolutionEditDialog = memo(
 
           // 로그인한 사용자 정보로 팀과 담당자 자동 설정
           if (currentUser) {
-            dispatch({ type: 'SET_FIELD', field: 'team', value: currentUser.department || '' });
+            // 부서가 유효한지 확인
+            const isValidDepartment = currentUser.department && departments.some(dept => dept.department_name === currentUser.department && dept.is_active);
+            const teamValue = isValidDepartment ? currentUser.department : '';
+
+            if (!isValidDepartment && currentUser.department) {
+              console.warn('⚠️ 로그인 사용자의 부서가 유효하지 않음:', currentUser.department);
+            }
+
+            dispatch({ type: 'SET_FIELD', field: 'team', value: teamValue });
             dispatch({ type: 'SET_FIELD', field: 'assignee', value: currentUser.user_name || '' });
           }
         }
       };
 
       initializeNewSolution();
-    }, [solution, open, generateSolutionCode, getCurrentDate, currentUser]);
+    }, [solution, open, generateSolutionCode, getCurrentDate, currentUser, users, departments]);
 
-    // 마스터코드 데이터가 로드되면 기본값 설정 (한 번만 실행)
-    React.useEffect(() => {
-      if (!solution && open && !defaultValuesSetRef.current &&
-          solutionTypesFromDB.length > 0 && developmentTypesFromDB.length > 0) {
-        dispatch({ type: 'SET_FIELD', field: 'solutionType', value: solutionTypesFromDB[0].subcode });
-        dispatch({ type: 'SET_FIELD', field: 'developmentType', value: developmentTypesFromDB[0].subcode });
-        defaultValuesSetRef.current = true;
-      }
-    }, [solution, open, solutionTypesFromDB, developmentTypesFromDB]);
+    // 마스터코드 데이터가 로드되면 기본값 설정 제거 (사용자가 직접 선택하도록)
+    // React.useEffect(() => {
+    //   if (!solution && open && !defaultValuesSetRef.current &&
+    //       solutionTypesFromDB.length > 0 && developmentTypesFromDB.length > 0) {
+    //     dispatch({ type: 'SET_FIELD', field: 'solutionType', value: solutionTypesFromDB[0].subcode });
+    //     dispatch({ type: 'SET_FIELD', field: 'developmentType', value: developmentTypesFromDB[0].subcode });
+    //     defaultValuesSetRef.current = true;
+    //   }
+    // }, [solution, open, solutionTypesFromDB, developmentTypesFromDB]);
 
     // 성능 모니터링 로그 제거 (프로덕션 준비)
     // useEffect(() => {
@@ -1764,6 +1804,14 @@ const SolutionEditDialog = memo(
 
       // 약간의 지연을 두고 저장 (상태 업데이트 완료 대기)
       setTimeout(async () => {
+        // 팀 필드 검증 - 유효하지 않으면 빈 문자열로 대체
+        const isTeamValid = solutionState.team && departments.some(dept => dept.department_name === solutionState.team && dept.is_active);
+        const validatedTeam = isTeamValid ? solutionState.team : '';
+
+        if (!isTeamValid && solutionState.team) {
+          console.warn('⚠️ 저장 시점 팀 필드 검증 실패:', solutionState.team, '→ 빈 문자열로 대체');
+        }
+
         if (!solution) {
           // 새 Solution 생성
           const newSolution: SolutionTableData = {
@@ -1779,7 +1827,7 @@ const SolutionEditDialog = memo(
             completedDate: solutionState.completedDate,
             solutionType: solutionState.solutionType,
             developmentType: solutionState.developmentType,
-            team: solutionState.team,
+            team: validatedTeam,
             progress: solutionState.progress,
             attachments: []
           } as any;
@@ -1798,7 +1846,7 @@ const SolutionEditDialog = memo(
             completedDate: solutionState.completedDate,
             solutionType: solutionState.solutionType,
             developmentType: solutionState.developmentType,
-            team: solutionState.team,
+            team: validatedTeam,
             code: solutionState.code,
             registrationDate: solutionState.registrationDate,
             progress: solutionState.progress
@@ -1820,7 +1868,8 @@ const SolutionEditDialog = memo(
       feedbacks,
       addFeedback,
       updateFeedback,
-      deleteFeedback
+      deleteFeedback,
+      departments
     ]);
 
     const handleClose = useCallback(() => {
@@ -2050,9 +2099,11 @@ const SolutionEditDialog = memo(
         statusOptions,
         statusColors,
         solutionTypesFromDB,
-        developmentTypesFromDB
+        developmentTypesFromDB,
+        users,
+        departments
       }),
-      [solutionState, handleFieldChange, assignees, assigneeAvatars, statusOptions, statusColors, solutionTypesFromDB, developmentTypesFromDB]
+      [solutionState, handleFieldChange, assignees, assigneeAvatars, statusOptions, statusColors, solutionTypesFromDB, developmentTypesFromDB, users, departments]
     );
 
     const recordTabProps = useMemo(

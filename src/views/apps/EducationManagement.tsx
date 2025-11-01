@@ -340,10 +340,11 @@ function KanbanView({
           educationCode,
           description,
           currentEducation.team || '미분류',
-          undefined,
-          undefined,
-          undefined,
-          educationTitle
+          oldStatus,
+          newStatus,
+          '상태',
+          educationTitle,
+          '칸반탭'
         );
       } else {
         console.error('❌ 드래그앤드롭 - DB 업데이트 실패');
@@ -834,6 +835,7 @@ interface MonthlyScheduleViewProps {
   selectedAssignee: string;
   educations: EducationTableData[];
   onCardClick: (education: EducationTableData) => void;
+  getStatusName: (subcode: string) => string;
 }
 
 function MonthlyScheduleView({
@@ -842,7 +844,8 @@ function MonthlyScheduleView({
   selectedStatus,
   selectedAssignee,
   educations,
-  onCardClick
+  onCardClick,
+  getStatusName
 }: MonthlyScheduleViewProps) {
   const theme = useTheme();
   const [viewYear, setViewYear] = useState(new Date().getFullYear().toString());
@@ -1012,7 +1015,7 @@ function MonthlyScheduleView({
                         mb: itemIndex < items.length - 1 ? 0.8 : 0,
                         p: 0.6,
                         borderRadius: 1,
-                        backgroundColor: getStatusColor(item.status),
+                        backgroundColor: getStatusColor(getStatusName(item.status)),
                         cursor: 'pointer',
                         transition: 'all 0.2s ease',
                         '&:hover': {
@@ -1025,7 +1028,7 @@ function MonthlyScheduleView({
                         variant="body2"
                         sx={{
                           fontSize: '13px',
-                          color: getStatusTextColor(item.status),
+                          color: getStatusTextColor(getStatusName(item.status)),
                           fontWeight: 500,
                           display: 'flex',
                           alignItems: 'center',
@@ -1033,7 +1036,7 @@ function MonthlyScheduleView({
                         }}
                       >
                         <span>{`${month}-${day}`}</span>
-                        <span>{item.status}</span>
+                        <span>{getStatusName(item.status)}</span>
                       </Typography>
                       <Typography
                         variant="body2"
@@ -1120,7 +1123,7 @@ function MonthlyScheduleView({
                         mb: itemIndex < items.length - 1 ? 0.8 : 0,
                         p: 0.6,
                         borderRadius: 1,
-                        backgroundColor: getStatusColor(item.status),
+                        backgroundColor: getStatusColor(getStatusName(item.status)),
                         cursor: 'pointer',
                         transition: 'all 0.2s ease',
                         '&:hover': {
@@ -1133,7 +1136,7 @@ function MonthlyScheduleView({
                         variant="body2"
                         sx={{
                           fontSize: '13px',
-                          color: getStatusTextColor(item.status),
+                          color: getStatusTextColor(getStatusName(item.status)),
                           fontWeight: 500,
                           display: 'flex',
                           alignItems: 'center',
@@ -1141,7 +1144,7 @@ function MonthlyScheduleView({
                         }}
                       >
                         <span>{`${month}-${day}`}</span>
-                        <span>{item.status}</span>
+                        <span>{getStatusName(item.status)}</span>
                       </Typography>
                       <Typography
                         variant="body2"
@@ -1542,6 +1545,7 @@ interface DashboardViewProps {
   selectedRecentStatus: string;
   setSelectedRecentStatus: (status: string) => void;
   educations: EducationTableData[];
+  getStatusName: (subcode: string) => string;
 }
 
 function DashboardView({
@@ -1551,7 +1555,8 @@ function DashboardView({
   selectedAssignee,
   selectedRecentStatus,
   setSelectedRecentStatus,
-  educations
+  educations,
+  getStatusName
 }: DashboardViewProps) {
   const theme = useTheme();
   const [startDate, setStartDate] = useState('');
@@ -1584,19 +1589,26 @@ function DashboardView({
     });
   };
 
-  // 데이터 필터링
-  const filteredData = filterByDateRange(educations).filter((education) => {
-    // 연도 필터
-    if (selectedYear !== '전체') {
-      const educationYear = new Date(education.registrationDate).getFullYear().toString();
-      if (educationYear !== selectedYear) return false;
-    }
+  // 데이터 필터링 및 역순 정렬
+  const filteredData = filterByDateRange(educations)
+    .filter((education) => {
+      // 연도 필터
+      if (selectedYear !== '전체') {
+        const educationYear = new Date(education.registrationDate).getFullYear().toString();
+        if (educationYear !== selectedYear) return false;
+      }
 
-    if (selectedTeam !== '전체' && education.team !== selectedTeam) return false;
-    if (selectedAssignee !== '전체' && education.assignee !== selectedAssignee) return false;
-    if (selectedStatus !== '전체' && education.status !== selectedStatus) return false;
-    return true;
-  });
+      if (selectedTeam !== '전체' && education.team !== selectedTeam) return false;
+      if (selectedAssignee !== '전체' && education.assignee !== selectedAssignee) return false;
+      if (selectedStatus !== '전체' && education.status !== selectedStatus) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      // 등록일 기준 역순 정렬 (최신이 먼저)
+      const dateA = new Date(a.registrationDate).getTime();
+      const dateB = new Date(b.registrationDate).getTime();
+      return dateB - dateA;
+    });
 
   // 통계 계산
   const totalCount = filteredData.length;
@@ -2241,9 +2253,9 @@ function DashboardView({
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {paginatedData.map((education) => (
+                    {paginatedData.map((education, index) => (
                       <TableRow key={education.id} hover>
-                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{education.no}</TableCell>
+                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{startIndex + index + 1}</TableCell>
                         <TableCell
                           sx={{
                             py: 0.5,
@@ -2262,10 +2274,10 @@ function DashboardView({
                         </TableCell>
                         <TableCell sx={{ py: 0.5 }}>
                           <Chip
-                            label={education.status}
+                            label={getStatusName(education.status)}
                             size="small"
                             sx={{
-                              bgcolor: getStatusColor(education.status),
+                              bgcolor: getStatusColor(getStatusName(education.status)),
                               color: 'white',
                               fontSize: '13px',
                               height: 18,
@@ -2558,7 +2570,8 @@ export default function EducationManagement() {
       beforeValue?: string,
       afterValue?: string,
       changedField?: string,
-      title?: string
+      title?: string,
+      location?: string
     ) => {
       console.log('🔥🔥🔥 addChangeLog 호출됨!', {
         action,
@@ -2581,6 +2594,7 @@ export default function EducationManagement() {
         before_value: beforeValue || null,
         after_value: afterValue || null,
         changed_field: changedField || null,
+        change_location: location || '개요탭',
         user_name: userName,
         team: currentUser?.department || '시스템',
         user_department: currentUser?.department,
@@ -3160,6 +3174,7 @@ export default function EducationManagement() {
                   selectedAssignee={selectedAssignee}
                   educations={educations}
                   onCardClick={handleCardClick}
+                  getStatusName={getStatusName}
                 />
               </Box>
             </TabPanel>
@@ -3201,6 +3216,7 @@ export default function EducationManagement() {
                   selectedRecentStatus={selectedRecentStatus}
                   setSelectedRecentStatus={setSelectedRecentStatus}
                   educations={educations}
+                  getStatusName={getStatusName}
                 />
               </Box>
             </TabPanel>

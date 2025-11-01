@@ -240,7 +240,7 @@ function KanbanView({ selectedYear, selectedTeam, selectedStatus, selectedAssign
       const workContent = currentTask.workContent || '업무내용 없음';
       const description = `${workContent} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
 
-      addChangeLog('수정', taskCode, description, currentTask.team || '미분류');
+      addChangeLog('수정', taskCode, description, currentTask.team || '미분류', oldStatus, newStatus, '상태', workContent, '칸반탭');
     }
   };
 
@@ -2838,7 +2838,7 @@ export default function TaskManagement() {
   }
 
   // 변경로그 추가 함수
-  const addChangeLog = (action: string, target: string, description: string, team: string = '시스템') => {
+  const addChangeLog = (action: string, target: string, description: string, team: string = '시스템', beforeValue?: string, afterValue?: string, changedField?: string, title?: string, location?: string) => {
     const now = new Date();
     const dateTime = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 

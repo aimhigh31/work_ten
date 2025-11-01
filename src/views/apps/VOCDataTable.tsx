@@ -246,8 +246,8 @@ export default function VOCDataTable({
   const handleExcelDownload = () => {
     try {
       // 필터링된 데이터를 Excel 형식으로 변환 (테이블과 동일한 컬럼 순서)
-      const excelData = filteredData.map((voc) => ({
-        NO: voc.no,
+      const excelData = filteredData.map((voc, index) => ({
+        NO: filteredData.length - index,
         등록일: voc.registrationDate,
         코드: `IT-VOC-${new Date(voc.registrationDate).getFullYear().toString().slice(-2)}-${String(voc.no).padStart(3, '0')}`,
         VOC유형: voc.vocType || '미분류',
@@ -323,9 +323,9 @@ export default function VOCDataTable({
     }
   }, [vocs]);
 
-  // 필터링된 데이터 (역순 정렬 추가)
+  // 필터링된 데이터
   const filteredData = useMemo(() => {
-    const filtered = data.filter((voc) => {
+    return data.filter((voc) => {
       // 연도 필터
       if (selectedYear !== '전체') {
         const vocYear = new Date(voc.registrationDate).getFullYear().toString();
@@ -338,8 +338,6 @@ export default function VOCDataTable({
 
       return teamMatch && statusMatch && assigneeMatch;
     });
-    // NO 기준 역순 정렬
-    return filtered.sort((a, b) => (b.no || 0) - (a.no || 0));
   }, [data, selectedYear || '전체', selectedTeam, selectedStatus, selectedAssignee]);
 
   // 페이지네이션 적용된 데이터
@@ -825,15 +823,15 @@ export default function VOCDataTable({
               <TableCell sx={{ width: columnWidths.requestContent, fontWeight: 600 }}>요청내용</TableCell>
               <TableCell sx={{ width: columnWidths.responseContent, fontWeight: 600 }}>처리내용</TableCell>
               <TableCell sx={{ width: columnWidths.priority, fontWeight: 600 }}>우선순위</TableCell>
+              <TableCell sx={{ width: columnWidths.assignee, fontWeight: 600 }}>담당자</TableCell>
               <TableCell sx={{ width: columnWidths.status, fontWeight: 600 }}>상태</TableCell>
               <TableCell sx={{ width: columnWidths.resolutionDate, fontWeight: 600 }}>완료일</TableCell>
-              <TableCell sx={{ width: columnWidths.assignee, fontWeight: 600 }}>담당자</TableCell>
               <TableCell sx={{ width: columnWidths.action, fontWeight: 600 }}>ACTION</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {paginatedData.length > 0 ? (
-              paginatedData.map((voc) => (
+              paginatedData.map((voc, index) => (
                 <TableRow
                   key={voc.id}
                   hover
@@ -865,7 +863,7 @@ export default function VOCDataTable({
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                      {voc.no}
+                      {filteredData.length - (page * rowsPerPage + index)}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -926,22 +924,6 @@ export default function VOCDataTable({
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Chip
-                      label={getStatusName(voc.status)}
-                      size="small"
-                      sx={{
-                        ...getStatusColor(getStatusName(voc.status)),
-                        fontWeight: 500,
-                        fontSize: '13px'
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                      {voc.resolutionDate || '-'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
                     {voc.assignee ? (
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Avatar
@@ -959,6 +941,22 @@ export default function VOCDataTable({
                         -
                       </Typography>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={getStatusName(voc.status)}
+                      size="small"
+                      sx={{
+                        ...getStatusColor(getStatusName(voc.status)),
+                        fontWeight: 500,
+                        fontSize: '13px'
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                      {voc.resolutionDate || '-'}
+                    </Typography>
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 0.5 }}>

@@ -39,7 +39,7 @@ import MainCard from 'components/MainCard';
 import TaskEditDialog from 'components/TaskEditDialog';
 
 // data and types
-import { taskData, teams, assignees, taskStatusOptions, taskStatusColors, assigneeAvatars } from 'data/task';
+import { teams, assignees, taskStatusOptions, taskStatusColors, assigneeAvatars } from 'data/task';
 import { TaskTableData, TaskStatus } from 'types/task';
 
 // Icons
@@ -212,10 +212,6 @@ export default function TaskTable({
     }
   };
 
-  // Supabase 데이터 변경 시 data 상태 업데이트
-  useEffect(() => {
-    setData(taskData);
-  }, [taskData]);
 
   // 필터링된 데이터 (최신 항목이 헤더 바로 아래 표시)
   const filteredData = useMemo(() => {

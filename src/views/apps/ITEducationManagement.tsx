@@ -262,7 +262,22 @@ function KanbanView({
 
       setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: newStatus } : task)));
 
-      // 변경로그는 ITEducationTable.tsx에서 자동으로 처리됨
+      // 변경로그 추가
+      const taskCode = currentTask.code || `ITEDU-${taskId}`;
+      const educationName = currentTask.educationName || '교육명 없음';
+      const description = `${educationName} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
+
+      addChangeLog(
+        'IT교육 상태 변경',
+        taskCode,
+        description,
+        currentTask.educationType || '미분류',
+        oldStatus,
+        newStatus,
+        '상태',
+        educationName,
+        '칸반탭'
+      );
     }
   };
 
@@ -1160,18 +1175,25 @@ function DashboardView({
   };
 
   // 데이터 필터링
-  const filteredData = filterByDateRange(tasks).filter((task) => {
-    // 연도 필터
-    if (selectedYear !== '전체') {
-      const taskYear = new Date(task.executionDate).getFullYear().toString();
-      if (taskYear !== selectedYear) return false;
-    }
+  const filteredData = filterByDateRange(tasks)
+    .filter((task) => {
+      // 연도 필터
+      if (selectedYear !== '전체') {
+        const taskYear = new Date(task.executionDate).getFullYear().toString();
+        if (taskYear !== selectedYear) return false;
+      }
 
-    if (selectedTeam !== '전체' && task.educationType !== selectedTeam) return false;
-    if (selectedAssignee !== '전체' && task.assignee !== selectedAssignee) return false;
-    if (selectedStatus !== '전체' && task.status !== selectedStatus) return false;
-    return true;
-  });
+      if (selectedTeam !== '전체' && task.educationType !== selectedTeam) return false;
+      if (selectedAssignee !== '전체' && task.assignee !== selectedAssignee) return false;
+      if (selectedStatus !== '전체' && task.status !== selectedStatus) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      // 실행일 기준 역순 정렬 (최신이 먼저)
+      const dateA = new Date(a.executionDate || a.registrationDate).getTime();
+      const dateB = new Date(b.executionDate || b.registrationDate).getTime();
+      return dateB - dateA;
+    });
 
   // 통계 계산
   const totalCount = filteredData.length;
@@ -1822,9 +1844,9 @@ function DashboardView({
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {paginatedData.map((task) => (
+                    {paginatedData.map((task, index) => (
                       <TableRow key={task.id} hover>
-                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{task.no}</TableCell>
+                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{filteredData.length - (startIndex + index)}</TableCell>
                         <TableCell
                           sx={{
                             py: 0.5,
@@ -2185,7 +2207,8 @@ export default function ITEducationManagement() {
       beforeValue?: string,
       afterValue?: string,
       changedField?: string,
-      title?: string
+      title?: string,
+      location?: string
     ) => {
       try {
         const userName = currentUser?.user_name || currentUser?.name || user?.name || '시스템';
@@ -2199,6 +2222,7 @@ export default function ITEducationManagement() {
           before_value: beforeValue || null,
           after_value: afterValue || null,
           changed_field: changedField || null,
+          change_location: location || '개요탭',
           user_name: userName,
           team: currentUser?.department || '시스템', // 로그인한 사용자의 부서
           user_department: currentUser?.department,

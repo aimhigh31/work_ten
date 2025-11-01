@@ -158,6 +158,16 @@ function KanbanView({
   canEditOthers = true
 }: KanbanViewProps) {
   const theme = useTheme();
+  const { masterCodes } = useCommonData();
+
+  // 서브코드를 서브코드명으로 변환하는 함수 (GROUP002 - 상태)
+  const getStatusName = React.useCallback((subcode: string) => {
+    if (!subcode) return '';
+    const found = masterCodes.find(
+      (item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.subcode === subcode && item.is_active
+    );
+    return found ? found.subcode_name : subcode;
+  }, [masterCodes]);
 
   // 🔐 세션 정보 (권한 체크용)
   const { data: session } = useSession();
@@ -248,15 +258,7 @@ function KanbanView({
     if (originalTask) {
       // 즉시 UI 업데이트
       setTasks((prev) => prev.map((task) => (task.id === updatedTask.id ? updatedTask : task)));
-
-      // Supabase 데이터 새로고침
-      try {
-        console.log('🔄 Supabase 데이터 새로고침 시작...');
-        await fetchSoftware();
-        console.log('✅ Supabase 데이터 새로고침 완료');
-      } catch (error) {
-        console.error('❌ Supabase 데이터 새로고침 실패:', error);
-      }
+      console.log('✅ 소프트웨어 업데이트 완료 (즉시 UI 반영)');
 
       // 변경로그는 SoftwareTable.tsx에서 자동으로 처리됨
     }
@@ -291,9 +293,9 @@ function KanbanView({
     { key: '홀딩', title: '홀딩', pillBg: '#FFEBEE', pillColor: '#D32F2F' }
   ];
 
-  // 상태별 아이템 가져오기
+  // 상태별 아이템 가져오기 (서브코드를 서브코드명으로 변환해서 비교)
   const getItemsByStatus = (status: string) => {
-    return filteredData.filter((item) => item.status === status);
+    return filteredData.filter((item) => getStatusName(item.status) === status);
   };
 
   // 팀별 색상 매핑 (데이터 테이블과 동일)
@@ -390,8 +392,8 @@ function KanbanView({
       >
         {/* 1. 상태 태그 영역 */}
         <div className="status-tags">
-          <span className="status-tag" style={getStatusTagStyle(task.status)}>
-            {task.status}
+          <span className="status-tag" style={getStatusTagStyle(getStatusName(task.status))}>
+            {getStatusName(task.status)}
           </span>
           <span className="incident-type-tag">소프트웨어</span>
         </div>
@@ -402,8 +404,12 @@ function KanbanView({
         {/* 3. 정보 라인 */}
         <div className="card-info">
           <div className="info-line">
-            <span className="info-label">팀:</span>
-            <span className="info-value">{task.team}</span>
+            <span className="info-label">스펙:</span>
+            <span className="info-value">{task.spec || '-'}</span>
+          </div>
+          <div className="info-line">
+            <span className="info-label">사용자:</span>
+            <span className="info-value">{task.currentUser || '-'}</span>
           </div>
           <div className="info-line">
             <span className="info-label">시작일:</span>
@@ -755,6 +761,16 @@ function MonthlyScheduleView({
   onCardClick
 }: MonthlyScheduleViewProps) {
   const theme = useTheme();
+  const { masterCodes } = useCommonData();
+
+  // 서브코드를 서브코드명으로 변환하는 함수 (GROUP002 - 상태)
+  const getStatusName = React.useCallback((subcode: string) => {
+    if (!subcode) return '';
+    const found = masterCodes.find(
+      (item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.subcode === subcode && item.is_active
+    );
+    return found ? found.subcode_name : subcode;
+  }, [masterCodes]);
 
   // 데이터 필터링
   const filteredData = tasks.filter((task) => {
@@ -790,34 +806,34 @@ function MonthlyScheduleView({
   // 월 이름 배열
   const monthNames = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
 
-  // 상태별 색상 (소프트웨어 상태에 맞춰 업데이트)
+  // 상태별 색상 (VOC관리 페이지와 동일)
   const getStatusColor = (status: string) => {
     switch (status) {
       case '대기':
-        return '#E0E0E0'; // 연한 회색
-      case '사용중':
-        return '#E3F2FD'; // 연한 파랑
-      case '사용만료':
-        return '#E8F5E8'; // 연한 초록
-      case '폐기':
-        return '#FFEBEE'; // 연한 빨강
+        return '#E0E0E0';
+      case '진행':
+        return '#e3f2fd';
+      case '완료':
+        return '#e8f5e8';
+      case '홀딩':
+        return '#ffebee';
       default:
-        return '#f5f5f5'; // 연한 회색
+        return '#f5f5f5';
     }
   };
 
   const getStatusTextColor = (status: string) => {
     switch (status) {
       case '대기':
-        return '#9E9E9E'; // 회색
-      case '사용중':
-        return '#2196F3'; // 파랑
-      case '사용만료':
-        return '#4CAF50'; // 초록
-      case '폐기':
-        return '#F44336'; // 빨강
+        return '#424242';
+      case '진행':
+        return '#1976D2';
+      case '완료':
+        return '#388E3C';
+      case '홀딩':
+        return '#D32F2F';
       default:
-        return '#424242'; // 진한 회색
+        return '#424242';
     }
   };
 
@@ -925,6 +941,7 @@ function MonthlyScheduleView({
                   const date = new Date(item.startDate);
                   const month = (date.getMonth() + 1).toString().padStart(2, '0');
                   const day = date.getDate().toString().padStart(2, '0');
+                  const statusName = getStatusName(item.status);
 
                   return (
                     <Box
@@ -934,7 +951,7 @@ function MonthlyScheduleView({
                         mb: itemIndex < items.length - 1 ? 0.8 : 0, // 카드 간격 6.4px (마지막 제외)
                         p: 0.6, // 내부 패딩 4.8px
                         borderRadius: 1, // 모서리 둥글기 4px
-                        backgroundColor: getStatusColor(item.status),
+                        backgroundColor: getStatusColor(statusName),
                         cursor: 'pointer',
                         transition: 'all 0.2s ease',
                         '&:hover': {
@@ -943,11 +960,10 @@ function MonthlyScheduleView({
                         }
                       }}
                     >
-                      <Typography
-                        variant="body2"
+                      <Box
                         sx={{
                           fontSize: '13px',
-                          color: getStatusTextColor(item.status),
+                          color: getStatusTextColor(statusName),
                           fontWeight: 500,
                           display: 'flex',
                           alignItems: 'center',
@@ -955,14 +971,14 @@ function MonthlyScheduleView({
                         }}
                       >
                         <span>{`${month}-${day}`}</span>
-                        <span>{item.status}</span>
-                      </Typography>
+                        <span>{statusName}</span>
+                      </Box>
                       <Typography
                         variant="body2"
                         sx={{
                           fontSize: '13px',
                           color: theme.palette.text.secondary,
-                          mt: 0.15, // 상단 마진 1.2px
+                          mt: 0.15,
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap'
@@ -1053,6 +1069,7 @@ function MonthlyScheduleView({
                   const date = new Date(item.startDate);
                   const month = (date.getMonth() + 1).toString().padStart(2, '0');
                   const day = date.getDate().toString().padStart(2, '0');
+                  const statusName = getStatusName(item.status);
 
                   return (
                     <Box
@@ -1062,7 +1079,7 @@ function MonthlyScheduleView({
                         mb: itemIndex < items.length - 1 ? 0.8 : 0, // 카드 간격 6.4px (마지막 제외)
                         p: 0.6, // 내부 패딩 4.8px
                         borderRadius: 1, // 모서리 둥글기 4px
-                        backgroundColor: getStatusColor(item.status),
+                        backgroundColor: getStatusColor(statusName),
                         cursor: 'pointer',
                         transition: 'all 0.2s ease',
                         '&:hover': {
@@ -1071,11 +1088,10 @@ function MonthlyScheduleView({
                         }
                       }}
                     >
-                      <Typography
-                        variant="body2"
+                      <Box
                         sx={{
                           fontSize: '13px',
-                          color: getStatusTextColor(item.status),
+                          color: getStatusTextColor(statusName),
                           fontWeight: 500,
                           display: 'flex',
                           alignItems: 'center',
@@ -1083,14 +1099,14 @@ function MonthlyScheduleView({
                         }}
                       >
                         <span>{`${month}-${day}`}</span>
-                        <span>{item.status}</span>
-                      </Typography>
+                        <span>{statusName}</span>
+                      </Box>
                       <Typography
                         variant="body2"
                         sx={{
                           fontSize: '13px',
                           color: theme.palette.text.secondary,
-                          mt: 0.15, // 상단 마진 1.2px
+                          mt: 0.15,
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap'
@@ -1466,10 +1482,29 @@ function DashboardView({
   tasks
 }: DashboardViewProps) {
   const theme = useTheme();
+  const { masterCodes } = useCommonData();
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
+
+  // 서브코드를 서브코드명으로 변환하는 함수 (GROUP002 - 상태)
+  const getStatusName = React.useCallback((subcode: string) => {
+    if (!subcode) return '';
+    const found = masterCodes.find(
+      (item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.subcode === subcode && item.is_active
+    );
+    return found ? found.subcode_name : subcode;
+  }, [masterCodes]);
+
+  // 서브코드를 서브코드명으로 변환하는 함수 (GROUP015 - 소프트웨어 분류)
+  const getSoftwareCategoryName = React.useCallback((subcode: string) => {
+    if (!subcode) return '';
+    const found = masterCodes.find(
+      (item) => item.codetype === 'subcode' && item.group_code === 'GROUP015' && item.subcode === subcode && item.is_active
+    );
+    return found ? found.subcode_name : subcode;
+  }, [masterCodes]);
 
   // 날짜 범위 필터링 함수
   const filterByDateRange = (data: TaskTableData[]) => {
@@ -1520,10 +1555,11 @@ function DashboardView({
     {} as Record<string, number>
   );
 
-  // 업무분류별 통계 (원형차트용) - department 필드 사용 (핵심 수정!)
+  // 업무분류별 통계 (원형차트용) - softwareCategory 필드 사용 (소프트웨어 분류)
   const categoryStats = filteredData.reduce(
     (acc, item) => {
-      const category = item.department || '기타';
+      const categorySubcode = item.softwareCategory || '';
+      const category = getSoftwareCategoryName(categorySubcode) || '기타';
       acc[category] = (acc[category] || 0) + 1;
       return acc;
     },
@@ -1556,11 +1592,12 @@ function DashboardView({
   filteredData.forEach((item) => {
     const date = new Date(item.startDate);
     const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+    const statusName = getStatusName(item.status); // 서브코드를 서브코드명으로 변환
 
     if (!monthData[monthKey]) {
-      monthData[monthKey] = { 대기: 0, 사용중: 0, 사용만료: 0, 폐기: 0 };
+      monthData[monthKey] = { 대기: 0, 진행: 0, 완료: 0, 홀딩: 0 };
     }
-    monthData[monthKey][item.status] = (monthData[monthKey][item.status] || 0) + 1;
+    monthData[monthKey][statusName] = (monthData[monthKey][statusName] || 0) + 1;
   });
 
   // 정렬된 월별 데이터 생성
@@ -1572,9 +1609,9 @@ function DashboardView({
       monthlyStats.push({
         month: `${yearShort}/${monthNum}`,
         대기: monthData[month]['대기'] || 0,
-        사용중: monthData[month]['사용중'] || 0,
-        사용만료: monthData[month]['사용만료'] || 0,
-        폐기: monthData[month]['폐기'] || 0
+        진행: monthData[month]['진행'] || 0,
+        완료: monthData[month]['완료'] || 0,
+        홀딩: monthData[month]['홀딩'] || 0
       });
     });
 
@@ -1583,11 +1620,11 @@ function DashboardView({
     switch (status) {
       case '대기':
         return '#90A4AE';
-      case '사용중':
+      case '진행':
         return '#7986CB';
-      case '사용만료':
+      case '완료':
         return '#81C784';
-      case '폐기':
+      case '홀딩':
         return '#E57373';
       default:
         return '#9e9e9e';
@@ -1830,16 +1867,16 @@ function DashboardView({
       data: monthlyStats.map((item) => item.대기)
     },
     {
-      name: '사용중',
-      data: monthlyStats.map((item) => item.사용중)
+      name: '진행',
+      data: monthlyStats.map((item) => item.진행)
     },
     {
-      name: '사용만료',
-      data: monthlyStats.map((item) => item.사용만료)
+      name: '완료',
+      data: monthlyStats.map((item) => item.완료)
     },
     {
-      name: '폐기',
-      data: monthlyStats.map((item) => item.폐기)
+      name: '홀딩',
+      data: monthlyStats.map((item) => item.홀딩)
     }
   ];
 
@@ -2158,9 +2195,9 @@ function DashboardView({
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {paginatedData.map((task) => (
+                    {paginatedData.map((task, index) => (
                       <TableRow key={task.id} hover>
-                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{task.no}</TableCell>
+                        <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{filteredData.length - (startIndex + index)}</TableCell>
                         <TableCell
                           sx={{
                             py: 0.5,
@@ -2177,10 +2214,10 @@ function DashboardView({
                         <TableCell sx={{ py: 0.5, fontSize: '13px' }}>{task.completedDate || '-'}</TableCell>
                         <TableCell sx={{ py: 0.5 }}>
                           <Chip
-                            label={task.status}
+                            label={getStatusName(task.status)}
                             size="small"
                             sx={{
-                              bgcolor: getStatusColor(task.status),
+                              bgcolor: getStatusColor(getStatusName(task.status)),
                               color: 'white',
                               fontSize: '13px',
                               height: 18,
@@ -2624,7 +2661,8 @@ export default function SoftwareManagement() {
       beforeValue?: string,
       afterValue?: string,
       changedField?: string,
-      title?: string
+      title?: string,
+      location?: string
     ) => {
       const logData = {
         page: 'it_software',
@@ -2635,6 +2673,7 @@ export default function SoftwareManagement() {
         before_value: beforeValue || null,
         after_value: afterValue || null,
         changed_field: changedField || null,
+        change_location: location || '개요탭',
         user_name: userName,
         team: currentUser?.department || '시스템', // 로그인한 사용자의 부서
         user_department: currentUser?.department,
@@ -2678,20 +2717,13 @@ export default function SoftwareManagement() {
     if (originalTask) {
       // 즉시 UI 업데이트 (낙관적 업데이트)
       setTasks((prevTasks) => prevTasks.map((task) => (task.id === updatedTask.id ? { ...updatedTask } : task)));
-
-      // Supabase 데이터 새로고침 (SoftwareEditDialog에서 이미 DB 저장 완료됨)
-      try {
-        console.log('🔄 Supabase 데이터 새로고침 시작...');
-        await fetchSoftware(); // Supabase에서 최신 데이터 다시 가져오기
-        console.log('✅ Supabase 데이터 새로고침 완료');
-      } catch (error) {
-        console.error('❌ Supabase 데이터 새로고침 실패:', error);
-      }
+      console.log('✅ 소프트웨어 업데이트 완료 (즉시 UI 반영)');
 
       // 변경로그는 SoftwareTable.tsx에서 자동으로 처리됨
     } else {
       // 새로 생성
       setTasks((prevTasks) => [...prevTasks, updatedTask]);
+      console.log('✅ 새 소프트웨어 추가 완료 (즉시 UI 반영)');
       // 변경로그는 SoftwareTable.tsx에서 자동으로 처리됨
     }
 
