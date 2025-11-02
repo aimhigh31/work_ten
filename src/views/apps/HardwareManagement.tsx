@@ -279,18 +279,18 @@ function KanbanView({
   const statusColumns = React.useMemo(() => {
     if (statusTypes.length === 0) {
       return [
-        { key: '대기', title: '대기', pillBg: '#F0F0F0', pillColor: '#424242' },
-        { key: '진행', title: '진행', pillBg: '#E3F2FD', pillColor: '#1976D2' },
-        { key: '완료', title: '완료', pillBg: '#E8F5E8', pillColor: '#388E3C' },
-        { key: '홀딩', title: '홀딩', pillBg: '#FFEBEE', pillColor: '#D32F2F' }
+        { key: '대기', title: '대기', pillBg: '#ECEFF1', pillColor: '#90A4AE' },
+        { key: '진행', title: '진행', pillBg: '#E8EAF6', pillColor: '#7986CB' },
+        { key: '완료', title: '완료', pillBg: '#E8F5E9', pillColor: '#81C784' },
+        { key: '홀딩', title: '홀딩', pillBg: '#FFEBEE', pillColor: '#E57373' }
       ];
     }
 
     const colorPalette = [
-      { pillBg: '#F0F0F0', pillColor: '#424242' },
-      { pillBg: '#E3F2FD', pillColor: '#1976D2' },
-      { pillBg: '#E8F5E8', pillColor: '#388E3C' },
-      { pillBg: '#FFEBEE', pillColor: '#D32F2F' },
+      { pillBg: '#ECEFF1', pillColor: '#90A4AE' },
+      { pillBg: '#E8EAF6', pillColor: '#7986CB' },
+      { pillBg: '#E8F5E9', pillColor: '#81C784' },
+      { pillBg: '#FFEBEE', pillColor: '#E57373' },
       { pillBg: '#FFF3E0', pillColor: '#F57C00' },
       { pillBg: '#F3E5F5', pillColor: '#7B1FA2' }
     ];
@@ -1264,7 +1264,8 @@ function DashboardView({
   const totalCount = filteredData.length;
   const statusStats = filteredData.reduce(
     (acc, item) => {
-      acc[item.status] = (acc[item.status] || 0) + 1;
+      const statusName = getStatusName(item.status);
+      acc[statusName] = (acc[statusName] || 0) + 1;
       return acc;
     },
     {} as Record<string, number>
@@ -1665,6 +1666,17 @@ function DashboardView({
             InputLabelProps={{ shrink: true }}
             sx={{ width: 150 }}
           />
+          <Button
+            variant="text"
+            size="small"
+            onClick={() => {
+              setStartDate('');
+              setEndDate('');
+            }}
+            sx={{ whiteSpace: 'nowrap' }}
+          >
+            초기화
+          </Button>
         </Box>
       </Box>
 
@@ -1689,7 +1701,7 @@ function DashboardView({
               {totalCount}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              전체 업무 현황
+              전체 하드웨어 현황
             </Typography>
           </Card>
         </Grid>
@@ -1713,7 +1725,7 @@ function DashboardView({
               {statusStats['대기'] || 0}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              대기중인 업무
+              대기중인 하드웨어
             </Typography>
           </Card>
         </Grid>
@@ -1737,7 +1749,7 @@ function DashboardView({
               {statusStats['진행'] || 0}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              진행중인 업무
+              진행중인 하드웨어
             </Typography>
           </Card>
         </Grid>
@@ -1761,7 +1773,7 @@ function DashboardView({
               {statusStats['완료'] || 0}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              완료된 업무
+              완료된 하드웨어
             </Typography>
           </Card>
         </Grid>
@@ -1785,7 +1797,7 @@ function DashboardView({
               {statusStats['홀딩'] || 0}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              보류중인 업무
+              홀딩중인 하드웨어
             </Typography>
           </Card>
         </Grid>

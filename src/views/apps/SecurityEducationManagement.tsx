@@ -1776,18 +1776,20 @@ function DashboardView({
   };
 
   // 데이터 필터링
-  const filteredData = filterByDateRange(tasks).filter((task) => {
-    // 연도 필터
-    if (selectedYear !== '전체') {
-      const taskYear = new Date(task.executionDate).getFullYear().toString();
-      if (taskYear !== selectedYear) return false;
-    }
+  const filteredData = filterByDateRange(tasks)
+    .filter((task) => {
+      // 연도 필터
+      if (selectedYear !== '전체') {
+        const taskYear = new Date(task.executionDate).getFullYear().toString();
+        if (taskYear !== selectedYear) return false;
+      }
 
-    if (selectedTeam !== '전체' && task.educationType !== selectedTeam) return false;
-    if (selectedAssignee !== '전체' && task.assignee !== selectedAssignee) return false;
-    if (selectedStatus !== '전체' && task.status !== selectedStatus) return false;
-    return true;
-  });
+      if (selectedTeam !== '전체' && task.educationType !== selectedTeam) return false;
+      if (selectedAssignee !== '전체' && task.assignee !== selectedAssignee) return false;
+      if (selectedStatus !== '전체' && task.status !== selectedStatus) return false;
+      return true;
+    })
+    .sort((a, b) => (b.no || 0) - (a.no || 0)); // 데이터탭과 동일한 정렬 (최신순)
 
   // 통계 계산
   const totalCount = filteredData.length;
@@ -2192,6 +2194,17 @@ function DashboardView({
             InputLabelProps={{ shrink: true }}
             sx={{ width: 150 }}
           />
+          <Button
+            variant="text"
+            size="small"
+            onClick={() => {
+              setStartDate('');
+              setEndDate('');
+            }}
+            sx={{ whiteSpace: 'nowrap' }}
+          >
+            초기화
+          </Button>
         </Box>
       </Box>
 

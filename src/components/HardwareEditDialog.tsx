@@ -1048,12 +1048,12 @@ const UserHistoryTab = memo(
         checkbox: 50,
         no: 60,
         registrationDate: 100,
-        team: 100,
-        userName: 120,
+        team: 80,
+        userName: 100,
         reason: 150,
-        status: 100,
-        startDate: 100,
-        endDate: 100
+        status: 120,
+        startDate: 120,
+        endDate: 120
       };
 
       const cellHeight = 56; // 고정 셀 높이
@@ -1183,7 +1183,7 @@ const UserHistoryTab = memo(
               }}
             >
               <Chip
-                label={displayValue}
+                label={displayValue || '-'}
                 size="small"
                 sx={{
                   bgcolor: statusColors[displayValue]?.bgColor || '#F5F5F5',
@@ -1272,7 +1272,7 @@ const UserHistoryTab = memo(
               }
             }}
           >
-            <Table size="small">
+            <Table size="small" sx={{ tableLayout: 'fixed' }}>
               <TableHead>
                 <TableRow sx={{ backgroundColor: 'grey.50' }}>
                   <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
@@ -1324,11 +1324,10 @@ const UserHistoryTab = memo(
                       />
                     </TableCell>
                     <TableCell sx={{ width: columnWidths.no }}>{userHistories.length - startIndex - index}</TableCell>
-                    <TableCell
-                      sx={{ width: columnWidths.registrationDate }}
-                      onClick={() => handleCellClick(history.id, 'registrationDate')}
-                    >
-                      {renderEditableCell(history, 'registrationDate', history.registrationDate)}
+                    <TableCell sx={{ width: columnWidths.registrationDate }}>
+                      <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                        {history.registrationDate || '-'}
+                      </Typography>
                     </TableCell>
                     <TableCell sx={{ width: columnWidths.team }} onClick={() => handleCellClick(history.id, 'department')}>
                       {renderEditableCell(history, 'department', history.department)}
@@ -1803,10 +1802,10 @@ const MaintenanceHistoryTab = memo(
       content: 180,
       vendor: 120,
       amount: 120,
-      registrant: 100,
-      status: 80,
-      startDate: 100,
-      completionDate: 100
+      registrant: 80,
+      status: 120,
+      startDate: 120,
+      completionDate: 120
     };
 
     const cellHeight = 56; // 고정 셀 높이
@@ -1851,9 +1850,7 @@ const MaintenanceHistoryTab = memo(
             >
               {options.map((option) => (
                 <MenuItem key={option} value={option}>
-                  {field === 'type' ? (
-                    <Chip label={option} color={getTypeColor(option === '구매' ? 'purchase' : 'repair') as any} size="small" />
-                  ) : field === 'status' ? (
+                  {field === 'status' ? (
                     <Chip
                       label={option}
                       size="small"
@@ -1872,7 +1869,7 @@ const MaintenanceHistoryTab = memo(
           );
         }
 
-        if (field === 'date') {
+        if (field === 'date' || field === 'startDate' || field === 'completionDate' || field === 'registrationDate') {
           return (
             <TextField
               type="date"
@@ -1962,19 +1959,20 @@ const MaintenanceHistoryTab = memo(
               height: 40, // 고정 높이
               display: 'flex',
               alignItems: 'center',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              '&:hover': { bgcolor: 'grey.50' },
+              p: 0.5,
+              borderRadius: 1
             }}
           >
-            <Chip
-              label={getTypeLabel(history.type)}
-              size="small"
+            <Typography
+              variant="body2"
               sx={{
-                ...getTypeColor(history.type),
-                '&:hover': { opacity: 0.8 },
-                fontSize: '12px',
-                fontWeight: 500
+                fontSize: '12px'
               }}
-            />
+            >
+              {getTypeLabel(history.type)}
+            </Typography>
           </Box>
         );
       }
@@ -2102,7 +2100,7 @@ const MaintenanceHistoryTab = memo(
             }
           }}
         >
-          <Table size="small">
+          <Table size="small" sx={{ tableLayout: 'fixed' }}>
             <TableHead>
               <TableRow sx={{ backgroundColor: 'grey.50' }}>
                 <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
@@ -2156,8 +2154,10 @@ const MaintenanceHistoryTab = memo(
                     />
                   </TableCell>
                   <TableCell sx={{ width: columnWidths.no }}>{maintenanceHistories.length - startIndex - index}</TableCell>
-                  <TableCell sx={{ width: columnWidths.registrationDate }} onClick={() => handleCellClick(history.id, 'registrationDate')}>
-                    {renderEditableCell(history, 'registrationDate', history.registrationDate)}
+                  <TableCell sx={{ width: columnWidths.registrationDate }}>
+                    <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                      {history.registrationDate || '-'}
+                    </Typography>
                   </TableCell>
                   <TableCell sx={{ width: columnWidths.type }} onClick={() => handleCellClick(history.id, 'type')}>
                     {renderEditableCell(history, 'type', getTypeLabel(history.type), typeOptions)}

@@ -2231,6 +2231,22 @@ export default function InspectionEditDialog({
                   sx={{
                     border: 'none',
                     boxShadow: 'none',
+                    maxHeight: 500,
+                    overflowY: 'auto',
+                    '&::-webkit-scrollbar': {
+                      width: '10px'
+                    },
+                    '&::-webkit-scrollbar-track': {
+                      backgroundColor: '#f1f1f1',
+                      borderRadius: '10px'
+                    },
+                    '&::-webkit-scrollbar-thumb': {
+                      backgroundColor: '#888',
+                      borderRadius: '10px',
+                      '&:hover': {
+                        backgroundColor: '#555'
+                      }
+                    },
                     '& .MuiTableCell-root': {
                       border: 'none'
                     },
@@ -3163,9 +3179,8 @@ export default function InspectionEditDialog({
         fullWidth
         PaperProps={{
           sx: {
-            height: '840px',
-            maxHeight: '840px',
-            overflow: 'hidden'
+            height: '90vh',
+            maxHeight: '90vh'
           }
         }}
       >

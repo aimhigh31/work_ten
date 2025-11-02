@@ -16,7 +16,7 @@ export interface CostRecord {
   quantity: number;
   unitPrice: number;
   amount: number;
-  status: '대기' | '진행' | '완료' | '취소';
+  status: '대기' | '진행' | '완료' | '홀딩';
   completion_date: string | null;
   completionDate: string | null; // 테이블 표시용 필드
   attachment: boolean;
@@ -81,7 +81,7 @@ export interface CostStatistics {
 export const costTypeOptions = ['솔루션', '하드웨어', '출장경비', '행사경비', '사무경비'] as const;
 
 // 상태 옵션
-export const statusOptions = ['대기', '진행', '완료', '취소'] as const;
+export const statusOptions = ['대기', '진행', '완료', '홀딩'] as const;
 
 // 팀 옵션
 export const teamOptions = ['IT팀', '마케팅팀', '영업팀', '기획팀', '인사팀'] as const;

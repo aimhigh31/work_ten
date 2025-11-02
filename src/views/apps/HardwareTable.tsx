@@ -322,6 +322,11 @@ export default function HardwareTable({
             );
           });
         }
+
+        // UI 상태 업데이트: tasks에서 삭제된 항목 제거
+        if (setTasks) {
+          setTasks((prevTasks) => prevTasks.filter((task) => !selected.includes(task.id)));
+        }
       }
 
       setSelected([]);

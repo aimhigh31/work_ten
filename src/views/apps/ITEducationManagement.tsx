@@ -1435,7 +1435,12 @@ function DashboardView({
       bar: {
         horizontal: false,
         columnWidth: '55%',
-        borderRadius: 4
+        borderRadius: 4,
+        dataLabels: {
+          total: {
+            enabled: false
+          }
+        }
       }
     },
     xaxis: {
@@ -1455,45 +1460,40 @@ function DashboardView({
       opacity: 1
     },
     dataLabels: {
-      enabled: false
+      enabled: true,
+      formatter: function() {
+        return '';
+      },
+      style: {
+        fontSize: '0px'
+      }
     },
     annotations: {
       points: monthlyStats.map((item, index) => {
-        // 각 상태별 실제 값을 합산하여 정확한 총합 계산 (안전한 숫자 변환)
-        const 계획 = Number(item.계획) || 0;
-        const 진행중 = Number(item.진행중) || 0;
+        const 대기 = Number(item.대기) || 0;
+        const 진행 = Number(item.진행) || 0;
         const 완료 = Number(item.완료) || 0;
-        const 취소 = Number(item.취소) || 0;
-        const total = 계획 + 진행중 + 완료 + 취소;
+        const 홀딩 = Number(item.홀딩) || 0;
+        const total = 대기 + 진행 + 완료 + 홀딩;
 
-        // 디버깅: 각 월의 데이터 확인
-        console.log(`${item.month}: 계획=${계획}, 진행중=${진행중}, 완료=${완료}, 취소=${취소}, total=${total}`);
-
-        // 6월, 8월 특별 확인
-        if (item.month === '06월' || item.month === '08월') {
-          console.warn(`⚠️ 문제 월 발견: ${item.month}, total=${total}`, item);
-        }
-
-        // total > 0 조건 제거하여 모든 월에 대해 annotation 생성
         return {
           x: item.month,
-          y: total, // 막대 최상단에 정확히 위치
+          y: total,
           marker: {
             size: 0,
-            strokeWidth: 0,
-            fillColor: 'transparent'
+            fillColor: 'transparent',
+            strokeColor: 'transparent'
           },
           label: {
-            text: total > 0 ? total.toString() : '',
-            offsetY: -5, // 간격 없이 막대 바로 위에 표시
+            borderColor: 'transparent',
+            offsetY: -5,
             style: {
-              fontSize: '11px',
-              fontWeight: 'bold',
-              color: '#333',
+              color: '#424242',
               background: 'transparent',
-              borderWidth: 0,
-              padding: 0
-            }
+              fontSize: '12px',
+              fontWeight: 600
+            },
+            text: total > 0 ? `${total}건` : ''
           }
         };
       })
@@ -1597,6 +1597,17 @@ function DashboardView({
             InputLabelProps={{ shrink: true }}
             sx={{ width: 150 }}
           />
+          <Button
+            variant="text"
+            size="small"
+            onClick={() => {
+              setStartDate('');
+              setEndDate('');
+            }}
+            sx={{ whiteSpace: 'nowrap' }}
+          >
+            초기화
+          </Button>
         </Box>
       </Box>
 

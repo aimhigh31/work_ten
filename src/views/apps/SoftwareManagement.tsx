@@ -287,10 +287,10 @@ function KanbanView({
 
   // 상태별 컬럼 정의 (표준화된 포맷)
   const statusColumns = [
-    { key: '대기', title: '대기', pillBg: '#F0F0F0', pillColor: '#424242' },
-    { key: '진행', title: '진행', pillBg: '#E3F2FD', pillColor: '#1976D2' },
-    { key: '완료', title: '완료', pillBg: '#E8F5E8', pillColor: '#388E3C' },
-    { key: '홀딩', title: '홀딩', pillBg: '#FFEBEE', pillColor: '#D32F2F' }
+    { key: '대기', title: '대기', pillBg: '#ECEFF1', pillColor: '#90A4AE' },
+    { key: '진행', title: '진행', pillBg: '#E8EAF6', pillColor: '#7986CB' },
+    { key: '완료', title: '완료', pillBg: '#E8F5E9', pillColor: '#81C784' },
+    { key: '홀딩', title: '홀딩', pillBg: '#FFEBEE', pillColor: '#E57373' }
   ];
 
   // 상태별 아이템 가져오기 (서브코드를 서브코드명으로 변환해서 비교)
@@ -345,13 +345,13 @@ function KanbanView({
   const getStatusTagStyle = (status: string) => {
     switch (status) {
       case '대기':
-        return { backgroundColor: 'rgba(251, 191, 36, 0.15)', color: '#f59e0b' };
+        return { backgroundColor: 'rgba(144, 164, 174, 0.15)', color: '#90A4AE' };
       case '진행':
-        return { backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6' };
+        return { backgroundColor: 'rgba(121, 134, 203, 0.15)', color: '#7986CB' };
       case '완료':
-        return { backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#16a34a' };
+        return { backgroundColor: 'rgba(129, 199, 132, 0.15)', color: '#81C784' };
       case '홀딩':
-        return { backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#dc2626' };
+        return { backgroundColor: 'rgba(229, 115, 115, 0.15)', color: '#E57373' };
       default:
         return { backgroundColor: 'rgba(156, 163, 175, 0.15)', color: '#4b5563' };
     }
@@ -1549,7 +1549,8 @@ function DashboardView({
   const totalCount = filteredData.length;
   const statusStats = filteredData.reduce(
     (acc, item) => {
-      acc[item.status] = (acc[item.status] || 0) + 1;
+      const statusName = getStatusName(item.status);
+      acc[statusName] = (acc[statusName] || 0) + 1;
       return acc;
     },
     {} as Record<string, number>
@@ -1948,6 +1949,17 @@ function DashboardView({
             InputLabelProps={{ shrink: true }}
             sx={{ width: 150 }}
           />
+          <Button
+            variant="text"
+            size="small"
+            onClick={() => {
+              setStartDate('');
+              setEndDate('');
+            }}
+            sx={{ whiteSpace: 'nowrap' }}
+          >
+            초기화
+          </Button>
         </Box>
       </Box>
 
@@ -1972,7 +1984,7 @@ function DashboardView({
               {totalCount}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              전체 업무 현황
+              전체 소프트웨어 현황
             </Typography>
           </Card>
         </Grid>
@@ -2001,7 +2013,7 @@ function DashboardView({
           </Card>
         </Grid>
 
-        {/* 사용중 */}
+        {/* 진행 */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
@@ -2014,18 +2026,18 @@ function DashboardView({
             }}
           >
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
-              사용중
+              진행
             </Typography>
             <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusStats['사용중'] || 0}
+              {statusStats['진행'] || 0}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              사용중인 소프트웨어
+              진행중인 소프트웨어
             </Typography>
           </Card>
         </Grid>
 
-        {/* 사용만료 */}
+        {/* 완료 */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
@@ -2038,18 +2050,18 @@ function DashboardView({
             }}
           >
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
-              사용만료
+              완료
             </Typography>
             <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusStats['사용만료'] || 0}
+              {statusStats['완료'] || 0}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              사용만료된 소프트웨어
+              완료된 소프트웨어
             </Typography>
           </Card>
         </Grid>
 
-        {/* 폐기 */}
+        {/* 홀딩 */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
@@ -2062,13 +2074,13 @@ function DashboardView({
             }}
           >
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
-              폐기
+              홀딩
             </Typography>
             <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusStats['폐기'] || 0}
+              {statusStats['홀딩'] || 0}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              폐기된 소프트웨어
+              홀딩중인 소프트웨어
             </Typography>
           </Card>
         </Grid>

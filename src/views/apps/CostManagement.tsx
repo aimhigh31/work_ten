@@ -335,13 +335,13 @@ function CostKanbanView({
     const getStatusTagStyle = (status: string) => {
       switch (status) {
         case '대기':
-          return { backgroundColor: 'rgba(251, 191, 36, 0.15)', color: '#f59e0b' };
+          return { backgroundColor: 'rgba(144, 164, 174, 0.15)', color: '#90A4AE' };
         case '진행':
-          return { backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6' };
+          return { backgroundColor: 'rgba(121, 134, 203, 0.15)', color: '#7986CB' };
         case '완료':
-          return { backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#16a34a' };
+          return { backgroundColor: 'rgba(129, 199, 132, 0.15)', color: '#81C784' };
         case '홀딩':
-          return { backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#dc2626' };
+          return { backgroundColor: 'rgba(229, 115, 115, 0.15)', color: '#E57373' };
         default:
           return { backgroundColor: 'rgba(156, 163, 175, 0.15)', color: '#4b5563' };
       }
@@ -836,7 +836,7 @@ function CostMonthlyScheduleView({
         return '#e3f2fd';
       case '완료':
         return '#e8f5e8';
-      case '취소':
+      case '홀딩':
         return '#ffebee';
       default:
         return '#f5f5f5';
@@ -851,7 +851,7 @@ function CostMonthlyScheduleView({
         return '#1976D2';
       case '완료':
         return '#388E3C';
-      case '취소':
+      case '홀딩':
         return '#D32F2F';
       default:
         return '#424242';
@@ -1220,16 +1220,17 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
     {} as Record<string, number>
   );
 
-  // 비용유형별 통계 (원형차트용)
+  // 비용유형별 통계 (원형차트용) - 서브코드명을 키로 사용
   const typeStats = filteredData.reduce(
     (acc, item) => {
       const typeSubcode = item.costType || '기타';
-      // 서브코드를 키로 사용 (고유성 보장)
-      if (!acc[typeSubcode]) {
-        acc[typeSubcode] = { count: 0, amount: 0 };
+      const typeName = getCostTypeName(typeSubcode); // 서브코드명으로 변환
+
+      if (!acc[typeName]) {
+        acc[typeName] = { count: 0, amount: 0 };
       }
-      acc[typeSubcode].count++;
-      acc[typeSubcode].amount += item.amount;
+      acc[typeName].count++;
+      acc[typeName].amount += item.amount;
       return acc;
     },
     {} as Record<string, { count: number; amount: number }>
@@ -1249,24 +1250,29 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
     {} as Record<string, { count: number; amount: number }>
   );
 
-  // 월별 통계 (막대차트용)
-  const monthlyStats: { month: string; 대기: number; 진행: number; 완료: number; 취소: number }[] = [];
+  // 월별 통계 (막대차트용) - 금액과 건수 모두 추적
+  const monthlyStats: { month: string; 대기: number; 진행: number; 완료: number; 홀딩: number }[] = [];
   const monthData: Record<string, Record<string, number>> = {};
+  const monthCountData: Record<string, Record<string, number>> = {}; // 건수 추적
 
   filteredData.forEach((item) => {
     const date = new Date(item.registrationDate);
     const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
     if (!monthData[monthKey]) {
-      monthData[monthKey] = { 대기: 0, 진행: 0, 완료: 0, 취소: 0 };
+      monthData[monthKey] = { 대기: 0, 진행: 0, 완료: 0, 홀딩: 0 };
+      monthCountData[monthKey] = { 대기: 0, 진행: 0, 완료: 0, 홀딩: 0 };
     }
     monthData[monthKey][item.status] += item.amount;
+    monthCountData[monthKey][item.status] += 1; // 건수 카운트
   });
 
   Object.keys(monthData)
     .sort()
     .forEach((month) => {
+      const yearShort = month.substring(2, 4); // YY
+      const monthNum = month.substring(5); // MM
       monthlyStats.push({
-        month: month.substring(5), // MM 형식으로 전환
+        month: `${yearShort}/${monthNum}`, // YY/MM 형식으로 전환
         ...monthData[month]
       });
     });
@@ -1281,9 +1287,9 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
   };
 
   // 라벨과 값 배열 미리 생성
-  const typeLabels = Object.keys(typeStats); // 서브코드 배열
+  const typeLabels = Object.keys(typeStats); // 이미 서브코드명 배열
   const typeValues = typeLabels.map((label) => typeStats[label].amount);
-  const typeLabelNames = typeLabels.map((subcode) => getCostTypeName(subcode)); // 서브코드명 배열
+  const typeLabelNames = typeLabels; // 이미 서브코드명이므로 변환 불필요
 
   // 원형차트 옵션
   const pieChartOptions: ApexOptions = {
@@ -1296,23 +1302,45 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
     legend: {
       show: false
     },
-    plotOptions: {
-      pie: {
-        donut: {
-          size: '0%'
-        }
+    dataLabels: {
+      enabled: true,
+      formatter: function (val: any) {
+        return val.toFixed(1) + '%';
+      },
+      style: {
+        fontSize: '13px',
+        fontWeight: 'bold'
       }
     },
     tooltip: {
-      y: {
-        formatter: function (val) {
-          return val.toLocaleString('ko-KR') + '원';
-        }
+      custom: function ({ series, seriesIndex, w }: any) {
+        const value = typeValues[seriesIndex] || 0;
+        const label = typeLabelNames[seriesIndex] || '유형';
+        const total = typeValues.reduce((sum: number, val: number) => sum + val, 0);
+        const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+
+        return `<div class="pie_box">
+        <span class="PieDot" style='background-color:${w.globals.colors[seriesIndex]}'></span>
+        <span class="fontsize">${label}${' '}
+        <span class="fontsizeValue">${formatAmount(value)}원 (${percentage}%)</span></span></div>`;
       }
     },
-    dataLabels: {
-      enabled: false
-    }
+    responsive: [
+      {
+        breakpoint: 768,
+        options: {
+          chart: {
+            width: 250,
+            offsetX: 0
+          },
+          legend: {
+            position: 'bottom',
+            offsetX: 0,
+            width: 'auto'
+          }
+        }
+      }
+    ]
   };
 
   const pieChartSeries = typeValues;
@@ -1332,23 +1360,45 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
     legend: {
       show: false
     },
-    plotOptions: {
-      pie: {
-        donut: {
-          size: '0%'
-        }
+    dataLabels: {
+      enabled: true,
+      formatter: function (val: any) {
+        return val.toFixed(1) + '%';
+      },
+      style: {
+        fontSize: '13px',
+        fontWeight: 'bold'
       }
     },
     tooltip: {
-      y: {
-        formatter: function (val) {
-          return val.toLocaleString('ko-KR') + '원';
-        }
+      custom: function ({ series, seriesIndex, w }: any) {
+        const value = teamValues[seriesIndex] || 0;
+        const label = teamLabels[seriesIndex] || '팀';
+        const total = teamValues.reduce((sum: number, val: number) => sum + val, 0);
+        const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+
+        return `<div class="pie_box">
+        <span class="PieDot" style='background-color:${w.globals.colors[seriesIndex]}'></span>
+        <span class="fontsize">${label}${' '}
+        <span class="fontsizeValue">${formatAmount(value)}원 (${percentage}%)</span></span></div>`;
       }
     },
-    dataLabels: {
-      enabled: false
-    }
+    responsive: [
+      {
+        breakpoint: 768,
+        options: {
+          chart: {
+            width: 250,
+            offsetX: 0
+          },
+          legend: {
+            position: 'bottom',
+            offsetX: 0,
+            width: 'auto'
+          }
+        }
+      }
+    ]
   };
 
   const teamPieChartSeries = teamValues;
@@ -1363,7 +1413,8 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
     plotOptions: {
       bar: {
         horizontal: false,
-        columnWidth: '55%'
+        columnWidth: '55%',
+        borderRadius: 4
       }
     },
     xaxis: {
@@ -1376,15 +1427,15 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
       labels: {
         formatter: function (val) {
           if (val >= 1000000) {
-            return (val / 1000000).toFixed(0) + 'M';
-          } else if (val >= 1000) {
-            return (val / 1000).toFixed(0) + 'K';
+            return (val / 1000000).toFixed(0) + '백만';
+          } else if (val >= 10000) {
+            return (val / 10000).toFixed(0) + '만';
           }
           return val.toString();
         }
       }
     },
-    colors: ['#90A4AE', '#7986CB', '#81C784', '#E57373'],
+    colors: ['#90A4AE', '#7986CB', '#81C784', '#FF9800'],
     legend: {
       position: 'top',
       horizontalAlign: 'right'
@@ -1392,9 +1443,72 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
     fill: {
       opacity: 1
     },
+    dataLabels: {
+      enabled: false
+    },
+    annotations: {
+      points: monthlyStats.map((item, index) => {
+        const 대기 = Number(item.대기) || 0;
+        const 진행 = Number(item.진행) || 0;
+        const 완료 = Number(item.완료) || 0;
+        const 홀딩 = Number(item.홀딩) || 0;
+        const totalAmount = 대기 + 진행 + 완료 + 홀딩;
+
+        // 해당 월의 총 건수 계산
+        const monthKey = Object.keys(monthCountData).sort()[index];
+        const totalCount = monthCountData[monthKey]
+          ? (monthCountData[monthKey].대기 || 0) +
+            (monthCountData[monthKey].진행 || 0) +
+            (monthCountData[monthKey].완료 || 0) +
+            (monthCountData[monthKey].홀딩 || 0)
+          : 0;
+
+        // 건수와 금액 함께 표시
+        const displayText = totalAmount > 0
+          ? `${totalCount}건, ${totalAmount.toLocaleString('ko-KR')}원`
+          : '';
+
+        return {
+          x: item.month,
+          y: totalAmount,
+          marker: {
+            size: 0,
+            strokeWidth: 0,
+            fillColor: 'transparent'
+          },
+          label: {
+            text: displayText,
+            offsetY: -5,
+            style: {
+              fontSize: '11px',
+              fontWeight: 'bold',
+              color: '#333',
+              background: 'transparent',
+              borderWidth: 0,
+              padding: 0
+            }
+          }
+        };
+      })
+    },
     tooltip: {
+      marker: {
+        show: false
+      },
       y: {
-        formatter: function (val) {
+        formatter: function (val, { seriesIndex, dataPointIndex, w }) {
+          // 상태명 가져오기
+          const statusName = w.globals.seriesNames[seriesIndex];
+          // 월 가져오기
+          const month = monthlyStats[dataPointIndex]?.month;
+
+          if (month) {
+            const monthKey = Object.keys(monthCountData).sort()[dataPointIndex];
+            const count = monthCountData[monthKey]?.[statusName] || 0;
+            const amount = val; // 금액
+            return `${count}건, ${amount.toLocaleString('ko-KR')}원`;
+          }
+
           return val.toLocaleString('ko-KR') + '원';
         }
       }
@@ -1415,8 +1529,8 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
       data: monthlyStats.map((item) => item.완료)
     },
     {
-      name: '취소',
-      data: monthlyStats.map((item) => item.취소)
+      name: '홀딩',
+      data: monthlyStats.map((item) => item.홀딩)
     }
   ];
 
@@ -1429,7 +1543,7 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
         return '#7986CB';
       case '완료':
         return '#81C784';
-      case '취소':
+      case '홀딩':
         return '#E57373';
       default:
         return '#6E6E75';
@@ -1473,6 +1587,17 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
             InputLabelProps={{ shrink: true }}
             sx={{ width: 150 }}
           />
+          <Button
+            variant="text"
+            size="small"
+            onClick={() => {
+              setStartDate('');
+              setEndDate('');
+            }}
+            sx={{ whiteSpace: 'nowrap' }}
+          >
+            초기화
+          </Button>
         </Box>
       </Box>
 
@@ -1501,7 +1626,7 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
             </Typography>
           </Card>
         </Grid>
-        {/* 완료 */}
+        {/* 대기 */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
@@ -1514,13 +1639,13 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
             }}
           >
             <Typography variant="h6" sx={{ fontWeight: 600, color: '#fff', mb: 1 }}>
-              완료
+              대기
             </Typography>
             <Typography variant="h5" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusCountStats['완료'] || 0}건
+              {statusCountStats['대기'] || 0}건
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              {formatAmount(statusStats['완료'] || 0)}원
+              {formatAmount(statusStats['대기'] || 0)}원
             </Typography>
           </Card>
         </Grid>
@@ -1547,7 +1672,7 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
             </Typography>
           </Card>
         </Grid>
-        {/* 취소 */}
+        {/* 완료 */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
@@ -1560,17 +1685,17 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
             }}
           >
             <Typography variant="h6" sx={{ fontWeight: 600, color: '#fff', mb: 1 }}>
-              취소
+              완료
             </Typography>
             <Typography variant="h5" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusCountStats['취소'] || 0}건
+              {statusCountStats['완료'] || 0}건
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              {formatAmount(statusStats['취소'] || 0)}원
+              {formatAmount(statusStats['완료'] || 0)}원
             </Typography>
           </Card>
         </Grid>
-        {/* 대기 */}
+        {/* 홀딩 */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
@@ -1583,13 +1708,13 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
             }}
           >
             <Typography variant="h6" sx={{ fontWeight: 600, color: '#fff', mb: 1 }}>
-              대기
+              홀딩
             </Typography>
             <Typography variant="h5" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusCountStats['대기'] || 0}건
+              {statusCountStats['홀딩'] || 0}건
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              {formatAmount(statusStats['대기'] || 0)}원
+              {formatAmount(statusStats['홀딩'] || 0)}원
             </Typography>
           </Card>
         </Grid>
@@ -1604,7 +1729,20 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
               p: 2,
               height: 400,
               backgroundColor: '#fff',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+              '.pie_box': {
+                padding: 2,
+                display: 'flex',
+                gap: 1,
+                alignItems: 'center',
+                width: '100%',
+                backgroundColor: '#ffffff',
+                borderRadius: '6px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              },
+              '.PieDot': { width: 12, height: 12, borderRadius: '50%' },
+              '.fontsize': { fontWeight: 500, fontSize: '0.875rem', lineHeight: '1.375rem', color: '#000000' },
+              '.fontsizeValue': { color: '#000000', fontWeight: 600 }
             }}
           >
             <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
@@ -1653,7 +1791,7 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
                             backgroundColor: pieChartOptions.colors?.[index % pieChartOptions.colors.length]
                           }}
                         />
-                        <Typography sx={{ flex: 1, fontSize: '13px' }}>{getCostTypeName(label)}</Typography>
+                        <Typography sx={{ flex: 1, fontSize: '13px' }}>{label}</Typography>
                         <Typography sx={{ fontSize: '13px', fontWeight: 600 }}>{formatAmount(typeValues[index])}원</Typography>
                       </Box>
                     ))}
@@ -1753,7 +1891,20 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
               p: 2,
               height: 400,
               backgroundColor: '#fff',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+              '.pie_box': {
+                padding: 2,
+                display: 'flex',
+                gap: 1,
+                alignItems: 'center',
+                width: '100%',
+                backgroundColor: '#ffffff',
+                borderRadius: '6px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              },
+              '.PieDot': { width: 12, height: 12, borderRadius: '50%' },
+              '.fontsize': { fontWeight: 500, fontSize: '0.875rem', lineHeight: '1.375rem', color: '#000000' },
+              '.fontsizeValue': { color: '#000000', fontWeight: 600 }
             }}
           >
             <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>

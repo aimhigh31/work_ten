@@ -1267,6 +1267,36 @@ function InvestmentDashboardView({
     dataLabels: {
       enabled: false
     },
+    annotations: {
+      points: monthlyStats.map((item, index) => {
+        const 대기 = Number(item.대기) || 0;
+        const 진행 = Number(item.진행) || 0;
+        const 완료 = Number(item.완료) || 0;
+        const 홀딩 = Number(item.홀딩) || 0;
+        const total = 대기 + 진행 + 완료 + 홀딩;
+
+        return {
+          x: item.month,
+          y: total,
+          marker: {
+            size: 0,
+            fillColor: 'transparent',
+            strokeColor: 'transparent'
+          },
+          label: {
+            borderColor: 'transparent',
+            offsetY: -5,
+            style: {
+              color: '#424242',
+              background: 'transparent',
+              fontSize: '12px',
+              fontWeight: 600
+            },
+            text: total > 0 ? `${total}건` : ''
+          }
+        };
+      })
+    },
     tooltip: {
       marker: {
         show: false
@@ -1366,6 +1396,17 @@ function InvestmentDashboardView({
             InputLabelProps={{ shrink: true }}
             sx={{ width: 150 }}
           />
+          <Button
+            variant="text"
+            size="small"
+            onClick={() => {
+              setStartDate('');
+              setEndDate('');
+            }}
+            sx={{ whiteSpace: 'nowrap' }}
+          >
+            초기화
+          </Button>
         </Box>
       </Box>
 
@@ -1395,7 +1436,7 @@ function InvestmentDashboardView({
           </Card>
         </Grid>
 
-        {/* 완료 */}
+        {/* 대기 */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
@@ -1408,13 +1449,13 @@ function InvestmentDashboardView({
             }}
           >
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
-              완료
+              대기
             </Typography>
             <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusStats['완료'] || 0}
+              {statusStats['대기'] || 0}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              완료된 투자
+              대기중인 투자
             </Typography>
           </Card>
         </Grid>
@@ -1443,12 +1484,36 @@ function InvestmentDashboardView({
           </Card>
         </Grid>
 
-        {/* 홀딩 */}
+        {/* 완료 */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
               p: 3,
               background: '#81C784',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+              borderRadius: 2,
+              color: '#fff',
+              textAlign: 'center'
+            }}
+          >
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
+              완료
+            </Typography>
+            <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
+              {statusStats['완료'] || 0}
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
+              완료된 투자
+            </Typography>
+          </Card>
+        </Grid>
+
+        {/* 홀딩 */}
+        <Grid item xs={12} sm={6} md={2.4}>
+          <Card
+            sx={{
+              p: 3,
+              background: '#E57373',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -1463,30 +1528,6 @@ function InvestmentDashboardView({
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
               홀딩중인 투자
-            </Typography>
-          </Card>
-        </Grid>
-
-        {/* 대기 */}
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              p: 3,
-              background: '#E57373',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-              borderRadius: 2,
-              color: '#fff',
-              textAlign: 'center'
-            }}
-          >
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
-              대기
-            </Typography>
-            <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusStats['대기'] || 0}
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              대기중인 투자
             </Typography>
           </Card>
         </Grid>

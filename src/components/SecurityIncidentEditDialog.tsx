@@ -2037,9 +2037,8 @@ const SecurityIncidentEditDialog = memo(
         fullWidth
         PaperProps={{
           sx: {
-            height: '840px',
-            maxHeight: '840px',
-            overflow: 'hidden'
+            height: '90vh',
+            maxHeight: '90vh'
           }
         }}
       >

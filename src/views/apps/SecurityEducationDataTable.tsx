@@ -307,8 +307,8 @@ export default function SecurityEducationTable({
   const handleExcelDownload = () => {
     try {
       // 필터링된 데이터를 Excel 형식으로 변환 (테이블과 동일한 컬럼 순서)
-      const excelData = filteredData.map((task) => ({
-        NO: task.no || task.id,
+      const excelData = filteredData.map((task, index) => ({
+        NO: filteredData.length - index,
         등록일: task.registrationDate,
         코드: task.code,
         교육유형: getEducationTypeName(task.educationType),
@@ -384,9 +384,12 @@ export default function SecurityEducationTable({
   }, [data, selectedYear || '전체', selectedTeam, selectedStatus, selectedAssignee]);
 
   // 페이지네이션 적용된 데이터
-  const paginatedData = useMemo(() => {
+  const { paginatedData, startIndex } = useMemo(() => {
     const startIndex = page * rowsPerPage;
-    return filteredData.slice(startIndex, startIndex + rowsPerPage);
+    return {
+      paginatedData: filteredData.slice(startIndex, startIndex + rowsPerPage),
+      startIndex
+    };
   }, [filteredData, page, rowsPerPage]);
 
   // 총 페이지 수 계산
@@ -1040,7 +1043,7 @@ export default function SecurityEducationTable({
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                      {task.no || task.id}
+                      {filteredData.length - (startIndex + index)}
                     </Typography>
                   </TableCell>
                   <TableCell>

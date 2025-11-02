@@ -2084,6 +2084,17 @@ function DashboardView({
             InputLabelProps={{ shrink: true }}
             sx={{ width: 150 }}
           />
+          <Button
+            variant="text"
+            size="small"
+            onClick={() => {
+              setStartDate('');
+              setEndDate('');
+            }}
+            sx={{ whiteSpace: 'nowrap' }}
+          >
+            초기화
+          </Button>
         </Box>
       </Box>
 
@@ -2113,7 +2124,7 @@ function DashboardView({
           </Card>
         </Grid>
 
-        {/* 완료 */}
+        {/* 대기 */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
@@ -2126,13 +2137,13 @@ function DashboardView({
             }}
           >
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
-              완료
+              대기
             </Typography>
             <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusStats['완료'] || 0}
+              {statusStats['대기'] || 0}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              완료된 업무
+              대기중인 업무
             </Typography>
           </Card>
         </Grid>
@@ -2161,12 +2172,36 @@ function DashboardView({
           </Card>
         </Grid>
 
-        {/* 홀딩 */}
+        {/* 완료 */}
         <Grid item xs={12} sm={6} md={2.4}>
           <Card
             sx={{
               p: 3,
               background: '#81C784',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+              borderRadius: 2,
+              color: '#fff',
+              textAlign: 'center'
+            }}
+          >
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
+              완료
+            </Typography>
+            <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
+              {statusStats['완료'] || 0}
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
+              완료된 업무
+            </Typography>
+          </Card>
+        </Grid>
+
+        {/* 홀딩 */}
+        <Grid item xs={12} sm={6} md={2.4}>
+          <Card
+            sx={{
+              p: 3,
+              background: '#E57373',
               boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
               borderRadius: 2,
               color: '#fff',
@@ -2181,30 +2216,6 @@ function DashboardView({
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
               보류중인 업무
-            </Typography>
-          </Card>
-        </Grid>
-
-        {/* 대기 */}
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card
-            sx={{
-              p: 3,
-              background: '#E57373',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-              borderRadius: 2,
-              color: '#fff',
-              textAlign: 'center'
-            }}
-          >
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', mb: 1 }}>
-              대기
-            </Typography>
-            <Typography variant="h3" sx={{ fontWeight: 700, color: '#fff', mb: 1 }}>
-              {statusStats['대기'] || 0}
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
-              대기중인 업무
             </Typography>
           </Card>
         </Grid>
