@@ -2020,18 +2020,27 @@ const ChecklistEditDialog = memo(
         if (task) {
           dispatch({ type: 'SET_TASK', task });
         } else if (open) {
-          // 새 Task 생성 시 자동으로 등록일, 담당자 설정 (코드는 서버에서 생성)
+          // 새 Task 생성 시 자동으로 코드, 등록일, 담당자 설정
+          console.log('🟢 [ChecklistEditDialog] 다이얼로그 열림: 새 체크리스트 생성');
+          console.log('🟢 [ChecklistEditDialog] task 값:', task);
+          console.log('🟢 [ChecklistEditDialog] open 값:', open);
           const newRegistrationDate = getCurrentDate();
+
+          // 코드 자동 생성
+          console.log('🟢 [ChecklistEditDialog] generateTaskCode 호출 시작');
+          const newCode = await generateTaskCode();
+          console.log('🟢 [ChecklistEditDialog] 생성된 코드:', newCode);
+
           dispatch({
             type: 'INIT_NEW_TASK',
-            code: '', // 빈 문자열로 설정하여 서버에서 생성하도록 함
+            code: newCode,
             registrationDate: newRegistrationDate,
             assignee: currentUserCode
           });
         }
       };
       initTask();
-    }, [task, open, getCurrentDate, currentUserCode]);
+    }, [task, open, getCurrentDate, currentUserCode, generateTaskCode]);
 
     // 팀을 로그인한 사용자의 부서로 자동 설정
     React.useEffect(() => {

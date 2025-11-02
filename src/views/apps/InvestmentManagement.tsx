@@ -2365,6 +2365,53 @@ export default function InvestmentManagement() {
     }));
   };
 
+  // 투자 코드 자동 생성 함수
+  const generateInvestmentCode = React.useCallback(async (): Promise<string> => {
+    try {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+
+      const currentYear = new Date().getFullYear();
+      const currentYearStr = currentYear.toString().slice(-2);
+
+      // 현재 연도의 최대 코드 조회
+      const { data, error } = await supabase
+        .from('plan_investment_data')
+        .select('code')
+        .like('code', `PLAN-INV-${currentYearStr}-%`)
+        .order('code', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error('❌ 투자 코드 조회 실패:', error);
+        throw error;
+      }
+
+      let nextSequence = 1;
+      if (data && data.length > 0 && data[0].code) {
+        const lastCode = data[0].code;
+        const sequencePart = lastCode.split('-')[3];
+        if (sequencePart) {
+          nextSequence = parseInt(sequencePart) + 1;
+        }
+      }
+
+      const formattedSequence = nextSequence.toString().padStart(3, '0');
+      const newCode = `PLAN-INV-${currentYearStr}-${formattedSequence}`;
+
+      console.log('🔄 [InvestmentManagement] 자동 생성된 코드:', newCode);
+      return newCode;
+    } catch (error) {
+      console.error('❌ 투자 코드 생성 실패:', error);
+      // 오류 시 임시 코드 반환
+      const year = new Date().getFullYear().toString().slice(-2);
+      const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+      return `PLAN-INV-${year}-${random}`;
+    }
+  }, []);
+
   // 투자 저장 함수 (생성/수정)
   const handleSaveInvestment = async (investmentData: InvestmentData) => {
     try {
@@ -3218,6 +3265,7 @@ export default function InvestmentManagement() {
           canEditOwn={canEditOwn}
           canEditOthers={canEditOthers}
           users={users}
+          generateInvestmentCode={generateInvestmentCode}
         />
       )}
     </Box>

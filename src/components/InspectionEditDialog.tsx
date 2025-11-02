@@ -1036,6 +1036,26 @@ export default function InspectionEditDialog({
     }
   }, [currentUser, currentUserCode, formData.assignee, inspection, activeUsers]);
 
+  // 신규 점검 생성 시 코드 자동 생성
+  React.useEffect(() => {
+    const initializeNewInspection = async () => {
+      if (!inspection && open && !formData.code && generateInspectionCode) {
+        try {
+          const newCode = await generateInspectionCode();
+          console.log('🔄 [InspectionEditDialog] 자동 생성된 코드:', newCode);
+          setFormData((prev) => ({
+            ...prev,
+            code: newCode
+          }));
+        } catch (error) {
+          console.error('❌ [InspectionEditDialog] 코드 생성 실패:', error);
+        }
+      }
+    };
+
+    initializeNewInspection();
+  }, [open, inspection, formData.code, generateInspectionCode]);
+
   // GROUP002 상태 옵션 로드 (Dialog 열 때마다 DB에서 직접 조회)
   useEffect(() => {
     if (!open) return;

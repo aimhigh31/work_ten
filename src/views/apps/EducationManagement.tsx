@@ -1546,6 +1546,7 @@ interface DashboardViewProps {
   setSelectedRecentStatus: (status: string) => void;
   educations: EducationTableData[];
   getStatusName: (subcode: string) => string;
+  getEducationTypeName: (subcode: string) => string;
 }
 
 function DashboardView({
@@ -1556,7 +1557,8 @@ function DashboardView({
   selectedRecentStatus,
   setSelectedRecentStatus,
   educations,
-  getStatusName
+  getStatusName,
+  getEducationTypeName
 }: DashboardViewProps) {
   const theme = useTheme();
   const [startDate, setStartDate] = useState('');
@@ -1620,10 +1622,10 @@ function DashboardView({
     {} as Record<string, number>
   );
 
-  // 개인교육 분류별 통계 (원형차트용) - educationType 필드 사용
+  // 개인교육 분류별 통계 (원형차트용) - educationType 필드를 서브코드명으로 변환
   const categoryStats = filteredData.reduce(
     (acc, item) => {
-      const category = item.educationType || '기타';
+      const category = getEducationTypeName(item.educationType) || '기타';
       acc[category] = (acc[category] || 0) + 1;
       return acc;
     },
@@ -3217,6 +3219,7 @@ export default function EducationManagement() {
                   setSelectedRecentStatus={setSelectedRecentStatus}
                   educations={educations}
                   getStatusName={getStatusName}
+                  getEducationTypeName={getEducationTypeName}
                 />
               </Box>
             </TabPanel>

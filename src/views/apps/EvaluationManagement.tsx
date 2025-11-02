@@ -2109,8 +2109,8 @@ export default function EvaluationManagement() {
       // 현재 연도의 코드 중 가장 큰 번호 찾기
       const currentYearCodes = evaluationDataList
         .map((item) => {
-          // 기존에 있는 코드에서 번호 추출 시도
-          const match = item.evaluation_title?.match(/HR-EVA-(\d{2})-(\d{3})/);
+          // 기존에 있는 코드에서 번호 추출 시도 (evaluation_code 필드 사용)
+          const match = item.evaluation_code?.match(/HR-EVA-(\d{2})-(\d{3})/);
           if (match && match[1] === currentYear) {
             return parseInt(match[2], 10);
           }

@@ -3225,9 +3225,10 @@ interface SecurityEducationDialogProps {
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
+  generateEducationCode?: () => Promise<string>;
 }
 
-export default function SecurityEducationDialog({ open, onClose, onSave, data, mode, canCreateData = true, canEditOwn = true, canEditOthers = true }: SecurityEducationDialogProps) {
+export default function SecurityEducationDialog({ open, onClose, onSave, data, mode, canCreateData = true, canEditOwn = true, canEditOthers = true, generateEducationCode }: SecurityEducationDialogProps) {
   const [value, setValue] = useState(0);
 
   // 현재 로그인 사용자 정보
@@ -3579,41 +3580,41 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
         }
         setNewComment('');
       } else {
-        // 새 교육 추가 시 API에서 다음 코드 가져오기
+        // 새 교육 추가 시 자동으로 코드 생성
         const initNewEducation = async () => {
           try {
-            const response = await fetch('/api/security-education/next-code');
-            const result = await response.json();
+            let newCode = '';
 
-            if (response.ok && result.code) {
-              const newCode = result.code;
-              const newDate = new Date().toISOString().split('T')[0];
-              const currentUserName = user ? user.name : assignees[0];
-              const currentUserDepartment = user?.department || '';
-              dispatch({
-                type: 'INIT_NEW_EDUCATION',
-                code: newCode,
-                registrationDate: newDate,
-                assignee: currentUserName,
-                team: currentUserDepartment
-              });
+            // generateEducationCode prop이 있으면 사용, 없으면 API 호출
+            if (generateEducationCode) {
+              newCode = await generateEducationCode();
+              console.log('🔄 [SecurityEducationEditDialog] 자동 생성된 코드:', newCode);
             } else {
-              console.error('❌ 코드 생성 API 오류:', result);
-              // 실패 시 임시 코드 사용
-              const tempCode = `SEC-EDU-TEMP-${Date.now()}`;
-              const newDate = new Date().toISOString().split('T')[0];
-              const currentUserName = user ? user.name : assignees[0];
-              const currentUserDepartment = user?.department || '';
-              dispatch({
-                type: 'INIT_NEW_EDUCATION',
-                code: tempCode,
-                registrationDate: newDate,
-                assignee: currentUserName,
-                team: currentUserDepartment
-              });
+              // 기존 API 방식 (하위 호환성)
+              const response = await fetch('/api/security-education/next-code');
+              const result = await response.json();
+
+              if (response.ok && result.code) {
+                newCode = result.code;
+              } else {
+                console.error('❌ 코드 생성 API 오류:', result);
+                newCode = `SEC-EDU-TEMP-${Date.now()}`;
+              }
             }
+
+            const newDate = new Date().toISOString().split('T')[0];
+            const currentUserName = user ? user.name : assignees[0];
+            const currentUserDepartment = user?.department || '';
+
+            dispatch({
+              type: 'INIT_NEW_EDUCATION',
+              code: newCode,
+              registrationDate: newDate,
+              assignee: currentUserName,
+              team: currentUserDepartment
+            });
           } catch (error) {
-            console.error('❌ 코드 생성 API 호출 실패:', error);
+            console.error('❌ 코드 생성 실패:', error);
             // 실패 시 임시 코드 사용
             const tempCode = `SEC-EDU-TEMP-${Date.now()}`;
             const newDate = new Date().toISOString().split('T')[0];

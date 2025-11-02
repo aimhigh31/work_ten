@@ -47,6 +47,7 @@ import { useSupabaseUsers } from 'hooks/useSupabaseUsers';
 import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 import { useSupabaseChecklistManagement } from 'hooks/useSupabaseChecklistManagement';
 import { useMenuPermission } from 'hooks/usePermissions'; // ✅ 권한 체크 훅
+import { useCommonData } from 'contexts/CommonDataContext';
 
 // Icons
 import { Add, Trash, Edit, DocumentDownload } from '@wandersonalwes/iconsax-react';
@@ -124,6 +125,16 @@ export default function ChecklistTable({
   // 마스터코드 훅 사용
   const { subCodes } = useSupabaseMasterCode3();
 
+  // CommonData에서 masterCodes 가져오기
+  const { masterCodes } = useCommonData();
+
+  // GROUP006 체크리스트분류 서브코드 목록
+  const checklistCategories = useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP006' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
   // 체크리스트 관리 훅 사용
   const {
     checklists: supabaseChecklists,
@@ -158,11 +169,12 @@ export default function ChecklistTable({
     return user ? user.user_name : userCode; // user를 찾지 못하면 code 그대로 반환
   };
 
-  // 서브코드로 서브코드명을 찾는 헬퍼 함수
-  const getSubCodeName = (subcode: string) => {
-    const subCodeInfo = subCodes.find((sc) => sc.subcode === subcode);
+  // 서브코드로 서브코드명을 찾는 헬퍼 함수 (GROUP006 체크리스트분류용)
+  const getSubCodeName = useCallback((subcode: string) => {
+    if (!subcode) return '분류없음';
+    const subCodeInfo = checklistCategories.find((sc) => sc.subcode === subcode);
     return subCodeInfo ? subCodeInfo.subcode_name : subcode; // 서브코드를 찾지 못하면 코드 그대로 반환
-  };
+  }, [checklistCategories]);
 
   // Supabase 데이터를 우선 사용하고, props로 전달된 tasks가 있으면 사용
   const [data, setData] = useState<TaskTableData[]>([]);

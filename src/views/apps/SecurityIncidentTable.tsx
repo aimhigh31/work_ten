@@ -145,6 +145,16 @@ export default function SecurityIncidentTable({
     return statusItem?.subcode_name || status;
   }, [masterCodes]);
 
+  // 사고대응단계 코드를 이름으로 변환하는 함수
+  const getResponseStageName = useCallback((responseStage: string) => {
+    if (!responseStage) return '사고 탐지';
+    // "GROUP010-SUB001" 형태에서 서브코드명 찾기
+    const stage = masterCodes.find(
+      (code) => code.codetype === 'subcode' && code.group_code === 'GROUP010' && (code.subcode === responseStage || `${code.group_code}-${code.subcode}` === responseStage)
+    );
+    return stage?.subcode_name || responseStage;
+  }, [masterCodes]);
+
   // 현재 로그인한 사용자 정보
   const { data: session } = useSession();
   const user = useUser();
@@ -214,8 +224,8 @@ export default function SecurityIncidentTable({
         대응조치: task.responseAction,
         팀: task.team || '-',
         담당자: task.assignee,
-        사고대응단계: task.responseStage || '사고 탐지',
-        상태: task.status,
+        사고대응단계: getResponseStageName(task.responseStage),
+        상태: getStatusName(task.status),
         시작일: task.startDate || '미정',
         완료일: task.completedDate || '미정'
       }));
@@ -910,7 +920,7 @@ export default function SecurityIncidentTable({
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                      {task.responseStage || '사고 탐지'}
+                      {getResponseStageName(task.responseStage)}
                     </Typography>
                   </TableCell>
                   <TableCell>

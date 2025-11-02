@@ -43,6 +43,7 @@ import MainCard from 'components/MainCard';
 import { ChecklistRecord, categoryOptions, statusOptions, departmentOptions, priorityOptions } from 'types/checklist';
 import { sampleChecklistData } from 'data/checklist';
 import ChecklistDialog from 'components/ChecklistDialog';
+import { useCommonData } from 'contexts/CommonDataContext';
 
 // ==============================|| 체크리스트 데이터 테이블 ||============================== //
 
@@ -96,6 +97,23 @@ export default function ChecklistDataTable({ selectedDepartment, selectedStatus,
 
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(8);
+
+  // masterCodes 가져오기
+  const { masterCodes } = useCommonData();
+
+  // GROUP006 체크리스트분류 서브코드 목록
+  const categoriesMap = useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP006' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order);
+  }, [masterCodes]);
+
+  // subcode → subcode_name 변환 함수 (체크리스트분류용)
+  const getCategoryName = React.useCallback((subcode: string) => {
+    if (!subcode) return '';
+    const found = categoriesMap.find((item) => item.subcode === subcode);
+    return found ? found.subcode_name : subcode;
+  }, [categoriesMap]);
 
   // 필터링된 데이터
   const filteredData = useMemo(() => {
@@ -323,7 +341,7 @@ export default function ChecklistDataTable({ selectedDepartment, selectedStatus,
         NO: filteredData.length - index,
         등록일: record.registrationDate,
         코드: record.code,
-        업무분류: record.category,
+        업무분류: getCategoryName(record.category),
         제목: record.title,
         설명: record.description,
         상태: record.status,
@@ -600,7 +618,7 @@ export default function ChecklistDataTable({ selectedDepartment, selectedStatus,
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
-                        {record.category}
+                        {getCategoryName(record.category)}
                       </Typography>
                     </TableCell>
                     <TableCell>

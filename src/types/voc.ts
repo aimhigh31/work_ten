@@ -4,6 +4,7 @@
 export interface DbVocData {
   id: number;
   no: number;
+  code: string; // IT-VOC-YY-NNN 형식
 
   // 기본 정보
   registration_date: string;
@@ -43,6 +44,7 @@ export interface DbVocData {
 export interface VocData {
   id: number;
   no: number;
+  code: string; // IT-VOC-YY-NNN 형식
 
   // 기본 정보
   registrationDate: string;

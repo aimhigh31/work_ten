@@ -146,6 +146,7 @@ interface KanbanViewProps {
   addChangeLog: (action: string, target: string, description: string, team?: string) => void;
   onCardClick?: (task: SecurityEducationTableData) => void;
   onSave?: (task: SecurityEducationRecord) => Promise<void>;
+  generateEducationCode?: () => Promise<string>;
   educationTypes?: string[];
   statusTypes?: string[];
   assigneeList?: any[];
@@ -170,6 +171,7 @@ function KanbanView({
   addChangeLog,
   onCardClick,
   onSave,
+  generateEducationCode,
   educationTypes,
   statusTypes,
   assigneeList,
@@ -919,6 +921,7 @@ function KanbanView({
           data={editingTask ? convertTableDataToRecord(editingTask) : null}
           mode={editingTask ? 'edit' : 'add'}
           onSave={onSave}
+          generateEducationCode={generateEducationCode}
           educationTypes={educationTypes}
           statusTypes={statusTypes}
           assigneeList={assigneeList}
@@ -2657,6 +2660,36 @@ export default function SecurityEducationManagement() {
     return found ? found.subcode_name : subcode;
   }, [statusTypes]);
 
+  // 보안교육 코드 생성 함수 (SEC-EDU-25-001 형식)
+  const generateEducationCode = React.useCallback(async (): Promise<string> => {
+    try {
+      const currentYear = new Date().getFullYear().toString().slice(-2); // 25
+
+      // 현재 연도의 코드 중 가장 큰 번호 찾기
+      const currentYearCodes = securityEducations
+        .map((item) => {
+          // 기존에 있는 코드에서 번호 추출 시도
+          const match = item.code?.match(/SEC-EDU-(\d{2})-(\d{3})/);
+          if (match && match[1] === currentYear) {
+            return parseInt(match[2], 10);
+          }
+          return 0;
+        })
+        .filter((num) => num > 0);
+
+      const maxNumber = currentYearCodes.length > 0 ? Math.max(...currentYearCodes) : 0;
+      const nextNumber = (maxNumber + 1).toString().padStart(3, '0');
+
+      return `SEC-EDU-${currentYear}-${nextNumber}`;
+    } catch (error) {
+      console.error('코드 생성 실패:', error);
+      // 실패 시 타임스탬프 기반 코드 생성
+      const year = new Date().getFullYear().toString().slice(-2);
+      const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+      return `SEC-EDU-${year}-${random}`;
+    }
+  }, [securityEducations]);
+
   // 공유 Tasks 상태 - 데이터베이스 데이터를 SecurityEducationTableData 형식으로 변환
   const [tasks, setTasks] = useState<SecurityEducationTableData[]>([]);
 
@@ -3436,6 +3469,7 @@ export default function SecurityEducationManagement() {
                   setTasks={setTasks}
                   addChangeLog={addChangeLog}
                   onSave={handleEditTaskSave}
+                  generateEducationCode={generateEducationCode}
                   educationTypes={educationTypes.map((code) => code.subcode_name)}
                   statusTypes={statusTypes.map((code) => code.subcode_name)}
                   assigneeList={users.filter((user) => user.status === 'active')}
@@ -3588,6 +3622,7 @@ export default function SecurityEducationManagement() {
           data={editingTask ? convertTableDataToRecord(editingTask) : null}
           mode={editingTask ? 'edit' : 'add'}
           onSave={handleKanbanEditTaskSave}
+          generateEducationCode={generateEducationCode}
           educationTypes={educationTypes.map((code) => code.subcode_name)}
           statusTypes={statusTypes.map((code) => code.subcode_name)}
           assigneeList={users.filter((user) => user.status === 'active')}

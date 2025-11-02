@@ -36,6 +36,7 @@ import { PAGE_IDENTIFIERS, FeedbackData } from '../types/feedback';
 import { useSupabaseFiles } from '../hooks/useSupabaseFiles';
 import { FileData } from '../types/files';
 import { createClient } from '@supabase/supabase-js';
+import { useSupabaseVoc } from '../hooks/useSupabaseVoc';
 // import { usePerformanceMonitor } from '../utils/performance';
 
 // Icons
@@ -57,6 +58,7 @@ interface EditVOCState {
   receptionDate: string;
   resolutionDate: string;
   team: string;
+  code: string;
 }
 
 type EditVOCAction =
@@ -81,6 +83,7 @@ const editVOCReducer = (state: EditVOCState, action: EditVOCAction): EditVOCStat
         assignee: action.voc.assignee || '',
         status: action.voc.status || '접수',
         priority: action.voc.priority || '보통',
+        code: action.voc.code || '',
         registrationDate: action.voc.registrationDate || '',
         receptionDate: action.voc.receptionDate || '',
         resolutionDate: action.voc.resolutionDate || '',
@@ -101,12 +104,14 @@ const editVOCReducer = (state: EditVOCState, action: EditVOCAction): EditVOCStat
         registrationDate: action.registrationDate,
         receptionDate: action.registrationDate,
         resolutionDate: '',
-        team: ''
+        team: '',
+        code: ''
       };
     case 'RESET':
       return {
         customerName: '',
         companyName: '',
+        code: '',
         vocType: '',
         channel: '전화',
         title: '',
@@ -618,11 +623,7 @@ const OverviewTab = memo(
             <TextField
               fullWidth
               label="코드"
-              value={
-                voc
-                  ? `IT-VOC-${new Date(voc.registrationDate).getFullYear().toString().slice(-2)}-${String(voc.no).padStart(3, '0')}`
-                  : `IT-VOC-${new Date().getFullYear().toString().slice(-2)}-XXX`
-              }
+              value={vocState.code || ''}
               InputLabelProps={{ shrink: true }}
               variant="outlined"
               InputProps={{
@@ -1441,6 +1442,9 @@ const VOCEditDialog = memo(
       return isOwnerResult;
     }, [voc, currentUser, canEditOwn, canEditOthers]);
 
+    // VOC 훅 사용 (코드 생성용)
+    const { generateVocCode } = useSupabaseVoc();
+
     // 피드백 훅 사용 (DB 연동)
     const {
       feedbacks,
@@ -1477,40 +1481,62 @@ const VOCEditDialog = memo(
       team: ''
     });
 
-    // 코드 자동 생성 함수
-    const generateVOCCode = useCallback(() => {
-      const currentYear = new Date().getFullYear();
-      const currentYearStr = currentYear.toString().slice(-2); // 연도 뒤 2자리
-
-      // 현재 연도의 VOC 개수를 기반으로 순번 생성 (실제 구현에서는 서버에서 처리)
-      // 여기서는 간단히 현재 시간을 기반으로 순번 생성
-      const sequence = String(Date.now()).slice(-3).padStart(3, '0');
-
-      return `VOC-${currentYearStr}-${sequence}`;
-    }, []);
-
     // 현재 날짜 생성 함수
     const getCurrentDate = useCallback(() => {
       const today = new Date();
       return today.toISOString().split('T')[0]; // YYYY-MM-DD 형식
     }, []);
 
+    // 이전 open 값 추적
+    const prevOpenRef = useRef(false);
+
     // VOC 변경 시 상태 업데이트
     React.useEffect(() => {
       if (voc) {
         dispatch({ type: 'SET_TASK', voc });
-      } else if (open) {
-        // 새 VOC 생성 시 자동으로 등록일 설정
-        const newRegistrationDate = getCurrentDate();
-        dispatch({ type: 'INIT_NEW_TASK', registrationDate: newRegistrationDate });
-
-        // 로그인한 사용자 정보로 팀과 담당자 자동 설정
-        if (currentUser) {
-          dispatch({ type: 'SET_FIELD', field: 'team', value: currentUser.department || '' });
-          dispatch({ type: 'SET_FIELD', field: 'assignee', value: currentUser.user_name || '' });
-        }
       }
-    }, [voc, open, getCurrentDate, currentUser]);
+    }, [voc]);
+
+    // Dialog가 열릴 때만 초기화 (false -> true)
+    React.useEffect(() => {
+      if (open && !prevOpenRef.current && !voc) {
+        // 새 VOC 생성 시 자동으로 코드와 등록일 설정
+        const initializeNewVOC = async () => {
+          try {
+            console.log('🟢 [VOCEditDialog] 다이얼로그 열림: 새 VOC 생성');
+
+            const newRegistrationDate = getCurrentDate();
+            console.log('🟢 [VOCEditDialog] generateVocCode 호출 시작');
+            const newCode = await generateVocCode();
+            console.log('🟢 [VOCEditDialog] 생성된 코드:', newCode);
+
+            dispatch({ type: 'INIT_NEW_TASK', registrationDate: newRegistrationDate });
+            dispatch({ type: 'SET_FIELD', field: 'code', value: newCode });
+
+            // 로그인한 사용자 정보로 팀과 담당자 자동 설정
+            if (currentUser) {
+              dispatch({ type: 'SET_FIELD', field: 'team', value: currentUser.department || '' });
+              dispatch({ type: 'SET_FIELD', field: 'assignee', value: currentUser.user_name || '' });
+            }
+          } catch (error) {
+            console.error('❌ VOC 코드 생성 실패:', error);
+            const newRegistrationDate = getCurrentDate();
+            dispatch({ type: 'INIT_NEW_TASK', registrationDate: newRegistrationDate });
+
+            // 로그인한 사용자 정보로 팀과 담당자 자동 설정
+            if (currentUser) {
+              dispatch({ type: 'SET_FIELD', field: 'team', value: currentUser.department || '' });
+              dispatch({ type: 'SET_FIELD', field: 'assignee', value: currentUser.user_name || '' });
+            }
+          }
+        };
+
+        initializeNewVOC();
+      }
+
+      // 이전 open 값 업데이트
+      prevOpenRef.current = open;
+    }, [open, voc, getCurrentDate, generateVocCode, currentUser]);
 
     // 성능 모니터링 로그 제거 (프로덕션 준비)
     // useEffect(() => {
@@ -1691,7 +1717,8 @@ const VOCEditDialog = memo(
             responseContent: currentValues.responseContent,
             resolutionDate: vocState.resolutionDate,
             satisfactionScore: null,
-            attachments: []
+            attachments: [],
+            code: vocState.code
           };
 
           console.log('🚀 새 VOC 생성 중:', newVOC);
@@ -1708,7 +1735,8 @@ const VOCEditDialog = memo(
             status: vocState.status,
             priority: vocState.priority,
             responseContent: currentValues.responseContent,
-            resolutionDate: vocState.resolutionDate
+            resolutionDate: vocState.resolutionDate,
+            code: vocState.code
           };
 
           console.log('📝 기존 VOC 수정 중:', updatedVOC);

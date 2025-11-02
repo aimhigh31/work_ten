@@ -5797,3 +5797,453 @@ useEffect(() => {
 
 ---
 
+
+---
+
+# 개인교육관리 자동 코드 생성 성공 기록
+
+## 📋 작업 일자
+2025-11-02
+
+## 🎯 최종 성공한 기능
+개인교육관리 페이지의 **신규 데이터 추가 시 자동으로 순차적인 코드(MAIN-EDU-25-001, 002, 003...)가 즉시 생성**되어 표시
+
+---
+
+## ❌ 문제 상황
+
+### 증상
+- **현상**: 데이터 추가 팝업 열면 코드 필드에 "자동 생성 중..." 텍스트만 계속 표시
+- **기대**: 솔루션관리처럼 즉시 "MAIN-EDU-25-013" 같은 실제 코드 표시
+- **이전 시도**: 여러 번 코드 수정했으나 계속 실패
+- **콘솔 로그**: 추가한 디버그 로그가 전혀 나타나지 않음
+
+### 브라우저 콘솔 증거
+```
+generateEducationCode 존재: false
+```
+
+### DB 상태
+- **올바른 코드**: MAIN-EDU-25-001, 002, 007, 008, 010, 011, 012 (최대: 012)
+- **잘못된 코드**: MAIN-EDU-25-1760409608748 (타임스탬프 형식)
+
+---
+
+## 🔍 근본 원인 분석
+
+### 1. 복잡한 의존성 체인 문제
+```
+EducationManagement (부모) → prop 전달
+  ↓
+EducationEditDialog (자식) → useEffect 의존성
+  ↓
+코드 생성
+```
+**문제점**: 4단계 체인에서 어느 하나라도 문제가 있으면 전체 실패
+
+### 2. Props 전달 실패
+- React 렌더링 타이밍, memo 최적화 등이 복잡하게 얽힘
+- prop이 전달되지 않았지만 이유가 명확하지 않음
+
+### 3. 브라우저 & 빌드 캐시 문제
+- 코드 수정 → 브라우저가 이전 JS 파일 사용 → 변경사항 미반영
+- Next.js .next 폴더 손상 → 모듈 오류 발생
+
+### 4. 잘못된 코드 생성 로직
+- 최신 1개만 가져와서 +1 계산
+- DB에 타임스탬프 형식 잘못된 코드가 있으면 엉뚱한 숫자 생성
+
+---
+
+## ✅ 해결 방법
+
+### 1. 구조적 단순화 (가장 핵심!)
+
+**솔루션관리 패턴을 따라함**
+
+이전 방식 (실패):
+- EducationManagement에서 함수 생성
+- prop으로 Dialog에 전달
+- useEffect에서 실행
+- 4단계 의존성
+
+개선 방식 (성공):
+- EducationEditDialog 내부에서 직접 생성
+- Supabase 직접 호출
+- 1단계로 단순화
+- 외부 의존성 제거
+
+### 2. 올바른 코드만 필터링
+
+```typescript
+// 모든 코드 가져오기
+const { data } = await supabase
+  .from('main_education_data')
+  .select('code')
+  .like('code', `MAIN-EDU-${currentYearStr}-%`);
+
+// 정규식으로 3자리 형식만 필터링
+const validCodePattern = new RegExp(`^MAIN-EDU-${currentYearStr}-(\d{3})$`);
+let maxSequence = 0;
+
+data.forEach((item) => {
+  const match = item.code.match(validCodePattern);
+  if (match) {
+    const sequence = parseInt(match[1], 10);
+    if (sequence > maxSequence) {
+      maxSequence = sequence;
+    }
+  }
+});
+
+// 다음 일련번호 = 최대값 + 1
+const nextSequence = maxSequence + 1;
+```
+
+### 3. 캐시 완전 제거
+```bash
+rm -rf .next
+npm run dev
+브라우저 하드 리로드: Ctrl + Shift + R
+```
+
+---
+
+## 🎯 핵심 교훈
+
+### 1. "복잡함이 적이다"
+- 부모→자식 prop 전달: 복잡도 높음, 실패 가능성 높음
+- 컴포넌트 내부 생성: 복잡도 낮음, 실패 가능성 낮음
+
+### 2. "검증된 패턴을 따라하라"
+- SolutionEditDialog가 이미 잘 작동
+- 같은 패턴 적용 → 즉시 성공
+- 바퀴를 재발명하지 말 것
+
+### 3. "캐시는 항상 의심하라"
+- 코드 수정했는데 안 되면 90% 캐시 문제
+- .next 삭제 + 브라우저 하드 리로드는 기본
+
+### 4. "데이터 검증은 필수"
+- DB에 잘못된 형식이 있을 수 있음
+- 정규식으로 올바른 형식만 필터링
+
+---
+
+## 📝 수정된 파일
+
+### 1. src/components/EducationEditDialog.tsx
+- generateEducationCode prop 제거
+- 코드 생성 함수 내부로 이동 (1481-1532줄)
+- useEffect에서 직접 호출 (1534-1561줄)
+- 코드 필드에 educationState.code 직접 표시 (634줄)
+
+### 2. src/views/apps/EducationManagement.tsx  
+- generateEducationCode 함수 제거 (2636-2681줄)
+- prop 전달 제거 (824, 3332줄)
+
+---
+
+## 🎯 결과
+
+### Before
+- "자동 생성 중..." 텍스트만 표시
+- 코드가 전혀 생성되지 않음
+
+### After
+- 즉시 "MAIN-EDU-25-013" 표시
+- 년도별 순차 증가 (25년: 001~999, 26년: 001부터 리셋)
+- 잘못된 타임스탬프 코드는 무시
+
+---
+
+## 📚 코드 규칙
+
+### 형식
+```
+MAIN-EDU-YY-NNN
+
+MAIN: 메인 메뉴 구분자
+EDU: 개인교육관리
+YY: 연도 (25 = 2025년)
+NNN: 일련번호 (001-999, 년도별 리셋)
+```
+
+### 예시
+- 2025년: MAIN-EDU-25-001, MAIN-EDU-25-002, ..., MAIN-EDU-25-999
+- 2026년: MAIN-EDU-26-001 (다시 001부터)
+
+
+---
+
+# VOC 관리 코드 자동 생성 개선 (2025-11-02)
+
+## 📌 문제 상황
+
+### 증상
+- VOC 관리 페이지에서 신규 데이터 추가 시 코드 필드가 **"IT-VOC-25-001"로 고정**
+- DB에 이미 001, 002가 있는데도 다음 일련번호(003)가 표시되지 않음
+- 캐시된 데이터를 사용해서 최신 코드를 가져오지 못함
+
+### 사용자 피드백
+> "지금은 001 로 고정되서 뜨자나!!"
+
+---
+
+## 🔍 근본 원인 분석
+
+### 1. DB 스키마 문제
+```javascript
+// DB 확인 결과
+const { data } = await supabase
+  .from('it_voc_data')
+  .select('*')
+  .limit(3);
+
+console.log('컬럼:', Object.keys(data[0]));
+// ❌ code 컬럼이 없음!
+// 컬럼: ['id', 'no', 'registration_date', 'customer_name', ...]
+```
+
+**문제점**: `it_voc_data` 테이블에 `code` 컬럼이 존재하지 않아서 코드 생성 쿼리가 실패
+
+### 2. 캐시 의존성 문제
+```typescript
+// 기존 코드 (문제)
+const generateVocCode = useCallback(async () => {
+  const allVocs = await getVocs(); // 캐시된 데이터 사용
+  // ...
+}, [getVocs]);
+```
+
+**문제점**: `getVocs()`가 캐시된 데이터를 반환해서 최신 코드를 못 가져옴
+
+---
+
+## ✅ 해결 방법
+
+### 1. DB 스키마 수정
+
+**SQL 실행 (Supabase Dashboard > SQL Editor)**
+```sql
+-- 1. code 컬럼 추가
+ALTER TABLE it_voc_data
+ADD COLUMN IF NOT EXISTS code VARCHAR(50);
+
+-- 2. 기존 데이터에 연도별 순차 코드 부여
+WITH ranked_vocs AS (
+  SELECT
+    id,
+    EXTRACT(YEAR FROM created_at) as year,
+    ROW_NUMBER() OVER (
+      PARTITION BY EXTRACT(YEAR FROM created_at)
+      ORDER BY id
+    ) as seq
+  FROM it_voc_data
+  WHERE code IS NULL
+)
+UPDATE it_voc_data
+SET code = CONCAT(
+  'IT-VOC-',
+  LPAD(RIGHT(ranked_vocs.year::TEXT, 2), 2, '0'),
+  '-',
+  LPAD(ranked_vocs.seq::TEXT, 3, '0')
+)
+FROM ranked_vocs
+WHERE it_voc_data.id = ranked_vocs.id;
+
+-- 3. 결과 확인
+SELECT id, code, created_at, title
+FROM it_voc_data
+ORDER BY code DESC
+LIMIT 10;
+```
+
+**결과**
+```
+id  code            created_at                  title
+24  IT-VOC-25-002   2025-11-02 03:53:09.94+00  GROUP023-SUB002
+23  IT-VOC-25-001   2025-11-02 01:15:47.287+00 GROUP023-SUB003
+```
+
+### 2. 타입 정의 업데이트
+
+**src/types/voc.ts**
+```typescript
+// Before
+export interface DbVocData {
+  id: number;
+  no: number;
+  // code 필드 없음
+
+// After
+export interface DbVocData {
+  id: number;
+  no: number;
+  code: string; // IT-VOC-YY-NNN 형식 추가
+```
+
+### 3. Hook 개선 - 캐시 우회
+
+**src/hooks/useSupabaseVoc.ts**
+```typescript
+// Before: 캐시된 데이터 사용
+const generateVocCode = useCallback(async () => {
+  const allVocs = await getVocs(); // 캐시 사용
+  // ...
+}, [getVocs]);
+
+// After: DB에서 직접 최신 데이터 조회
+const generateVocCode = useCallback(async () => {
+  console.log('🔵 DB에서 직접 최신 데이터 조회 (캐시 우회)');
+  
+  const { data, error } = await supabase
+    .from('it_voc_data')
+    .select('code')
+    .eq('is_active', true)
+    .not('code', 'is', null); // code가 null이 아닌 것만
+
+  const allVocs = data || [];
+  
+  // 현재 연도 코드 필터링
+  const currentYearVocs = allVocs.filter((voc: any) => {
+    const codePattern = `IT-VOC-${currentYearStr}-`;
+    return voc.code && voc.code.startsWith(codePattern);
+  });
+
+  // 정규식으로 올바른 형식만 필터링
+  const validCodePattern = new RegExp(`^IT-VOC-${currentYearStr}-(\d{3})$`);
+  let maxSequence = 0;
+
+  currentYearVocs.forEach((voc: any) => {
+    const match = voc.code.match(validCodePattern);
+    if (match) {
+      const sequence = parseInt(match[1], 10);
+      if (sequence > maxSequence) {
+        maxSequence = sequence;
+      }
+    }
+  });
+
+  const nextSequence = maxSequence + 1;
+  const formattedSequence = nextSequence.toString().padStart(3, '0');
+  return `IT-VOC-${currentYearStr}-${formattedSequence}`;
+}, []); // getVocs 의존성 제거
+```
+
+### 4. Dialog 컴포넌트 개선
+
+**src/components/VOCEditDialog.tsx**
+```typescript
+// VOC 훅 사용 (코드 생성용)
+const { generateVocCode } = useSupabaseVoc();
+
+// Dialog 열릴 때 코드 생성
+React.useEffect(() => {
+  if (open && !prevOpenRef.current && !voc) {
+    const initializeNewVOC = async () => {
+      console.log('🟢 [VOCEditDialog] 새 VOC 생성');
+      
+      const newCode = await generateVocCode();
+      console.log('🟢 [VOCEditDialog] 생성된 코드:', newCode);
+      
+      dispatch({ type: 'SET_FIELD', field: 'code', value: newCode });
+    };
+    initializeNewVOC();
+  }
+}, [open, voc, generateVocCode]);
+```
+
+---
+
+## 🎯 핵심 개선 포인트
+
+### 1. DB 스키마가 먼저다
+- 테이블에 `code` 컬럼이 없으면 아무것도 작동하지 않음
+- 스키마 확인을 최우선으로 해야 함
+
+### 2. 캐시 우회는 필수
+- 코드 생성은 항상 최신 데이터가 필요
+- `getVocs()` 같은 캐시 함수 대신 직접 쿼리
+
+### 3. NULL 처리
+```typescript
+.not('code', 'is', null)  // code가 null이 아닌 것만
+```
+
+### 4. 상세한 로깅
+```typescript
+console.log('🔍 발견한 코드:', voc.code, '→ 일련번호:', sequence);
+console.log('📊 현재 최대 일련번호:', maxSequence, '→ 다음:', nextSequence);
+```
+
+---
+
+## 📝 수정된 파일
+
+### 1. add_voc_code_column.sql (신규 생성)
+- VOC 테이블 스키마 수정 SQL
+- 기존 데이터 마이그레이션
+
+### 2. src/types/voc.ts
+- `DbVocData`에 `code: string` 추가
+- `VocData`에 `code: string` 추가
+
+### 3. src/hooks/useSupabaseVoc.ts
+- `generateVocCode()` 함수 추가 (캐시 우회)
+- `convertToVocData()` - code 필드 매핑
+- `convertToDbVocData()` - code 필드 매핑
+
+### 4. src/components/VOCEditDialog.tsx
+- `useSupabaseVoc` import 추가
+- `generateVocCode` 사용
+- 중복 코드 생성 로직 제거
+
+---
+
+## 🎯 결과
+
+### Before
+```
+코드 필드: IT-VOC-25-001 (고정)
+다음 추가: IT-VOC-25-001 (또 001!) ❌
+```
+
+### After
+```
+코드 필드: IT-VOC-25-003 (자동 증가) ✅
+다음 추가: IT-VOC-25-004 (순차 증가) ✅
+다음 추가: IT-VOC-25-005 (순차 증가) ✅
+```
+
+### 동작 방식
+1. 다이얼로그 열림
+2. DB에서 현재 연도 최대 코드 조회 (IT-VOC-25-002)
+3. 일련번호 추출 (002 → 2)
+4. 다음 번호 생성 (2 + 1 = 3)
+5. 코드 포맷팅 (IT-VOC-25-003)
+6. 코드 필드에 표시
+
+---
+
+## 📚 코드 규칙
+
+### 형식
+```
+IT-VOC-YY-NNN
+
+IT: IT 부서
+VOC: Voice of Customer
+YY: 연도 (25 = 2025년)
+NNN: 일련번호 (001-999, 년도별 리셋)
+```
+
+### 예시
+- 2025년: IT-VOC-25-001, IT-VOC-25-002, ..., IT-VOC-25-999
+- 2026년: IT-VOC-26-001 (다시 001부터)
+
+---
+
+## 🚀 적용된 페이지
+- ✅ VOC 관리 (http://localhost:3200/it/voc)
+

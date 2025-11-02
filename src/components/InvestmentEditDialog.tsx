@@ -675,6 +675,7 @@ interface InvestmentEditDialogProps {
   canEditOwn?: boolean;
   canEditOthers?: boolean;
   users?: any[];
+  generateInvestmentCode?: () => Promise<string>;
 }
 
 // 기록 탭 컴포넌트 (보안교육관리와 동일)
@@ -2196,7 +2197,8 @@ function InvestmentEditDialog({
   canCreateData = true,
   canEditOwn = true,
   canEditOthers = true,
-  users: propsUsers = []
+  users: propsUsers = [],
+  generateInvestmentCode
 }: InvestmentEditDialogProps) {
   // 세션 정보
   const { data: session } = useSession();
@@ -2361,6 +2363,30 @@ function InvestmentEditDialog({
       });
     }
   }, [investment, open]);
+
+  // 투자 코드 자동 생성 (신규 생성 시에만)
+  const prevOpenRef = useRef(false);
+
+  useEffect(() => {
+    const initializeNewInvestmentCode = async () => {
+      // 다이얼로그가 새로 열렸고, 기존 투자가 없으며, generateInvestmentCode 함수가 있을 때
+      if (open && !prevOpenRef.current && !investment && generateInvestmentCode) {
+        try {
+          const newCode = await generateInvestmentCode();
+          console.log('🔄 [InvestmentEditDialog] 자동 생성된 코드:', newCode);
+          setInvestmentState({
+            type: 'SET_FIELD',
+            payload: { field: 'code', value: newCode }
+          });
+        } catch (error) {
+          console.error('❌ [InvestmentEditDialog] 코드 생성 실패:', error);
+        }
+      }
+    };
+
+    initializeNewInvestmentCode();
+    prevOpenRef.current = open;
+  }, [open, investment, generateInvestmentCode]);
 
   const handleTabChange = useCallback((event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);

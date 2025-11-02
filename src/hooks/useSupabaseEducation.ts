@@ -272,10 +272,8 @@ export const useSupabaseEducation = (): UseSupabaseEducationReturn => {
 
   // 프론트엔드 데이터를 DB 형식으로 변환
   const convertToDbEducationData = useCallback((frontendData: EducationData): any => {
-    // 코드 생성: MAIN-EDU-{YY}-{NNN}
-    const year = new Date(frontendData.registrationDate || Date.now()).getFullYear().toString().slice(-2);
-    const no = frontendData.no || 0;
-    const code = `MAIN-EDU-${year}-${String(no).padStart(3, '0')}`;
+    // 프론트엔드에서 생성된 코드를 그대로 사용 (no로 재생성하지 않음)
+    const code = frontendData.code;
 
     return {
       code: code,

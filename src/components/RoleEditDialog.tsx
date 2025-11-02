@@ -32,6 +32,8 @@ import {
 } from '@mui/material';
 import { useSession } from 'next-auth/react';
 import { useCommonData } from 'contexts/CommonDataContext';
+import { useSupabaseRoleManagement } from 'hooks/useSupabaseRoleManagement';
+import { createClient } from '@supabase/supabase-js';
 import {
   CloseSquare,
   Setting2,
@@ -123,6 +125,70 @@ export default function RoleEditDialog({ open, onClose, role, onSave, canEditOwn
     },
     [users]
   );
+
+  // 역할 코드 자동 생성 함수 - ROLE-25-001 형식 (년도별 일련번호)
+  const generateRoleCode = useCallback(async (): Promise<string> => {
+    console.log('🔵 [RoleEditDialog] generateRoleCode 시작');
+    try {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+
+      const currentYear = new Date().getFullYear();
+      const currentYearStr = currentYear.toString().slice(-2);
+
+      // DB에서 모든 역할 조회
+      console.log('🔵 [RoleEditDialog] Supabase 조회');
+      const { data, error } = await supabase
+        .from('admin_users_rules')
+        .select('role_code');
+
+      if (error) {
+        console.error('❌ 역할 코드 조회 실패:', error);
+        throw error;
+      }
+
+      const allRoles = data || [];
+      console.log('🔵 [RoleEditDialog] 전체 역할 수:', allRoles.length);
+
+      // 현재 연도의 코드만 필터링 (ROLE-25-XXX 형식)
+      const currentYearRoles = allRoles.filter((r: any) => {
+        const codePattern = `ROLE-${currentYearStr}-`;
+        return r.role_code && r.role_code.startsWith(codePattern);
+      });
+      console.log('🔵 [RoleEditDialog] 현재 연도 역할 수:', currentYearRoles.length);
+
+      // 정규식으로 올바른 형식(3자리 숫자)의 코드만 필터링
+      const validCodePattern = new RegExp(`^ROLE-${currentYearStr}-(\\d{3})$`);
+      let maxSequence = 0;
+
+      currentYearRoles.forEach((r: any) => {
+        const match = r.role_code.match(validCodePattern);
+        if (match) {
+          const sequence = parseInt(match[1], 10);
+          if (sequence > maxSequence) {
+            maxSequence = sequence;
+          }
+        }
+      });
+
+      // 다음 일련번호 생성 (최대값 + 1)
+      const nextSequence = maxSequence + 1;
+      const formattedSequence = nextSequence.toString().padStart(3, '0');
+      const newCode = `ROLE-${currentYearStr}-${formattedSequence}`;
+
+      console.log('✅ [RoleEditDialog] 자동 생성된 코드:', newCode);
+      console.log('📊 [RoleEditDialog] 현재 최대 일련번호:', maxSequence, '→ 다음:', nextSequence);
+      return newCode;
+    } catch (error) {
+      console.error('❌ 역할 코드 생성 실패:', error);
+      const year = new Date().getFullYear().toString().slice(-2);
+      const fallbackCode = `ROLE-${year}-001`;
+      console.log('🔴 [RoleEditDialog] 폴백 코드 사용:', fallbackCode);
+      return fallbackCode; // 오류 시 001부터 시작
+    }
+  }, []);
 
   // 권한 데이터 상태 관리
   const [permissions, setPermissions] = useState<any[]>([]);
@@ -294,27 +360,37 @@ export default function RoleEditDialog({ open, onClose, role, onSave, canEditOwn
     if (role) {
       setFormData({ ...role });
     } else {
-      // 새 역할 생성시 초기값
-      const currentDate = new Date().toISOString().split('T')[0];
-      const currentYear = new Date().getFullYear();
-      const yearSuffix = currentYear.toString().slice(-2);
+      // 새 역할 생성시 초기값 (비동기 처리)
+      const initializeNewRole = async () => {
+        console.log('🟢 [RoleEditDialog] 다이얼로그 열림: 새 역할 생성');
+        console.log('🟢 [RoleEditDialog] role 값:', role);
+        console.log('🟢 [RoleEditDialog] open 값:', open);
+        const currentDate = new Date().toISOString().split('T')[0];
 
-      setFormData({
-        id: 0, // 새 역할의 경우 임시 ID
-        no: 0,
-        registrationDate: currentDate,
-        code: `ROLE-${yearSuffix}-NEW`,
-        role: '',
-        description: '',
-        userCount: 0,
-        permissionCount: 0,
-        status: '활성',
-        registeredBy: session?.user?.name || 'system',
-        lastModifiedDate: currentDate,
-        lastModifiedBy: session?.user?.name || 'system'
-      });
+        // 코드 자동 생성
+        console.log('🟢 [RoleEditDialog] generateRoleCode 호출 시작');
+        const newCode = await generateRoleCode();
+        console.log('🟢 [RoleEditDialog] 생성된 코드:', newCode);
+
+        setFormData({
+          id: 0, // 새 역할의 경우 임시 ID
+          no: 0,
+          registrationDate: currentDate,
+          code: newCode,
+          role: '',
+          description: '',
+          userCount: 0,
+          permissionCount: 0,
+          status: '활성',
+          registeredBy: session?.user?.name || 'system',
+          lastModifiedDate: currentDate,
+          lastModifiedBy: session?.user?.name || 'system'
+        });
+      };
+
+      initializeNewRole();
     }
-  }, [role, session]);
+  }, [role, open, generateRoleCode, session]);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);

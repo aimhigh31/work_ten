@@ -261,6 +261,7 @@ export function useSupabaseCalendar() {
     fetchEvents, // 후방 호환성: 내부 상태 업데이트
     createEvent,
     updateEvent,
-    deleteEvent
+    deleteEvent,
+    generateNextEventCode // 코드 자동 생성 함수 추가
   };
 }

@@ -24,6 +24,7 @@ import {
 import { CloseSquare } from '@wandersonalwes/iconsax-react';
 import { useSession } from 'next-auth/react';
 import { useCommonData } from 'contexts/CommonDataContext';
+import { useSupabaseDepartmentManagement } from 'hooks/useSupabaseDepartmentManagement';
 
 // 부서 데이터 타입
 interface DepartmentData {
@@ -82,6 +83,7 @@ interface DepartmentEditDialogProps {
 export default function DepartmentEditDialog({ open, onClose, department, onSave, existingDepartments, canEditOwn = true, canEditOthers = true }: DepartmentEditDialogProps) {
   const { data: session } = useSession();
   const { users } = useCommonData();
+  const { getDepartments } = useSupabaseDepartmentManagement();
   const [tabValue, setTabValue] = useState(0);
   const [validationError, setValidationError] = useState<string>('');
   const [formData, setFormData] = useState<DepartmentData>({
@@ -107,60 +109,85 @@ export default function DepartmentEditDialog({ open, onClose, department, onSave
     [users]
   );
 
-  // 중복되지 않는 부서 코드 생성
-  const generateUniqueCode = useCallback(() => {
-    const currentYear = new Date().getFullYear();
-    const yearSuffix = currentYear.toString().slice(-2);
+  // 부서 코드 자동 생성 함수 - DEPT-001 형식 (일련번호만)
+  const generateDepartmentCode = useCallback(async (): Promise<string> => {
+    console.log('🔵 [DepartmentEditDialog] generateDepartmentCode 시작');
+    try {
+      // DB에서 모든 부서 조회
+      console.log('🔵 [DepartmentEditDialog] getDepartments 호출');
+      const allDepartments = await getDepartments();
+      console.log('🔵 [DepartmentEditDialog] 전체 부서 수:', allDepartments.length);
 
-    console.log(
-      '기존 부서들:',
-      existingDepartments.map((d) => ({ id: d.id, code: d.code }))
-    );
+      // DEPT-XXX 형식의 코드만 필터링
+      const validCodes = allDepartments.filter((dept) => {
+        return dept.department_code && dept.department_code.startsWith('DEPT-');
+      });
+      console.log('🔵 [DepartmentEditDialog] 유효한 코드 수:', validCodes.length);
 
-    // 기존 부서 코드들에서 같은 년도의 코드들을 찾아서 가장 큰 번호를 찾음
-    const currentYearCodes = existingDepartments.map((dept) => dept.code).filter((code) => code && code.startsWith(`DEPT-${yearSuffix}-`));
+      // 정규식으로 올바른 형식(3자리 숫자)의 코드만 필터링
+      const validCodePattern = /^DEPT-(\d{3})$/;
+      let maxSequence = 0;
 
-    console.log('현재 년도 코드들:', currentYearCodes);
+      validCodes.forEach((dept) => {
+        const match = dept.department_code.match(validCodePattern);
+        if (match) {
+          const sequence = parseInt(match[1], 10);
+          if (sequence > maxSequence) {
+            maxSequence = sequence;
+          }
+        }
+      });
 
-    const existingNumbers = currentYearCodes.map((code) => {
-      const match = code.match(/DEPT-\d{2}-(\d{3})$/);
-      return match ? parseInt(match[1]) : 0;
-    });
+      // 다음 일련번호 생성 (최대값 + 1)
+      const nextSequence = maxSequence + 1;
+      const formattedSequence = nextSequence.toString().padStart(3, '0');
+      const newCode = `DEPT-${formattedSequence}`;
 
-    console.log('기존 번호들:', existingNumbers);
-
-    const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
-    const nextNumber = maxNumber + 1;
-    const paddedNumber = nextNumber.toString().padStart(3, '0');
-
-    const newCode = `DEPT-${yearSuffix}-${paddedNumber}`;
-    console.log('새로 생성된 코드:', newCode);
-
-    return newCode;
-  }, [existingDepartments]);
+      console.log('✅ [DepartmentEditDialog] 자동 생성된 코드:', newCode);
+      console.log('📊 [DepartmentEditDialog] 현재 최대 일련번호:', maxSequence, '→ 다음:', nextSequence);
+      return newCode;
+    } catch (error) {
+      console.error('❌ 부서 코드 생성 실패:', error);
+      const fallbackCode = 'DEPT-001';
+      console.log('🔴 [DepartmentEditDialog] 폴백 코드 사용:', fallbackCode);
+      return fallbackCode; // 오류 시 001부터 시작
+    }
+  }, [getDepartments]);
 
   // department가 변경될 때 formData 업데이트
   useEffect(() => {
     if (department) {
       setFormData({ ...department });
     } else {
-      // 새 부서 생성시 초기값
-      const currentDate = new Date().toISOString().split('T')[0];
+      // 새 부서 생성시 초기값 (비동기 처리)
+      const initializeNewDepartment = async () => {
+        console.log('🟢 [DepartmentEditDialog] 다이얼로그 열림: 새 부서 생성');
+        console.log('🟢 [DepartmentEditDialog] department 값:', department);
+        console.log('🟢 [DepartmentEditDialog] open 값:', open);
+        const currentDate = new Date().toISOString().split('T')[0];
 
-      setFormData({
-        id: Date.now(),
-        no: 0,
-        registrationDate: currentDate,
-        code: generateUniqueCode(),
-        departmentName: '',
-        departmentDescription: '',
-        status: '활성',
-        lastModifiedDate: currentDate,
-        modifier: session?.user?.name || 'system',
-        team: ''
-      });
+        // 코드 자동 생성
+        console.log('🟢 [DepartmentEditDialog] generateDepartmentCode 호출 시작');
+        const newCode = await generateDepartmentCode();
+        console.log('🟢 [DepartmentEditDialog] 생성된 코드:', newCode);
+
+        setFormData({
+          id: Date.now(),
+          no: 0,
+          registrationDate: currentDate,
+          code: newCode,
+          departmentName: '',
+          departmentDescription: '',
+          status: '활성',
+          lastModifiedDate: currentDate,
+          modifier: session?.user?.name || 'system',
+          team: ''
+        });
+      };
+
+      initializeNewDepartment();
     }
-  }, [department, generateUniqueCode, session]);
+  }, [department, open, generateDepartmentCode, session]);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);

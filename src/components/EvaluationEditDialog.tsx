@@ -1978,6 +1978,26 @@ export default function EvaluationEditDialog({
     }
   }, [currentUser, currentUserCode, formData.assignee, evaluation, activeUsers]);
 
+  // 신규 평가 생성 시 코드 자동 생성
+  React.useEffect(() => {
+    const initializeNewEvaluation = async () => {
+      if (!evaluation && open && !formData.code && generateEvaluationCode) {
+        try {
+          const newCode = await generateEvaluationCode();
+          console.log('🔄 [EvaluationEditDialog] 자동 생성된 코드:', newCode);
+          setFormData((prev) => ({
+            ...prev,
+            code: newCode
+          }));
+        } catch (error) {
+          console.error('❌ [EvaluationEditDialog] 코드 생성 실패:', error);
+        }
+      }
+    };
+
+    initializeNewEvaluation();
+  }, [open, evaluation, formData.code, generateEvaluationCode]);
+
   // GROUP002 상태 옵션은 Dialog 열릴 때 DB에서 직접 조회 (위의 fetchMasterCodeData에서 처리)
 
   // evaluation prop 변경시 formData 업데이트

@@ -58,7 +58,8 @@ export default function Calendar() {
     fetchEvents,
     createEvent: supabaseCreateEvent,
     updateEvent: supabaseUpdateEvent,
-    deleteEvent: supabaseDeleteEvent
+    deleteEvent: supabaseDeleteEvent,
+    generateNextEventCode
   } = useSupabaseCalendar();
 
   // 초기 데이터 로딩
@@ -545,6 +546,7 @@ export default function Calendar() {
           canCreateData={canCreateData}
           canEditOwn={canEditOwn}
           canEditOthers={canEditOthers}
+          generateNextEventCode={generateNextEventCode}
         />
       </Dialog>
           {/* 기존 컨텐츠 끝 */}

@@ -57,13 +57,14 @@ interface EditEducationState {
   receptionDate: string;
   resolutionDate: string;
   team: string;
+  code: string;
 }
 
 type EditEducationAction =
   | { type: 'SET_FIELD'; field: keyof EditEducationState; value: string }
   | { type: 'SET_TASK'; education: EducationData }
   | { type: 'RESET' }
-  | { type: 'INIT_NEW_TASK'; registrationDate: string };
+  | { type: 'INIT_NEW_TASK'; registrationDate: string; code?: string };
 
 const editEducationReducer = (state: EditEducationState, action: EditEducationAction): EditEducationState => {
   switch (action.type) {
@@ -84,7 +85,8 @@ const editEducationReducer = (state: EditEducationState, action: EditEducationAc
         registrationDate: action.education.registrationDate || '',
         receptionDate: action.education.receptionDate || '',
         resolutionDate: action.education.resolutionDate || '',
-        team: action.education.team || ''
+        team: action.education.team || '',
+        code: action.education.code || ''
       };
     case 'INIT_NEW_TASK':
       return {
@@ -101,7 +103,8 @@ const editEducationReducer = (state: EditEducationState, action: EditEducationAc
         registrationDate: action.registrationDate,
         receptionDate: action.registrationDate,
         resolutionDate: '',
-        team: ''
+        team: '',
+        code: action.code || ''
       };
     case 'RESET':
       return {
@@ -118,7 +121,8 @@ const editEducationReducer = (state: EditEducationState, action: EditEducationAc
         registrationDate: '',
         receptionDate: '',
         resolutionDate: '',
-        team: ''
+        team: '',
+        code: ''
       };
     default:
       return state;
@@ -627,11 +631,7 @@ const OverviewTab = memo(
             <TextField
               fullWidth
               label="코드"
-              value={
-                education
-                  ? `MAIN-EDU-${new Date(education.registrationDate).getFullYear().toString().slice(-2)}-${String(education.no).padStart(3, '0')}`
-                  : `MAIN-EDU-${new Date().getFullYear().toString().slice(-2)}-XXX`
-              }
+              value={educationState.code || '자동 생성 중...'}
               InputLabelProps={{ shrink: true }}
               variant="outlined"
               InputProps={{
@@ -1468,20 +1468,9 @@ const EducationEditDialog = memo(
       registrationDate: new Date().toISOString().split('T')[0],
       receptionDate: new Date().toISOString().split('T')[0],
       resolutionDate: '',
-      team: ''
+      team: '',
+      code: ''
     });
-
-    // 코드 자동 생성 함수
-    const generateEducationCode = useCallback(() => {
-      const currentYear = new Date().getFullYear();
-      const currentYearStr = currentYear.toString().slice(-2); // 연도 뒤 2자리
-
-      // 현재 연도의 Education 개수를 기반으로 순번 생성 (실제 구현에서는 서버에서 처리)
-      // 여기서는 간단히 현재 시간을 기반으로 순번 생성
-      const sequence = String(Date.now()).slice(-3).padStart(3, '0');
-
-      return `Education-${currentYearStr}-${sequence}`;
-    }, []);
 
     // 현재 날짜 생성 함수
     const getCurrentDate = useCallback(() => {
@@ -1489,22 +1478,120 @@ const EducationEditDialog = memo(
       return today.toISOString().split('T')[0]; // YYYY-MM-DD 형식
     }, []);
 
+    // 코드 자동 생성 함수 - MAIN-EDU-25-001 형식 (년도별 일련번호)
+    const generateEducationCode = useCallback(async (): Promise<string> => {
+      console.log('🔵 [EducationEditDialog] generateEducationCode 시작');
+      try {
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+
+        const currentYear = new Date().getFullYear();
+        const currentYearStr = currentYear.toString().slice(-2);
+
+        // 캐시를 우회하고 DB에서 직접 최신 데이터 조회 (is_active 무관하게 전체 조회)
+        console.log('🔵 [EducationEditDialog] DB에서 직접 최신 데이터 조회 (캐시 우회)');
+        const { data, error } = await supabase
+          .from('main_education_data')
+          .select('code')
+          .not('code', 'is', null);
+
+        if (error) {
+          console.error('❌ 교육 코드 조회 실패:', error);
+          throw error;
+        }
+
+        const allEducations = data || [];
+        console.log('🔵 [EducationEditDialog] 전체 교육 데이터 수:', allEducations.length);
+
+        // 현재 연도의 코드만 필터링 (MAIN-EDU-25-XXX 형식)
+        const currentYearEducations = allEducations.filter((edu: any) => {
+          const codePattern = `MAIN-EDU-${currentYearStr}-`;
+          return edu.code && edu.code.startsWith(codePattern);
+        });
+        console.log('🔵 [EducationEditDialog] 현재 연도 교육 데이터 수:', currentYearEducations.length);
+
+        // 정규식으로 올바른 형식(3자리 숫자)의 코드만 필터링
+        const validCodePattern = new RegExp(`^MAIN-EDU-${currentYearStr}-(\\d{3})$`);
+        let maxSequence = 0;
+
+        currentYearEducations.forEach((edu: any) => {
+          const match = edu.code.match(validCodePattern);
+          if (match) {
+            const sequence = parseInt(match[1], 10);
+            console.log('🔍 [EducationEditDialog] 발견한 코드:', edu.code, '→ 일련번호:', sequence);
+            if (sequence > maxSequence) {
+              maxSequence = sequence;
+            }
+          }
+        });
+
+        // 다음 일련번호 생성 (최대값 + 1)
+        const nextSequence = maxSequence + 1;
+        const formattedSequence = nextSequence.toString().padStart(3, '0');
+        const newCode = `MAIN-EDU-${currentYearStr}-${formattedSequence}`;
+
+        console.log('✅ [EducationEditDialog] 자동 생성된 코드:', newCode);
+        console.log('📊 [EducationEditDialog] 현재 최대 일련번호:', maxSequence, '→ 다음:', nextSequence);
+        return newCode;
+      } catch (error) {
+        console.error('❌ 교육 코드 생성 실패:', error);
+        const year = new Date().getFullYear().toString().slice(-2);
+        const fallbackCode = `MAIN-EDU-${year}-001`;
+        console.log('🔴 [EducationEditDialog] 폴백 코드 사용:', fallbackCode);
+        return fallbackCode; // 오류 시 001부터 시작
+      }
+    }, []);
+
+    // 이전 open 값 추적
+    const prevOpenRef = useRef(false);
+
     // Education 변경 시 상태 업데이트
     React.useEffect(() => {
       if (education) {
+        // 기존 데이터 편집 시
         dispatch({ type: 'SET_TASK', education });
-      } else if (open) {
-        // 새 Education 생성 시 자동으로 등록일 설정
-        const newRegistrationDate = getCurrentDate();
-        dispatch({ type: 'INIT_NEW_TASK', registrationDate: newRegistrationDate });
-
-        // 로그인한 사용자 정보로 팀과 담당자 자동 설정
-        if (currentUser) {
-          dispatch({ type: 'SET_FIELD', field: 'team', value: currentUser.department || '' });
-          dispatch({ type: 'SET_FIELD', field: 'assignee', value: currentUser.user_name || '' });
-        }
       }
-    }, [education, open, getCurrentDate, currentUser]);
+    }, [education]);
+
+    // Dialog가 열릴 때만 초기화 (false -> true)
+    React.useEffect(() => {
+      if (open && !prevOpenRef.current && !education) {
+        // 새 Education 생성 시 자동으로 코드와 등록일 설정
+        const initializeNewEducation = async () => {
+          try {
+            console.log('🟢 [EducationEditDialog] 다이얼로그 열림: 새 교육 생성');
+
+            const newRegistrationDate = getCurrentDate();
+            console.log('🟢 [EducationEditDialog] generateEducationCode 호출 시작');
+            const newCode = await generateEducationCode();
+            console.log('🟢 [EducationEditDialog] 생성된 코드:', newCode);
+
+            dispatch({
+              type: 'INIT_NEW_TASK',
+              registrationDate: newRegistrationDate
+            });
+
+            // 생성된 코드를 state에 반영
+            dispatch({ type: 'SET_FIELD', field: 'code', value: newCode });
+
+            // 로그인한 사용자 정보로 팀과 담당자 자동 설정
+            if (currentUser) {
+              dispatch({ type: 'SET_FIELD', field: 'team', value: currentUser.department || '' });
+              dispatch({ type: 'SET_FIELD', field: 'assignee', value: currentUser.user_name || '' });
+            }
+          } catch (error) {
+            console.error('❌ 교육 초기화 실패:', error);
+          }
+        };
+
+        initializeNewEducation();
+      }
+
+      // 이전 open 값 업데이트
+      prevOpenRef.current = open;
+    }, [open, education, generateEducationCode, getCurrentDate, currentUser]);
 
     // 성능 모니터링 로그 제거 (프로덕션 준비)
     // useEffect(() => {
@@ -1671,7 +1758,8 @@ const EducationEditDialog = memo(
           // 새 Education 생성
           const newEducation: EducationData = {
             id: Date.now(),
-            no: Date.now(),
+            no: 0, // DB에서 자동 생성됨
+            code: educationState.code, // 다이얼로그에서 자동 생성된 코드 사용
             registrationDate: educationState.registrationDate || new Date().toISOString().split('T')[0],
             receptionDate: new Date().toISOString().split('T')[0],
             customerName: educationState.customerName,
@@ -1694,6 +1782,7 @@ const EducationEditDialog = memo(
 
           console.log('🚀 새 Education 생성 중:', newEducation);
           console.log('👤 현재 사용자 정보:', { department: currentUser?.department, name: currentUser?.user_name });
+          console.log('🔖 자동 생성된 코드:', educationState.code);
           onSave(newEducation);
         } else {
           // 기존 Education 수정
@@ -1727,7 +1816,8 @@ const EducationEditDialog = memo(
       feedbacks,
       addFeedback,
       updateFeedback,
-      deleteFeedback
+      deleteFeedback,
+      currentUser
     ]);
 
     const handleClose = useCallback(() => {

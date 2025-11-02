@@ -276,32 +276,62 @@ export function useSupabaseChecklistManagement() {
     [fetchChecklists]
   );
 
-  // 체크리스트 코드 생성
+  // 체크리스트 코드 생성 (DB 직접 조회 방식으로 개선)
   const generateChecklistCode = useCallback(async (): Promise<string> => {
+    console.log('🔵 [ChecklistManagement] generateChecklistCode 시작');
     try {
-      const currentYear = new Date().getFullYear().toString().slice(-2);
+      const currentYear = new Date().getFullYear();
+      const currentYearStr = currentYear.toString().slice(-2);
 
-      // 현재 연도의 기존 코드 확인
-      const existingCodes = checklists
-        .filter((checklist) => checklist.code.startsWith(`ADMIN-CHECK-${currentYear}-`))
-        .map((checklist) => {
-          const match = checklist.code.match(/ADMIN-CHECK-\d{2}-(\d{3})/);
-          return match ? parseInt(match[1], 10) : 0;
-        });
+      // API를 통해 최신 데이터 조회
+      console.log('🔵 [ChecklistManagement] API 호출');
+      const response = await fetch('/api/checklists');
+      const result = await response.json();
 
-      // 최대값 찾기
-      const maxNumber = existingCodes.length > 0 ? Math.max(...existingCodes) : 0;
-      const newNumber = maxNumber + 1;
+      if (!result.success) {
+        throw new Error(result.error || '체크리스트 목록 조회 실패');
+      }
 
-      return `ADMIN-CHECK-${currentYear}-${newNumber.toString().padStart(3, '0')}`;
-    } catch (err) {
-      console.error('체크리스트 코드 생성 실패:', err);
-      // 폴백: 타임스탬프 기반
-      const currentYear = new Date().getFullYear().toString().slice(-2);
-      const sequence = String(Date.now()).slice(-3).padStart(3, '0');
-      return `ADMIN-CHECK-${currentYear}-${sequence}`;
+      const allChecklists = result.data || [];
+      console.log('🔵 [ChecklistManagement] 전체 체크리스트 수:', allChecklists.length);
+
+      // 현재 연도의 코드만 필터링 (ADMIN-CHECK-25-XXX 형식)
+      const currentYearChecklists = allChecklists.filter((c: any) => {
+        const codePattern = `ADMIN-CHECK-${currentYearStr}-`;
+        return c.code && c.code.startsWith(codePattern);
+      });
+      console.log('🔵 [ChecklistManagement] 현재 연도 체크리스트 수:', currentYearChecklists.length);
+
+      // 정규식으로 올바른 형식(3자리 숫자)의 코드만 필터링
+      const validCodePattern = new RegExp(`^ADMIN-CHECK-${currentYearStr}-(\\d{3})$`);
+      let maxSequence = 0;
+
+      currentYearChecklists.forEach((c: any) => {
+        const match = c.code.match(validCodePattern);
+        if (match) {
+          const sequence = parseInt(match[1], 10);
+          if (sequence > maxSequence) {
+            maxSequence = sequence;
+          }
+        }
+      });
+
+      // 다음 일련번호 생성 (최대값 + 1)
+      const nextSequence = maxSequence + 1;
+      const formattedSequence = nextSequence.toString().padStart(3, '0');
+      const newCode = `ADMIN-CHECK-${currentYearStr}-${formattedSequence}`;
+
+      console.log('✅ [ChecklistManagement] 자동 생성된 코드:', newCode);
+      console.log('📊 [ChecklistManagement] 현재 최대 일련번호:', maxSequence, '→ 다음:', nextSequence);
+      return newCode;
+    } catch (error) {
+      console.error('❌ 체크리스트 코드 생성 실패:', error);
+      const year = new Date().getFullYear().toString().slice(-2);
+      const fallbackCode = `ADMIN-CHECK-${year}-001`;
+      console.log('🔴 [ChecklistManagement] 폴백 코드 사용:', fallbackCode);
+      return fallbackCode; // 오류 시 001부터 시작
     }
-  }, [checklists]);
+  }, []);
 
   // 컴포넌트 마운트 시 데이터 로드 (캐시 우선 전략)
   useEffect(() => {

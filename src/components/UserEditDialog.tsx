@@ -36,6 +36,9 @@ import { useSupabaseMasterCode3 } from 'hooks/useSupabaseMasterCode3';
 // Supabase Storage 훅 import
 import { useSupabaseStorage } from 'hooks/useSupabaseStorage';
 
+// 사용자 관리 훅 import
+import { useSupabaseUserManagement } from 'hooks/useSupabaseUserManagement';
+
 // Supabase 클라이언트 import
 import supabase from '../lib/supabaseClient';
 
@@ -146,6 +149,9 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
 
   // Supabase Storage 훅 사용
   const { uploadProfileImage, deleteProfileImage, uploading, uploadProgress } = useSupabaseStorage();
+
+  // 사용자 관리 훅 사용 (코드 생성용)
+  const { getUsers } = useSupabaseUserManagement();
 
   // DB에서 직접 조회한 마스터코드 데이터
   const [positionsFromDB, setPositionsFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
@@ -390,6 +396,56 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
 
   // 역할별 권한 가져오기 함수 - fetchRoles와 통합됨
 
+  // 코드 자동 생성 함수 - USER-25-001 형식 (년도별 일련번호)
+  const generateUserCode = useCallback(async (): Promise<string> => {
+    console.log('🔵 [UserEditDialog] generateUserCode 시작');
+    try {
+      const currentYear = new Date().getFullYear();
+      const currentYearStr = currentYear.toString().slice(-2);
+
+      // DB에서 모든 사용자 조회
+      console.log('🔵 [UserEditDialog] getUsers 호출');
+      const allUsers = await getUsers();
+      console.log('🔵 [UserEditDialog] 전체 사용자 수:', allUsers.length);
+
+      // 현재 연도의 코드만 필터링 (USER-25-XXX 형식)
+      const currentYearUsers = allUsers.filter((u) => {
+        const codePattern = `USER-${currentYearStr}-`;
+        return u.user_code && u.user_code.startsWith(codePattern);
+      });
+      console.log('🔵 [UserEditDialog] 현재 연도 사용자 수:', currentYearUsers.length);
+
+      // 정규식으로 올바른 형식(3자리 숫자)의 코드만 필터링
+      const validCodePattern = new RegExp(`^USER-${currentYearStr}-(\\d{3})$`);
+      let maxSequence = 0;
+
+      currentYearUsers.forEach((u) => {
+        const match = u.user_code.match(validCodePattern);
+        if (match) {
+          const sequence = parseInt(match[1], 10);
+          if (sequence > maxSequence) {
+            maxSequence = sequence;
+          }
+        }
+      });
+
+      // 다음 일련번호 생성 (최대값 + 1)
+      const nextSequence = maxSequence + 1;
+      const formattedSequence = nextSequence.toString().padStart(3, '0');
+      const newCode = `USER-${currentYearStr}-${formattedSequence}`;
+
+      console.log('✅ [UserEditDialog] 자동 생성된 코드:', newCode);
+      console.log('📊 [UserEditDialog] 현재 최대 일련번호:', maxSequence, '→ 다음:', nextSequence);
+      return newCode;
+    } catch (error) {
+      console.error('❌ 사용자 코드 생성 실패:', error);
+      const year = new Date().getFullYear().toString().slice(-2);
+      const fallbackCode = `USER-${year}-001`;
+      console.log('🔴 [UserEditDialog] 폴백 코드 사용:', fallbackCode);
+      return fallbackCode; // 오류 시 001부터 시작
+    }
+  }, [getUsers]);
+
   // 탭 값 범위 체크
   useEffect(() => {
     if (tabValue > 1) {
@@ -471,45 +527,56 @@ export default function UserEditDialog({ open, onClose, user, onSave, department
       setUserAccountCheckResult(null);
       setEmailCheckResult(null);
     } else {
-      // 새 사용자 생성시 초기값
-      console.log('📋📋📋 UserEditDialog - 다이얼로그 열림: 새 사용자 생성');
-      const currentDate = new Date().toISOString().split('T')[0];
-      const currentYear = new Date().getFullYear();
-      const yearSuffix = currentYear.toString().slice(-2);
+      // 새 사용자 생성시 초기값 (비동기 처리)
+      const initializeNewUser = async () => {
+        console.log('🟢 [UserEditDialog] 다이얼로그 열림: 새 사용자 생성');
+        console.log('🟢 [UserEditDialog] user 값:', user);
+        console.log('🟢 [UserEditDialog] open 값:', open);
+        const currentDate = new Date().toISOString().split('T')[0];
 
-      setFormData({
-        id: Date.now(),
-        no: 0,
-        registrationDate: currentDate,
-        code: `USER-${yearSuffix}-001`,
-        userAccount: '',
-        userName: '',
-        department: departments && departments.length > 0 ? departments[0].department_name : '개발팀',
-        position: '사원',
-        role: '프로',
-        status: '',
-        lastLogin: '',
-        registrant: currentUser && typeof currentUser !== 'boolean' ? currentUser.name || '' : '',
-        assignedRole: [],
-        rule: 'ROLE-25-003',
-        phone: '',
-        country: '',
-        address: '',
-        email: '',
-        profileImage: undefined,
-        profile_image_url: undefined
-      });
-      // 에러 상태 초기화
-      setEmailError('');
-      setPhoneError('');
-      // 중복체크 결과 초기화
-      setUserAccountCheckResult(null);
-      setEmailCheckResult(null);
+        // 코드 자동 생성
+        console.log('🟢 [UserEditDialog] generateUserCode 호출 시작');
+        const newCode = await generateUserCode();
+        console.log('🟢 [UserEditDialog] 생성된 코드:', newCode);
+
+        setFormData({
+          id: Date.now(),
+          no: 0,
+          registrationDate: currentDate,
+          code: newCode,
+          userAccount: '',
+          userName: '',
+          department: departments && departments.length > 0 ? departments[0].department_name : '개발팀',
+          position: '사원',
+          role: '프로',
+          status: '',
+          lastLogin: '',
+          registrant: currentUser && typeof currentUser !== 'boolean' ? currentUser.name || '' : '',
+          assignedRole: [],
+          rule: 'ROLE-25-003',
+          phone: '',
+          country: '',
+          address: '',
+          email: '',
+          profileImage: undefined,
+          profile_image_url: undefined
+        });
+        // 에러 상태 초기화
+        setEmailError('');
+        setPhoneError('');
+        // 중복체크 결과 초기화
+        setUserAccountCheckResult(null);
+        setEmailCheckResult(null);
+      };
+
+      initializeNewUser();
     }
   }, [
     open,  // ← 핵심! 다이얼로그가 열릴 때만 실행
-    user?.id  // ← user의 id만 체크 (다른 사용자로 변경될 때만 재실행)
-    // departments, actualUserLevels 등은 제거 (불필요한 재실행 방지)
+    user?.id,  // ← user의 id만 체크 (다른 사용자로 변경될 때만 재실행)
+    generateUserCode,  // ← 코드 생성 함수 dependency 추가
+    departments,  // ← departments 추가
+    currentUser  // ← currentUser 추가
   ]);
 
   // formData 변경 시 디버깅 로그

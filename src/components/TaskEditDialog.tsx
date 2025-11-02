@@ -44,6 +44,7 @@ import { TaskTableData, TaskStatus } from '../types/task';
 import { useOptimizedInput } from '../hooks/useDebounce';
 // import { usePerformanceMonitor } from '../utils/performance';
 import supabase from '../lib/supabaseClient';
+import { useSupabaseTaskManagement } from '../hooks/useSupabaseTaskManagement';
 import { useSupabasePlanManagement, PlanItemInput } from '../hooks/useSupabasePlanManagement';
 import useUser from '../hooks/useUser';
 import { useCommonData } from '../contexts/CommonDataContext';
@@ -2948,6 +2949,9 @@ const TaskEditDialog = memo(
     // 계획탭 Supabase 연동
     const { fetchPlanItems, savePlanItems } = useSupabasePlanManagement();
 
+    // 업무 데이터 조회 (코드 생성용)
+    const { getTasks } = useSupabaseTaskManagement();
+
     // 기록탭 Supabase 연동
     const {
       feedbacks,
@@ -3093,17 +3097,49 @@ const TaskEditDialog = memo(
       fetchMasterCodes();
     }, []); // 컴포넌트 마운트 시 한번만 실행
 
-    // 코드 자동 생성 함수
-    const generateTaskCode = useCallback(() => {
-      const currentYear = new Date().getFullYear();
-      const currentYearStr = currentYear.toString().slice(-2); // 연도 뒤 2자리
+    // 코드 자동 생성 함수 - MAIN-TASK-25-001 형식 (년도별 일련번호)
+    const generateTaskCode = useCallback(async (): Promise<string> => {
+      try {
+        const currentYear = new Date().getFullYear();
+        const currentYearStr = currentYear.toString().slice(-2);
 
-      // 현재 연도의 Task 개수를 기반으로 순번 생성 (실제 구현에서는 서버에서 처리)
-      // 여기서는 간단히 현재 시간을 기반으로 순번 생성
-      const sequence = String(Date.now()).slice(-3).padStart(3, '0');
+        // DB에서 모든 업무 조회
+        const allTasks = await getTasks();
 
-      return `TASK-${currentYearStr}-${sequence}`;
-    }, []);
+        // 현재 연도의 코드만 필터링 (MAIN-TASK-25-XXX 형식)
+        const currentYearTasks = allTasks.filter((task) => {
+          const codePattern = `MAIN-TASK-${currentYearStr}-`;
+          return task.code && task.code.startsWith(codePattern);
+        });
+
+        // 정규식으로 올바른 형식(3자리 숫자)의 코드만 필터링
+        const validCodePattern = new RegExp(`^MAIN-TASK-${currentYearStr}-(\\d{3})$`);
+        let maxSequence = 0;
+
+        currentYearTasks.forEach((task) => {
+          const match = task.code.match(validCodePattern);
+          if (match) {
+            const sequence = parseInt(match[1], 10);
+            if (sequence > maxSequence) {
+              maxSequence = sequence;
+            }
+          }
+        });
+
+        // 다음 일련번호 생성 (최대값 + 1)
+        const nextSequence = maxSequence + 1;
+        const formattedSequence = nextSequence.toString().padStart(3, '0');
+        const newCode = `MAIN-TASK-${currentYearStr}-${formattedSequence}`;
+
+        console.log('🔄 [TaskEditDialog] 자동 생성된 코드:', newCode);
+        console.log('📊 [TaskEditDialog] 현재 최대 일련번호:', maxSequence, '→ 다음:', nextSequence);
+        return newCode;
+      } catch (error) {
+        console.error('❌ 업무 코드 생성 실패:', error);
+        const year = new Date().getFullYear().toString().slice(-2);
+        return `MAIN-TASK-${year}-001`; // 오류 시 001부터 시작
+      }
+    }, [getTasks]);
 
     // 현재 날짜 생성 함수
     const getCurrentDate = useCallback(() => {
@@ -3113,14 +3149,19 @@ const TaskEditDialog = memo(
 
     // Task 변경 시 상태 업데이트
     React.useEffect(() => {
-      if (task) {
-        dispatch({ type: 'SET_TASK', task });
-      } else if (open) {
-        // 새 Task 생성 시 자동으로 코드와 등록일 설정
-        const newCode = generateTaskCode();
-        const newRegistrationDate = getCurrentDate();
-        dispatch({ type: 'INIT_NEW_TASK', code: newCode, registrationDate: newRegistrationDate });
-      }
+      const initializeTask = async () => {
+        if (task) {
+          // 기존 데이터 편집 시
+          dispatch({ type: 'SET_TASK', task });
+        } else if (open) {
+          // 새 Task 생성 시 자동으로 코드와 등록일 설정
+          const newCode = await generateTaskCode();
+          const newRegistrationDate = getCurrentDate();
+          dispatch({ type: 'INIT_NEW_TASK', code: newCode, registrationDate: newRegistrationDate });
+        }
+      };
+
+      initializeTask();
     }, [task, open, generateTaskCode, getCurrentDate]);
 
     // 팀을 로그인한 사용자의 부서로 자동 설정

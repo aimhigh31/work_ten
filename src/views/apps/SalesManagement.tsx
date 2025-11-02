@@ -1968,13 +1968,60 @@ export default function SalesManagement() {
     setEditDialog(true);
   };
 
-  // 코드 생성
+  // 코드 생성 (기존 로컬 메모리 기반 - 참고용)
   const generateCode = () => {
     const currentYear = new Date().getFullYear().toString().slice(-2);
     const lastRecord = sales[sales.length - 1];
     const lastNumber = lastRecord ? parseInt(lastRecord.code.split('-')[2]) : 0;
     return `SALES-${currentYear}-${String(lastNumber + 1).padStart(3, '0')}`;
   };
+
+  // 매출 코드 자동 생성 함수 (Supabase DB 기반)
+  const generateSalesCode = React.useCallback(async (): Promise<string> => {
+    try {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+
+      const currentYear = new Date().getFullYear();
+      const currentYearStr = currentYear.toString().slice(-2);
+
+      // 현재 연도의 최대 코드 조회
+      const { data, error } = await supabase
+        .from('plan_sales_data')
+        .select('code')
+        .like('code', `SALES-${currentYearStr}-%`)
+        .order('code', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error('❌ 매출 코드 조회 실패:', error);
+        throw error;
+      }
+
+      let nextSequence = 1;
+      if (data && data.length > 0 && data[0].code) {
+        const lastCode = data[0].code;
+        const sequencePart = lastCode.split('-')[2];
+        if (sequencePart) {
+          nextSequence = parseInt(sequencePart) + 1;
+        }
+      }
+
+      const formattedSequence = nextSequence.toString().padStart(3, '0');
+      const newCode = `SALES-${currentYearStr}-${formattedSequence}`;
+
+      console.log('🔄 [SalesManagement] 자동 생성된 코드:', newCode);
+      return newCode;
+    } catch (error) {
+      console.error('❌ 매출 코드 생성 실패:', error);
+      // 오류 시 임시 코드 반환
+      const year = new Date().getFullYear().toString().slice(-2);
+      const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+      return `SALES-${year}-${random}`;
+    }
+  }, []);
 
   return (
     <Box
@@ -2535,6 +2582,7 @@ export default function SalesManagement() {
         canEditOwn={canEditOwn}
         canEditOthers={canEditOthers}
         users={users}
+        generateSalesCode={generateSalesCode}
         onSave={async (updatedRecord) => {
           console.log('💾 [SalesManagement] onSave 호출됨, editingSales:', editingSales);
           console.log('📦 [SalesManagement] updatedRecord:', updatedRecord);

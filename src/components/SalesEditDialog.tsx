@@ -44,6 +44,7 @@ interface SalesEditDialogProps {
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
+  generateSalesCode?: () => Promise<string>;
 }
 
 // 기록 탭 컴포넌트
@@ -772,7 +773,7 @@ function a11yProps(index: number) {
   };
 }
 
-const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesRecord, onSave, users: propUsers, canCreateData = true, canEditOwn = true, canEditOthers = true }) => {
+const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesRecord, onSave, users: propUsers, canCreateData = true, canEditOwn = true, canEditOthers = true, generateSalesCode }) => {
   const [value, setValue] = useState(0);
   const [formData, setFormData] = useState<SalesRecord | null>(null);
 
@@ -1041,6 +1042,27 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
       setFormData(null);
     }
   }, [salesRecord, open]);
+
+  // 매출 코드 자동 생성 (신규 생성 시에만)
+  const prevOpenRef = useRef(false);
+
+  useEffect(() => {
+    const initializeNewSalesCode = async () => {
+      // 다이얼로그가 새로 열렸고, 기존 매출이 없으며, generateSalesCode 함수가 있을 때
+      if (open && !prevOpenRef.current && !salesRecord && generateSalesCode && formData) {
+        try {
+          const newCode = await generateSalesCode();
+          console.log('🔄 [SalesEditDialog] 자동 생성된 코드:', newCode);
+          setFormData((prev) => prev ? { ...prev, code: newCode } : prev);
+        } catch (error) {
+          console.error('❌ [SalesEditDialog] 코드 생성 실패:', error);
+        }
+      }
+    };
+
+    initializeNewSalesCode();
+    prevOpenRef.current = open;
+  }, [open, salesRecord, generateSalesCode, formData]);
 
   // 다이얼로그가 열릴 때 탭을 첫 번째로 리셋
   useEffect(() => {

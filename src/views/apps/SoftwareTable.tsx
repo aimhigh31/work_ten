@@ -615,18 +615,14 @@ export default function SoftwareTable({
 
       console.log('✅ 기존 Task 업데이트 완료');
     } else {
-      // 새 Task 추가 - 상단에 추가
-      const currentYear = new Date().getFullYear();
-      const yearSuffix = currentYear.toString().slice(-2);
-
-      // IT-SW-YY-NNN 형식으로 코드 생성 (임시적으로, 실제로는 SoftwareEditDialog에서 정확한 코드 생성)
-      const tempSequence = String(Date.now()).slice(-3);
+      // 새 Task 추가 - DB 저장 후 정확한 코드로 추가
+      // updatedTask에는 이미 SoftwareEditDialog에서 생성된 정확한 코드가 포함되어 있음
       const newTaskWithNumber = {
         ...updatedTask,
-        id: Date.now(), // 임시 ID
+        id: updatedTask.id || Date.now(), // DB에서 생성된 ID 사용
         no: 0, // 프론트엔드에서 계산됨
-        code: `IT-SW-${yearSuffix}-${tempSequence}`, // 임시 코드 (저장 시 정확한 코드로 교체됨)
-        registrationDate: new Date().toISOString().split('T')[0],
+        code: updatedTask.code || '', // Dialog에서 생성된 정확한 코드 사용
+        registrationDate: updatedTask.registrationDate || new Date().toISOString().split('T')[0],
         startDate: updatedTask.startDate || new Date().toISOString().split('T')[0]
       };
       // 새 데이터를 배열 맨 앞에 추가 (역순 정렬을 위해)

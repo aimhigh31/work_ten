@@ -27,6 +27,7 @@ export interface UseSupabaseVocReturn {
   deleteVoc: (id: number) => Promise<boolean>;
   convertToVocData: (dbData: DbVocData) => VocData;
   convertToDbVocData: (frontendData: VocData) => Omit<DbVocData, 'id' | 'created_at' | 'updated_at'>;
+  generateVocCode: () => Promise<string>;
   loading: boolean;
   error: string | null;
 }
@@ -236,6 +237,7 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
     return {
       id: dbData.id,
       no: dbData.no,
+      code: dbData.code,
       registrationDate: dbData.registration_date,
       receptionDate: dbData.reception_date || '',
       customerName: dbData.customer_name || '',
@@ -260,6 +262,7 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
   const convertToDbVocData = useCallback((frontendData: VocData): Omit<DbVocData, 'id' | 'created_at' | 'updated_at'> => {
     return {
       no: frontendData.no || 0, // createVoc에서 자동으로 설정됨
+      code: frontendData.code,
       registration_date: frontendData.registrationDate || new Date().toISOString().split('T')[0],
       reception_date: frontendData.receptionDate || frontendData.registrationDate || new Date().toISOString().split('T')[0],
       customer_name: frontendData.customerName || null,
@@ -282,6 +285,67 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
     };
   }, []);
 
+  // VOC 코드 생성 (IT-VOC-YY-NNN 형식)
+  const generateVocCode = useCallback(async (): Promise<string> => {
+    console.log('🔵 [useSupabaseVoc] generateVocCode 시작');
+    try {
+      const currentYear = new Date().getFullYear();
+      const currentYearStr = currentYear.toString().slice(-2);
+
+      // 캐시를 우회하고 DB에서 직접 최신 데이터 조회 (is_active 무관하게 전체 조회)
+      console.log('🔵 [useSupabaseVoc] DB에서 직접 최신 데이터 조회 (캐시 우회)');
+      const { data, error: supabaseError } = await supabase
+        .from('it_voc_data')
+        .select('code')
+        .not('code', 'is', null); // code가 null이 아닌 것만
+
+      if (supabaseError) {
+        console.error('❌ Supabase 조회 오류:', supabaseError);
+        throw supabaseError;
+      }
+
+      const allVocs = data || [];
+      console.log('🔵 [useSupabaseVoc] 전체 VOC 수:', allVocs.length);
+
+      // 현재 연도의 코드만 필터링 (IT-VOC-25-XXX 형식)
+      const currentYearVocs = allVocs.filter((voc: any) => {
+        const codePattern = `IT-VOC-${currentYearStr}-`;
+        return voc.code && voc.code.startsWith(codePattern);
+      });
+      console.log('🔵 [useSupabaseVoc] 현재 연도 VOC 수:', currentYearVocs.length);
+
+      // 정규식으로 올바른 형식(3자리 숫자)의 코드만 필터링
+      const validCodePattern = new RegExp(`^IT-VOC-${currentYearStr}-(\\d{3})$`);
+      let maxSequence = 0;
+
+      currentYearVocs.forEach((voc: any) => {
+        const match = voc.code.match(validCodePattern);
+        if (match) {
+          const sequence = parseInt(match[1], 10);
+          console.log('🔍 [useSupabaseVoc] 발견한 코드:', voc.code, '→ 일련번호:', sequence);
+          if (sequence > maxSequence) {
+            maxSequence = sequence;
+          }
+        }
+      });
+
+      // 다음 일련번호 생성 (최대값 + 1)
+      const nextSequence = maxSequence + 1;
+      const formattedSequence = nextSequence.toString().padStart(3, '0');
+      const newCode = `IT-VOC-${currentYearStr}-${formattedSequence}`;
+
+      console.log('✅ [useSupabaseVoc] 자동 생성된 코드:', newCode);
+      console.log('📊 [useSupabaseVoc] 현재 최대 일련번호:', maxSequence, '→ 다음:', nextSequence);
+      return newCode;
+    } catch (error) {
+      console.error('❌ VOC 코드 생성 실패:', error);
+      const year = new Date().getFullYear().toString().slice(-2);
+      const fallbackCode = `IT-VOC-${year}-001`;
+      console.log('🔴 [useSupabaseVoc] 폴백 코드 사용:', fallbackCode);
+      return fallbackCode; // 오류 시 001부터 시작
+    }
+  }, []); // getVocs 의존성 제거 - 직접 쿼리
+
   return {
     getVocs,
     getVocById,
@@ -290,6 +354,7 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
     deleteVoc,
     convertToVocData,
     convertToDbVocData,
+    generateVocCode,
     loading,
     error
   };
