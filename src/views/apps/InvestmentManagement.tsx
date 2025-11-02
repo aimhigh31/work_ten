@@ -2661,7 +2661,7 @@ export default function InvestmentManagement() {
               const financeItems = amountData.map((item: any, index: number) => ({
                 investment_id: currentInvestment.id,
                 item_order: index + 1,
-                investment_category: item.investmentCategory || '',
+                investment_category: getInvestmentDetailTypeName(item.investmentCategory) || '',
                 item_name: item.itemName || '',
                 budget_amount: parseFloat(item.budgetAmount) || 0,
                 execution_amount: parseFloat(item.executionAmount) || 0,
@@ -2717,7 +2717,7 @@ export default function InvestmentManagement() {
               const financeItems = amountData.map((item: any, index: number) => ({
                 investment_id: newInvestment.id,
                 item_order: index + 1,
-                investment_category: item.investmentCategory || '',
+                investment_category: getInvestmentDetailTypeName(item.investmentCategory) || '',
                 item_name: item.itemName || '',
                 budget_amount: parseFloat(item.budgetAmount) || 0,
                 execution_amount: parseFloat(item.executionAmount) || 0,

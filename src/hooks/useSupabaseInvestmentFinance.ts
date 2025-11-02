@@ -111,6 +111,11 @@ export function useSupabaseInvestmentFinance() {
         }
 
         console.log('✅ saveFinanceItems 성공');
+
+        // 캐시 무효화 (최신 데이터 보장)
+        const cacheKey = createCacheKey('investment_finance', `id_${investmentId}`);
+        sessionStorage.removeItem(cacheKey);
+
         return true;
       } catch (err) {
         console.error('❌ saveFinanceItems 실패:', err);

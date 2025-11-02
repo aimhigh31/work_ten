@@ -1649,7 +1649,7 @@ const PerformanceTab = memo(
             <Select
               value={editingValue}
               onChange={(e) => {
-                const newValue = e.target.value;
+                const newValue = e.target.value as 'red' | 'yellow' | 'green';
                 setEditingValue(newValue);
                 // Select는 즉시 값을 저장
                 const updatedItem = { ...item, trafficLight: newValue };
@@ -4097,27 +4097,50 @@ const TaskEditDialog = memo(
     // KPI Record 데이터 로드
     React.useEffect(() => {
       if (task?.id && open) {
+        // 캐시 무효화 후 데이터 로드 (데이터 키와 타임스탬프 키 모두 삭제)
+        const cacheKey = `nexwork_cache_v3_kpi_record_kpi_${task.id}`;
+        sessionStorage.removeItem(cacheKey);
+        sessionStorage.removeItem(cacheKey + '_timestamp');
+        console.log('🔄 캐시 완전 삭제 후 데이터 로드:', task.id);
         fetchRecords(task.id);
       }
     }, [task?.id, open, fetchRecords]);
 
-    // DB Records를 로컬 상태와 동기화
+    // DB Records를 로컬 상태와 동기화 (팝업 열릴 때만)
+    const hasLoadedData = React.useRef(false);
+
     React.useEffect(() => {
-      if (dbRecords && dbRecords.length > 0) {
-        const transformedRecords = dbRecords.map((dbRecord) => ({
-          id: dbRecord.id,
-          month: dbRecord.month,
-          targetKpi: dbRecord.target_kpi || '',
-          actualKpi: dbRecord.actual_kpi || '',
-          trafficLight: (dbRecord.traffic_light || 'green') as 'red' | 'yellow' | 'green',
-          overallProgress: dbRecord.overall_progress || '0',
-          planPerformance: dbRecord.plan_performance || '',
-          achievementReflection: dbRecord.achievement_reflection || '',
-          attachments: dbRecord.attachments || []
-        }));
-        setPerformanceItems(transformedRecords);
-      } else if (dbRecords && dbRecords.length === 0 && open && task?.id) {
-        // DB에 데이터가 없으면 로컬 상태도 비움
+      if (open && task?.id && dbRecords !== undefined) {
+        // dbRecords가 변경될 때마다 항상 로컬 상태 업데이트
+        console.log('📊 DB 데이터 동기화:', {
+          kpi_id: task.id,
+          count: dbRecords.length,
+          hasLoadedData: hasLoadedData.current,
+          dbRecords: JSON.parse(JSON.stringify(dbRecords))
+        });
+
+        if (dbRecords.length > 0) {
+          const transformedRecords = dbRecords.map((dbRecord) => ({
+            id: dbRecord.id,
+            month: dbRecord.month,
+            targetKpi: dbRecord.target_kpi || '',
+            actualKpi: dbRecord.actual_kpi || '',
+            trafficLight: (dbRecord.traffic_light || 'green') as 'red' | 'yellow' | 'green',
+            overallProgress: dbRecord.overall_progress || '0',
+            planPerformance: dbRecord.plan_performance || '',
+            achievementReflection: dbRecord.achievement_reflection || '',
+            attachments: dbRecord.attachments || []
+          }));
+          setPerformanceItems(transformedRecords);
+          console.log('✅ 로컬 상태 업데이트:', { count: transformedRecords.length, transformedRecords });
+        } else {
+          setPerformanceItems([]);
+          console.log('ℹ️ 실적 데이터 없음 - DB에서 조회된 데이터가 없습니다');
+        }
+        hasLoadedData.current = true;
+      } else if (!open) {
+        // 팝업이 닫히면 플래그 리셋
+        hasLoadedData.current = false;
         setPerformanceItems([]);
       }
     }, [dbRecords, open, task?.id]);
@@ -4935,6 +4958,25 @@ const TaskEditDialog = memo(
         if (!task?.id) return;
 
         try {
+          console.log('📝 실적 편집 시작:', { month: item.month, kpi_id: task.id });
+
+          // 먼저 로컬 상태 즉시 업데이트 (UI 반영)
+          setPerformanceItems((prev) => {
+            const existingIndex = prev.findIndex((p) => p.month === item.month);
+            if (existingIndex >= 0) {
+              // 기존 항목 업데이트
+              const newItems = [...prev];
+              newItems[existingIndex] = item;
+              console.log('🔄 로컬 상태 업데이트 (기존 항목)');
+              return newItems;
+            } else {
+              // 새 항목 추가
+              console.log('➕ 로컬 상태 추가 (새 항목)');
+              return [...prev, item];
+            }
+          });
+
+          // 백그라운드에서 DB에 저장
           const recordData = {
             kpi_id: task.id,
             month: item.month,
@@ -4947,20 +4989,26 @@ const TaskEditDialog = memo(
             attachments: item.attachments || []
           };
 
-          // month를 기준으로 기존 항목 찾기
-          const existing = performanceItems.find((p) => p.month === item.month);
+          // month와 kpi_id를 기준으로 기존 항목 찾기
+          console.log('🔍 기존 항목 검색:', { dbRecords: dbRecords.length, month: item.month });
+          const existing = dbRecords.find((p) => p.kpi_id === task.id && p.month === item.month);
+
           if (existing) {
-            // 기존 항목 업데이트
+            console.log('✏️ DB 업데이트:', existing.id);
             await updateRecord(existing.id, recordData);
           } else {
-            // 새 항목 추가
+            console.log('➕ DB 추가 (새 항목)');
             await addRecord(recordData);
           }
+
+          // DB 저장 후 최신 데이터 다시 로드하여 dbRecords 동기화
+          console.log('🔄 DB 저장 후 데이터 재로드');
+          await fetchRecords(task.id);
         } catch (error) {
           console.error('❌ 실적 저장 실패:', error);
         }
       },
-      [task?.id, performanceItems, updateRecord, addRecord]
+      [task?.id, dbRecords, updateRecord, addRecord, fetchRecords]
     );
 
     // 메모이제이션된 탭 컴포넌트 props

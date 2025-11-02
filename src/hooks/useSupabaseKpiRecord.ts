@@ -59,6 +59,7 @@ export const useSupabaseKpiRecord = (kpiId?: number) => {
           throw fetchError;
         }
 
+        console.log('🔍 [KpiRecord] DB 조회 결과:', { kpi_id: fetchKpiId, count: data?.length || 0, data });
         setRecords(data || []);
 
         // 2. 캐시에 저장
@@ -87,6 +88,15 @@ export const useSupabaseKpiRecord = (kpiId?: number) => {
 
       console.log('✅ KPI Record 추가 성공:', data);
       setRecords((prev) => [...prev, data]);
+
+      // 캐시 무효화 (데이터 키와 타임스탬프 키 모두 삭제)
+      if (recordData.kpi_id) {
+        const cacheKey = createCacheKey('kpi_record', `kpi_${recordData.kpi_id}`);
+        sessionStorage.removeItem(cacheKey);
+        sessionStorage.removeItem(cacheKey + '_timestamp');
+        console.log('🗑️ [KpiRecord] 캐시 무효화 (추가):', cacheKey);
+      }
+
       return data;
     } catch (err: any) {
       console.error('KPI Record 추가 오류:', err);
@@ -105,6 +115,15 @@ export const useSupabaseKpiRecord = (kpiId?: number) => {
       }
 
       setRecords((prev) => prev.map((record) => (record.id === id ? data : record)));
+
+      // 캐시 무효화 (데이터 키와 타임스탬프 키 모두 삭제)
+      if (data?.kpi_id) {
+        const cacheKey = createCacheKey('kpi_record', `kpi_${data.kpi_id}`);
+        sessionStorage.removeItem(cacheKey);
+        sessionStorage.removeItem(cacheKey + '_timestamp');
+        console.log('🗑️ [KpiRecord] 캐시 무효화 (수정):', cacheKey);
+      }
+
       return data;
     } catch (err: any) {
       console.error('KPI Record 수정 오류:', err);
@@ -169,12 +188,12 @@ export const useSupabaseKpiRecord = (kpiId?: number) => {
     [kpiId]
   );
 
-  // 초기 데이터 로드
-  useEffect(() => {
-    if (kpiId) {
-      fetchRecords(kpiId);
-    }
-  }, [kpiId, fetchRecords]);
+  // 초기 데이터 로드 제거 - 명시적으로 fetchRecords를 호출해야 함
+  // useEffect(() => {
+  //   if (kpiId) {
+  //     fetchRecords(kpiId);
+  //   }
+  // }, [kpiId, fetchRecords]);
 
   return {
     records,

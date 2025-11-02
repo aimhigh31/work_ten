@@ -1653,15 +1653,22 @@ const InvestmentAmountTab = memo(({ mode, investmentId, canEdit = true }: { mode
 
         if (dbData && dbData.length > 0) {
           // DB 데이터를 UI 형식으로 변환
-          const uiData = dbData.map((item) => ({
-            id: item.id.toString(),
-            no: item.item_order,
-            investmentCategory: item.investment_category,
-            itemName: item.item_name,
-            budgetAmount: item.budget_amount,
-            executionAmount: item.execution_amount,
-            remarks: item.remarks || ''
-          }));
+          const uiData = dbData.map((item) => {
+            // subcode_name을 subcode로 역변환 (DB: "서버" → UI: "GROUP026-SUB001")
+            const categorySubcode = investmentDetailTypesFromDB.find(
+              t => t.subcode_name === item.investment_category
+            )?.subcode || item.investment_category;
+
+            return {
+              id: item.id.toString(),
+              no: item.item_order,
+              investmentCategory: categorySubcode,
+              itemName: item.item_name,
+              budgetAmount: item.budget_amount,
+              executionAmount: item.execution_amount,
+              remarks: item.remarks || ''
+            };
+          });
           console.log('✅ DB 데이터 로드 완료:', uiData.length, '개');
           setAmountItems(uiData);
         } else {
@@ -1672,7 +1679,7 @@ const InvestmentAmountTab = memo(({ mode, investmentId, canEdit = true }: { mode
     };
 
     loadData();
-  }, [mode, investmentId, getFinanceItems]);
+  }, [mode, investmentId, getFinanceItems, investmentDetailTypesFromDB]);
 
   // 외부에서 현재 데이터를 가져갈 수 있도록 노출
   useEffect(() => {
@@ -1847,6 +1854,18 @@ const InvestmentAmountTab = memo(({ mode, investmentId, canEdit = true }: { mode
           fullWidth
           autoFocus
           multiline={field === 'itemName' || field === 'remarks'}
+          sx={field === 'remarks' ? {
+            '& .MuiInputBase-root': {
+              height: '48px',
+              alignItems: 'flex-start',
+              overflowY: 'auto',
+              padding: '8px 12px'
+            },
+            '& .MuiInputBase-input': {
+              height: 'auto !important',
+              overflow: 'auto !important'
+            }
+          } : undefined}
         />
       );
     }
@@ -1859,20 +1878,42 @@ const InvestmentAmountTab = memo(({ mode, investmentId, canEdit = true }: { mode
           padding: '8px 12px',
           height: '48px',
           display: 'flex',
-          alignItems: 'center',
+          alignItems: field === 'remarks' ? 'flex-start' : 'center',
           cursor: field === 'amount' ? 'default' : 'text',
-          '&:hover': { backgroundColor: field === 'amount' ? 'transparent' : 'action.hover' }
+          '&:hover': { backgroundColor: field === 'amount' ? 'transparent' : 'action.hover' },
+          overflow: field === 'remarks' ? 'auto' : 'hidden',
+          '&::-webkit-scrollbar': field === 'remarks' ? {
+            width: '6px',
+            height: '6px'
+          } : undefined,
+          '&::-webkit-scrollbar-track': field === 'remarks' ? {
+            backgroundColor: '#f1f1f1',
+            borderRadius: '3px'
+          } : undefined,
+          '&::-webkit-scrollbar-thumb': field === 'remarks' ? {
+            backgroundColor: '#888',
+            borderRadius: '3px',
+            '&:hover': {
+              backgroundColor: '#555'
+            }
+          } : undefined
         }}
       >
         <Typography
           variant="body2"
           sx={{
             fontSize: '12px',
-            textAlign: field === 'budgetAmount' || field === 'executionAmount' ? 'right' : 'left'
+            textAlign: field === 'budgetAmount' || field === 'executionAmount' ? 'right' : 'left',
+            whiteSpace: field === 'remarks' ? 'pre-wrap' : 'nowrap',
+            wordBreak: field === 'remarks' ? 'break-word' : 'normal',
+            overflow: field === 'remarks' ? 'visible' : 'hidden',
+            textOverflow: field === 'remarks' ? 'clip' : 'ellipsis',
+            width: '100%',
+            lineHeight: field === 'remarks' ? '1.5' : 'normal'
           }}
         >
           {field === 'budgetAmount' || field === 'executionAmount'
-            ? `₩${(value != null ? Number(value) : 0).toLocaleString()}`
+            ? `${(value != null ? Number(value) : 0).toLocaleString()}원`
             : field === 'investmentCategory'
               ? (() => {
                   if (!value) return '선택';
@@ -2111,7 +2152,8 @@ const InvestmentAmountTab = memo(({ mode, investmentId, canEdit = true }: { mode
                     padding: 0,
                     height: 48,
                     minWidth: columnWidths.remarks,
-                    maxWidth: columnWidths.remarks
+                    maxWidth: columnWidths.remarks,
+                    verticalAlign: 'top'
                   }}
                   onClick={() => handleCellClick(item.id, 'remarks')}
                 >
