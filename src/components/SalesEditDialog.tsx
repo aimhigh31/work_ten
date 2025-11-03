@@ -934,6 +934,14 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
     fetchMasterCodeData();
   }, [supabaseClient, open]);
 
+  // statusTypesFromDB 로드 후 신규 생성 시 기본값 설정
+  useEffect(() => {
+    if (formData && !salesRecord && statusTypesFromDB.length > 0 && !formData.status) {
+      console.log('🔧 [SalesEditDialog] status 기본값 설정:', statusTypesFromDB[0].subcode);
+      setFormData(prev => prev ? { ...prev, status: statusTypesFromDB[0].subcode } : null);
+    }
+  }, [statusTypesFromDB, formData, salesRecord]);
+
   // 피드백/기록 훅
   const {
     feedbacks,
@@ -1019,10 +1027,10 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
         setFormData({
           id: Date.now(),
           registrationDate: new Date().toISOString().split('T')[0],
-          code: `SALES-${new Date().getFullYear().toString().slice(-2)}-001`,
+          code: `PLAN-SALES-${new Date().getFullYear().toString().slice(-2)}-001`,
           customerName: '',
           salesType: '',
-          status: '대기',
+          status: '', // 초기값 빈 문자열 (DB 로드 후 설정)
           businessUnit: '',
           modelCode: '',
           itemCode: '',
@@ -1044,16 +1052,20 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
   }, [salesRecord, open]);
 
   // 매출 코드 자동 생성 (신규 생성 시에만)
-  const prevOpenRef = useRef(false);
-
   useEffect(() => {
     const initializeNewSalesCode = async () => {
-      // 다이얼로그가 새로 열렸고, 기존 매출이 없으며, generateSalesCode 함수가 있을 때
-      if (open && !prevOpenRef.current && !salesRecord && generateSalesCode && formData) {
+      // 다이얼로그가 열렸고, 신규 생성 모드일 때만 코드 생성
+      if (open && !salesRecord && generateSalesCode) {
         try {
           const newCode = await generateSalesCode();
           console.log('🔄 [SalesEditDialog] 자동 생성된 코드:', newCode);
-          setFormData((prev) => prev ? { ...prev, code: newCode } : prev);
+          setFormData((prev) => {
+            if (prev && prev.code.startsWith('PLAN-SALES-')) {
+              // 임시 코드만 업데이트 (이미 생성된 코드는 유지)
+              return { ...prev, code: newCode };
+            }
+            return prev;
+          });
         } catch (error) {
           console.error('❌ [SalesEditDialog] 코드 생성 실패:', error);
         }
@@ -1061,8 +1073,7 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
     };
 
     initializeNewSalesCode();
-    prevOpenRef.current = open;
-  }, [open, salesRecord, generateSalesCode, formData]);
+  }, [open, salesRecord, generateSalesCode]);
 
   // 다이얼로그가 열릴 때 탭을 첫 번째로 리셋
   useEffect(() => {

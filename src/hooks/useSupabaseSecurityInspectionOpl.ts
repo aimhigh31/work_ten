@@ -43,7 +43,7 @@ export function useSupabaseSecurityInspectionOpl() {
         .from('security_inspection_opl')
         .select('*')
         .eq('inspection_id', inspectionId)
-        .order('registration_date', { ascending: false });
+        .order('id', { ascending: false }); // 신규 추가된 항목이 맨 위에 표시
 
       if (error) {
         console.error('OPL 항목 조회 실패:', error);
@@ -100,6 +100,13 @@ export function useSupabaseSecurityInspectionOpl() {
         throw error;
       }
 
+      // 캐시 무효화 (최신 데이터 보장)
+      if (item.inspection_id) {
+        const cacheKey = createCacheKey('security_opl', `inspection_${item.inspection_id}`);
+        sessionStorage.removeItem(cacheKey);
+        console.log('🗑️ addOplItem: 캐시 무효화 완료');
+      }
+
       return data;
     } catch (err) {
       console.error('OPL 항목 추가 catch 오류:', {
@@ -139,6 +146,13 @@ export function useSupabaseSecurityInspectionOpl() {
         throw error;
       }
 
+      // 캐시 무효화 (최신 데이터 보장)
+      if (data?.inspection_id) {
+        const cacheKey = createCacheKey('security_opl', `inspection_${data.inspection_id}`);
+        sessionStorage.removeItem(cacheKey);
+        console.log('🗑️ updateOplItem: 캐시 무효화 완료');
+      }
+
       return data;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'OPL 항목 수정 중 오류가 발생했습니다.';
@@ -151,16 +165,30 @@ export function useSupabaseSecurityInspectionOpl() {
   }, []);
 
   // OPL 항목 삭제
-  const deleteOplItem = useCallback(async (id: number): Promise<boolean> => {
+  const deleteOplItem = useCallback(async (id: number, inspectionId?: number): Promise<boolean> => {
     setLoading(true);
     setError(null);
 
     try {
+      // 먼저 inspection_id를 가져오기 (캐시 무효화용)
+      let targetInspectionId = inspectionId;
+      if (!targetInspectionId) {
+        const { data } = await supabase.from('security_inspection_opl').select('inspection_id').eq('id', id).single();
+        targetInspectionId = data?.inspection_id;
+      }
+
       const { error } = await supabase.from('security_inspection_opl').delete().eq('id', id);
 
       if (error) {
         console.error('OPL 항목 삭제 실패:', error);
         throw error;
+      }
+
+      // 캐시 무효화 (최신 데이터 보장)
+      if (targetInspectionId) {
+        const cacheKey = createCacheKey('security_opl', `inspection_${targetInspectionId}`);
+        sessionStorage.removeItem(cacheKey);
+        console.log('🗑️ deleteOplItem: 캐시 무효화 완료');
       }
 
       return true;
@@ -175,16 +203,30 @@ export function useSupabaseSecurityInspectionOpl() {
   }, []);
 
   // 여러 OPL 항목 삭제
-  const deleteOplItems = useCallback(async (ids: number[]): Promise<boolean> => {
+  const deleteOplItems = useCallback(async (ids: number[], inspectionId?: number): Promise<boolean> => {
     setLoading(true);
     setError(null);
 
     try {
+      // 먼저 inspection_id를 가져오기 (캐시 무효화용)
+      let targetInspectionId = inspectionId;
+      if (!targetInspectionId && ids.length > 0) {
+        const { data } = await supabase.from('security_inspection_opl').select('inspection_id').eq('id', ids[0]).single();
+        targetInspectionId = data?.inspection_id;
+      }
+
       const { error } = await supabase.from('security_inspection_opl').delete().in('id', ids);
 
       if (error) {
         console.error('OPL 항목들 삭제 실패:', error);
         throw error;
+      }
+
+      // 캐시 무효화 (최신 데이터 보장)
+      if (targetInspectionId) {
+        const cacheKey = createCacheKey('security_opl', `inspection_${targetInspectionId}`);
+        sessionStorage.removeItem(cacheKey);
+        console.log('🗑️ deleteOplItems: 캐시 무효화 완료');
       }
 
       return true;

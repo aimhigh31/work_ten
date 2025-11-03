@@ -64,7 +64,7 @@ function convertToFrontendData(dbData: DbCostData, isNew = false): CostRecord {
 function convertToDbData(frontendData: Partial<CostRecord>): Partial<DbCostData> {
   const dbData: any = {};
 
-  if (frontendData.no !== undefined) dbData.no = frontendData.no;
+  // DB 테이블 컬럼만 매핑 (amountDetails, comments 등 제외)
   if (frontendData.registration_date || frontendData.registrationDate) {
     dbData.registration_date = frontendData.registration_date || frontendData.registrationDate;
   }
@@ -82,9 +82,12 @@ function convertToDbData(frontendData: Partial<CostRecord>): Partial<DbCostData>
   if (frontendData.completion_date || frontendData.completionDate) {
     dbData.completion_date = frontendData.completion_date || frontendData.completionDate;
   }
-  if (frontendData.attachments !== undefined) {
-    dbData.attachments = frontendData.attachments;
-  }
+
+  // 주의: attachments, amountDetails, comments는 별도 테이블이므로 제외
+
+  console.log('🔄 convertToDbData 변환 완료');
+  console.log('🔄 입력:', JSON.stringify(frontendData, null, 2));
+  console.log('🔄 출력:', JSON.stringify(dbData, null, 2));
 
   return dbData;
 }
@@ -169,23 +172,35 @@ export function useSupabaseCost() {
       };
       console.log('📤 삽입할 데이터:', insertData);
 
+      console.log('🚀 Supabase INSERT 시작');
+      console.log('🚀 테이블: main_cost_data');
+      console.log('🚀 삽입 데이터:', JSON.stringify(insertData, null, 2));
+
       const { data, error: supabaseError } = await supabase.from('main_cost_data').insert([insertData]).select().single();
 
+      console.log('📥 Supabase INSERT 응답');
+      console.log('📥 data:', data);
+      console.log('📥 error:', supabaseError);
+
       if (supabaseError) {
-        console.error('❌ Supabase 생성 오류 상세:', {
-          message: supabaseError.message,
-          details: supabaseError.details,
-          hint: supabaseError.hint,
-          code: supabaseError.code,
-          fullError: JSON.stringify(supabaseError, null, 2)
-        });
+        console.error('❌ Supabase 생성 오류 상세:');
+        console.error('  - message:', supabaseError.message);
+        console.error('  - details:', supabaseError.details);
+        console.error('  - hint:', supabaseError.hint);
+        console.error('  - code:', supabaseError.code);
+        console.error('  - 전체 에러 객체:', supabaseError);
+        console.error('  - 전체 에러 JSON:', JSON.stringify(supabaseError, null, 2));
 
         // 409 Conflict - UNIQUE 제약 조건 위반
         if (supabaseError.code === '23505') {
-          throw new Error(`코드 중복 오류: ${insertData.code} 코드가 이미 존재합니다.`);
+          const errorMsg = `코드 중복 오류: ${insertData.code} 코드가 이미 존재합니다.`;
+          console.error('❌', errorMsg);
+          throw new Error(errorMsg);
         }
 
-        throw new Error(supabaseError.message || '비용 데이터 생성 실패');
+        const errorMsg = supabaseError.message || supabaseError.details || '비용 데이터 생성 실패';
+        console.error('❌ 최종 에러 메시지:', errorMsg);
+        throw new Error(errorMsg);
       }
 
       console.log('✅ createCost 성공:', data);

@@ -145,7 +145,7 @@ export function convertSalesToDB(frontendData: Partial<SalesRecord>): Partial<Sa
   if (frontendData.notes !== undefined) dbData.notes = frontendData.notes;
   if (frontendData.contractDate !== undefined) dbData.contract_date = frontendData.contractDate;
   if (frontendData.assignee !== undefined) dbData.assignee = frontendData.assignee;
-  if (frontendData.createdBy !== undefined) dbData.created_by = frontendData.createdBy;
+  // createdBy는 DB 컬럼이 없으므로 제외
 
   return dbData;
 }

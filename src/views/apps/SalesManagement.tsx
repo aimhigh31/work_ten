@@ -1998,39 +1998,54 @@ export default function SalesManagement() {
       const currentYear = new Date().getFullYear();
       const currentYearStr = currentYear.toString().slice(-2);
 
-      // 현재 연도의 최대 코드 조회
+      // 현재 연도의 모든 코드 조회 (PLAN-SALES-YY-XXX 형식)
       const { data, error } = await supabase
         .from('plan_sales_data')
         .select('code')
-        .like('code', `SALES-${currentYearStr}-%`)
-        .order('code', { ascending: false })
-        .limit(1);
+        .like('code', `PLAN-SALES-${currentYearStr}-%`);
 
       if (error) {
         console.error('❌ 매출 코드 조회 실패:', error);
         throw error;
       }
 
+      console.log('📊 [generateSalesCode] DB 조회 결과:', data);
+      console.log('📊 [generateSalesCode] 현재 연도:', currentYearStr);
+
       let nextSequence = 1;
-      if (data && data.length > 0 && data[0].code) {
-        const lastCode = data[0].code;
-        const sequencePart = lastCode.split('-')[2];
-        if (sequencePart) {
-          nextSequence = parseInt(sequencePart) + 1;
+      if (data && data.length > 0) {
+        // 모든 코드에서 일련번호 추출하여 최대값 찾기
+        const sequences = data
+          .map(item => {
+            const parts = item.code.split('-');
+            // PLAN-SALES-25-001 형식에서 001 추출 (인덱스 3)
+            return parts.length === 4 ? parseInt(parts[3]) : 0;
+          })
+          .filter(num => !isNaN(num));
+
+        console.log('📊 [generateSalesCode] 추출된 일련번호들:', sequences);
+
+        if (sequences.length > 0) {
+          const maxSequence = Math.max(...sequences);
+          nextSequence = maxSequence + 1;
+          console.log('📊 [generateSalesCode] 최대 일련번호:', maxSequence);
+          console.log('📊 [generateSalesCode] 다음 일련번호:', nextSequence);
         }
+      } else {
+        console.log('📊 [generateSalesCode] DB에 데이터 없음, 001부터 시작');
       }
 
       const formattedSequence = nextSequence.toString().padStart(3, '0');
-      const newCode = `SALES-${currentYearStr}-${formattedSequence}`;
+      const newCode = `PLAN-SALES-${currentYearStr}-${formattedSequence}`;
 
-      console.log('🔄 [SalesManagement] 자동 생성된 코드:', newCode);
+      console.log('✅ [generateSalesCode] 생성된 코드:', newCode);
       return newCode;
     } catch (error) {
       console.error('❌ 매출 코드 생성 실패:', error);
       // 오류 시 임시 코드 반환
       const year = new Date().getFullYear().toString().slice(-2);
       const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-      return `SALES-${year}-${random}`;
+      return `PLAN-SALES-${year}-${random}`;
     }
   }, []);
 
@@ -2605,104 +2620,126 @@ export default function SalesManagement() {
             try {
               console.log('🔄 기존 매출 수정 시작, ID:', editingSales.id);
 
+              // 서브코드를 서브코드명으로 변환
+              const customerNameText = getCustomerName(updatedRecord.customerName);
+              const salesTypeText = getSalesTypeName(updatedRecord.salesType);
+              const statusText = getStatusName(updatedRecord.status);
+              const businessUnitText = getBusinessUnitName(updatedRecord.businessUnit);
+
+              console.log('🔄 서브코드명 변환 (수정):', {
+                고객명: `${updatedRecord.customerName} → ${customerNameText}`,
+                판매유형: `${updatedRecord.salesType} → ${salesTypeText}`,
+                상태: `${updatedRecord.status} → ${statusText}`,
+                사업부: `${updatedRecord.businessUnit} → ${businessUnitText}`
+              });
+
+              // 서브코드명으로 변환된 데이터
+              const updateInput = {
+                ...updatedRecord,
+                customerName: customerNameText,
+                salesType: salesTypeText,
+                status: statusText,
+                businessUnit: businessUnitText
+              };
+
               // DB 업데이트
-              await updateSales(updatedRecord.id, updatedRecord);
+              await updateSales(updatedRecord.id, updateInput);
 
               // 로컬 상태 업데이트
-              setSales((prev) => prev.map((s) => (s.id === updatedRecord.id ? updatedRecord : s)));
+              setSales((prev) => prev.map((s) => (s.id === updatedRecord.id ? updateInput : s)));
 
               // 변경로그 추가 (필드별)
               if (originalSales) {
-                const salesCode = updatedRecord.code || `SALES-${updatedRecord.id}`;
-                const salesTitle = updatedRecord.itemName || '매출';
+                const salesCode = updateInput.code || `SALES-${updateInput.id}`;
+                const salesTitle = updateInput.itemName || '매출';
 
                 // 각 필드별 변경사항 추적
-                if (originalSales.customerName !== updatedRecord.customerName) {
+                if (originalSales.customerName !== updateInput.customerName) {
                   await addChangeLog(
                     '수정',
                     salesCode,
-                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 고객명이 ${originalSales.customerName || ''} → ${updatedRecord.customerName || ''} 로 수정 되었습니다.`,
-                    updatedRecord.businessUnit || '미분류',
+                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 고객명이 ${originalSales.customerName || ''} → ${updateInput.customerName || ''} 로 수정 되었습니다.`,
+                    updateInput.businessUnit || '미분류',
                     originalSales.customerName || '',
-                    updatedRecord.customerName || '',
+                    updateInput.customerName || '',
                     '고객명',
                     salesTitle
                   );
                 }
 
-                if (originalSales.salesType !== updatedRecord.salesType) {
+                if (originalSales.salesType !== updateInput.salesType) {
                   await addChangeLog(
                     '수정',
                     salesCode,
-                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 판매유형이 ${originalSales.salesType || ''} → ${updatedRecord.salesType || ''} 로 수정 되었습니다.`,
-                    updatedRecord.businessUnit || '미분류',
+                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 판매유형이 ${originalSales.salesType || ''} → ${updateInput.salesType || ''} 로 수정 되었습니다.`,
+                    updateInput.businessUnit || '미분류',
                     originalSales.salesType || '',
-                    updatedRecord.salesType || '',
+                    updateInput.salesType || '',
                     '판매유형',
                     salesTitle
                   );
                 }
 
-                if (originalSales.businessUnit !== updatedRecord.businessUnit) {
+                if (originalSales.businessUnit !== updateInput.businessUnit) {
                   await addChangeLog(
                     '수정',
                     salesCode,
-                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 사업부가 ${originalSales.businessUnit || ''} → ${updatedRecord.businessUnit || ''} 로 수정 되었습니다.`,
-                    updatedRecord.businessUnit || '미분류',
+                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 사업부가 ${originalSales.businessUnit || ''} → ${updateInput.businessUnit || ''} 로 수정 되었습니다.`,
+                    updateInput.businessUnit || '미분류',
                     originalSales.businessUnit || '',
-                    updatedRecord.businessUnit || '',
+                    updateInput.businessUnit || '',
                     '사업부',
                     salesTitle
                   );
                 }
 
-                if (originalSales.itemName !== updatedRecord.itemName) {
+                if (originalSales.itemName !== updateInput.itemName) {
                   await addChangeLog(
                     '수정',
                     salesCode,
-                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 품목명이 ${originalSales.itemName || ''} → ${updatedRecord.itemName || ''} 로 수정 되었습니다.`,
-                    updatedRecord.businessUnit || '미분류',
+                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 품목명이 ${originalSales.itemName || ''} → ${updateInput.itemName || ''} 로 수정 되었습니다.`,
+                    updateInput.businessUnit || '미분류',
                     originalSales.itemName || '',
-                    updatedRecord.itemName || '',
+                    updateInput.itemName || '',
                     '품목명',
                     salesTitle
                   );
                 }
 
-                if (originalSales.status !== updatedRecord.status) {
+                if (originalSales.status !== updateInput.status) {
                   await addChangeLog(
                     '수정',
                     salesCode,
-                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 상태가 ${originalSales.status || ''} → ${updatedRecord.status || ''} 로 수정 되었습니다.`,
-                    updatedRecord.businessUnit || '미분류',
+                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 상태가 ${originalSales.status || ''} → ${updateInput.status || ''} 로 수정 되었습니다.`,
+                    updateInput.businessUnit || '미분류',
                     originalSales.status || '',
-                    updatedRecord.status || '',
+                    updateInput.status || '',
                     '상태',
                     salesTitle
                   );
                 }
 
-                if (originalSales.team !== updatedRecord.team) {
+                if (originalSales.team !== updateInput.team) {
                   await addChangeLog(
                     '수정',
                     salesCode,
-                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 팀이 ${originalSales.team || ''} → ${updatedRecord.team || ''} 로 수정 되었습니다.`,
-                    updatedRecord.businessUnit || '미분류',
+                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 팀이 ${originalSales.team || ''} → ${updateInput.team || ''} 로 수정 되었습니다.`,
+                    updateInput.businessUnit || '미분류',
                     originalSales.team || '',
-                    updatedRecord.team || '',
+                    updateInput.team || '',
                     '팀',
                     salesTitle
                   );
                 }
 
-                if (originalSales.registrant !== updatedRecord.registrant) {
+                if (originalSales.registrant !== updateInput.registrant) {
                   await addChangeLog(
                     '수정',
                     salesCode,
-                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 등록자가 ${originalSales.registrant || ''} → ${updatedRecord.registrant || ''} 로 수정 되었습니다.`,
-                    updatedRecord.businessUnit || '미분류',
+                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 등록자가 ${originalSales.registrant || ''} → ${updateInput.registrant || ''} 로 수정 되었습니다.`,
+                    updateInput.businessUnit || '미분류',
                     originalSales.registrant || '',
-                    updatedRecord.registrant || '',
+                    updateInput.registrant || '',
                     '등록자',
                     salesTitle
                   );
@@ -2809,25 +2846,26 @@ export default function SalesManagement() {
             try {
               console.log('📝 신규 매출 데이터 생성:', updatedRecord);
 
-              // 코드 자동 생성 (DB의 id 기반)
-              const currentYear = new Date().getFullYear().toString().slice(-2);
-              const dbSales = await getSales();
-              const maxId = Math.max(...dbSales.map((s) => s.id || 0), 0);
-              const newCode = `SALES-${currentYear}-${String(maxId + 1).padStart(3, '0')}`;
+              // 서브코드를 서브코드명으로 변환
+              const customerNameText = getCustomerName(updatedRecord.customerName);
+              const salesTypeText = getSalesTypeName(updatedRecord.salesType);
+              const statusText = getStatusName(updatedRecord.status);
+              const businessUnitText = getBusinessUnitName(updatedRecord.businessUnit);
 
-              console.log('🆕 자동 생성된 코드:', newCode);
-
-              // 현재 사용자의 user_name 가져오기 (권한 체크용)
-              const currentUserName = session?.user?.email ? users.find((u) => u.email === session.user.email)?.user_name : undefined;
-              console.log('👤 신규 생성 - createdBy 설정:', currentUserName);
+              console.log('🔄 서브코드명 변환:', {
+                고객명: `${updatedRecord.customerName} → ${customerNameText}`,
+                판매유형: `${updatedRecord.salesType} → ${salesTypeText}`,
+                상태: `${updatedRecord.status} → ${statusText}`,
+                사업부: `${updatedRecord.businessUnit} → ${businessUnitText}`
+              });
 
               // SalesRecord를 CreateSalesInput으로 변환
               const createInput = {
-                code: newCode, // 자동 생성된 코드 사용
-                customerName: updatedRecord.customerName,
-                salesType: updatedRecord.salesType,
-                status: updatedRecord.status,
-                businessUnit: updatedRecord.businessUnit,
+                code: updatedRecord.code, // SalesEditDialog에서 생성된 코드 사용
+                customerName: customerNameText, // 서브코드명으로 저장
+                salesType: salesTypeText, // 서브코드명으로 저장
+                status: statusText, // 서브코드명으로 저장
+                businessUnit: businessUnitText, // 서브코드명으로 저장
                 modelCode: updatedRecord.modelCode,
                 itemCode: updatedRecord.itemCode,
                 itemName: updatedRecord.itemName,
@@ -2840,8 +2878,7 @@ export default function SalesManagement() {
                 notes: updatedRecord.notes,
                 contractDate: updatedRecord.contractDate,
                 assignee: updatedRecord.assignee,
-                registrationDate: updatedRecord.registrationDate,
-                createdBy: currentUserName // 권한 체크용 생성자 user_name 저장
+                registrationDate: updatedRecord.registrationDate
               };
 
               const newSales = await createSales(createInput);
@@ -2965,22 +3002,17 @@ function SalesKanbanView({
 
     const currentUserName = currentUser.user_name;
 
-    // createdBy로 확인 (우선순위 1)
-    const isCreator = sales.createdBy === currentUserName;
-
-    // registrant로 확인 (우선순위 2)
+    // registrant로 확인
     // registrant가 "홍길동 팀장" 형식일 수 있으므로, startsWith도 체크
     const registrantStartsWith = sales.registrant?.startsWith(currentUserName);
     const isAssignee = sales.registrant === currentUserName || registrantStartsWith;
 
-    const result = isCreator || isAssignee;
+    const result = isAssignee;
 
     console.log('🔍 [SalesKanbanView] 드래그 권한 체크:', {
       salesId: sales.id,
-      createdBy: sales.createdBy,
       registrant: sales.registrant,
       currentUserName,
-      isCreator,
       registrantStartsWith,
       isAssignee,
       isDataOwner: result,

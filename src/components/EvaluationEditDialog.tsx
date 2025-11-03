@@ -1931,23 +1931,23 @@ export default function EvaluationEditDialog({
 
   // 점검유형과 점검대상은 사용자가 직접 선택하도록 자동 설정 제거
 
-  // 상태 초기값을 "대기" subcode로 설정 (add 모드일 때만)
+  // 상태 초기값을 "대기" 서브코드명으로 설정 (add 모드일 때만)
   React.useEffect(() => {
     if (statusOptions.length > 0 && !formData.status && !evaluation) {
-      // "대기"에 해당하는 subcode 찾기
+      // "대기"에 해당하는 서브코드명 찾기
       const defaultStatus = statusOptions.find(option => option.name === '대기');
       if (defaultStatus) {
-        console.log('✅ [EvaluationEditDialog] 상태 초기값 설정:', defaultStatus.code, '-', defaultStatus.name);
+        console.log('✅ [EvaluationEditDialog] 상태 초기값 설정:', defaultStatus.name);
         setFormData((prev) => ({
           ...prev,
-          status: defaultStatus.code
+          status: defaultStatus.name
         }));
       } else {
         // "대기"가 없으면 첫 번째 옵션 사용
-        console.log('⚠️ [EvaluationEditDialog] "대기" 없음, 첫 번째 옵션 사용:', statusOptions[0].code);
+        console.log('⚠️ [EvaluationEditDialog] "대기" 없음, 첫 번째 옵션 사용:', statusOptions[0].name);
         setFormData((prev) => ({
           ...prev,
-          status: statusOptions[0].code
+          status: statusOptions[0].name
         }));
       }
     }
@@ -2887,7 +2887,7 @@ export default function EvaluationEditDialog({
                   >
                     <MenuItem value="">선택</MenuItem>
                     {evaluationTypesList.map((type, index) => (
-                      <MenuItem key={index} value={type.subcode}>
+                      <MenuItem key={index} value={type.subcode_name}>
                         {type.subcode_name}
                       </MenuItem>
                     ))}
@@ -2910,7 +2910,7 @@ export default function EvaluationEditDialog({
                     <MenuItem value="">선택</MenuItem>
                     {managementCategoryOptionsFromMasterCode.length > 0 ? (
                       managementCategoryOptionsFromMasterCode.map((option) => (
-                        <MenuItem key={option.subcode} value={option.subcode}>
+                        <MenuItem key={option.subcode} value={option.subcode_name}>
                           {option.subcode_name}
                         </MenuItem>
                       ))
@@ -2945,7 +2945,7 @@ export default function EvaluationEditDialog({
                         };
 
                         return (
-                          <MenuItem key={option.code} value={option.code}>
+                          <MenuItem key={option.code} value={option.name}>
                             <Chip
                               label={option.name}
                               size="small"

@@ -245,7 +245,7 @@ function KanbanView({
   };
 
   // 드래그 종료 핸들러
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveTask(null);
     setIsDraggingState(false);
@@ -260,7 +260,29 @@ function KanbanView({
     if (currentTask && currentTask.status !== newStatus) {
       const oldStatus = currentTask.status;
 
+      // 로컬 상태 업데이트
       setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: newStatus } : task)));
+
+      // DB에 상태 변경 저장
+      try {
+        console.log('🔄 칸반 드래그: 상태 변경 DB 저장 시작', {
+          id: currentTask.id,
+          oldStatus,
+          newStatus
+        });
+
+        await updateItEducation(currentTask.id, {
+          status: newStatus
+        });
+
+        console.log('✅ 칸반 드래그: 상태 변경 DB 저장 성공');
+      } catch (error) {
+        console.error('🔴 칸반 드래그: 상태 변경 DB 저장 실패:', error);
+        // 실패 시 원래 상태로 되돌림
+        setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: oldStatus } : task)));
+        alert('상태 변경 저장에 실패했습니다.');
+        return;
+      }
 
       // 변경로그 추가
       const taskCode = currentTask.code || `ITEDU-${taskId}`;
@@ -2027,7 +2049,7 @@ export default function ITEducationManagement() {
   const [value, setValue] = useState(0);
 
   // Supabase 훅 사용
-  const { loading, error, getItEducationData } = useSupabaseItEducation();
+  const { loading, error, getItEducationData, updateItEducation } = useSupabaseItEducation();
   const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 가져오기
 
   // 🔐 권한 관리

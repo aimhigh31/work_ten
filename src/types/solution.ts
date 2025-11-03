@@ -20,6 +20,7 @@ export interface SolutionData {
 export interface SolutionTableData extends SolutionData {
   isEditing?: boolean;
   originalData?: SolutionData;
+  solutionDataId?: number; // it_solution_data 테이블의 실제 ID (칸반 드래그 시 DB 업데이트용)
 }
 
 export type SolutionStatus = '대기' | '진행' | '완료' | '홀딩';

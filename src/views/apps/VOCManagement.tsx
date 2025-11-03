@@ -121,6 +121,8 @@ interface KanbanViewProps {
   getVocTypeName?: (subcode: string) => string;
   getPriorityName?: (subcode: string) => string;
   getStatusName?: (subcode: string) => string;
+  updateVoc?: (id: number, voc: Partial<any>) => Promise<boolean>;
+  onSaveVOC?: (updatedVOC: VOCTableData) => Promise<void>;
 }
 
 function KanbanView({
@@ -138,7 +140,9 @@ function KanbanView({
   users = [],
   getVocTypeName = (subcode: string) => subcode,
   getPriorityName = (subcode: string) => subcode,
-  getStatusName = (subcode: string) => subcode
+  getStatusName = (subcode: string) => subcode,
+  updateVoc,
+  onSaveVOC
 }: KanbanViewProps) {
   // 세션 정보 가져오기
   const { data: session } = useSession();
@@ -267,7 +271,7 @@ function KanbanView({
   };
 
   // 드래그 종료 핸들러
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveVOC(null);
     setIsDraggingState(false);
@@ -282,7 +286,35 @@ function KanbanView({
     if (currentVOC && currentVOC.status !== newStatus) {
       const oldStatus = currentVOC.status;
 
+      // 로컬 상태 업데이트
       setVOCs((prev) => prev.map((voc) => (voc.id === vocId ? { ...voc, status: newStatus } : voc)));
+
+      // DB에 상태 변경 저장
+      if (updateVoc && typeof currentVOC.id === 'number') {
+        try {
+          console.log('🔄 칸반 드래그: 상태 변경 DB 저장 시작', {
+            vocId: currentVOC.id,
+            oldStatus,
+            newStatus
+          });
+
+          const success = await updateVoc(currentVOC.id, {
+            status: newStatus
+          });
+
+          if (!success) {
+            throw new Error('DB 업데이트 실패');
+          }
+
+          console.log('✅ 칸반 드래그: 상태 변경 DB 저장 성공');
+        } catch (error) {
+          console.error('🔴 칸반 드래그: 상태 변경 DB 저장 실패:', error);
+          // 실패 시 원래 상태로 되돌림
+          setVOCs((prev) => prev.map((voc) => (voc.id === vocId ? { ...voc, status: oldStatus } : voc)));
+          alert('상태 변경 저장에 실패했습니다.');
+          return;
+        }
+      }
 
       // 변경로그 추가
       const vocCode = currentVOC.code || `VOC-${vocId}`;

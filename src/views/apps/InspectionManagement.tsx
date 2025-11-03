@@ -279,7 +279,7 @@ function KanbanView({
   };
 
   // 드래그 종료 핸들러
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveInspection(null);
     setIsDraggingState(false);
@@ -294,9 +294,33 @@ function KanbanView({
     if (currentInspection && currentInspection.status !== newStatus) {
       const oldStatus = currentInspection.status;
 
+      // 로컬 상태 업데이트
       setInspections((prev) =>
         prev.map((inspection) => (inspection.id === inspectionId ? { ...inspection, status: newStatus } : inspection))
       );
+
+      // DB에 상태 변경 저장
+      try {
+        console.log('🔄 칸반 드래그: 상태 변경 DB 저장 시작', {
+          inspectionId,
+          oldStatus,
+          newStatus
+        });
+
+        await updateInspection(inspectionId as number, {
+          status: newStatus
+        });
+
+        console.log('✅ 칸반 드래그: 상태 변경 DB 저장 성공');
+      } catch (error) {
+        console.error('🔴 칸반 드래그: 상태 변경 DB 저장 실패:', error);
+        // 실패 시 원래 상태로 되돌림
+        setInspections((prev) =>
+          prev.map((inspection) => (inspection.id === inspectionId ? { ...inspection, status: oldStatus } : inspection))
+        );
+        alert('상태 변경 저장에 실패했습니다.');
+        return;
+      }
 
       // 변경로그 추가
       const inspectionCode = currentInspection.code || `TASK-${inspectionId}`;

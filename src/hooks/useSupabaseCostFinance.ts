@@ -149,6 +149,12 @@ export function useSupabaseCostFinance() {
       }
 
       console.log('✅ saveFinanceItems 성공');
+
+      // 캐시 무효화 (저장 후 최신 데이터 보장)
+      const cacheKey = createCacheKey('cost_finance', `id_${costId}`);
+      sessionStorage.removeItem(cacheKey);
+      console.log('🗑️ 캐시 무효화 완료:', cacheKey);
+
       return true;
     } catch (err) {
       console.error('❌ saveFinanceItems 실패:', err);

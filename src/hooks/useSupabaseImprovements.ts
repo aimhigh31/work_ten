@@ -128,6 +128,11 @@ export function useSupabaseImprovements() {
 
         console.log('🟢 개선사항 생성 성공:', data);
 
+        // 캐시 무효화 (최신 데이터 보장)
+        const cacheKey = createCacheKey('improvements', `accident_${improvementData.accident_id}`);
+        sessionStorage.removeItem(cacheKey);
+        console.log('🗑️ createImprovement: 캐시 무효화 완료');
+
         // 해당 사고의 개선사항 목록 재조회
         await fetchImprovementsByAccidentId(improvementData.accident_id);
 
@@ -172,8 +177,13 @@ export function useSupabaseImprovements() {
           return false;
         }
 
-        // 해당 사고의 개선사항 목록 재조회
+        // 캐시 무효화 (최신 데이터 보장)
         if (data?.accident_id) {
+          const cacheKey = createCacheKey('improvements', `accident_${data.accident_id}`);
+          sessionStorage.removeItem(cacheKey);
+          console.log('🗑️ updateImprovement: 캐시 무효화 완료');
+
+          // 해당 사고의 개선사항 목록 재조회
           await fetchImprovementsByAccidentId(data.accident_id);
         }
 
@@ -222,6 +232,11 @@ export function useSupabaseImprovements() {
           return false;
         }
 
+        // 캐시 무효화 (최신 데이터 보장)
+        const cacheKey = createCacheKey('improvements', `accident_${improvementData.accident_id}`);
+        sessionStorage.removeItem(cacheKey);
+        console.log('🗑️ deleteImprovement: 캐시 무효화 완료');
+
         // 해당 사고의 개선사항 목록 재조회
         await fetchImprovementsByAccidentId(improvementData.accident_id);
         return true;
@@ -254,6 +269,11 @@ export function useSupabaseImprovements() {
           setError(error.message || '개선사항 일괄 삭제에 실패했습니다.');
           return false;
         }
+
+        // 캐시 무효화 (최신 데이터 보장)
+        const cacheKey = createCacheKey('improvements', `accident_${accidentId}`);
+        sessionStorage.removeItem(cacheKey);
+        console.log('🗑️ deleteAllImprovementsByAccidentId: 캐시 무효화 완료');
 
         // 목록 재조회
         await fetchImprovementsByAccidentId(accidentId);
@@ -304,7 +324,12 @@ export function useSupabaseImprovements() {
           console.log('🟢 새 개선사항 생성 성공:', data);
         }
 
-        // 3. 목록 재조회
+        // 3. 캐시 무효화 (최신 데이터 보장)
+        const cacheKey = createCacheKey('improvements', `accident_${accidentId}`);
+        sessionStorage.removeItem(cacheKey);
+        console.log('🗑️ replaceAllImprovements: 캐시 무효화 완료');
+
+        // 4. 목록 재조회
         await fetchImprovementsByAccidentId(accidentId);
         return true;
       } catch (error) {

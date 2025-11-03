@@ -92,6 +92,11 @@ export function useSupabaseSecurityRevision() {
         console.log('📥 createRevision: API 응답:', result);
 
         if (result.success) {
+          // 캐시 무효화 (최신 데이터 보장)
+          const cacheKey = createCacheKey('security_revision', `reg_${revisionData.security_regulation_id}`);
+          sessionStorage.removeItem(cacheKey);
+          console.log('🗑️ createRevision: 캐시 무효화 완료');
+
           // 목록 새로고침
           await fetchRevisions(revisionData.security_regulation_id);
           return true;
@@ -127,8 +132,8 @@ export function useSupabaseSecurityRevision() {
 
       if (result.success) {
         // 로컬 state 업데이트
-        setRevisions((prev) =>
-          prev.map((rev) =>
+        setRevisions((prev) => {
+          const updated = prev.map((rev) =>
             rev.id === id
               ? {
                   ...rev,
@@ -136,8 +141,18 @@ export function useSupabaseSecurityRevision() {
                   updated_at: new Date().toISOString()
                 }
               : rev
-          )
-        );
+          );
+
+          // 캐시 업데이트 (해당 리비전의 regulationId로 캐시 갱신)
+          const targetRevision = prev.find((rev) => rev.id === id);
+          if (targetRevision) {
+            const cacheKey = createCacheKey('security_revision', `reg_${targetRevision.security_regulation_id}`);
+            saveToCache(cacheKey, updated);
+            console.log('💾 updateRevision: 캐시 업데이트 완료');
+          }
+
+          return updated;
+        });
         return true;
       } else {
         setError(result.error || '수정에 실패했습니다.');
@@ -165,6 +180,11 @@ export function useSupabaseSecurityRevision() {
         console.log('📥 deleteRevision: API 응답:', result);
 
         if (result.success) {
+          // 캐시 무효화 (최신 데이터 보장)
+          const cacheKey = createCacheKey('security_revision', `reg_${regulationId}`);
+          sessionStorage.removeItem(cacheKey);
+          console.log('🗑️ deleteRevision: 캐시 무효화 완료');
+
           // 목록 새로고침
           await fetchRevisions(regulationId);
           return true;

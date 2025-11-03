@@ -1459,8 +1459,8 @@ export default function InspectionEditDialog({
 
     try {
       const newCode = await generateOplCode();
-      // 기본 상태 값을 DB에서 조회한 첫 번째 subcode로 설정
-      const defaultStatus = statusFromDB.length > 0 ? statusFromDB[0].subcode : '대기';
+      // 기본 상태 값을 DB에서 조회한 첫 번째 subcode_name으로 설정
+      const defaultStatus = statusFromDB.length > 0 ? statusFromDB[0].subcode_name : '대기';
 
       const newOplItem: Omit<OPLItem, 'id' | 'created_at' | 'updated_at'> = {
         inspection_id: inspection.id,
@@ -1476,8 +1476,10 @@ export default function InspectionEditDialog({
       };
 
       const addedItem = await addOplItem(newOplItem);
-      if (addedItem) {
-        setOplItems((prev) => [...prev, addedItem]);
+      if (addedItem && inspection?.id) {
+        // DB에서 최신 데이터 다시 로드 (캐시 무효화 후)
+        await loadOplItems(inspection.id);
+        console.log('✅ OPL 항목 추가 후 목록 새로고침 완료');
       }
     } catch (error) {
       console.error('OPL 항목 추가 실패:', error);
@@ -1488,16 +1490,18 @@ export default function InspectionEditDialog({
   const handleDeleteOplItem = useCallback(
     async (itemId: number) => {
       try {
-        const success = await deleteOplItem(itemId);
-        if (success) {
-          setOplItems((prev) => prev.filter((item) => item.id !== itemId));
+        const success = await deleteOplItem(itemId, inspection?.id);
+        if (success && inspection?.id) {
+          // DB에서 최신 데이터 다시 로드 (캐시 무효화 후)
+          await loadOplItems(inspection.id);
+          console.log('✅ OPL 항목 삭제 후 목록 새로고침 완료');
         }
       } catch (error) {
         console.error('OPL 항목 삭제 실패:', error);
         alert('OPL 항목 삭제에 실패했습니다.');
       }
     },
-    [deleteOplItem]
+    [deleteOplItem, inspection?.id]
   );
 
   const handleEditOplField = useCallback(
@@ -2602,7 +2606,7 @@ export default function InspectionEditDialog({
                   </TableHead>
                   <TableBody>
                     {oplItems.length > 0 ? (
-                      [...oplItems].reverse().map((item, reverseIndex) => (
+                      oplItems.map((item, index) => (
                         <TableRow key={item.id} hover>
                           <TableCell padding="checkbox" sx={{ textAlign: 'center' }}>
                             <Checkbox
@@ -2618,7 +2622,7 @@ export default function InspectionEditDialog({
                               }}
                             />
                           </TableCell>
-                          <TableCell>{oplItems.length - reverseIndex}</TableCell>
+                          <TableCell>{oplItems.length - index}</TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                               {/* 등록일 */}
@@ -2887,13 +2891,16 @@ export default function InspectionEditDialog({
                           <TableCell>
                             <Select
                               size="small"
-                              value={item.status || (statusFromDB.length > 0 ? statusFromDB[0].subcode : '대기')}
+                              value={(() => {
+                                // 서브코드면 서브코드명으로 변환하여 value 설정
+                                const currentStatus = item.status || (statusFromDB.length > 0 ? statusFromDB[0].subcode_name : '대기');
+                                const statusItem = statusFromDB.find((s) => s.subcode === currentStatus || s.subcode_name === currentStatus);
+                                return statusItem ? statusItem.subcode_name : currentStatus;
+                              })()}
                               onChange={(e) => {
-                                // subcode_name을 subcode로 변환하여 저장
+                                // subcode_name을 그대로 저장
                                 const selectedName = e.target.value;
-                                const selectedItem = statusFromDB.find((s) => s.subcode_name === selectedName);
-                                const subcodeValue = selectedItem ? selectedItem.subcode : selectedName;
-                                handleEditOplField(item.id, 'status', subcodeValue);
+                                handleEditOplField(item.id, 'status', selectedName);
                               }}
                               sx={{
                                 minWidth: 120,
@@ -2908,8 +2915,8 @@ export default function InspectionEditDialog({
                                 }
                               }}
                               renderValue={(selected) => {
-                                // subcode를 subcode_name으로 변환하여 표시 (Chip으로 색상 적용)
-                                const statusItem = statusFromDB.find((s) => s.subcode === selected);
+                                // 서브코드면 서브코드명으로 변환, 아니면 그대로 표시
+                                const statusItem = statusFromDB.find((s) => s.subcode === selected || s.subcode_name === selected);
                                 const statusName = statusItem ? statusItem.subcode_name : selected;
                                 return (
                                   <Chip
@@ -2917,9 +2924,9 @@ export default function InspectionEditDialog({
                                     size="small"
                                     sx={{
                                       fontSize: '12px',
-                                      ...getStatusColor(selected),
+                                      ...getStatusColor(statusName),
                                       '& .MuiChip-label': {
-                                        color: getStatusColor(selected).color
+                                        color: getStatusColor(statusName).color
                                       }
                                     }}
                                   />

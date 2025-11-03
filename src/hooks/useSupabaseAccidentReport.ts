@@ -161,6 +161,14 @@ export function useSupabaseAccidentReport() {
       }
 
       console.log('✅ 사고보고 저장 성공:', result);
+
+      // 캐시 무효화 (최신 데이터 보장)
+      if (report.accident_id) {
+        const cacheKey = createCacheKey('accident_report', `accident_${report.accident_id}`);
+        sessionStorage.removeItem(cacheKey);
+        console.log('🗑️ saveReport: 캐시 무효화 완료');
+      }
+
       return result;
     } catch (err: any) {
       console.error('🔴 사고보고 저장 실패:', err);
@@ -187,6 +195,11 @@ export function useSupabaseAccidentReport() {
       const { error } = await supabase.from('security_accident_report').delete().eq('accident_id', accidentId);
 
       if (error) throw error;
+
+      // 캐시 무효화 (최신 데이터 보장)
+      const cacheKey = createCacheKey('accident_report', `accident_${accidentId}`);
+      sessionStorage.removeItem(cacheKey);
+      console.log('🗑️ deleteReport: 캐시 무효화 완료');
 
       console.log('✅ 사고보고 삭제 성공');
       return true;

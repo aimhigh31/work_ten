@@ -39,8 +39,28 @@
 - **ID 타입 규칙**: 신규 DB 생성 시 id는 항상 **int4** 사용
   - 이유: 내부 시스템, 중소 규모, 성능 우선, 디버깅 편의성
   - UUID는 글로벌 SaaS나 MSA 구조에서만 고려
+- **서브코드 저장 규칙** (매우 중요):
+  - ❌ **절대 서브코드(subcode)를 DB에 저장하지 말 것**: `GROUP002-SUB001`, `GROUP043-SUB001` 등
+  - ✅ **반드시 서브코드명(subcode_name)을 저장할 것**: `대기`, `진행`, `완료`, `직원평가`, `상반기` 등
+  - **이유**: 사용자에게 보여지는 값과 DB에 저장되는 값의 일관성 유지, 데이터 가독성 향상
+  - **적용 대상**: 모든 마스터코드(admin_mastercode_data) 참조 필드
+  - **구현 방법**:
+    - Select 컴포넌트의 MenuItem value는 `subcode_name` 사용
+    - DB 저장 시 formData에서 바로 저장 (변환 불필요)
+    - DB 조회 시 서브코드명 그대로 표시 (변환 불필요)
+  - **예시**:
+    ```typescript
+    // ❌ 잘못된 방법
+    <MenuItem value={option.subcode}>{option.subcode_name}</MenuItem>
+
+    // ✅ 올바른 방법
+    <MenuItem value={option.subcode_name}>{option.subcode_name}</MenuItem>
+    ```
 - **현재 적용 테이블**:
   - `admin_systemsetting_menu`: 시스템설정 메뉴관리 (9개 데이터)
+  - `hr_evaluation_data`: 인사평가 데이터 (evaluation_type, management_category, status는 서브코드명으로 저장)
+  - `security_accident_report`: 보안사고 보고서 (discovery_method, report_method, service_impact, business_impact, response_method는 서브코드명으로 저장)
+  - `security_accident_improvement`: 보안사고 개선사항 (status는 서브코드명으로 저장)
 
 ### 파일 구조
 ```

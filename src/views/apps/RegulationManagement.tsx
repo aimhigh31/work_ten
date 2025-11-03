@@ -1242,6 +1242,7 @@ interface MaterialTabProps {
     revision: string;
     no: number;
     file?: File;
+    filePath?: string; // 파일 경로 추가
   }>;
   setAttachedFiles: React.Dispatch<
     React.SetStateAction<
@@ -1254,6 +1255,7 @@ interface MaterialTabProps {
         revision: string;
         no: number;
         file?: File;
+        filePath?: string; // 파일 경로 추가
       }>
     >
   >;
@@ -1281,17 +1283,40 @@ const MaterialTab = React.memo(({ selectedItem, attachedFiles, setAttachedFiles,
       }
 
       for (const file of Array.from(files)) {
-        // DB에 리비전 저장
-        const success = await createRevision({
-          security_regulation_id: regulationId,
-          file_name: file.name,
-          file_size: `${Math.round(file.size / 1024)}KB`,
-          file_description: ''
-          // file_path는 나중에 Supabase Storage 연동 시 추가
-        });
+        try {
+          // 1. 서버에 파일 업로드
+          const formData = new FormData();
+          formData.append('file', file);
 
-        if (!success) {
-          alert(`파일 ${file.name} 저장에 실패했습니다.`);
+          const uploadResponse = await fetch('/api/upload/regulation', {
+            method: 'POST',
+            body: formData
+          });
+
+          const uploadResult = await uploadResponse.json();
+
+          if (!uploadResult.success) {
+            alert(`파일 ${file.name} 업로드에 실패했습니다: ${uploadResult.error}`);
+            continue;
+          }
+
+          console.log('✅ 파일 업로드 성공:', uploadResult);
+
+          // 2. DB에 리비전 저장 (file_path 포함)
+          const success = await createRevision({
+            security_regulation_id: regulationId,
+            file_name: file.name,
+            file_size: `${Math.round(file.size / 1024)}KB`,
+            file_description: '',
+            file_path: uploadResult.url // 업로드된 파일 경로
+          });
+
+          if (!success) {
+            alert(`파일 ${file.name} DB 저장에 실패했습니다.`);
+          }
+        } catch (error) {
+          console.error('❌ 파일 업로드 오류:', error);
+          alert(`파일 ${file.name} 업로드 중 오류가 발생했습니다.`);
         }
       }
 
@@ -1372,20 +1397,35 @@ const MaterialTab = React.memo(({ selectedItem, attachedFiles, setAttachedFiles,
   const handleFileDownload = (fileId: string, fileName: string) => {
     const fileData = attachedFiles.find((f) => f.id === fileId);
 
-    if (fileData && fileData.file) {
-      // 실제 업로드된 파일이 있는 경우
-      const url = URL.createObjectURL(fileData.file);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url); // 메모리 해제
+    if (fileData) {
+      if (fileData.filePath) {
+        // 서버에 저장된 파일 경로가 있는 경우
+        const link = document.createElement('a');
+        link.href = fileData.filePath;
+        link.download = fileName;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        console.log('✅ 파일 다운로드:', fileName, fileData.filePath);
+      } else if (fileData.file) {
+        // File 객체가 있는 경우 (방금 업로드한 파일)
+        const url = URL.createObjectURL(fileData.file);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        console.log('✅ 파일 다운로드 (메모리):', fileName);
+      } else {
+        // 파일 경로도 File 객체도 없는 경우
+        console.log(`❌ 파일 다운로드 불가: ${fileName} (경로 없음)`);
+        alert('파일 경로가 없어 다운로드할 수 없습니다.\n오래된 파일은 다시 업로드해주세요.');
+      }
     } else {
-      // 기존 파일이나 파일 객체가 없는 경우 (초기 데이터)
-      console.log(`파일을 찾을 수 없습니다: ${fileName}`);
-      alert('파일을 다운로드할 수 없습니다. 파일이 존재하지 않습니다.');
+      alert('파일 정보를 찾을 수 없습니다.');
     }
   };
 
@@ -1689,6 +1729,7 @@ const OverviewPanel = React.memo(
         revision: string;
         no: number;
         file?: File;
+        filePath?: string;
       }>
     >([]);
 
@@ -1719,7 +1760,8 @@ const OverviewPanel = React.memo(
             fileDescription: rev.file_description || '',
             createdDate: rev.upload_date,
             revision: rev.revision,
-            no: revisions.length - index
+            no: revisions.length - index,
+            filePath: rev.file_path || undefined // 파일 경로 추가
           }));
           setAttachedFiles(converted);
         } else if (revisions && revisions.length === 0) {
@@ -2084,6 +2126,7 @@ interface FolderViewProps {
     revision: string;
     no: number;
     file?: File;
+    filePath?: string;
   }>;
   setSharedAttachedFiles: React.Dispatch<
     React.SetStateAction<
@@ -2096,6 +2139,7 @@ interface FolderViewProps {
         revision: string;
         no: number;
         file?: File;
+        filePath?: string;
       }>
     >
   >;
@@ -5125,6 +5169,7 @@ export default function RegulationManagement() {
       revision: string;
       no: number;
       file?: File;
+      filePath?: string;
     }>
   >([]);
 
@@ -5150,7 +5195,8 @@ export default function RegulationManagement() {
           fileDescription: rev.file_description || '',
           createdDate: rev.upload_date,
           revision: rev.revision,
-          no: revisions.length - index
+          no: revisions.length - index,
+          filePath: rev.file_path || undefined // 파일 경로 추가
         }));
         console.log('📋 칸반 팝업창: attachedFiles 변환 완료', converted);
         setSharedAttachedFiles(converted);
@@ -6256,6 +6302,12 @@ export default function RegulationManagement() {
                   selectedItem={selectedFile}
                   attachedFiles={sharedAttachedFiles}
                   setAttachedFiles={setSharedAttachedFiles}
+                  onRefreshRevisions={() => {
+                    const regulationId = Number(selectedFile.id);
+                    if (!isNaN(regulationId)) {
+                      fetchRevisions(regulationId);
+                    }
+                  }}
                   canCreateData={canCreateData}
                   canEditOwn={canEditOwn}
                   canEditOthers={canEditOthers}

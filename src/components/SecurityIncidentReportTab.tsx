@@ -23,13 +23,15 @@ import {
   TableRow,
   IconButton,
   Button,
-  Pagination
+  Pagination,
+  Checkbox
 } from '@mui/material';
 import { AddCircle, Trash } from '@wandersonalwes/iconsax-react';
 import { useSupabaseMasterCode3 } from '../hooks/useSupabaseMasterCode3';
 import { useSupabaseImprovements, CreateImprovementRequest } from '../hooks/useSupabaseImprovements';
 import { supabase } from '../lib/supabase';
 import { createClient } from '@supabase/supabase-js';
+import { createCacheKey } from '../utils/cacheUtils';
 
 interface SecurityIncidentReportTabProps {
   incidentReport?: any;
@@ -284,6 +286,7 @@ const SecurityIncidentReportTab = memo(
     const [reportMethodsFromDB, setReportMethodsFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
     const [serviceImpactsFromDB, setServiceImpactsFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
     const [responseMethodsFromDB, setResponseMethodsFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+    const [statusFromDB, setStatusFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
 
     // Dialog가 열릴 때 DB에서 직접 조회
     useEffect(() => {
@@ -337,6 +340,16 @@ const SecurityIncidentReportTab = memo(
           .eq('is_active', true)
           .order('subcode_order', { ascending: true });
         setResponseMethodsFromDB(group013Data || []);
+
+        // GROUP002 상태 조회
+        const { data: group002Data } = await supabaseClient
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP002')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+        setStatusFromDB(group002Data || []);
       };
 
       fetchMasterCodeData();
@@ -452,8 +465,8 @@ const SecurityIncidentReportTab = memo(
     const handleAddImprovement = useCallback(() => {
       const newImprovement = {
         id: Date.now(), // 임시 ID
-        plan: '새로운 개선사항',
-        status: '미완료',
+        plan: '',
+        status: statusFromDB.length > 0 ? statusFromDB[0].subcode_name : '대기',
         completionDate: '',
         assignee: ''
       };
@@ -461,7 +474,7 @@ const SecurityIncidentReportTab = memo(
       console.log('📝 Step5 - 개선사항 추가 (임시저장):', newImprovement);
       // 항상 로컬 상태에만 추가 (신규/수정 모드 관계없이)
       setLocalImprovements((prev) => [...prev, newImprovement]);
-    }, []);
+    }, [statusFromDB]);
 
     const handleDeleteImprovement = useCallback((index: number) => {
       console.log('🗑️ Step5 - 개선사항 삭제 (임시저장):', index);
@@ -561,6 +574,11 @@ const SecurityIncidentReportTab = memo(
           const tempKey = finalAccidentId ? `tempSecurityImprovements_${finalAccidentId}` : 'tempSecurityImprovements';
           console.log('🧹 정리할 키:', tempKey);
           sessionStorage.removeItem(tempKey);
+
+          // 캐시 무효화 (최신 데이터 보장) - createCacheKey 사용
+          const cacheKey = createCacheKey('improvements', `accident_${finalAccidentId}`);
+          sessionStorage.removeItem(cacheKey);
+          console.log('🗑️ saveAllImprovements: 캐시 무효화 완료', cacheKey);
 
           console.log('🟡 4단계: 수정 모드로 전환 및 데이터 다시 로드 시작');
           // 4단계: 수정 모드로 전환 및 데이터 다시 로드
@@ -799,8 +817,8 @@ const SecurityIncidentReportTab = memo(
     };
 
     // 페이지네이션 계산
-    // 개선사항 데이터는 로컬 상태에서 가져오기
-    const preventionMeasures = localImprovements;
+    // 개선사항 데이터는 로컬 상태에서 가져오기 (최신 항목이 위로 오도록 역순 정렬)
+    const preventionMeasures = [...localImprovements].reverse();
     const totalPages = Math.ceil(preventionMeasures.length / itemsPerPage);
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
@@ -815,22 +833,25 @@ const SecurityIncidentReportTab = memo(
       setEditingCell({ id: index, field });
     };
 
-    const renderEditableCell = (item: any, field: string, value: string, type: string = 'text', options?: string[]) => {
+    const renderEditableCell = (item: any, field: string, value: string, type: string = 'text', options?: string[], placeholder?: string) => {
       const isEditing = editingCell?.id === localImprovements.indexOf(item) && editingCell?.field === field;
 
       if (isEditing) {
         if (type === 'select' && options) {
           return (
-            <FormControl fullWidth size="small" sx={{ minWidth: 0 }}>
+            <Box sx={{ width: '100%', height: '48px', position: 'relative' }}>
               <Select
                 value={value}
                 onChange={(e) => {
                   const index = localImprovements.indexOf(item);
                   handlePreventionRowChange(index, field, e.target.value);
-                  setEditingCell(null);
+                  setTimeout(() => setEditingCell(null), 0);
                 }}
-                onBlur={() => setEditingCell(null)}
+                size="small"
+                fullWidth
                 autoFocus
+                onClose={() => setEditingCell(null)}
+                displayEmpty
               >
                 {options.map((option) => (
                   <MenuItem key={option} value={option}>
@@ -838,7 +859,7 @@ const SecurityIncidentReportTab = memo(
                   </MenuItem>
                 ))}
               </Select>
-            </FormControl>
+            </Box>
           );
         } else {
           return (
@@ -857,27 +878,38 @@ const SecurityIncidentReportTab = memo(
                   setEditingCell(null);
                 }
               }}
+              placeholder={placeholder}
               InputLabelProps={type === 'date' ? { shrink: true } : undefined}
               autoFocus
-              sx={{ minWidth: 0 }}
             />
           );
         }
       } else {
         return (
           <Box
+            onClick={() => handleCellClick(localImprovements.indexOf(item), field)}
             sx={{
-              height: 48,
+              width: '100%',
+              padding: '8px 12px',
+              height: '48px',
               display: 'flex',
               alignItems: 'center',
-              padding: '8px 12px',
-              cursor: 'pointer',
-              '&:hover': {
-                backgroundColor: 'action.hover'
-              }
+              cursor: 'text',
+              '&:hover': { backgroundColor: 'action.hover' }
             }}
           >
-            {value || '-'}
+            <Typography
+              variant="body2"
+              sx={{
+                fontSize: '12px',
+                width: '100%',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+            >
+              {value || (placeholder ? <span style={{ color: '#999' }}>{placeholder}</span> : '-')}
+            </Typography>
           </Box>
         );
       }
@@ -1066,20 +1098,24 @@ const SecurityIncidentReportTab = memo(
                     <FormControl fullWidth size="small">
                       <InputLabel shrink>발견방법</InputLabel>
                       <Select
-                        value={incidentReport.discoveryMethod || ''}
+                        value={(() => {
+                          // 서브코드면 서브코드명으로 변환
+                          const current = incidentReport.discoveryMethod || '';
+                          const item = discoveryMethodsFromDB.find(m => m.subcode === current || m.subcode_name === current);
+                          return item ? item.subcode_name : current;
+                        })()}
                         onChange={handleFieldChange('discoveryMethod')}
                         label="발견방법"
                         notched
                         displayEmpty
                         renderValue={(selected) => {
                           if (!selected) return '선택';
-                          const item = discoveryMethodsFromDB.find(m => m.subcode === selected);
-                          return item ? item.subcode_name : selected;
+                          return selected;
                         }}
                       >
                         <MenuItem value="">선택</MenuItem>
                         {discoveryMethodsFromDB.map((option) => (
-                          <MenuItem key={option.subcode} value={option.subcode}>
+                          <MenuItem key={option.subcode} value={option.subcode_name}>
                             {option.subcode_name}
                           </MenuItem>
                         ))}
@@ -1116,20 +1152,24 @@ const SecurityIncidentReportTab = memo(
                     <FormControl fullWidth size="small">
                       <InputLabel shrink>보고방식</InputLabel>
                       <Select
-                        value={incidentReport.reportMethod || ''}
+                        value={(() => {
+                          // 서브코드면 서브코드명으로 변환
+                          const current = incidentReport.reportMethod || '';
+                          const item = reportMethodsFromDB.find(m => m.subcode === current || m.subcode_name === current);
+                          return item ? item.subcode_name : current;
+                        })()}
                         onChange={handleFieldChange('reportMethod')}
                         label="보고방식"
                         notched
                         displayEmpty
                         renderValue={(selected) => {
                           if (!selected) return '선택';
-                          const item = reportMethodsFromDB.find(m => m.subcode === selected);
-                          return item ? item.subcode_name : selected;
+                          return selected;
                         }}
                       >
                         <MenuItem value="">선택</MenuItem>
                         {reportMethodsFromDB.map((option) => (
-                          <MenuItem key={option.subcode} value={option.subcode}>
+                          <MenuItem key={option.subcode} value={option.subcode_name}>
                             {option.subcode_name}
                           </MenuItem>
                         ))}
@@ -1197,20 +1237,24 @@ const SecurityIncidentReportTab = memo(
                     <FormControl fullWidth size="small">
                       <InputLabel shrink>서비스 영향도</InputLabel>
                       <Select
-                        value={incidentReport.serviceImpact || ''}
+                        value={(() => {
+                          // 서브코드면 서브코드명으로 변환
+                          const current = incidentReport.serviceImpact || '';
+                          const item = serviceImpactsFromDB.find(m => m.subcode === current || m.subcode_name === current);
+                          return item ? item.subcode_name : current;
+                        })()}
                         onChange={handleFieldChange('serviceImpact')}
                         label="서비스 영향도"
                         notched
                         displayEmpty
                         renderValue={(selected) => {
                           if (!selected) return '선택';
-                          const item = serviceImpactsFromDB.find(m => m.subcode === selected);
-                          return item ? item.subcode_name : selected;
+                          return selected;
                         }}
                       >
                         <MenuItem value="">선택</MenuItem>
                         {serviceImpactsFromDB.map((option) => (
-                          <MenuItem key={option.subcode} value={option.subcode}>
+                          <MenuItem key={option.subcode} value={option.subcode_name}>
                             {option.subcode_name}
                           </MenuItem>
                         ))}
@@ -1221,20 +1265,24 @@ const SecurityIncidentReportTab = memo(
                     <FormControl fullWidth size="small">
                       <InputLabel shrink>비즈니스 영향도</InputLabel>
                       <Select
-                        value={incidentReport.businessImpact || ''}
+                        value={(() => {
+                          // 서브코드면 서브코드명으로 변환
+                          const current = incidentReport.businessImpact || '';
+                          const item = serviceImpactsFromDB.find(m => m.subcode === current || m.subcode_name === current);
+                          return item ? item.subcode_name : current;
+                        })()}
                         onChange={handleFieldChange('businessImpact')}
                         label="비즈니스 영향도"
                         notched
                         displayEmpty
                         renderValue={(selected) => {
                           if (!selected) return '선택';
-                          const item = serviceImpactsFromDB.find(m => m.subcode === selected);
-                          return item ? item.subcode_name : selected;
+                          return selected;
                         }}
                       >
                         <MenuItem value="">선택</MenuItem>
                         {serviceImpactsFromDB.map((option) => (
-                          <MenuItem key={option.subcode} value={option.subcode}>
+                          <MenuItem key={option.subcode} value={option.subcode_name}>
                             {option.subcode_name}
                           </MenuItem>
                         ))}
@@ -1272,20 +1320,24 @@ const SecurityIncidentReportTab = memo(
                     <FormControl fullWidth size="small">
                       <InputLabel shrink>대응방식</InputLabel>
                       <Select
-                        value={incidentReport.responseMethod || ''}
+                        value={(() => {
+                          // 서브코드면 서브코드명으로 변환
+                          const current = incidentReport.responseMethod || '';
+                          const item = responseMethodsFromDB.find(m => m.subcode === current || m.subcode_name === current);
+                          return item ? item.subcode_name : current;
+                        })()}
                         onChange={handleFieldChange('responseMethod')}
                         label="대응방식"
                         notched
                         displayEmpty
                         renderValue={(selected) => {
                           if (!selected) return '선택';
-                          const item = responseMethodsFromDB.find(m => m.subcode === selected);
-                          return item ? item.subcode_name : selected;
+                          return selected;
                         }}
                       >
                         <MenuItem value="">선택</MenuItem>
                         {responseMethodsFromDB.map((option) => (
-                          <MenuItem key={option.subcode} value={option.subcode}>
+                          <MenuItem key={option.subcode} value={option.subcode_name}>
                             {option.subcode_name}
                           </MenuItem>
                         ))}
@@ -1409,21 +1461,28 @@ const SecurityIncidentReportTab = memo(
                 </Box>
 
                 <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                  <Table size="small">
+                  <Table size="small" sx={{ tableLayout: 'fixed', width: '100%' }}>
                     <TableHead>
                       <TableRow sx={{ backgroundColor: 'grey.50' }}>
-                        <TableCell padding="checkbox" sx={{ width: 50 }}>
-                          <input
-                            type="checkbox"
+                        <TableCell padding="checkbox" sx={{ width: 50, minWidth: 50, maxWidth: 50 }}>
+                          <Checkbox
                             checked={localImprovements.length > 0 && (selectedRows || []).length === localImprovements.length}
                             onChange={handleSelectAll}
+                            color="primary"
+                            size="small"
+                            sx={{
+                              transform: 'scale(0.7)',
+                              '&.Mui-checked': {
+                                color: '#1976d2'
+                              }
+                            }}
                           />
                         </TableCell>
-                        <TableCell sx={{ width: 60, fontWeight: 600 }}>NO</TableCell>
-                        <TableCell sx={{ width: 250, fontWeight: 600 }}>실행안</TableCell>
-                        <TableCell sx={{ width: 120, fontWeight: 600 }}>상태</TableCell>
-                        <TableCell sx={{ width: 140, fontWeight: 600 }}>완료일</TableCell>
-                        <TableCell sx={{ width: 120, fontWeight: 600 }}>담당자</TableCell>
+                        <TableCell sx={{ width: 60, minWidth: 60, maxWidth: 60, fontWeight: 600 }}>NO</TableCell>
+                        <TableCell sx={{ width: 250, minWidth: 250, maxWidth: 250, fontWeight: 600 }}>실행안</TableCell>
+                        <TableCell sx={{ width: 120, minWidth: 120, maxWidth: 120, fontWeight: 600 }}>상태</TableCell>
+                        <TableCell sx={{ width: 140, minWidth: 140, maxWidth: 140, fontWeight: 600 }}>완료일</TableCell>
+                        <TableCell sx={{ width: 120, minWidth: 120, maxWidth: 120, fontWeight: 600 }}>담당자</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -1438,37 +1497,40 @@ const SecurityIncidentReportTab = memo(
                       ) : (
                         currentItems.map((row: any, pageIndex: number) => {
                           const actualIndex = startIndex + pageIndex;
-                          const reverseIndex = preventionMeasures.length - actualIndex;
+                          const displayNo = preventionMeasures.length - actualIndex;
                           return (
-                            <TableRow key={actualIndex} sx={{ height: 48 }}>
-                              <TableCell padding="checkbox" sx={{ padding: 0 }}>
+                            <TableRow key={actualIndex} sx={{ '&:hover': { backgroundColor: 'action.hover' } }}>
+                              <TableCell sx={{ width: 50, minWidth: 50, maxWidth: 50, padding: 0, height: 48 }}>
                                 <Box sx={{ height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <input
-                                    type="checkbox"
+                                  <Checkbox
                                     checked={(selectedRows || []).includes(actualIndex.toString())}
                                     onChange={() => handleSelectRow(actualIndex.toString())}
+                                    color="primary"
+                                    size="small"
+                                    sx={{
+                                      transform: 'scale(0.7)',
+                                      '&.Mui-checked': {
+                                        color: '#1976d2'
+                                      }
+                                    }}
                                   />
                                 </Box>
                               </TableCell>
-                              <TableCell sx={{ width: 60, padding: 0, height: 48 }}>
-                                <Box sx={{ height: 48, display: 'flex', alignItems: 'center', padding: '8px 12px' }}>{reverseIndex}</Box>
+                              <TableCell sx={{ width: 60, minWidth: 60, maxWidth: 60, padding: 0, height: 48 }}>
+                                <Box sx={{ height: 48, display: 'flex', alignItems: 'center', padding: '8px 12px' }}>
+                                  <Typography variant="body2" sx={{ fontSize: '12px' }}>{displayNo}</Typography>
+                                </Box>
                               </TableCell>
-                              <TableCell sx={{ width: 250, padding: 0, height: 48 }} onClick={() => handleCellClick(actualIndex, 'plan')}>
-                                {renderEditableCell(row, 'plan', row.plan || '')}
+                              <TableCell sx={{ width: 250, minWidth: 250, maxWidth: 250, padding: 0, height: 48 }}>
+                                {renderEditableCell(row, 'plan', row.plan || '', 'text', undefined, '클릭하여 실행안을 입력하세요')}
                               </TableCell>
-                              <TableCell sx={{ width: 120, padding: 0, height: 48 }} onClick={() => handleCellClick(actualIndex, 'status')}>
-                                {renderEditableCell(row, 'status', row.status || '', 'select', ['계획', '진행중', '완료', '보류'])}
+                              <TableCell sx={{ width: 120, minWidth: 120, maxWidth: 120, padding: 0, height: 48 }}>
+                                {renderEditableCell(row, 'status', row.status || '', 'select', statusFromDB.map(s => s.subcode_name))}
                               </TableCell>
-                              <TableCell
-                                sx={{ width: 140, padding: 0, height: 48 }}
-                                onClick={() => handleCellClick(actualIndex, 'completionDate')}
-                              >
+                              <TableCell sx={{ width: 140, minWidth: 140, maxWidth: 140, padding: 0, height: 48 }}>
                                 {renderEditableCell(row, 'completionDate', row.completionDate || '', 'date')}
                               </TableCell>
-                              <TableCell
-                                sx={{ width: 120, padding: 0, height: 48 }}
-                                onClick={() => handleCellClick(actualIndex, 'assignee')}
-                              >
+                              <TableCell sx={{ width: 120, minWidth: 120, maxWidth: 120, padding: 0, height: 48 }}>
                                 {renderEditableCell(row, 'assignee', row.assignee || '')}
                               </TableCell>
                             </TableRow>

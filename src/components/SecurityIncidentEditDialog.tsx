@@ -1459,6 +1459,36 @@ const SecurityIncidentEditDialog = memo(
               const savedReport = await saveReport(reportData);
               if (savedReport) {
                 console.log('✅ 사고보고 저장 성공:', savedReport);
+
+                // 저장 후 최신 데이터 다시 로드 (캐시 무효화 후)
+                const reloadedReport = await fetchReportByAccidentId(finalAccidentId);
+                if (reloadedReport) {
+                  console.log('✅ 사고보고 데이터 재로드 성공:', reloadedReport);
+                  // incidentReport 상태 업데이트
+                  setIncidentReport({
+                    discoveryDateTime: reloadedReport.discovery_datetime || '',
+                    discoverer: reloadedReport.discoverer || '',
+                    discoveryMethod: reloadedReport.discovery_method || '',
+                    reportDateTime: reloadedReport.report_datetime || '',
+                    reporter: reloadedReport.reporter || '',
+                    reportMethod: reloadedReport.report_method || '',
+                    incidentTarget: reloadedReport.incident_target || '',
+                    incidentCause: reloadedReport.incident_cause || '',
+                    affectedSystems: reloadedReport.affected_systems || '',
+                    affectedData: reloadedReport.affected_data || '',
+                    serviceImpact: reloadedReport.service_impact || '',
+                    businessImpact: reloadedReport.business_impact || '',
+                    situationDetails: reloadedReport.situation_details || '',
+                    responseMethod: reloadedReport.response_method || '',
+                    improvementExecutor: reloadedReport.improvement_executor || '',
+                    expectedCompletionDate: reloadedReport.expected_completion_date || '',
+                    improvementDetails: reloadedReport.improvement_details || '',
+                    completionDate: reloadedReport.completion_date || '',
+                    completionApprover: reloadedReport.completion_approver || '',
+                    resolutionDetails: reloadedReport.resolution_details || '',
+                    preventionDetails: reloadedReport.prevention_details || ''
+                  });
+                }
               } else {
                 console.warn('⚠️ 사고보고 저장 실패 - null 반환');
                 console.warn('🔍 reportLoading:', reportLoading);
@@ -1631,6 +1661,36 @@ const SecurityIncidentEditDialog = memo(
               const savedReport = await saveReport(reportData);
               if (savedReport) {
                 console.log('✅ 사고보고 저장 성공:', savedReport);
+
+                // 저장 후 최신 데이터 다시 로드 (캐시 무효화 후)
+                const reloadedReport = await fetchReportByAccidentId(finalAccidentId);
+                if (reloadedReport) {
+                  console.log('✅ 사고보고 데이터 재로드 성공:', reloadedReport);
+                  // incidentReport 상태 업데이트
+                  setIncidentReport({
+                    discoveryDateTime: reloadedReport.discovery_datetime || '',
+                    discoverer: reloadedReport.discoverer || '',
+                    discoveryMethod: reloadedReport.discovery_method || '',
+                    reportDateTime: reloadedReport.report_datetime || '',
+                    reporter: reloadedReport.reporter || '',
+                    reportMethod: reloadedReport.report_method || '',
+                    incidentTarget: reloadedReport.incident_target || '',
+                    incidentCause: reloadedReport.incident_cause || '',
+                    affectedSystems: reloadedReport.affected_systems || '',
+                    affectedData: reloadedReport.affected_data || '',
+                    serviceImpact: reloadedReport.service_impact || '',
+                    businessImpact: reloadedReport.business_impact || '',
+                    situationDetails: reloadedReport.situation_details || '',
+                    responseMethod: reloadedReport.response_method || '',
+                    improvementExecutor: reloadedReport.improvement_executor || '',
+                    expectedCompletionDate: reloadedReport.expected_completion_date || '',
+                    improvementDetails: reloadedReport.improvement_details || '',
+                    completionDate: reloadedReport.completion_date || '',
+                    completionApprover: reloadedReport.completion_approver || '',
+                    resolutionDetails: reloadedReport.resolution_details || '',
+                    preventionDetails: reloadedReport.prevention_details || ''
+                  });
+                }
               } else {
                 console.warn('⚠️ 사고보고 저장 실패 - null 반환');
                 console.warn('🔍 reportLoading:', reportLoading);

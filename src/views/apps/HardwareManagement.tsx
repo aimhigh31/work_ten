@@ -249,7 +249,7 @@ function KanbanView({
   // Hardware 저장 핸들러
 
   // 드래그 종료 핸들러
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveHardware(null);
     setIsDraggingState(false);
@@ -264,7 +264,29 @@ function KanbanView({
     if (currentHardware && currentHardware.status !== newStatus) {
       const oldStatus = currentHardware.status;
 
+      // 로컬 상태 업데이트
       setHardware((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: newStatus } : task)));
+
+      // DB에 상태 변경 저장
+      try {
+        console.log('🔄 칸반 드래그: 상태 변경 DB 저장 시작', {
+          id: currentHardware.id,
+          oldStatus,
+          newStatus
+        });
+
+        await updateHardware(currentHardware.id, {
+          status: newStatus
+        });
+
+        console.log('✅ 칸반 드래그: 상태 변경 DB 저장 성공');
+      } catch (error) {
+        console.error('🔴 칸반 드래그: 상태 변경 DB 저장 실패:', error);
+        // 실패 시 원래 상태로 되돌림
+        setHardware((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: oldStatus } : task)));
+        alert('상태 변경 저장에 실패했습니다.');
+        return;
+      }
 
       // 변경로그 추가
       const taskCode = currentHardware.code || `TASK-${taskId}`;

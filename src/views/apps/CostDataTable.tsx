@@ -516,12 +516,31 @@ export default function CostDataTable({
   const { masterCodes, getSubCodesByGroup } = useCommonData();
 
   // 비용유형 서브코드명 변환 함수
-  const getCostTypeName = useCallback((subcode: string) => {
-    if (!subcode) return '';
-    const found = masterCodes.find(
-      (item) => item.codetype === 'subcode' && item.group_code === 'GROUP027' && item.subcode === subcode && item.is_active
-    );
-    return found ? found.subcode_name : subcode;
+  const getCostTypeName = useCallback((value: string) => {
+    if (!value) return '';
+    // GROUP027-SUB001 형식이면 서브코드명으로 변환
+    if (value.startsWith('GROUP027-')) {
+      const found = masterCodes.find(
+        (item) => item.codetype === 'subcode' && item.group_code === 'GROUP027' && item.subcode === value && item.is_active
+      );
+      return found ? found.subcode_name : value;
+    }
+    // 이미 서브코드명이면 그대로 반환
+    return value;
+  }, [masterCodes]);
+
+  // 비용세부유형 서브코드명 변환 함수 (금액탭용)
+  const getCostDetailTypeName = useCallback((value: string) => {
+    if (!value) return '';
+    // GROUP028-SUB001 형식이면 서브코드명으로 변환
+    if (value.startsWith('GROUP028-')) {
+      const found = masterCodes.find(
+        (item) => item.codetype === 'subcode' && item.group_code === 'GROUP028' && item.subcode === value && item.is_active
+      );
+      return found ? found.subcode_name : value;
+    }
+    // 이미 서브코드명이면 그대로 반환
+    return value;
   }, [masterCodes]);
 
   // Supabase 금액 데이터 연동
@@ -669,13 +688,17 @@ export default function CostDataTable({
   }, [masterCodes]);
 
   // 상태 코드를 이름으로 변환하는 함수
-  const getStatusName = useCallback((statusCode: string) => {
-    if (!statusCode) return '대기';
-    // "GROUP002-SUB001" 형태에서 서브코드명 찾기
-    const status = masterCodes.find(
-      (code) => code.codetype === 'subcode' && code.group_code === 'GROUP002' && (code.subcode === statusCode || `${code.group_code}-${code.subcode}` === statusCode)
-    );
-    return status?.subcode_name || statusCode;
+  const getStatusName = useCallback((value: string) => {
+    if (!value) return '대기';
+    // GROUP002-SUB001 형식이면 서브코드명으로 변환
+    if (value.startsWith('GROUP002-')) {
+      const found = masterCodes.find(
+        (item) => item.codetype === 'subcode' && item.group_code === 'GROUP002' && item.subcode === value && item.is_active
+      );
+      return found ? found.subcode_name : value;
+    }
+    // 이미 서브코드명이면 그대로 반환
+    return value;
   }, [masterCodes]);
 
   // 부서명 목록
@@ -903,15 +926,22 @@ export default function CostDataTable({
 
         // Supabase에서 금액 데이터 로드
         const loadFinanceData = async () => {
-          console.log('📥 금액 데이터 로드 시작, cost_id:', dialog.recordId);
+          console.log('📥 [로드] 금액 데이터 로드 시작');
+          console.log('📥 [로드] cost_id:', dialog.recordId);
+          console.log('📥 [로드] existingRecord:', existingRecord);
+
           const financeItems = await getFinanceItems(Number(dialog.recordId));
-          console.log('✅ 금액 데이터 로드 완료:', financeItems.length, '개');
+          console.log('✅ [로드] 금액 데이터 로드 완료:', financeItems.length, '개');
+          console.log('✅ [로드] 로드된 데이터:', JSON.stringify(financeItems, null, 2));
 
           if (financeItems.length > 0) {
+            console.log('✅ [로드] Supabase 데이터 사용');
             setAmountItems(financeItems);
           } else {
+            console.log('⚠️ [로드] Supabase에 데이터 없음, 로컬 데이터 확인');
             // Supabase에 데이터가 없으면 기존 로컬 데이터 사용 (마이그레이션 대비)
             if (existingRecord.amountDetails && existingRecord.amountDetails.length > 0) {
+              console.log('✅ [로드] 로컬 amountDetails 사용:', existingRecord.amountDetails.length, '개');
               const safeAmountItems = existingRecord.amountDetails.map((item) => ({
                 id: item.id || Date.now(),
                 code: item.code || '',
@@ -923,6 +953,7 @@ export default function CostDataTable({
               }));
               setAmountItems(safeAmountItems);
             } else {
+              console.log('⚠️ [로드] 로컬 데이터도 없음, 빈 배열로 초기화');
               setAmountItems([]);
             }
           }
@@ -1167,6 +1198,15 @@ export default function CostDataTable({
 
     try {
       if (dialog.mode === 'add') {
+        // 서브코드를 서브코드명으로 변환
+        const costTypeText = getCostTypeName(overviewData.costType);
+        const statusText = getStatusName(overviewData.status);
+
+        console.log('🔄 [신규] 서브코드명 변환:', {
+          비용유형: `${overviewData.costType} → ${costTypeText}`,
+          상태: `${overviewData.status} → ${statusText}`
+        });
+
         // 새 레코드 추가 (이미 생성된 코드 사용)
         const newRecordData = {
           registration_date: overviewData.registrationDate,
@@ -1178,12 +1218,12 @@ export default function CostDataTable({
           team: overviewData.team,
           assignee_id: null,
           assignee: overviewData.assignee,
-          costType: overviewData.costType || (amountItems.length > 0 ? amountItems[0].costType : '솔루션'),
+          costType: costTypeText, // 서브코드명으로 저장
           content: overviewData.content,
           quantity: amountItems.reduce((sum, item) => sum + (item.quantity || 0), 0),
           unitPrice: amountItems.length > 0 ? amountItems[0].unitPrice : 0,
           amount: totalAmount,
-          status: overviewData.status,
+          status: statusText, // 서브코드명으로 저장
           completion_date: overviewData.completionDate || null,
           completionDate: overviewData.completionDate || null, // 테이블 표시용 필드
           attachment: false,
@@ -1213,14 +1253,31 @@ export default function CostDataTable({
           }
 
           // Supabase에 금액 데이터 저장 (data_relation.md 패턴)
+          console.log('💾 [신규] 금액 데이터 저장 시작');
+          console.log('💾 [신규] savedCost:', savedCost);
+          console.log('💾 [신규] savedCost.id:', savedCost?.id);
+          console.log('💾 [신규] amountItems 개수:', amountItems.length);
+          console.log('💾 [신규] amountItems 내용:', JSON.stringify(amountItems, null, 2));
+
           if (savedCost && amountItems.length > 0) {
-            console.log('💾 금액 데이터 저장 시작, cost_id:', savedCost.id);
-            const success = await saveFinanceItems(Number(savedCost.id), amountItems);
+            // 금액 항목의 비용세부유형을 서브코드명으로 변환
+            const convertedAmountItems = amountItems.map(item => {
+              const costDetailTypeText = getCostDetailTypeName(item.costType);
+              console.log('🔄 [신규-금액] 비용세부유형 변환:', `${item.costType} → ${costDetailTypeText}`);
+              return {
+                ...item,
+                costType: costDetailTypeText // 서브코드명으로 변환
+              };
+            });
+
+            const success = await saveFinanceItems(Number(savedCost.id), convertedAmountItems);
             if (success) {
-              console.log('✅ 금액 데이터 저장 완료');
+              console.log('✅ [신규] 금액 데이터 저장 완료');
             } else {
-              console.error('❌ 금액 데이터 저장 실패');
+              console.error('❌ [신규] 금액 데이터 저장 실패');
             }
+          } else {
+            console.warn('⚠️ [신규] 금액 데이터 저장 건너뜀 (savedCost 또는 amountItems 없음)');
           }
 
           // 기록(피드백) 데이터 저장
@@ -1260,13 +1317,22 @@ export default function CostDataTable({
         // 기존 레코드 수정
         const originalCost = costs.find((c) => c.id === dialog.recordId?.toString());
 
+        // 서브코드를 서브코드명으로 변환
+        const costTypeText = getCostTypeName(overviewData.costType);
+        const statusText = getStatusName(overviewData.status);
+
+        console.log('🔄 [수정] 서브코드명 변환:', {
+          비용유형: `${overviewData.costType} → ${costTypeText}`,
+          상태: `${overviewData.status} → ${statusText}`
+        });
+
         const updates = {
           title: overviewData.title,
           content: overviewData.content,
-          costType: overviewData.costType,
+          costType: costTypeText, // 서브코드명으로 저장
           team: overviewData.team,
           assignee: overviewData.assignee,
-          status: overviewData.status,
+          status: statusText, // 서브코드명으로 저장
           start_date: overviewData.startDate || null,
           startDate: overviewData.startDate || null,
           completion_date: overviewData.completionDate || null,
@@ -1405,12 +1471,26 @@ export default function CostDataTable({
           }
 
           // Supabase에 금액 데이터 저장 (data_relation.md 패턴 - 삭제 후 재저장)
-          console.log('💾 금액 데이터 저장 시작, cost_id:', dialog.recordId);
-          const success = await saveFinanceItems(Number(dialog.recordId), amountItems);
+          console.log('💾 [수정] 금액 데이터 저장 시작');
+          console.log('💾 [수정] cost_id:', dialog.recordId);
+          console.log('💾 [수정] amountItems 개수:', amountItems.length);
+          console.log('💾 [수정] amountItems 내용:', JSON.stringify(amountItems, null, 2));
+
+          // 금액 항목의 비용세부유형을 서브코드명으로 변환
+          const convertedAmountItems = amountItems.map(item => {
+            const costDetailTypeText = getCostDetailTypeName(item.costType);
+            console.log('🔄 [수정-금액] 비용세부유형 변환:', `${item.costType} → ${costDetailTypeText}`);
+            return {
+              ...item,
+              costType: costDetailTypeText // 서브코드명으로 변환
+            };
+          });
+
+          const success = await saveFinanceItems(Number(dialog.recordId), convertedAmountItems);
           if (success) {
-            console.log('✅ 금액 데이터 저장 완료');
+            console.log('✅ [수정] 금액 데이터 저장 완료');
           } else {
-            console.error('❌ 금액 데이터 저장 실패');
+            console.error('❌ [수정] 금액 데이터 저장 실패');
           }
 
           // 기록(피드백) 데이터 저장
@@ -2636,13 +2716,12 @@ export default function CostDataTable({
                       notched
                       renderValue={(selected) => {
                         if (!selected) return '선택';
-                        const item = costTypesFromDB.find(t => t.subcode === selected);
-                        return item ? item.subcode_name : selected;
+                        return selected;
                       }}
                     >
                       <MenuItem value="">선택</MenuItem>
                       {costTypesFromDB.map((option) => (
-                        <MenuItem key={option.subcode} value={option.subcode}>
+                        <MenuItem key={option.subcode} value={option.subcode_name}>
                           {option.subcode_name}
                         </MenuItem>
                       ))}
@@ -2688,15 +2767,13 @@ export default function CostDataTable({
                       notched
                       renderValue={(selected) => {
                         if (!selected) return '';
-                        const item = statusTypesFromDB.find(s => s.subcode === selected);
-                        const displayName = item ? item.subcode_name : selected;
                         return (
                           <Chip
-                            label={displayName}
+                            label={selected}
                             size="small"
                             sx={{
-                              backgroundColor: getStatusColor(displayName).bgcolor,
-                              color: getStatusColor(displayName).color,
+                              backgroundColor: getStatusColor(selected).bgcolor,
+                              color: getStatusColor(selected).color,
                               fontSize: '13px',
                               fontWeight: 400
                             }}
@@ -2705,7 +2782,7 @@ export default function CostDataTable({
                       }}
                     >
                       {statusTypesFromDB.map((option) => (
-                        <MenuItem key={option.subcode} value={option.subcode}>
+                        <MenuItem key={option.subcode} value={option.subcode_name}>
                           <Chip
                             label={option.subcode_name}
                             size="small"
@@ -3060,8 +3137,7 @@ export default function CostDataTable({
                               disableUnderline
                               renderValue={(selected) => {
                                 if (!selected) return '';
-                                const found = costDetailTypesFromDB.find(t => t.subcode === selected);
-                                return found ? found.subcode_name : selected;
+                                return selected;
                               }}
                               sx={{
                                 width: '100%',
@@ -3087,7 +3163,7 @@ export default function CostDataTable({
                               }}
                             >
                               {costDetailTypesFromDB.map((option) => (
-                                <MenuItem key={option.subcode} value={option.subcode} sx={{ fontSize: '12px' }}>
+                                <MenuItem key={option.subcode} value={option.subcode_name} sx={{ fontSize: '12px' }}>
                                   {option.subcode_name}
                                 </MenuItem>
                               ))}

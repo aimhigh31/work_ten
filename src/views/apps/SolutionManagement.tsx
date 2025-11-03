@@ -124,6 +124,8 @@ interface KanbanViewProps {
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
+  updateSolution?: (id: number, data: Partial<DbSolutionData>) => Promise<boolean>;
+  onSaveSolution?: (updatedSolution: SolutionTableData) => Promise<void>;
 }
 
 function KanbanView({
@@ -138,7 +140,9 @@ function KanbanView({
   users = [],
   canCreateData = true,
   canEditOwn = true,
-  canEditOthers = true
+  canEditOthers = true,
+  updateSolution,
+  onSaveSolution
 }: KanbanViewProps) {
   const theme = useTheme();
 
@@ -256,7 +260,7 @@ function KanbanView({
   };
 
   // 드래그 종료 핸들러
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveSolution(null);
     setIsDraggingState(false);
@@ -271,7 +275,29 @@ function KanbanView({
     if (currentSolution && currentSolution.status !== newStatus) {
       const oldStatus = currentSolution.status;
 
+      // 로컬 상태 업데이트
       setSolutions((prev) => prev.map((solution) => (solution.id === solutionId ? { ...solution, status: newStatus } : solution)));
+
+      // DB에 상태 변경 저장
+      try {
+        console.log('🔄 칸반 드래그: 상태 변경 DB 저장 시작', {
+          id: currentSolution.id,
+          oldStatus,
+          newStatus
+        });
+
+        await updateSolution(currentSolution.id, {
+          status: newStatus
+        });
+
+        console.log('✅ 칸반 드래그: 상태 변경 DB 저장 성공');
+      } catch (error) {
+        console.error('🔴 칸반 드래그: 상태 변경 DB 저장 실패:', error);
+        // 실패 시 원래 상태로 되돌림
+        setSolutions((prev) => prev.map((solution) => (solution.id === solutionId ? { ...solution, status: oldStatus } : solution)));
+        alert('상태 변경 저장에 실패했습니다.');
+        return;
+      }
 
       // 변경로그 추가
       const solutionCode = currentSolution.code || `TASK-${solutionId}`;

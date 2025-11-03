@@ -117,7 +117,7 @@ export const useSupabaseSales = (): UseSupabaseSalesReturn => {
         code: sales.code,
         customer_name: sales.customerName,
         sales_type: sales.salesType,
-        status: sales.status || '대기',
+        status: sales.status, // 필수값 (빈 값이면 DB에서 에러 발생)
         business_unit: sales.businessUnit,
         model_code: sales.modelCode,
         item_code: sales.itemCode,
@@ -130,8 +130,7 @@ export const useSupabaseSales = (): UseSupabaseSalesReturn => {
         delivery_date: sales.deliveryDate,
         notes: sales.notes || '',
         contract_date: sales.contractDate || null,
-        assignee: sales.assignee || null,
-        created_by: sales.createdBy || null // 권한 체크용 생성자 user_name
+        assignee: sales.assignee || null
       };
 
       console.log('💾 최종 삽입 데이터:', insertData);
@@ -189,7 +188,6 @@ export const useSupabaseSales = (): UseSupabaseSalesReturn => {
       if (sales.notes !== undefined) updateData.notes = sales.notes;
       if (sales.contractDate !== undefined) updateData.contract_date = sales.contractDate;
       if (sales.assignee !== undefined) updateData.assignee = sales.assignee;
-      if (sales.createdBy !== undefined) updateData.created_by = sales.createdBy;
 
       console.log('💾 Supabase로 전송할 데이터:', JSON.stringify(updateData, null, 2));
 

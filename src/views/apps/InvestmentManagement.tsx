@@ -111,6 +111,8 @@ interface KanbanViewProps {
   canEditOwn?: boolean;
   canEditOthers?: boolean;
   users?: any[];
+  onSaveInvestment?: (investmentData: InvestmentData) => Promise<void>;
+  updateInvestmentData?: (investmentDataId: number, updates: Partial<any>) => Promise<void>;
 }
 
 function KanbanView({
@@ -124,7 +126,9 @@ function KanbanView({
   assigneeList,
   canEditOwn = true,
   canEditOthers = true,
-  users = []
+  users = [],
+  onSaveInvestment,
+  updateInvestmentData
 }: KanbanViewProps) {
   const theme = useTheme();
 
@@ -199,7 +203,7 @@ function KanbanView({
   };
 
   // 드래그 종료 핸들러
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveInvestment(null);
     setIsDraggingState(false);
@@ -212,14 +216,42 @@ function KanbanView({
     // 상태가 변경된 경우만 업데이트
     const currentInvestment = investments.find((investment) => investment.id === investmentId);
     if (currentInvestment && currentInvestment.status !== newStatus) {
+      const oldStatus = currentInvestment.status;
+
+      // 로컬 상태 업데이트
       setInvestments((prev) =>
         prev.map((investment) => (investment.id === investmentId ? { ...investment, status: newStatus } : investment))
       );
 
+      // DB에 상태 변경 저장
+      if (updateInvestmentData && currentInvestment.investmentDataId) {
+        try {
+          console.log('🔄 칸반 드래그: 상태 변경 DB 저장 시작', {
+            investmentDataId: currentInvestment.investmentDataId,
+            oldStatus,
+            newStatus
+          });
+
+          await updateInvestmentData(currentInvestment.investmentDataId, {
+            status: newStatus
+          });
+
+          console.log('✅ 칸반 드래그: 상태 변경 DB 저장 성공');
+        } catch (error) {
+          console.error('🔴 칸반 드래그: 상태 변경 DB 저장 실패:', error);
+          // 실패 시 원래 상태로 되돌림
+          setInvestments((prev) =>
+            prev.map((investment) => (investment.id === investmentId ? { ...investment, status: oldStatus } : investment))
+          );
+          alert('상태 변경 저장에 실패했습니다.');
+          return;
+        }
+      }
+
       // 변경로그 추가 - 칸반에서 상태 변경
       const investmentCode = currentInvestment.code || `PLAN-INV-25-${String(currentInvestment.id).padStart(3, '0')}`;
-      const description = `${currentInvestment.investmentName || '투자'} 상태를 "${currentInvestment.status}"에서 "${newStatus}"로 변경`;
-      addChangeLog('수정', investmentCode, description, currentInvestment.team || '미분류', currentInvestment.status, newStatus, '상태', currentInvestment.investmentName, '칸반탭');
+      const description = `${currentInvestment.investmentName || '투자'} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
+      addChangeLog('수정', investmentCode, description, currentInvestment.team || '미분류', oldStatus, newStatus, '상태', currentInvestment.investmentName, '칸반탭');
     }
   };
 
