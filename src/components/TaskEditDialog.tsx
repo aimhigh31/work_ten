@@ -128,9 +128,9 @@ const editTaskReducer = (state: EditTaskState, action: EditTaskAction): EditTask
         registrationDate: action.registrationDate,
         completedDate: '',
         team: '',
-        department: 'IT',
+        department: '',
         progress: 0,
-        taskType: '일반',
+        taskType: '',
         loadedKpiTitle: '',
         loadedKpiData: null
       };
@@ -145,8 +145,8 @@ const editTaskReducer = (state: EditTaskState, action: EditTaskAction): EditTask
         registrationDate: '',
         completedDate: '',
         team: '',
-        department: 'IT',
-        taskType: '일반',
+        department: '',
+        taskType: '',
         loadedKpiTitle: '',
         loadedKpiData: null
       };
@@ -345,7 +345,18 @@ const OverviewTab = memo(
               >
                 업무유형
               </InputLabel>
-              <Select value={taskState.taskType} label="업무유형" onChange={handleFieldChange('taskType')}>
+              <Select
+                value={taskState.taskType}
+                label="업무유형"
+                onChange={handleFieldChange('taskType')}
+                displayEmpty
+                notched
+                renderValue={(selected) => {
+                  if (!selected) return '선택';
+                  return selected;
+                }}
+              >
+                <MenuItem value="">선택</MenuItem>
                 {taskTypeOptions.map((option) => (
                   <MenuItem key={option.code} value={option.name}>
                     {option.name}
@@ -475,13 +486,12 @@ const OverviewTab = memo(
                 notched
                 renderValue={(selected) => {
                   if (!selected) return '선택';
-                  const item = departmentsFromDB.find((t) => t.subcode === selected);
-                  return item ? item.subcode_name : selected;
+                  return selected;
                 }}
               >
                 <MenuItem value="">선택</MenuItem>
                 {departmentsFromDB.map((option) => (
-                  <MenuItem key={option.subcode} value={option.subcode}>
+                  <MenuItem key={option.subcode} value={option.subcode_name}>
                     {option.subcode_name}
                   </MenuItem>
                 ))}

@@ -1186,7 +1186,7 @@ export default function InspectionEditDialog({
     []
   );
 
-  // 체크리스트 선택 핸들러
+  // 체크리스트 선택 핸들러 (커리큘럼탭과 동일한 패턴: DB 작업 제거)
   const handleChecklistChange = useCallback(
     async (checklistId: number | string) => {
       console.log('🔍 체크리스트 선택:', checklistId);
@@ -1203,35 +1203,7 @@ export default function InspectionEditDialog({
 
       if (checklistId) {
         try {
-          // 다른 체크리스트로 변경하는 경우 기존 데이터 삭제
-          if (selectedChecklistId && selectedChecklistId !== checklistId && inspection?.id) {
-            console.log('🗑️ 기존 체크리스트 데이터 삭제 중...', {
-              inspectionId: inspection.id,
-              oldChecklistId: selectedChecklistId,
-              newChecklistId: checklistId
-            });
-            await deleteAllChecksheetItems(inspection.id);
-            console.log('✅ 기존 체크리스트 데이터 삭제 완료');
-          }
-
-          // 먼저 DB에 저장된 체크시트 데이터가 있는지 확인
-          if (inspection?.id) {
-            console.log('🔍 DB에 저장된 체크시트 데이터 확인 중...', {
-              inspectionId: inspection.id,
-              checklistId: Number(checklistId)
-            });
-            const savedItems = await fetchChecksheetItemsByChecklist(inspection.id, Number(checklistId));
-
-            if (savedItems && savedItems.length > 0) {
-              console.log('✅ 기존 저장된 데이터 로드:', savedItems.length, '개');
-              setChecklistItems(savedItems);
-              return;
-            } else {
-              console.log('ℹ️ 저장된 데이터 없음 - 템플릿으로 새로 생성');
-            }
-          }
-
-          // 저장된 데이터가 없으면 템플릿으로 생성
+          // 커리큘럼탭과 동일: DB 삭제/저장 제거, 템플릿만 로드
           console.log('📡 에디터 템플릿 데이터 요청:', Number(checklistId));
           const editorItems = await fetchEditorItems(Number(checklistId));
           console.log('📦 에디터 템플릿 데이터 수신:', editorItems);
@@ -1250,20 +1222,7 @@ export default function InspectionEditDialog({
             }));
             console.log('✅ 변환된 체크리스트 항목:', checklistItemsData);
             setChecklistItems(checklistItemsData);
-
-            // 기존 점검이 있으면 DB에 즉시 저장
-            if (inspection?.id) {
-              console.log('📝 새 체크시트 데이터 저장 중...', inspection.id);
-              await createChecksheetItems(inspection.id, checklistItemsData, Number(checklistId));
-
-              // DB에서 실제 ID를 가진 항목들을 다시 가져옴
-              console.log('🔄 저장된 체크시트 항목 다시 로드 중...');
-              const savedItems = await fetchChecksheetItems(inspection.id);
-              if (savedItems && savedItems.length > 0) {
-                setChecklistItems(savedItems);
-                console.log('✅ 실제 DB ID로 상태 업데이트 완료:', savedItems.length, '개');
-              }
-            }
+            // 커리큘럼탭과 동일: DB 저장 제거, 로컬 state만 업데이트
           } else {
             console.log('⚠️ 에디터 데이터가 없음');
             setChecklistItems([]);
@@ -1279,28 +1238,18 @@ export default function InspectionEditDialog({
     [
       selectedChecklistId,
       checklistItems,
-      inspection,
-      fetchChecksheetItemsByChecklist,
-      fetchEditorItems,
-      createChecksheetItems,
-      fetchChecksheetItems,
-      deleteAllChecksheetItems
+      fetchEditorItems
     ]
   );
 
-  // 체크리스트 아이템 업데이트 핸들러
+  // 체크리스트 아이템 업데이트 핸들러 (커리큘럼탭과 동일한 패턴: 로컬 state만 업데이트)
   const handleChecklistItemChange = useCallback(
     (itemIndex: number, field: string, value: any) => {
       setChecklistItems((prev) => {
         const updated = prev.map((item, index) => {
           if (index === itemIndex) {
             const updatedItem = { ...item, [field]: value };
-
-            // DB에 저장 (ID가 양수인 경우만 - 이미 DB에 저장된 항목)
-            if (inspection?.id && updatedItem.id > 0) {
-              updateChecksheetItem(inspection.id, updatedItem);
-            }
-
+            // 커리큘럼탭과 동일: DB 저장 제거, 로컬 state만 업데이트
             return updatedItem;
           }
           return item;
@@ -1308,7 +1257,7 @@ export default function InspectionEditDialog({
         return updated;
       });
     },
-    [inspection, updateChecksheetItem]
+    [] // DB 저장 로직 제거로 dependency 단순화
   );
 
   // 첨부파일 다이얼로그 열기
@@ -1450,20 +1399,19 @@ export default function InspectionEditDialog({
     setPendingFeedbacks((prev) => prev.filter((fb) => fb.id !== id));
   }, []);
 
-  // OPL 관련 핸들러 함수들 (Supabase 연동)
+  // OPL 관련 핸들러 함수들 (커리큘럼탭과 동일한 패턴: 로컬 state만 업데이트)
   const handleAddOplItem = useCallback(async () => {
-    if (!inspection?.id) {
-      alert('점검을 먼저 저장한 후 OPL을 추가해주세요.');
-      return;
-    }
-
     try {
       const newCode = await generateOplCode();
       // 기본 상태 값을 DB에서 조회한 첫 번째 subcode_name으로 설정
       const defaultStatus = statusFromDB.length > 0 ? statusFromDB[0].subcode_name : '대기';
 
-      const newOplItem: Omit<OPLItem, 'id' | 'created_at' | 'updated_at'> = {
-        inspection_id: inspection.id,
+      // 임시 ID 생성 (음수로 DB ID와 구분)
+      const tempId = -(oplItems.length + 1) - Date.now();
+
+      const newOplItem: OPLItem = {
+        id: tempId, // 임시 ID
+        inspection_id: inspection?.id || 0,
         registration_date: new Date().toISOString().split('T')[0],
         code: newCode,
         before: '',
@@ -1472,50 +1420,36 @@ export default function InspectionEditDialog({
         after_image: null,
         completion_date: null,
         assignee: '',
-        status: defaultStatus
+        status: defaultStatus,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
-      const addedItem = await addOplItem(newOplItem);
-      if (addedItem && inspection?.id) {
-        // DB에서 최신 데이터 다시 로드 (캐시 무효화 후)
-        await loadOplItems(inspection.id);
-        console.log('✅ OPL 항목 추가 후 목록 새로고침 완료');
-      }
+      // 커리큘럼탭과 동일: 로컬 state만 업데이트, DB 저장 제거
+      setOplItems((prev) => [newOplItem, ...prev]);
+      console.log('✅ OPL 항목 로컬 추가 완료 (DB 저장은 저장 버튼 클릭 시)');
     } catch (error) {
       console.error('OPL 항목 추가 실패:', error);
       alert('OPL 항목 추가에 실패했습니다.');
     }
-  }, [inspection?.id, generateOplCode, addOplItem, statusFromDB]);
+  }, [inspection?.id, generateOplCode, statusFromDB, oplItems.length]);
 
   const handleDeleteOplItem = useCallback(
     async (itemId: number) => {
-      try {
-        const success = await deleteOplItem(itemId, inspection?.id);
-        if (success && inspection?.id) {
-          // DB에서 최신 데이터 다시 로드 (캐시 무효화 후)
-          await loadOplItems(inspection.id);
-          console.log('✅ OPL 항목 삭제 후 목록 새로고침 완료');
-        }
-      } catch (error) {
-        console.error('OPL 항목 삭제 실패:', error);
-        alert('OPL 항목 삭제에 실패했습니다.');
-      }
+      // 커리큘럼탭과 동일: 로컬 state에서만 제거, DB 저장 제거
+      setOplItems((prev) => prev.filter((item) => item.id !== itemId));
+      console.log('✅ OPL 항목 로컬 삭제 완료 (DB 저장은 저장 버튼 클릭 시)');
     },
-    [deleteOplItem, inspection?.id]
+    []
   );
 
   const handleEditOplField = useCallback(
     async (itemId: number, field: keyof OPLItem, value: any) => {
-      try {
-        const updatedItem = await updateOplItem(itemId, { [field]: value });
-        if (updatedItem) {
-          setOplItems((prev) => prev.map((item) => (item.id === itemId ? updatedItem : item)));
-        }
-      } catch (error) {
-        console.error('OPL 항목 수정 실패:', error);
-      }
+      // 커리큘럼탭과 동일: 로컬 state만 업데이트, DB 저장 제거
+      setOplItems((prev) => prev.map((item) => (item.id === itemId ? { ...item, [field]: value } : item)));
+      console.log('✅ OPL 항목 로컬 수정 완료 (DB 저장은 저장 버튼 클릭 시)');
     },
-    [updateOplItem]
+    []
   );
 
   const handleStartEditOpl = useCallback(
@@ -1716,6 +1650,66 @@ export default function InspectionEditDialog({
 
     onSave(updatedInspection);
 
+    // 🔄 점검 탭 체크리스트 변경사항 DB 저장 (커리큘럼탭과 동일한 패턴)
+    if (inspection?.id && selectedChecklistId && checklistItems.length > 0) {
+      console.log('💾 체크리스트 변경사항 저장 시작');
+      console.time('⏱️ 체크리스트 저장 Total');
+
+      try {
+        // 1단계: 기존 체크시트 데이터 전체 삭제 (커리큘럼탭과 동일한 패턴)
+        console.log('🗑️ 기존 체크시트 데이터 삭제 시작');
+        await deleteAllChecksheetItems(inspection.id);
+        console.log('✅ 기존 체크시트 데이터 삭제 완료');
+
+        // 2단계: 현재 checklistItems를 DB에 저장 (커리큘럼탭과 동일한 패턴)
+        console.log('📝 새 체크시트 데이터 저장 시작');
+        await createChecksheetItems(inspection.id, checklistItems, Number(selectedChecklistId));
+        console.log('✅ 새 체크시트 데이터 저장 완료');
+
+        console.timeEnd('⏱️ 체크리스트 저장 Total');
+        console.log('✅ 체크리스트 변경사항 저장 완료');
+      } catch (error) {
+        console.error('🔴 체크리스트 저장 오류:', error);
+      }
+    } else {
+      console.log('ℹ️ 저장할 체크리스트 데이터 없음');
+    }
+
+    // 🔄 OPL 탭 변경사항 DB 저장 (커리큘럼탭과 동일한 패턴)
+    if (inspection?.id && oplItems.length > 0) {
+      console.log('💾 OPL 변경사항 저장 시작');
+      console.time('⏱️ OPL 저장 Total');
+
+      try {
+        // 1단계: 기존 OPL 데이터 전체 삭제 (커리큘럼탭과 동일한 패턴)
+        console.log('🗑️ 기존 OPL 데이터 삭제 시작');
+        const allOplIds = (await getOplItemsByInspectionId(inspection.id)).map(item => item.id);
+        if (allOplIds.length > 0) {
+          await deleteOplItems(allOplIds);
+          console.log('✅ 기존 OPL 데이터 삭제 완료');
+        }
+
+        // 2단계: 현재 oplItems를 DB에 저장 (커리큘럼탭과 동일한 패턴)
+        console.log('📝 새 OPL 데이터 저장 시작');
+        for (const item of oplItems) {
+          // 임시 ID (음수)를 제외하고 저장
+          const { id, created_at, updated_at, ...itemData } = item;
+          await addOplItem({
+            ...itemData,
+            inspection_id: inspection.id
+          });
+        }
+        console.log('✅ 새 OPL 데이터 저장 완료');
+
+        console.timeEnd('⏱️ OPL 저장 Total');
+        console.log('✅ OPL 변경사항 저장 완료');
+      } catch (error) {
+        console.error('🔴 OPL 저장 오류:', error);
+      }
+    } else {
+      console.log('ℹ️ 저장할 OPL 데이터 없음');
+    }
+
     // 🔄 기록 탭 변경사항 DB 저장
     console.log('💾 기록 탭 변경사항 저장 시작');
     console.time('⏱️ 기록 저장 Total');
@@ -1784,7 +1778,11 @@ export default function InspectionEditDialog({
     feedbacks,
     addFeedback,
     updateFeedback,
-    deleteFeedback
+    deleteFeedback,
+    selectedChecklistId,
+    checklistItems,
+    deleteAllChecksheetItems,
+    createChecksheetItems
   ]);
 
   // 닫기 핸들러
@@ -2451,18 +2449,11 @@ export default function InspectionEditDialog({
                     disabled={selectedOplItems.size === 0 || !(canEditOthers || (canEditOwn && isOwner))}
                     startIcon={<Trash size={16} />}
                     onClick={async () => {
-                      // 선택된 항목들 삭제 로직
+                      // 선택된 항목들 삭제 로직 (커리큘럼탭과 동일: 로컬 state만 업데이트)
                       const itemsToDelete = Array.from(selectedOplItems);
-                      try {
-                        const success = await deleteOplItems(itemsToDelete);
-                        if (success) {
-                          setOplItems((prev) => prev.filter((item) => !itemsToDelete.includes(item.id)));
-                          setSelectedOplItems(new Set());
-                        }
-                      } catch (error) {
-                        console.error('OPL 항목들 삭제 실패:', error);
-                        alert('OPL 항목들 삭제에 실패했습니다.');
-                      }
+                      setOplItems((prev) => prev.filter((item) => !itemsToDelete.includes(item.id)));
+                      setSelectedOplItems(new Set());
+                      console.log('✅ 선택된 OPL 항목 로컬 삭제 완료 (DB 저장은 저장 버튼 클릭 시)');
                     }}
                     sx={{
                       color: (selectedOplItems.size > 0 && (canEditOthers || (canEditOwn && isOwner))) ? '#d32f2f' : '#9e9e9e',

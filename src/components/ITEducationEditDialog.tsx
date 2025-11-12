@@ -1163,20 +1163,28 @@ if (typeof window !== 'undefined' && !(window as any).educationTempStorage) {
   };
 }
 
-// 참석자 탭 컴포넌트
+// 참석자 탭 컴포넌트 (커리큘럼탭과 동일한 패턴: 부모 state 사용)
 const ParticipantsTab = memo(
   ({
     mode,
     educationId,
     onParticipantCountChange,
     canEditOwn = true,
-    canEditOthers = true
+    canEditOthers = true,
+    participantItems,
+    setParticipantItems,
+    selectedRows,
+    setSelectedRows
   }: {
     mode: 'add' | 'edit';
     educationId?: number;
     onParticipantCountChange?: (count: number) => void;
     canEditOwn?: boolean;
     canEditOthers?: boolean;
+    participantItems: ParticipantItem[];
+    setParticipantItems: React.Dispatch<React.SetStateAction<ParticipantItem[]>>;
+    selectedRows: string[];
+    setSelectedRows: React.Dispatch<React.SetStateAction<string[]>>;
   }) => {
     // 참석자 관리 훅 사용
     const { getAttendeesByEducationId, convertSupabaseToParticipantItem, convertParticipantItemToSupabase } =
@@ -1294,15 +1302,7 @@ const ParticipantsTab = memo(
       }
     ];
 
-    // 초기값을 임시 저장소에서 가져오기
-    const getInitialParticipants = () => {
-      const tempKey = `${mode}_${educationId || 'new'}`;
-      const tempStorage = (window as any).educationTempStorage?.participants;
-      const savedData = tempStorage?.get(tempKey);
-      return savedData || [];
-    };
-
-    const [participantItems, setParticipantItems] = useState<ParticipantItem[]>(getInitialParticipants);
+    // 커리큘럼탭과 동일한 패턴: 부모 state 사용 (로컬 state 제거)
     const [statusFromDB, setStatusFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
 
     // GROUP045 출석점검 데이터 조회 (Dialog가 열릴 때마다)
@@ -1329,93 +1329,16 @@ const ParticipantsTab = memo(
       fetchStatusData();
     }, []);
 
-    // mode와 educationId에 따라 초기 데이터 설정
+    // 커리큘럼탭과 동일한 패턴: 데이터 로드와 임시저장은 부모에서 관리
+    // participantItems와 selectedRows는 props로 받아서 사용
+
+    // 참석자 수가 변경될 때 개요탭에 알림 (커리큘럼탭과 동일한 패턴)
     useEffect(() => {
-      const loadParticipantData = async () => {
-        const tempKey = `${mode}_${educationId || 'new'}`;
-
-        // 먼저 임시 저장소 확인
-        const tempStorage = (window as any).educationTempStorage?.participants;
-        const tempData = tempStorage?.get(tempKey);
-        if (tempData && tempData.length > 0) {
-          console.log('📦 임시 저장된 참석자 데이터 복원:', { count: tempData.length });
-          setParticipantItems(tempData);
-          if (onParticipantCountChange) {
-            onParticipantCountChange(tempData.length);
-          }
-          return; // 임시 데이터가 있으면 DB 조회 안함
-        }
-
-        if (mode === 'add') {
-          setParticipantItems([]);
-          // 새 추가 모드일 때는 참석자 수 0으로 초기화
-          if (onParticipantCountChange) {
-            onParticipantCountChange(0);
-          }
-        } else if (educationId) {
-          try {
-            console.log('🔍 참석자 데이터 로드 중...', { educationId });
-            // Supabase에서 실제 참석자 데이터 조회
-            const supabaseData = await getAttendeesByEducationId(educationId);
-
-            if (supabaseData && supabaseData.length > 0) {
-              console.log('✅ Supabase 참석자 데이터 로드 완료:', { count: supabaseData.length });
-              // Supabase 데이터를 ParticipantItem 형태로 변환
-              const participantItems = supabaseData.map(convertSupabaseToParticipantItem);
-              setParticipantItems(participantItems);
-              if (onParticipantCountChange) {
-                onParticipantCountChange(participantItems.length);
-              }
-            } else {
-              console.log('ℹ️ Supabase 참석자 데이터 없음');
-              // Supabase에 데이터가 없으면 빈 배열 설정
-              setParticipantItems([]);
-              if (onParticipantCountChange) {
-                onParticipantCountChange(0);
-              }
-            }
-          } catch (error) {
-            console.error('❌ 참석자 데이터 로드 실패:', error);
-            // 에러 발생시 빈 배열로 초기화
-            setParticipantItems([]);
-            if (onParticipantCountChange) {
-              onParticipantCountChange(0);
-            }
-          }
-        }
-      };
-
-      loadParticipantData();
-    }, [mode, educationId]); // dependency를 최소화하여 불필요한 재로드 방지
-
-    // 참석자 데이터가 변경될 때 저장 및 개요탭 참석자수 업데이트
-    useEffect(() => {
-      // 임시 저장소에 데이터 저장
-      const tempKey = `${mode}_${educationId || 'new'}`;
-      const tempStorage = (window as any).educationTempStorage?.participants;
-      if (tempStorage && (participantItems.length > 0 || mode === 'edit')) {
-        tempStorage.set(tempKey, participantItems);
-        console.log('💾 참석자 데이터 임시 저장:', { key: tempKey, count: participantItems.length });
-      }
-
-      if (educationId && participantItems.length > 0 && mode === 'edit') {
-        const dataManager = EducationDataManager.getInstance();
-        dataManager.saveParticipants(educationId, participantItems);
-      }
-      // 마지막 NO를 기준으로 참석자 수 계산 (NO는 내림차순이므로 participantItems.length가 마지막 NO)
       if (onParticipantCountChange) {
         onParticipantCountChange(participantItems.length);
       }
-    }, [participantItems, educationId, mode, onParticipantCountChange]);
+    }, [participantItems, onParticipantCountChange]);
 
-    // 글로벌 참석자 데이터 접근 함수 (data_relation.md 패턴)
-    useEffect(() => {
-      (window as any).getCurrentParticipantData = () => {
-        return participantItems.map(convertParticipantItemToSupabase);
-      };
-    }, [participantItems, convertParticipantItemToSupabase]);
-
-    const [selectedRows, setSelectedRows] = useState<string[]>([]);
     const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
 
     // 페이지네이션 상태
@@ -1932,8 +1855,26 @@ const ParticipantsTab = memo(
   }
 );
 
-// 커리큘럼 탭 컴포넌트
-const CurriculumTab = memo(({ mode, educationId, canEditOwn = true, canEditOthers = true }: { mode: 'add' | 'edit'; educationId?: number; canEditOwn?: boolean; canEditOthers?: boolean }) => {
+// 커리큘럼 탭 컴포넌트 (체크리스트탭과 동일한 패턴: 부모 state 사용)
+const CurriculumTab = memo(({
+  mode,
+  educationId,
+  canEditOwn = true,
+  canEditOthers = true,
+  curriculumItems,
+  setCurriculumItems,
+  selectedRows,
+  setSelectedRows
+}: {
+  mode: 'add' | 'edit';
+  educationId?: number;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
+  curriculumItems: CurriculumItem[];
+  setCurriculumItems: React.Dispatch<React.SetStateAction<CurriculumItem[]>>;
+  selectedRows: string[];
+  setSelectedRows: React.Dispatch<React.SetStateAction<string[]>>;
+}) => {
   // Supabase 커리큘럼 훅 사용
   const {
     loading: curriculumLoading,
@@ -2038,72 +1979,9 @@ const CurriculumTab = memo(({ mode, educationId, canEditOwn = true, canEditOther
     }
   ];
 
-  // 초기 커리큘럼 데이터 가져오기 (임시저장 포함)
-  const getInitialCurriculum = () => {
-    if (typeof window === 'undefined') return [];
-    const tempKey = `${mode}_${educationId || 'new'}`;
-    const tempStorage = (window as any).educationTempStorage?.curriculum;
-    const savedData = tempStorage?.get(tempKey);
-    return savedData || [];
-  };
+  // 체크리스트탭과 동일한 패턴: 데이터 로드와 임시저장은 부모에서 관리
+  // curriculumItems와 selectedRows는 props로 받아서 사용
 
-  const [curriculumItems, setCurriculumItems] = useState<CurriculumItem[]>(getInitialCurriculum);
-
-  // 커리큘럼 데이터 로드 (edit 모드에서만 Supabase에서 로드)
-  useEffect(() => {
-    const loadCurriculumData = async () => {
-      const tempKey = `${mode}_${educationId || 'new'}`;
-
-      // 먼저 임시 저장소 확인
-      const tempStorage = (window as any).educationTempStorage?.curriculum;
-      const tempData = tempStorage?.get(tempKey);
-      if (tempData && tempData.length > 0) {
-        console.log('📦 임시 저장된 커리큘럼 데이터 복원:', { count: tempData.length });
-        setCurriculumItems(tempData);
-        return; // 임시 데이터가 있으면 DB 조회 안함
-      }
-
-      if (mode === 'edit' && educationId) {
-        console.log('🔄 커리큘럼 데이터 로드 중:', { educationId });
-        try {
-          const supabaseData = await getCurriculumByEducationId(educationId);
-          const curriculumItems = supabaseData.map(convertSupabaseToCurriculumItem);
-          setCurriculumItems(curriculumItems);
-          console.log('✅ 커리큘럼 데이터 로드 완료:', { count: curriculumItems.length });
-        } catch (error) {
-          console.error('❌ 커리큘럼 데이터 로드 실패:', error);
-          setCurriculumItems([]); // 실패 시 빈 배열
-        }
-      } else if (mode === 'add') {
-        setCurriculumItems([]);
-      }
-    };
-
-    loadCurriculumData();
-  }, [mode, educationId]); // dependency를 최소화하여 불필요한 재로드 방지
-
-  // 커리큘럼 데이터 변경 시 임시 저장
-  useEffect(() => {
-    const tempKey = `${mode}_${educationId || 'new'}`;
-    const tempStorage = (window as any).educationTempStorage?.curriculum;
-    if (tempStorage && (curriculumItems.length > 0 || mode === 'edit')) {
-      tempStorage.set(tempKey, curriculumItems);
-      console.log('💾 커리큘럼 데이터 임시 저장:', { key: tempKey, count: curriculumItems.length });
-    }
-  }, [curriculumItems, mode, educationId]);
-
-  // 전역 함수로 현재 커리큘럼 데이터를 외부에서 접근할 수 있도록 설정 (data_relation.md 패턴)
-  useEffect(() => {
-    (window as any).getCurrentCurriculumData = () => {
-      return curriculumItems.map((item, index) => convertCurriculumItemToSupabase(item, index + 1));
-    };
-
-    return () => {
-      delete (window as any).getCurrentCurriculumData;
-    };
-  }, [curriculumItems, convertCurriculumItemToSupabase]);
-
-  const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
 
   // 페이지네이션 상태
@@ -3173,11 +3051,21 @@ export default function ITEducationDialog({
     return isOwnerResult;
   }, [data, recordId, currentUser]);
 
-  // 커리큘럼 관리 훅 사용
-  const { saveCurriculumByEducationId } = useSupabaseItEducationCurriculum();
+  // 커리큘럼 관리 훅 사용 (체크리스트탭 패턴: 데이터 로드와 저장 모두 부모에서 처리)
+  const {
+    getCurriculumByEducationId,
+    saveCurriculumByEducationId,
+    convertSupabaseToCurriculumItem,
+    convertCurriculumItemToSupabase
+  } = useSupabaseItEducationCurriculum();
 
-  // 참석자 관리 훅 사용
-  const { saveAttendeesByEducationId } = useSupabaseItEducationAttendee();
+  // 참석자 관리 훅 사용 (커리큘럼탭 패턴: 데이터 로드와 저장 모두 부모에서 처리)
+  const {
+    getAttendeesByEducationId,
+    saveAttendeesByEducationId,
+    convertSupabaseToParticipantItem,
+    convertParticipantItemToSupabase
+  } = useSupabaseItEducationAttendee();
 
   // 피드백 훅
   const {
@@ -3221,6 +3109,14 @@ export default function ITEducationDialog({
     feedback: '',
     notes: ''
   });
+
+  // 커리큘럼 상태 관리 (체크리스트탭과 동일한 패턴)
+  const [curriculumItems, setCurriculumItems] = useState<CurriculumItem[]>([]);
+  const [selectedCurriculumRows, setSelectedCurriculumRows] = useState<string[]>([]);
+
+  // 참석자 상태 관리 (커리큘럼탭과 동일한 패턴)
+  const [participantItems, setParticipantItems] = useState<ParticipantItem[]>([]);
+  const [selectedParticipantRows, setSelectedParticipantRows] = useState<string[]>([]);
 
   // feedbacks를 ref에 저장 (dependency 문제 방지)
   useEffect(() => {
@@ -3343,6 +3239,30 @@ export default function ITEducationDialog({
                 };
                 setEducationReport(reportData);
               }
+
+              // 커리큘럼 데이터 로드 (체크리스트탭 패턴)
+              console.log('🔄 커리큘럼 데이터 로드 중:', { educationId: recordId });
+              try {
+                const curriculumData = await getCurriculumByEducationId(recordId);
+                const items = curriculumData.map(convertSupabaseToCurriculumItem);
+                setCurriculumItems(items);
+                console.log('✅ 커리큘럼 데이터 로드 완료:', { count: items.length });
+              } catch (error) {
+                console.error('❌ 커리큘럼 데이터 로드 실패:', error);
+                setCurriculumItems([]);
+              }
+
+              // 참석자 데이터 로드 (커리큘럼탭과 동일한 패턴)
+              console.log('🔄 참석자 데이터 로드 중:', { educationId: recordId });
+              try {
+                const participantData = await getAttendeesByEducationId(recordId);
+                const items = participantData.map(convertSupabaseToParticipantItem);
+                setParticipantItems(items);
+                console.log('✅ 참석자 데이터 로드 완료:', { count: items.length });
+              } catch (error) {
+                console.error('❌ 참석자 데이터 로드 실패:', error);
+                setParticipantItems([]);
+              }
             }
           } catch (error) {
             console.error('데이터 로드 실패:', error);
@@ -3371,11 +3291,20 @@ export default function ITEducationDialog({
           feedback: '',
           notes: ''
         });
+
+        // 커리큘럼 초기화 (체크리스트탭 패턴)
+        setCurriculumItems([]);
+        setSelectedCurriculumRows([]);
+
+        // 참석자 초기화 (커리큘럼탭과 동일한 패턴)
+        setParticipantItems([]);
+        setSelectedParticipantRows([]);
+
         setNewComment('');
       }
       setValue(0);
     }
-  }, [open, recordId, getItEducationById, generateItEducationCode, mode]);
+  }, [open, recordId, getItEducationById, generateItEducationCode, mode, getCurriculumByEducationId, convertSupabaseToCurriculumItem, getAttendeesByEducationId, convertSupabaseToParticipantItem]);
 
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
@@ -3552,32 +3481,52 @@ export default function ITEducationDialog({
       }
 
       if (result) {
-        // 커리큘럼 데이터 저장 (data_relation.md 패턴 적용)
+        // 커리큘럼 데이터 저장 (체크리스트탭 패턴: 부모 state 직접 사용)
         try {
-          const getCurrentCurriculumData = (window as any).getCurrentCurriculumData;
-          if (getCurrentCurriculumData && typeof getCurrentCurriculumData === 'function') {
-            const curriculumData = getCurrentCurriculumData();
-            if (curriculumData && curriculumData.length > 0) {
-              console.log('💾 커리큘럼 데이터 저장 중...', { educationId: result.id, curriculumCount: curriculumData.length });
-              await saveCurriculumByEducationId(result.id, curriculumData);
-              console.log('✅ 커리큘럼 데이터 저장 완료');
-            }
+          console.log('💾 커리큘럼 데이터 저장 중...', { educationId: result.id, curriculumCount: curriculumItems.length });
+          const curriculumData = curriculumItems.map((item, index) => convertCurriculumItemToSupabase(item, index + 1));
+          const saveSuccess = await saveCurriculumByEducationId(result.id, curriculumData);
+
+          if (saveSuccess) {
+            console.log('✅ 커리큘럼 데이터 저장 완료');
+
+            // 캐시 무효화 및 최신 데이터 다시 로드
+            const { clearCache, createCacheKey } = await import('../utils/cacheUtils');
+            const cacheKey = createCacheKey('it_education_curriculum', `edu_${result.id}`);
+            clearCache(cacheKey);
+            console.log('🗑️ 커리큘럼 캐시 무효화 완료');
+
+            // 최신 데이터 다시 로드
+            const freshData = await getCurriculumByEducationId(result.id);
+            const freshItems = freshData.map(convertSupabaseToCurriculumItem);
+            setCurriculumItems(freshItems);
+            console.log('🔄 최신 커리큘럼 데이터 로드 완료:', { count: freshItems.length });
           }
         } catch (curriculumError) {
           console.error('❌ 커리큘럼 저장 실패:', curriculumError);
           // 커리큘럼 저장 실패해도 메인 교육 데이터는 저장 완료된 상태
         }
 
-        // 참석자 데이터 저장 (data_relation.md 패턴 적용)
+        // 참석자 데이터 저장 (커리큘럼탭 패턴: 부모 state 직접 사용)
         try {
-          const getCurrentParticipantData = (window as any).getCurrentParticipantData;
-          if (getCurrentParticipantData && typeof getCurrentParticipantData === 'function') {
-            const participantData = getCurrentParticipantData();
-            if (participantData && participantData.length > 0) {
-              console.log('💾 참석자 데이터 저장 중...', { educationId: result.id, participantCount: participantData.length });
-              await saveAttendeesByEducationId(result.id, participantData);
-              console.log('✅ 참석자 데이터 저장 완료');
-            }
+          console.log('💾 참석자 데이터 저장 중...', { educationId: result.id, participantCount: participantItems.length });
+          const participantData = participantItems.map(convertParticipantItemToSupabase);
+          const saveSuccess = await saveAttendeesByEducationId(result.id, participantData);
+
+          if (saveSuccess) {
+            console.log('✅ 참석자 데이터 저장 완료');
+
+            // 캐시 무효화 및 최신 데이터 다시 로드
+            const { clearCache, createCacheKey } = await import('../utils/cacheUtils');
+            const cacheKey = createCacheKey('it_education_attendee', `edu_${result.id}`);
+            clearCache(cacheKey);
+            console.log('🗑️ 참석자 캐시 무효화 완료');
+
+            // 최신 데이터 다시 로드
+            const freshData = await getAttendeesByEducationId(result.id);
+            const freshItems = freshData.map(convertSupabaseToParticipantItem);
+            setParticipantItems(freshItems);
+            console.log('🔄 최신 참석자 데이터 로드 완료:', { count: freshItems.length });
           }
         } catch (attendeeError) {
           console.error('❌ 참석자 저장 실패:', attendeeError);
@@ -3692,7 +3641,15 @@ export default function ITEducationDialog({
     feedbacks,
     addFeedback,
     updateFeedback,
-    deleteFeedback
+    deleteFeedback,
+    curriculumItems,
+    convertCurriculumItemToSupabase,
+    getCurriculumByEducationId,
+    convertSupabaseToCurriculumItem,
+    participantItems,
+    convertParticipantItemToSupabase,
+    getAttendeesByEducationId,
+    convertSupabaseToParticipantItem
   ]);
 
   const handleClose = useCallback(() => {
@@ -3705,6 +3662,12 @@ export default function ITEducationDialog({
       feedback: '',
       notes: ''
     });
+    // 커리큘럼 초기화 (체크리스트탭 패턴)
+    setCurriculumItems([]);
+    setSelectedCurriculumRows([]);
+    // 참석자 초기화 (커리큘럼탭과 동일한 패턴)
+    setParticipantItems([]);
+    setSelectedParticipantRows([]);
     setNewComment('');
     setEditingCommentId(null);
     setEditingCommentText('');
@@ -3812,11 +3775,30 @@ export default function ITEducationDialog({
             </TabPanel>
 
             <TabPanel value={value} index={1}>
-              <CurriculumTab mode={mode} educationId={data?.id} canEditOwn={canEditOwn && isOwner} canEditOthers={canEditOthers} />
+              <CurriculumTab
+                mode={mode}
+                educationId={data?.id}
+                canEditOwn={canEditOwn && isOwner}
+                canEditOthers={canEditOthers}
+                curriculumItems={curriculumItems}
+                setCurriculumItems={setCurriculumItems}
+                selectedRows={selectedCurriculumRows}
+                setSelectedRows={setSelectedCurriculumRows}
+              />
             </TabPanel>
 
             <TabPanel value={value} index={2}>
-              <ParticipantsTab mode={mode} educationId={data?.id} onParticipantCountChange={handleParticipantCountChange} canEditOwn={canEditOwn && isOwner} canEditOthers={canEditOthers} />
+              <ParticipantsTab
+                mode={mode}
+                educationId={data?.id}
+                onParticipantCountChange={handleParticipantCountChange}
+                canEditOwn={canEditOwn && isOwner}
+                canEditOthers={canEditOthers}
+                participantItems={participantItems}
+                setParticipantItems={setParticipantItems}
+                selectedRows={selectedParticipantRows}
+                setSelectedRows={setSelectedParticipantRows}
+              />
             </TabPanel>
 
             <TabPanel value={value} index={3}>

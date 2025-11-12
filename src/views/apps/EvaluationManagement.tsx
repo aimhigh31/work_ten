@@ -37,7 +37,9 @@ import {
   TableRow,
   TextField,
   Pagination,
-  Button
+  Button,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
@@ -115,8 +117,8 @@ interface KanbanViewProps {
   selectedTeam: string;
   selectedStatus: string;
   selectedAssignee: string;
-  inspections: InspectionTableData[];
-  setInspections: React.Dispatch<React.SetStateAction<InspectionTableData[]>>;
+  inspections: EvaluationTableData[];
+  setInspections: React.Dispatch<React.SetStateAction<EvaluationTableData[]>>;
   addChangeLog: (
     action: string,
     target: string,
@@ -134,7 +136,12 @@ interface KanbanViewProps {
   canEditOwn?: boolean;
   canEditOthers?: boolean;
   updateEvaluationData?: (id: number, data: Partial<EvaluationData>) => Promise<EvaluationData | null>;
-  onSaveEvaluation?: (updatedInspection: InspectionTableData) => Promise<void>;
+  onSaveEvaluation?: (updatedInspection: EvaluationTableData) => Promise<void>;
+  setSnackbar?: React.Dispatch<React.SetStateAction<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>>;
 }
 
 function KanbanView({
@@ -152,7 +159,8 @@ function KanbanView({
   canEditOwn = true,
   canEditOthers = true,
   updateEvaluationData,
-  onSaveEvaluation
+  onSaveEvaluation,
+  setSnackbar
 }: KanbanViewProps) {
   const theme = useTheme();
 
@@ -167,19 +175,19 @@ function KanbanView({
   }, [session, users]);
 
   // 데이터 소유자 확인 함수
-  const isDataOwner = useCallback((evaluation: InspectionTableData) => {
+  const isDataOwner = useCallback((evaluation: EvaluationTableData) => {
     if (!currentUser) return false;
     const dataOwner = evaluation.createdBy || evaluation.assignee;
     return dataOwner === currentUser.user_name;
   }, [currentUser]);
 
   // 상태 관리
-  const [activeInspection, setActiveInspection] = useState<InspectionTableData | null>(null);
+  const [activeInspection, setActiveInspection] = useState<EvaluationTableData | null>(null);
   const [isDraggingState, setIsDraggingState] = useState(false);
 
   // 편집 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);
-  const [editingInspection, setEditingInspection] = useState<InspectionTableData | null>(null);
+  const [editingInspection, setEditingInspection] = useState<EvaluationTableData | null>(null);
 
   // 센서 설정
   const sensors = useSensors(
@@ -228,8 +236,9 @@ function KanbanView({
   };
 
   // 카드 클릭 핸들러
-  const handleCardClick = (inspection: InspectionTableData) => {
-    setEditingInspection(inspection);
+  const handleCardClick = (inspection: EvaluationTableData) => {
+    // 원본 데이터를 깊은 복사로 저장 (비교용)
+    setEditingInspection(JSON.parse(JSON.stringify(inspection)));
     setEditDialog(true);
   };
 
@@ -240,7 +249,7 @@ function KanbanView({
   };
 
   // Inspection 저장 핸들러
-  const handleEditInspectionSave = (updatedInspection: InspectionTableData) => {
+  const handleEditInspectionSave = (updatedInspection: EvaluationTableData) => {
     const originalInspection = inspections.find((t) => t.id === updatedInspection.id);
 
     if (originalInspection) {
@@ -319,13 +328,30 @@ function KanbanView({
           });
 
           console.log('✅ 칸반 드래그: 상태 변경 DB 저장 성공');
+
+          // 성공 알림
+          if (setSnackbar) {
+            setSnackbar({
+              open: true,
+              message: `상태가 "${oldStatus}"에서 "${newStatus}"로 변경되었습니다.`,
+              severity: 'success'
+            });
+          }
         } catch (error) {
           console.error('🔴 칸반 드래그: 상태 변경 DB 저장 실패:', error);
           // 실패 시 원래 상태로 되돌림
           setInspections((prev) =>
             prev.map((inspection) => (inspection.id === inspectionId ? { ...inspection, status: oldStatus } : inspection))
           );
-          alert('상태 변경 저장에 실패했습니다.');
+
+          // 실패 알림
+          if (setSnackbar) {
+            setSnackbar({
+              open: true,
+              message: '상태 변경 저장에 실패했습니다.',
+              severity: 'error'
+            });
+          }
           return;
         }
       }
@@ -430,7 +456,7 @@ function KanbanView({
   };
 
   // 드래그 가능한 카드 컴포넌트
-  function DraggableCard({ inspection }: { inspection: InspectionTableData }) {
+  function DraggableCard({ inspection }: { inspection: EvaluationTableData }) {
     // 드래그 가능 여부: canEditOthers가 있거나, canEditOwn이 있고 자신의 데이터인 경우
     const isDragDisabled = !(canEditOthers || (canEditOwn && isDataOwner(inspection)));
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -830,8 +856,8 @@ interface MonthlyScheduleViewProps {
   selectedTeam: string;
   selectedStatus: string;
   selectedAssignee: string;
-  inspections: InspectionTableData[];
-  onCardClick: (inspection: InspectionTableData) => void;
+  inspections: EvaluationTableData[];
+  onCardClick: (inspection: EvaluationTableData) => void;
 }
 
 function MonthlyScheduleView({
@@ -874,7 +900,7 @@ function MonthlyScheduleView({
   });
 
   // 월별로 데이터 그룹화 (시작일 기준)
-  const monthlyData: { [key: number]: InspectionTableData[] } = {};
+  const monthlyData: { [key: number]: EvaluationTableData[] } = {};
   filteredData.forEach((item) => {
     const dateToUse = item.startDate || item.inspectionDate || new Date().toISOString().split('T')[0];
     const date = new Date(dateToUse);
@@ -1208,7 +1234,7 @@ interface DashboardViewProps {
   selectedAssignee: string;
   selectedRecentStatus: string;
   setSelectedRecentStatus: (status: string) => void;
-  inspections: InspectionTableData[];
+  inspections: EvaluationTableData[];
 }
 
 function DashboardView({
@@ -1227,7 +1253,7 @@ function DashboardView({
   const itemsPerPage = 8;
 
   // 날짜 범위 필터링 함수
-  const filterByDateRange = (data: InspectionTableData[]) => {
+  const filterByDateRange = (data: EvaluationTableData[]) => {
     if (!startDate && !endDate) {
       return data;
     }
@@ -2116,6 +2142,13 @@ export default function EvaluationManagement() {
   const theme = useTheme();
   const [value, setValue] = useState(0);
 
+  // 알림 상태
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error' | 'warning' | 'info'
+  });
+
   // ✅ 권한 체크
   const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers, loading: permissionLoading } = useMenuPermission('/hr/evaluation');
 
@@ -2219,7 +2252,7 @@ export default function EvaluationManagement() {
   }, [statusTypes]);
 
   // 공유 Inspections 상태
-  const [inspections, setInspections] = useState<InspectionTableData[]>([]);
+  const [inspections, setInspections] = useState<EvaluationTableData[]>([]);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
 
   // hr_evaluation_data를 테이블 형식으로 변환
@@ -2239,11 +2272,10 @@ export default function EvaluationManagement() {
         code: code,
         evaluationType: (getEvaluationTypeName(item.evaluation_type || '') || '직원평가') as any,
         managementCategory: (getManagementCategoryName(item.management_category || '') || '상반기') as any,
-        inspectionType: (getEvaluationTypeName(item.evaluation_type || '') || '직원평가') as any, // 칸반 뷰용
-        inspectionTarget: (getManagementCategoryName(item.management_category || '') || '상반기') as any, // 칸반 뷰용
         evaluationTitle: item.evaluation_title || '',
         team: (item.team || '개발팀') as any,
         assignee: item.manager || '',
+        createdBy: item.manager || '',
         status: (getStatusName(item.status || '') || '대기') as any,
         inspectionDate: item.start_date || new Date().toISOString().split('T')[0],
         startDate: item.start_date || '',
@@ -2269,7 +2301,7 @@ export default function EvaluationManagement() {
 
   // 편집 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);
-  const [editingInspection, setEditingInspection] = useState<InspectionTableData | null>(null);
+  const [editingInspection, setEditingInspection] = useState<EvaluationTableData | null>(null);
 
   // 변경로그 페이지네이션 상태
   const [changeLogPage, setChangeLogPage] = useState(0);
@@ -2372,8 +2404,8 @@ export default function EvaluationManagement() {
       const data = await fetchAllInspections();
       console.log('📊 fetchAllInspections 결과:', data?.length, '건');
 
-      // Supabase 데이터를 InspectionTableData 형식으로 변환
-      const transformedData: InspectionTableData[] = data.map((item: SecurityInspectionData, index: number) => {
+      // Supabase 데이터를 EvaluationTableData 형식으로 변환
+      const transformedData: EvaluationTableData[] = data.map((item: SecurityInspectionData, index: number) => {
         console.log(`🔍 데이터 변환 [${index}]:`, {
           id: item.id,
           status: item.status,
@@ -2386,19 +2418,22 @@ export default function EvaluationManagement() {
           no: item.no || 0,
           registrationDate: item.registration_date || '',
           code: item.code || '',
-          inspectionType: item.evaluation_type || item.inspection_type || '보안점검',
-          inspectionTarget: item.management_category || item.inspection_target || '고객사',
+          evaluationType: item.evaluation_type || item.inspection_type || '직원평가',
+          managementCategory: item.management_category || item.inspection_target || '상반기',
           evaluationTitle: (item as any).evaluation_title || item.inspection_content || '',
           team: item.team || '',
           assignee: item.assignee || '',
           status: item.status || '대기',
           inspectionDate: item.inspection_date || '',
+          startDate: item.start_date || item.inspection_date || '',
+          endDate: item.end_date || '',
           details: (item as any).details || '',
           performance: item.performance || '',
           improvements: item.improvements || '',
           thoughts: item.thoughts || '',
           notes: item.notes || '',
-          attachments: item.attachments || []
+          attachments: item.attachments || [],
+          evaluationDataId: item.id
         };
       });
 
@@ -2525,8 +2560,9 @@ export default function EvaluationManagement() {
   );
 
   // 카드 클릭 핸들러
-  const handleCardClick = (inspection: InspectionTableData) => {
-    setEditingInspection(inspection);
+  const handleCardClick = (inspection: EvaluationTableData) => {
+    // 원본 데이터를 깊은 복사로 저장 (비교용)
+    setEditingInspection(JSON.parse(JSON.stringify(inspection)));
     setEditDialog(true);
   };
 
@@ -2537,39 +2573,71 @@ export default function EvaluationManagement() {
   };
 
   // Inspection 저장 핸들러
-  const handleEditInspectionSave = async (updatedInspection: InspectionTableData) => {
-    console.log('🔄 handleEditInspectionSave 시작 (hr_evaluation_data 사용)');
+  const handleEditInspectionSave = async (updatedInspection: EvaluationTableData) => {
+    console.log('🔄 handleEditInspectionSave 시작');
     console.log('📊 받은 데이터:', updatedInspection);
+    console.log('📊 editingInspection:', editingInspection);
+
+    // ⚠️ 중요: EvaluationEditDialog에서 이미 DB 저장을 완료했으므로
+    // 여기서는 토스트 메시지, 데이터 새로고침, 변경로그만 처리
 
     try {
-      // hr_evaluation_data 형식으로 변환
-      const evaluationDataPayload = {
-        evaluation_title: updatedInspection.evaluationTitle || updatedInspection.inspectionContent || '',
-        evaluation_code: updatedInspection.code || '', // 평가 코드 저장
-        details: updatedInspection.details || '',
-        evaluation_type: updatedInspection.inspectionType || updatedInspection.evaluationType || '',
-        management_category: updatedInspection.inspectionTarget || updatedInspection.managementCategory || '',
-        status: updatedInspection.status || '대기',
-        start_date: updatedInspection.startDate || updatedInspection.inspectionDate || null,
-        end_date: updatedInspection.endDate || null,
-        team: updatedInspection.team || '',
-        manager: updatedInspection.assignee || '',
-        performance: updatedInspection.performance || '',
-        improvements: updatedInspection.improvements || '',
-        thoughts: updatedInspection.thoughts || '',
-        notes: updatedInspection.notes || '',
-        checklist_guide: updatedInspection.checklistGuide || ''
-      };
+      // inspections 배열에서 해당 ID가 있는지 확인하여 추가/수정 구분
+      const existingRecord = inspections.find((item) =>
+        item.id === updatedInspection.id || item.evaluationDataId === updatedInspection.evaluationDataId
+      );
+      const isNewRecord = !existingRecord;
+      console.log('🔍 신규 레코드 여부:', isNewRecord);
+      console.log('🔍 기존 레코드:', existingRecord);
 
-      console.log('💾 hr_evaluation_data에 저장할 데이터:', evaluationDataPayload);
+      if (!isNewRecord) {
+        // 기존 데이터 수정
+        console.log('✅ 평가 데이터 수정 (EvaluationEditDialog에서 이미 저장됨)');
 
-      if (updatedInspection.evaluationDataId) {
-        // 기존 데이터 업데이트
-        console.log('🔄 평가 데이터 업데이트 (ID:', updatedInspection.evaluationDataId, ')');
-        const result = await updateEvaluationData(updatedInspection.evaluationDataId, evaluationDataPayload);
+          // 변경된 필드 찾기 - inspections 배열에서 원본 데이터 찾기
+          const changedFields: string[] = [];
+          const fieldMap: { [key: string]: string } = {
+            evaluationTitle: '평가제목',
+            evaluationType: '평가유형',
+            managementCategory: '관리분류',
+            status: '상태',
+            inspectionDate: '시작일',
+            startDate: '시작일',
+            endDate: '종료일',
+            team: '팀',
+            assignee: '담당자',
+            performance: '성과',
+            improvements: '개선사항',
+            thoughts: '소감',
+            notes: '비고',
+            details: '상세내용'
+          };
 
-        if (result) {
-          console.log('✅ 평가 데이터 업데이트 성공:', result);
+          // inspections 배열에서 원본 데이터 찾기 (DB 저장 전 데이터)
+          const originalData = inspections.find((item) => item.id === updatedInspection.evaluationDataId || item.id === updatedInspection.id);
+
+          console.log('🔍 변경 감지 시작 - originalData:', originalData);
+          console.log('🔍 변경 감지 시작 - updatedInspection:', updatedInspection);
+
+          if (originalData) {
+            Object.keys(fieldMap).forEach((key) => {
+              const oldValue = (originalData as any)[key];
+              const newValue = (updatedInspection as any)[key];
+
+              console.log(`🔍 필드 비교 [${key}]:`, {
+                old: oldValue,
+                new: newValue,
+                changed: oldValue !== newValue
+              });
+
+              if (oldValue !== newValue && !changedFields.includes(fieldMap[key])) {
+                changedFields.push(fieldMap[key]);
+                console.log(`✅ 변경 감지됨: ${fieldMap[key]}`);
+              }
+            });
+          }
+
+          console.log('📋 최종 변경된 필드:', changedFields);
 
           // 변경로그 추가
           addChangeLog(
@@ -2582,38 +2650,55 @@ export default function EvaluationManagement() {
           // 데이터 새로고침
           await fetchEvaluationDataList();
 
+          // 성공 알림
+          let message = '';
+          if (changedFields.length > 0) {
+            const fieldsText = changedFields.join(', ');
+            message = `${updatedInspection.evaluationTitle}의 ${fieldsText}${changedFields.length === 1 ? '이' : '가'} 성공적으로 수정되었습니다.`;
+          } else {
+            message = `${updatedInspection.evaluationTitle}이 성공적으로 수정되었습니다.`;
+          }
+          setSnackbar({
+            open: true,
+            message: message,
+            severity: 'success'
+          });
+
           handleEditDialogClose();
-        } else {
-          throw new Error('평가 데이터 업데이트에 실패했습니다.');
-        }
       } else {
-        // 새 데이터 생성
-        console.log('➕ 새 평가 데이터 생성');
-        const result = await createEvaluationData(evaluationDataPayload);
+        // 새 데이터 추가
+        console.log('✅ 새 평가 데이터 추가 (EvaluationEditDialog에서 이미 저장됨)');
 
-        if (result) {
-          console.log('✅ 새 평가 데이터 생성 성공:', result);
+        // 변경로그 추가
+        addChangeLog(
+          '추가',
+          updatedInspection.code || `EVAL-${updatedInspection.id}`,
+          `${updatedInspection.evaluationTitle} - 새로 생성됨`,
+          updatedInspection.team || '미분류'
+        );
 
-          // 변경로그 추가
-          addChangeLog(
-            '추가',
-            updatedInspection.code || `EVAL-${result.id}`,
-            `${updatedInspection.evaluationTitle} - 새로 생성됨`,
-            updatedInspection.team || '미분류'
-          );
+        // 데이터 새로고침
+        await fetchEvaluationDataList();
 
-          // 데이터 새로고침
-          await fetchEvaluationDataList();
+        // 성공 알림
+        setSnackbar({
+          open: true,
+          message: `${updatedInspection.evaluationTitle}이 성공적으로 추가되었습니다.`,
+          severity: 'success'
+        });
 
-          handleEditDialogClose();
-        } else {
-          throw new Error('평가 데이터 생성에 실패했습니다.');
-        }
+        handleEditDialogClose();
       }
     } catch (error: any) {
       console.error('🔴 평가 데이터 저장 중 오류:', error);
       console.error('🔴 오류 메시지:', error?.message);
-      alert(`저장 실패: ${error?.message || '알 수 없는 오류가 발생했습니다.'}`);
+
+      // 실패 알림
+      setSnackbar({
+        open: true,
+        message: `저장 실패: ${error?.message || '알 수 없는 오류가 발생했습니다.'}`,
+        severity: 'error'
+      });
     }
   };
 
@@ -2621,41 +2706,87 @@ export default function EvaluationManagement() {
   const handleDeleteInspections = async (ids: number[]) => {
     console.log('🗑️ handleDeleteInspections 시작:', ids);
 
-    try {
-      // 삭제할 평가 데이터 정보 미리 저장 (변경로그용)
-      const deletedEvaluations = inspections.filter((inspection) => ids.includes(inspection.id));
+    // 삭제할 평가 데이터 정보 미리 저장 (변경로그용)
+    const deletedEvaluations = inspections.filter((inspection) => ids.includes(inspection.id));
 
-      // 각 ID에 대해 삭제 실행
-      for (const id of ids) {
+    let successCount = 0;
+    let failCount = 0;
+    const successfulIds: number[] = [];
+
+    // 각 ID에 대해 삭제 실행
+    for (const id of ids) {
+      try {
         const result = await deleteEvaluationData(id);
-        if (!result) {
-          throw new Error(`ID ${id} 삭제 실패`);
+        if (result) {
+          successCount++;
+          successfulIds.push(id);
+        } else {
+          failCount++;
         }
+      } catch (error) {
+        console.error(`🔴 ID ${id} 삭제 중 오류:`, error);
+        failCount++;
       }
+    }
 
-      // UI에서 삭제된 항목들 제거
-      setInspections((prevInspections) => prevInspections.filter((inspection) => !ids.includes(inspection.id)));
+    // UI에서 성공한 항목들만 제거
+    if (successfulIds.length > 0) {
+      setInspections((prevInspections) => prevInspections.filter((inspection) => !successfulIds.includes(inspection.id)));
 
       // 변경로그 추가
-      deletedEvaluations.forEach((evaluation) => {
-        const evaluationCode = evaluation.code || `EVAL-${evaluation.id}`;
-        const evaluationTitle = evaluation.inspectionContent || '평가';
-        addChangeLog(
-          '삭제',
-          evaluationCode,
-          `인사평가관리 ${evaluationTitle}(${evaluationCode}) 데이터가 삭제 되었습니다.`,
-          evaluation.team || '미분류',
-          '',
-          '',
-          '-',
-          evaluationTitle
-        );
-      });
+      deletedEvaluations
+        .filter((evaluation) => successfulIds.includes(evaluation.id))
+        .forEach((evaluation) => {
+          const evaluationCode = evaluation.code || `EVAL-${evaluation.id}`;
+          const evaluationTitle = evaluation.inspectionContent || '평가';
+          addChangeLog(
+            '삭제',
+            evaluationCode,
+            `인사평가관리 ${evaluationTitle}(${evaluationCode}) 데이터가 삭제 되었습니다.`,
+            evaluation.team || '미분류',
+            '',
+            '',
+            '-',
+            evaluationTitle
+          );
+        });
+    }
 
+    // 결과에 따른 알림
+    if (failCount === 0) {
+      // 전체 성공
+      if (successCount === 1 && deletedEvaluations.length > 0) {
+        // 단일 삭제
+        setSnackbar({
+          open: true,
+          message: `${deletedEvaluations[0].evaluationTitle} 성공적으로 삭제되었습니다.`,
+          severity: 'error'
+        });
+      } else {
+        // 다중 삭제
+        setSnackbar({
+          open: true,
+          message: `${successCount}개 인사평가가 성공적으로 삭제되었습니다.`,
+          severity: 'error'
+        });
+      }
       console.log('✅ 인사평가 데이터 삭제 완료');
-    } catch (error) {
-      console.error('🔴 인사평가 데이터 삭제 중 오류:', error);
-      throw error; // 에러를 다시 던져서 UI에서 처리할 수 있도록
+    } else if (successCount > 0) {
+      // 부분 실패
+      setSnackbar({
+        open: true,
+        message: `삭제 완료: ${successCount}개, 실패: ${failCount}개`,
+        severity: 'warning'
+      });
+      console.log(`⚠️ 인사평가 데이터 부분 삭제: 성공 ${successCount}, 실패 ${failCount}`);
+    } else {
+      // 전체 실패
+      setSnackbar({
+        open: true,
+        message: '인사평가 삭제에 실패했습니다.',
+        severity: 'error'
+      });
+      console.error('🔴 인사평가 데이터 삭제 전체 실패');
     }
   };
 
@@ -2663,16 +2794,7 @@ export default function EvaluationManagement() {
     setValue(newValue);
   };
 
-  // ✅ 권한 없음 - 카테고리 보기 권한도 없으면 완전 차단
-  if (!canViewCategory && !permissionLoading) {
-    return (
-      <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Typography variant="h6" color="error">
-          이 페이지에 접근할 권한이 없습니다.
-        </Typography>
-      </Box>
-    );
-  }
+  // ✅ 권한 체크는 하단의 JSX에서 KPI관리 패턴으로 처리 (깜빡임 방지)
 
   return (
     <Box
@@ -3035,6 +3157,7 @@ export default function EvaluationManagement() {
                   onSave={handleEditInspectionSave}
                   onDelete={handleDeleteInspections}
                   generateEvaluationCode={generateEvaluationCode}
+                  canViewCategory={canViewCategory}
                   canReadData={canReadData}
                   canCreateData={canCreateData}
                   canEditOwn={canEditOwn}
@@ -3087,6 +3210,7 @@ export default function EvaluationManagement() {
                   canEditOthers={canEditOthers}
                   updateEvaluationData={updateEvaluationData}
                   onSaveEvaluation={handleEditInspectionSave}
+                  setSnackbar={setSnackbar}
                 />
               </Box>
             </TabPanel>
@@ -3538,6 +3662,22 @@ export default function EvaluationManagement() {
           canEditOthers={canEditOthers}
         />
       )}
+
+      {/* 알림 Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

@@ -93,6 +93,7 @@ interface EvaluationTableProps {
   onSave?: (evaluation: EvaluationTableData) => Promise<void>;
   onDelete?: (ids: number[]) => Promise<void>;
   generateEvaluationCode?: () => Promise<string>;
+  canViewCategory?: boolean;
   canReadData?: boolean;
   canCreateData?: boolean;
   canEditOwn?: boolean;
@@ -110,6 +111,7 @@ export default function EvaluationTable({
   onSave,
   onDelete,
   generateEvaluationCode,
+  canViewCategory = true,
   canReadData = true,
   canCreateData = true,
   canEditOwn = true,
@@ -737,21 +739,33 @@ export default function EvaluationTable({
     return { color: '#333333' };
   };
 
-  // ✅ 권한 없음 - 접근 차단
-  if (!canReadData) {
-    return (
-      <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Typography variant="h6" color="error">
-          이 페이지에 접근할 권한이 없습니다.
-        </Typography>
-      </Box>
-    );
-  }
+  // ✅ 권한 체크는 하단 JSX에서 KPI관리 패턴으로 처리 (깜빡임 방지)
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* 상단 정보 및 액션 버튼 */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, mt: 3, flexShrink: 0 }}>
+      {canViewCategory && !canReadData ? (
+        <Box
+          sx={{
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            gap: 2,
+            py: 8
+          }}
+        >
+          <Typography variant="h5" color="text.secondary">
+            이 페이지에 대한 데이터 조회 권한이 없습니다.
+          </Typography>
+          <Typography variant="body2" color="text.disabled">
+            관리자에게 권한을 요청하세요.
+          </Typography>
+        </Box>
+      ) : (
+        <>
+          {/* 상단 정보 및 액션 버튼 */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, mt: 3, flexShrink: 0 }}>
         <Typography variant="body2" color="text.secondary">
           총 {filteredData.length}건
         </Typography>
@@ -1147,6 +1161,8 @@ export default function EvaluationTable({
           canEditOwn={canEditOwn}
           canEditOthers={canEditOthers}
         />
+      )}
+        </>
       )}
     </Box>
   );

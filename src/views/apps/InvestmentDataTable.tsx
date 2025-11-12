@@ -76,6 +76,16 @@ interface InvestmentDataTableProps {
   canEditOwn?: boolean;
   canEditOthers?: boolean;
   users?: any[];
+  snackbar?: {
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  };
+  setSnackbar?: React.Dispatch<React.SetStateAction<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>>;
 }
 
 // 컬럼 너비 정의
@@ -110,7 +120,9 @@ export default function InvestmentDataTable({
   canCreateData = true,
   canEditOwn = true,
   canEditOthers = true,
-  users = []
+  users = [],
+  snackbar,
+  setSnackbar
 }: InvestmentDataTableProps) {
   const theme = useTheme();
 
@@ -497,6 +509,27 @@ export default function InvestmentDataTable({
                     }
                     onDeleteInvestments([investment]);
                   });
+
+                  // 토스트 알림 추가
+                  if (setSnackbar) {
+                    let message = '';
+                    if (selectedInvestments.length === 1) {
+                      const investmentName = selectedInvestments[0].investmentName || '투자';
+                      const lastChar = investmentName.charAt(investmentName.length - 1);
+                      const code = lastChar.charCodeAt(0);
+                      const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+                      const josa = hasJongseong ? '이' : '가';
+                      message = `${investmentName}${josa} 삭제되었습니다.`;
+                    } else {
+                      message = `${selectedInvestments.length}건의 데이터가 삭제되었습니다.`;
+                    }
+                    setSnackbar({
+                      open: true,
+                      message: message,
+                      severity: 'error'
+                    });
+                  }
+
                   setSelectedItems([]);
                 }
               }

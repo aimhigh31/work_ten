@@ -167,8 +167,29 @@ export default function MediaManagement() {
   };
 
   const handleCopyUrl = (url: string) => {
-    navigator.clipboard.writeText(url);
-    alert('URL이 클립보드에 복사되었습니다.');
+    // Clipboard API 사용 가능 여부 확인
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(() => {
+        alert('URL이 클립보드에 복사되었습니다.');
+      }).catch(() => {
+        alert('URL 복사에 실패했습니다.');
+      });
+    } else {
+      // Fallback: 임시 textarea 사용
+      const textarea = document.createElement('textarea');
+      textarea.value = url;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        alert('URL이 클립보드에 복사되었습니다.');
+      } catch (err) {
+        alert('URL 복사에 실패했습니다.');
+      }
+      document.body.removeChild(textarea);
+    }
   };
 
   return (

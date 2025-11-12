@@ -187,6 +187,12 @@ interface SecurityEducationTableProps {
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
+  curriculumData?: any[];
+  curriculumLoading?: boolean;
+  fetchCurriculum?: () => Promise<void>;
+  attendeeData?: any[];
+  attendeeLoading?: boolean;
+  fetchAttendee?: () => Promise<void>;
 }
 
 export default function SecurityEducationTable({
@@ -201,7 +207,13 @@ export default function SecurityEducationTable({
   canReadData = true,
   canCreateData = true,
   canEditOwn = true,
-  canEditOthers = true
+  canEditOthers = true,
+  curriculumData,
+  curriculumLoading,
+  fetchCurriculum,
+  attendeeData,
+  attendeeLoading,
+  fetchAttendee
 }: SecurityEducationTableProps) {
   const theme = useTheme();
 
@@ -491,8 +503,6 @@ export default function SecurityEducationTable({
         if (onDataRefresh) {
           await onDataRefresh();
         }
-
-        alert('선택한 교육이 삭제되었습니다.');
       } else {
         alert('일부 항목 삭제에 실패했습니다. 다시 시도해주세요.');
       }
@@ -1281,6 +1291,12 @@ export default function SecurityEducationTable({
           canCreateData={canCreateData}
           canEditOwn={canEditOwn}
           canEditOthers={canEditOthers}
+          curriculumData={curriculumData}
+          curriculumLoading={curriculumLoading}
+          fetchCurriculum={fetchCurriculum}
+          attendeeData={attendeeData}
+          attendeeLoading={attendeeLoading}
+          fetchAttendee={fetchAttendee}
         />
       )}
     </Box>

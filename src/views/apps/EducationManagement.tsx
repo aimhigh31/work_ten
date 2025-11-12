@@ -35,7 +35,9 @@ import {
   TableRow,
   TextField,
   Pagination,
-  Button
+  Button,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 
@@ -122,6 +124,7 @@ interface KanbanViewProps {
     changedField?: string,
     title?: string
   ) => void;
+  setSnackbar: React.Dispatch<React.SetStateAction<{ open: boolean; message: string; severity: 'success' | 'error' | 'warning' | 'info' }>>;
   assigneeList?: any[];
   // 🔐 권한 관리
   canCreateData?: boolean;
@@ -137,6 +140,7 @@ function KanbanView({
   educations,
   setEducations,
   addChangeLog,
+  setSnackbar,
   assigneeList,
   canCreateData = true,
   canEditOwn = true,
@@ -255,25 +259,32 @@ function KanbanView({
 
         // 변경로그 추가 - 변경된 필드 확인
         const changes: string[] = [];
+        const changedFields: string[] = [];
         const educationCode = `MAIN-EDU-${new Date(updatedEducation.registrationDate).getFullYear().toString().slice(-2)}-${String(updatedEducation.no).padStart(3, '0')}`;
 
         if (originalEducation.status !== updatedEducation.status) {
           changes.push(`상태: "${originalEducation.status}" → "${updatedEducation.status}"`);
+          changedFields.push('상태');
         }
         if (originalEducation.assignee !== updatedEducation.assignee) {
           changes.push(`담당자: "${originalEducation.assignee || '미할당'}" → "${updatedEducation.assignee || '미할당'}"`);
+          changedFields.push('담당자');
         }
         if (originalEducation.team !== updatedEducation.team) {
           changes.push(`팀: "${originalEducation.team}" → "${updatedEducation.team}"`);
+          changedFields.push('팀');
         }
         if (originalEducation.content !== updatedEducation.content) {
           changes.push(`교육내용 수정`);
+          changedFields.push('교육내용');
         }
         if (originalEducation.responseContent !== updatedEducation.responseContent) {
           changes.push(`처리내용 수정`);
+          changedFields.push('처리내용');
         }
         if (originalEducation.resolutionDate !== updatedEducation.resolutionDate) {
           changes.push(`완료일: "${originalEducation.resolutionDate || '미정'}" → "${updatedEducation.resolutionDate || '미정'}"`);
+          changedFields.push('완료일');
         }
 
         if (changes.length > 0) {
@@ -288,9 +299,29 @@ function KanbanView({
             updatedEducation.title
           );
         }
+
+        // 토스트 알림 (칸반뷰)
+        const educationTitle = updatedEducation.title || '개인교육관리';
+        let message = '';
+        if (changedFields.length > 0) {
+          const fieldsText = changedFields.join(', ');
+          const josa = changedFields.length === 1 ? '이' : '가';
+          message = `${educationTitle}의 ${fieldsText}${josa} 수정되었습니다.`;
+        } else {
+          message = `${educationTitle}이 성공적으로 수정되었습니다.`;
+        }
+        setSnackbar({
+          open: true,
+          message,
+          severity: 'success'
+        });
       } else {
         console.error('❌ 칸반뷰 - DB 업데이트 실패');
-        alert('교육 정보 업데이트에 실패했습니다.');
+        setSnackbar({
+          open: true,
+          message: '교육 정보 업데이트에 실패했습니다.',
+          severity: 'error'
+        });
         return;
       }
     }
@@ -346,9 +377,20 @@ function KanbanView({
           educationTitle,
           '칸반탭'
         );
+
+        // 토스트 알림
+        setSnackbar({
+          open: true,
+          message: `${educationTitle}의 상태가 ${oldStatus} → ${newStatus}로 변경되었습니다.`,
+          severity: 'success'
+        });
       } else {
         console.error('❌ 드래그앤드롭 - DB 업데이트 실패');
-        alert('상태 변경에 실패했습니다.');
+        setSnackbar({
+          open: true,
+          message: '상태 변경에 실패했습니다.',
+          severity: 'error'
+        });
       }
     }
   };
@@ -2470,6 +2512,13 @@ export default function EducationManagement() {
   // 공유 Educations 상태
   const [educations, setEducations] = useState<EducationTableData[]>([]);
 
+  // 토스트 알림 상태
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error' | 'warning' | 'info'
+  });
+
   // DB에서 교육 데이터 로드
   React.useEffect(() => {
     const loadEducations = async () => {
@@ -2667,17 +2716,22 @@ export default function EducationManagement() {
 
         // 변경로그 추가
         const changes = [];
+        const changedFields = [];
         if (originalEducation.status !== updatedEducation.status) {
           changes.push(`상태: ${originalEducation.status} → ${updatedEducation.status}`);
+          changedFields.push('상태');
         }
         if (originalEducation.assignee !== updatedEducation.assignee) {
           changes.push(`담당자: ${originalEducation.assignee} → ${updatedEducation.assignee}`);
+          changedFields.push('담당자');
         }
         if (originalEducation.team !== updatedEducation.team) {
           changes.push(`팀: ${originalEducation.team} → ${updatedEducation.team}`);
+          changedFields.push('팀');
         }
         if (originalEducation.resolutionDate !== updatedEducation.resolutionDate) {
           changes.push(`완료일: ${originalEducation.resolutionDate || '미정'} → ${updatedEducation.resolutionDate || '미정'}`);
+          changedFields.push('완료일');
         }
 
         if (changes.length > 0) {
@@ -2693,9 +2747,29 @@ export default function EducationManagement() {
             updatedEducation.title
           );
         }
+
+        // 토스트 알림
+        const educationTitle = updatedEducation.title || '개인교육관리';
+        let message = '';
+        if (changedFields.length > 0) {
+          const fieldsText = changedFields.join(', ');
+          const josa = changedFields.length === 1 ? '이' : '가';
+          message = `${educationTitle}의 ${fieldsText}${josa} 수정되었습니다.`;
+        } else {
+          message = `${educationTitle}이 성공적으로 수정되었습니다.`;
+        }
+        setSnackbar({
+          open: true,
+          message,
+          severity: 'success'
+        });
       } else {
         console.error('❌ DB 업데이트 실패');
-        alert('교육 정보 업데이트에 실패했습니다.');
+        setSnackbar({
+          open: true,
+          message: '교육 정보 업데이트에 실패했습니다.',
+          severity: 'error'
+        });
         return;
       }
     } else {
@@ -2730,9 +2804,21 @@ export default function EducationManagement() {
           undefined,
           newEducation.title
         );
+
+        // 토스트 알림
+        const educationTitle = newEducation.title || '개인교육관리';
+        setSnackbar({
+          open: true,
+          message: `${educationTitle}이 성공적으로 등록되었습니다.`,
+          severity: 'success'
+        });
       } else {
         console.error('❌ DB 생성 실패');
-        alert('교육 정보 생성에 실패했습니다.');
+        setSnackbar({
+          open: true,
+          message: '교육 정보 생성에 실패했습니다.',
+          severity: 'error'
+        });
         return;
       }
     }
@@ -3100,6 +3186,7 @@ export default function EducationManagement() {
                   educations={educations}
                   setEducations={setEducations}
                   addChangeLog={addChangeLog}
+                  setSnackbar={setSnackbar}
                   canCreateData={canCreateData}
                   canEditOwn={canEditOwn}
                   canEditOthers={canEditOthers}
@@ -3143,6 +3230,7 @@ export default function EducationManagement() {
                   educations={educations}
                   setEducations={setEducations}
                   addChangeLog={addChangeLog}
+                  setSnackbar={setSnackbar}
                   assigneeList={users}
                   canCreateData={canCreateData}
                   canEditOwn={canEditOwn}
@@ -3294,6 +3382,22 @@ export default function EducationManagement() {
           canEditOthers={canEditOthers}
         />
       )}
+
+      {/* 토스트 알림 Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

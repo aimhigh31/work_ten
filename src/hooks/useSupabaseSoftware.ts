@@ -40,6 +40,7 @@ export interface SoftwareData {
 }
 
 export const useSupabaseSoftware = () => {
+  const [software, setSoftware] = useState<SoftwareData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,6 +50,7 @@ export const useSupabaseSoftware = () => {
     const cachedData = loadFromCache<SoftwareData[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
     if (cachedData) {
       console.log('⚡ [Software] 캐시 데이터 반환 (깜빡임 방지)');
+      setSoftware(cachedData); // ✅ 캐시 데이터로 상태 업데이트 (KPI 패턴)
       return cachedData;
     }
 
@@ -71,7 +73,10 @@ export const useSupabaseSoftware = () => {
 
       console.log('✅ getSoftware 성공:', data?.length || 0, '개');
 
-      // 3. 캐시에 저장
+      // 3. 상태 업데이트 (KPI 패턴)
+      setSoftware(data || []);
+
+      // 4. 캐시에 저장
       saveToCache(CACHE_KEY, data || []);
 
       return data || [];
@@ -111,6 +116,9 @@ export const useSupabaseSoftware = () => {
 
       console.log('✅ createSoftware 성공:', data);
 
+      // ✅ 로컬 상태 즉시 업데이트 (KPI 패턴)
+      setSoftware((prev) => [data, ...prev]);
+
       // 캐시 무효화 (최신 데이터 보장)
       sessionStorage.removeItem(CACHE_KEY);
 
@@ -146,6 +154,9 @@ export const useSupabaseSoftware = () => {
       }
 
       console.log('✅ updateSoftware 성공:', data);
+
+      // ✅ 로컬 상태 즉시 업데이트 (KPI 패턴)
+      setSoftware((prev) => prev.map((sw) => (sw.id === id ? data : sw)));
 
       // 캐시 무효화 (최신 데이터 보장)
       sessionStorage.removeItem(CACHE_KEY);
@@ -233,6 +244,7 @@ export const useSupabaseSoftware = () => {
   }, []);
 
   return {
+    software,
     getSoftware,
     createSoftware,
     updateSoftware,

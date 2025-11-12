@@ -87,11 +87,13 @@ export function useSupabaseChecklistEditor() {
     // 1. 동적 캐시 키 생성
     const cacheKey = createCacheKey('checklist_editor', `checklist_${checklistId}`);
     const cachedData = loadFromCache<ChecklistEditorItem[]>(cacheKey, DEFAULT_CACHE_EXPIRY_MS);
-    if (cachedData) {
-      console.log('⚡ [ChecklistEditor] 캐시 데이터 반환');
+    if (cachedData && cachedData.length > 0) {
+      console.log('⚡ [ChecklistEditor] 캐시 데이터 반환:', cachedData.length, '개');
       setEditorItems(cachedData);
       return cachedData;
     }
+
+    console.log('🔍 [ChecklistEditor] 캐시 없음 또는 빈 배열, API 호출 진행');
 
     try {
       console.log('🔄 체크리스트 에디터 항목 조회 시작...', { checklistId });
@@ -165,6 +167,9 @@ export function useSupabaseChecklistEditor() {
 
         if (result.success) {
           console.log('✅ 체크리스트 에디터 항목 생성 성공');
+          // 캐시 무효화 (최신 데이터 보장)
+          const cacheKey = createCacheKey('checklist_editor', `checklist_${checklistId}`);
+          sessionStorage.removeItem(cacheKey);
           // 목록 새로고침
           await fetchEditorItems(checklistId);
           return true;
@@ -200,6 +205,9 @@ export function useSupabaseChecklistEditor() {
 
         if (result.success) {
           console.log('✅ 체크리스트 에디터 항목 수정 성공');
+          // 캐시 무효화 (최신 데이터 보장)
+          const cacheKey = createCacheKey('checklist_editor', `checklist_${checklistId}`);
+          sessionStorage.removeItem(cacheKey);
           // 목록 새로고침
           await fetchEditorItems(checklistId);
           return true;
@@ -229,6 +237,9 @@ export function useSupabaseChecklistEditor() {
 
         if (result.success) {
           console.log('✅ 체크리스트 에디터 항목 삭제 성공');
+          // 캐시 무효화 (최신 데이터 보장)
+          const cacheKey = createCacheKey('checklist_editor', `checklist_${checklistId}`);
+          sessionStorage.removeItem(cacheKey);
           // 목록 새로고침
           await fetchEditorItems(checklistId);
           return true;
@@ -279,6 +290,9 @@ export function useSupabaseChecklistEditor() {
 
         if (result.success) {
           console.log('✅ 체크리스트 에디터 항목 일괄 저장 성공');
+          // 캐시 무효화 (최신 데이터 보장)
+          const cacheKey = createCacheKey('checklist_editor', `checklist_${checklistId}`);
+          sessionStorage.removeItem(cacheKey);
           // 목록 새로고침
           await fetchEditorItems(checklistId);
           return true;

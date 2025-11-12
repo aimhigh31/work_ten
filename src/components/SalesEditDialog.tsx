@@ -45,6 +45,11 @@ interface SalesEditDialogProps {
   canEditOwn?: boolean;
   canEditOthers?: boolean;
   generateSalesCode?: () => Promise<string>;
+  setSnackbar?: React.Dispatch<React.SetStateAction<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>>;
 }
 
 // 기록 탭 컴포넌트
@@ -773,7 +778,7 @@ function a11yProps(index: number) {
   };
 }
 
-const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesRecord, onSave, users: propUsers, canCreateData = true, canEditOwn = true, canEditOthers = true, generateSalesCode }) => {
+const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesRecord, onSave, users: propUsers, canCreateData = true, canEditOwn = true, canEditOthers = true, generateSalesCode, setSnackbar }) => {
   const [value, setValue] = useState(0);
   const [formData, setFormData] = useState<SalesRecord | null>(null);
 

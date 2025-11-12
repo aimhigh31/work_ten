@@ -35,7 +35,9 @@ import {
   TableRow,
   TextField,
   Pagination,
-  Button
+  Button,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 
@@ -123,6 +125,16 @@ interface KanbanViewProps {
   getStatusName?: (subcode: string) => string;
   updateVoc?: (id: number, voc: Partial<any>) => Promise<boolean>;
   onSaveVOC?: (updatedVOC: VOCTableData) => Promise<void>;
+  snackbar: {
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  };
+  setSnackbar: React.Dispatch<React.SetStateAction<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>>;
 }
 
 function KanbanView({
@@ -142,7 +154,9 @@ function KanbanView({
   getPriorityName = (subcode: string) => subcode,
   getStatusName = (subcode: string) => subcode,
   updateVoc,
-  onSaveVOC
+  onSaveVOC,
+  snackbar,
+  setSnackbar
 }: KanbanViewProps) {
   // 세션 정보 가져오기
   const { data: session } = useSession();
@@ -307,11 +321,25 @@ function KanbanView({
           }
 
           console.log('✅ 칸반 드래그: 상태 변경 DB 저장 성공');
+
+          // 토스트 알림 - 상태 변경 성공
+          const vocTitle = currentVOC.workContent || currentVOC.requestContent || 'VOC';
+          setSnackbar({
+            open: true,
+            message: `${vocTitle}의 상태가 ${oldStatus} → ${newStatus}로 변경되었습니다.`,
+            severity: 'success'
+          });
         } catch (error) {
           console.error('🔴 칸반 드래그: 상태 변경 DB 저장 실패:', error);
           // 실패 시 원래 상태로 되돌림
           setVOCs((prev) => prev.map((voc) => (voc.id === vocId ? { ...voc, status: oldStatus } : voc)));
-          alert('상태 변경 저장에 실패했습니다.');
+
+          // 토스트 알림 - 에러
+          setSnackbar({
+            open: true,
+            message: '상태 변경 저장에 실패했습니다.',
+            severity: 'error'
+          });
           return;
         }
       }
@@ -325,11 +353,11 @@ function KanbanView({
     }
   };
 
-  // 상태별 컬럼 정의 - DB의 실제 status 값에 맞게 수정
+  // 상태별 컬럼 정의 (표준화된 칸반 디자인)
   const statusColumns = [
-    { key: '대기', title: '대기', pillBg: '#FFF3E0', pillColor: '#F57C00' },
+    { key: '대기', title: '대기', pillBg: '#F5F5F5', pillColor: '#757575' },
     { key: '진행', title: '진행중', pillBg: '#E3F2FD', pillColor: '#1976D2' },
-    { key: '완료', title: '완료', pillBg: '#E8F5E8', pillColor: '#388E3C' },
+    { key: '완료', title: '완료', pillBg: '#E8F5E9', pillColor: '#388E3C' },
     { key: '홀딩', title: '홀딩', pillBg: '#FFEBEE', pillColor: '#D32F2F' }
   ];
 
@@ -378,20 +406,16 @@ function KanbanView({
     return colorMap[requestType as keyof typeof colorMap] || { backgroundColor: '#F5F5F5', color: '#666666' };
   };
 
-  // 상태 태그 스타일 함수
+  // 상태 태그 스타일 함수 (동적)
   const getStatusTagStyle = (status: string) => {
-    switch (status) {
-      case '대기':
-        return { backgroundColor: 'rgba(251, 191, 36, 0.15)', color: '#f59e0b' };
-      case '진행':
-        return { backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6' };
-      case '완료':
-        return { backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#16a34a' };
-      case '홀딩':
-        return { backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#dc2626' };
-      default:
-        return { backgroundColor: 'rgba(156, 163, 175, 0.15)', color: '#4b5563' };
+    const column = statusColumns.find((col) => col.key === status);
+    if (column) {
+      return {
+        backgroundColor: column.pillBg,
+        color: column.pillColor
+      };
     }
+    return { backgroundColor: '#F5F5F5', color: '#757575' };
   };
 
   // 팀별 색상
@@ -804,8 +828,25 @@ function KanbanView({
           canCreateData={canCreateData}
           canEditOwn={canEditOwn}
           canEditOthers={canEditOthers}
+          setSnackbar={setSnackbar}
         />
       )}
+
+      {/* 알림 Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
@@ -2414,6 +2455,13 @@ export default function VOCManagement() {
   const [value, setValue] = useState(0);
   const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers } = useMenuPermission('/it/voc');
 
+  // 알림 상태
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error' | 'warning' | 'info'
+  });
+
   // 세션 및 사용자 정보
   const { data: session } = useSession();
   const user = useUser();
@@ -2474,8 +2522,18 @@ export default function VOCManagement() {
     return found ? found.subcode_name : subcode;
   }, [statusTypes]);
 
-  // Supabase VOC 연동
-  const { getVocs, createVoc, updateVoc, deleteVoc, convertToVocData, convertToDbVocData, loading, error } = useSupabaseVoc();
+  // ⭐ Investment 패턴: 데이터 로딩 함수만 가져오기 (KPI 패턴 적용)
+  const {
+    vocs: vocsFromHook,
+    getVocs,
+    createVoc,
+    updateVoc,
+    deleteVoc,
+    convertToVocData,
+    convertToDbVocData,
+    loading: vocLoading,
+    error
+  } = useSupabaseVoc();
 
   // 공유 VOCs 상태
   const [vocs, setVOCs] = useState<VOCTableData[]>([]);
@@ -2524,32 +2582,54 @@ export default function VOCManagement() {
   const [selectedAssignee, setSelectedAssignee] = useState('전체');
   const [selectedRecentStatus, setSelectedRecentStatus] = useState('전체');
 
-  // 컴포넌트 마운트 시 VOC 데이터 로드
-  useEffect(() => {
-    const loadVocData = async () => {
-      console.log('📞 VOC 데이터 로드 시작');
-      const dbVocs = await getVocs();
-      console.log('📞 DB에서 가져온 VOC 개수:', dbVocs.length);
+  // ⭐ 초기 데이터 로딩
+  React.useEffect(() => {
+    const loadAllData = async () => {
+      try {
+        console.time('⚡ VOCManagement - 페이지 데이터 로딩');
 
-      // DB 데이터를 프론트엔드 형식으로 변환
-      const vocData = dbVocs.map((dbVoc) => {
-        const converted = convertToVocData(dbVoc);
+        // ⚡ VOC만 로딩! (users, departments, masterCodes는 CommonData에 이미 있음)
+        await getVocs(); // ✅ 훅 내부에서 setVocs 호출됨 (KPI 패턴)
 
-        // subcode를 subcode_name으로 변환
-        return {
-          ...converted,
-          vocType: getVocTypeName(converted.vocType) || converted.vocType,
-          priority: getPriorityName(converted.priority) || converted.priority,
-          status: getStatusName(converted.status) || converted.status
-        };
-      });
+        console.timeEnd('⚡ VOCManagement - 페이지 데이터 로딩');
 
-      console.log('📞 변환된 VOC 데이터:', vocData);
-      setVOCs(vocData);
+        console.log('✅ VOCManagement 로딩 완료');
+      } catch (error) {
+        console.error('❌ 데이터 로딩 실패:', error);
+      }
     };
 
-    loadVocData();
-  }, [getVocs, convertToVocData, getVocTypeName, getPriorityName, getStatusName]);
+    loadAllData();
+  }, [getVocs]);
+
+  // Supabase 데이터가 변경되면 vocs 상태 업데이트 (즉시 렌더링)
+  useEffect(() => {
+    console.log('🔍 Supabase VOC 데이터 상태:', {
+      length: vocsFromHook.length,
+      error,
+      sampleData: vocsFromHook.slice(0, 2)
+    });
+
+    // DB 데이터를 프론트엔드 형식으로 변환
+    const vocData = vocsFromHook.map((dbVoc) => {
+      const converted = convertToVocData(dbVoc);
+
+      // subcode를 subcode_name으로 변환
+      return {
+        ...converted,
+        vocType: getVocTypeName(converted.vocType) || converted.vocType,
+        priority: getPriorityName(converted.priority) || converted.priority,
+        status: getStatusName(converted.status) || converted.status
+      };
+    });
+
+    setVOCs(vocData);
+    console.log('🔄 Supabase VOC 데이터를 VOCTableData로 변환 완료:', vocData.length + '개');
+
+    if (vocData.length > 0) {
+      console.log('📝 변환된 첫 번째 VOC 샘플:', vocData[0]);
+    }
+  }, [vocsFromHook, error, convertToVocData, getVocTypeName, getPriorityName, getStatusName]);
 
   // 연도 옵션 생성
   const currentYearValue = new Date().getFullYear();
@@ -2614,6 +2694,20 @@ export default function VOCManagement() {
     setEditingVOC(null);
   };
 
+  // 받침 감지 함수
+  const getKoreanParticle = (word: string): string => {
+    const lastChar = word.charAt(word.length - 1);
+    const code = lastChar.charCodeAt(0);
+
+    // 한글 범위: 0xAC00 ~ 0xD7A3
+    if (code >= 0xAC00 && code <= 0xD7A3) {
+      // 받침이 있으면 (code - 0xAC00) % 28 !== 0
+      const hasJongseong = (code - 0xAC00) % 28 !== 0;
+      return hasJongseong ? '이' : '가';
+    }
+    return '가'; // 한글이 아닌 경우 기본값
+  };
+
   // VOC 저장 핸들러
   const handleEditVOCSave = (updatedVOC: VOCTableData) => {
     const originalVOC = vocs.find((t) => t.id === updatedVOC.id);
@@ -2621,6 +2715,51 @@ export default function VOCManagement() {
     if (originalVOC) {
       // 업데이트
       setVOCs((prevVOCs) => prevVOCs.map((voc) => (voc.id === updatedVOC.id ? { ...updatedVOC } : voc)));
+
+      // 필드 변경 감지 (fieldMap)
+      const fieldMap: { [key: string]: string } = {
+        vocType: 'VOC유형',
+        workCategory: '업무분류',
+        workContent: '요청내용',
+        requestContent: '요청내용',
+        actionContent: '조치내용',
+        requester: '요청자',
+        requestDate: '요청일',
+        completedDate: '완료일',
+        status: '상태',
+        assignee: '담당자',
+        team: '팀'
+      };
+
+      const changedFields: string[] = [];
+      Object.keys(fieldMap).forEach((key) => {
+        const oldValue = (originalVOC as any)[key];
+        const newValue = (updatedVOC as any)[key];
+
+        if (oldValue !== newValue && !changedFields.includes(fieldMap[key])) {
+          changedFields.push(fieldMap[key]);
+        }
+      });
+
+      // 토스트 알림 with Korean particle detection
+      let message = '';
+      if (changedFields.length > 0) {
+        const fieldsText = changedFields.join(', ');
+        // 마지막 필드명의 받침 유무에 따라 조사 결정
+        const lastField = changedFields[changedFields.length - 1];
+        const josa = getKoreanParticle(lastField);
+        message = `${updatedVOC.workContent || 'VOC'}의 ${fieldsText}${josa} 성공적으로 수정되었습니다.`;
+      } else {
+        // 필드 변경이 없는 경우
+        const josa = getKoreanParticle(updatedVOC.workContent || 'VOC');
+        message = `${updatedVOC.workContent || 'VOC'}${josa} 성공적으로 수정되었습니다.`;
+      }
+
+      setSnackbar({
+        open: true,
+        message: message,
+        severity: 'success'
+      });
 
       // 변경로그 추가
       const changes = [];
@@ -2640,6 +2779,17 @@ export default function VOCManagement() {
     } else {
       // 새로 생성
       setVOCs((prevVOCs) => [...prevVOCs, updatedVOC]);
+
+      // 성공 알림 with Korean particle detection
+      const josa = getKoreanParticle(updatedVOC.workContent || 'VOC');
+      const addMessage = `${updatedVOC.workContent || 'VOC'}${josa} 성공적으로 추가되었습니다.`;
+
+      setSnackbar({
+        open: true,
+        message: addMessage,
+        severity: 'success'
+      });
+
       addChangeLog('추가', updatedVOC.code, `새로운 VOC가 생성되었습니다: ${updatedVOC.workContent}`, updatedVOC.team);
     }
 
@@ -2732,27 +2882,8 @@ export default function VOCManagement() {
             </Box>
           </Box>
 
-          {/* 권한 체크 */}
-          {!canViewCategory ? (
-            <Box
-              sx={{
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'column',
-                gap: 2,
-                py: 8
-              }}
-            >
-              <Typography variant="h5" color="text.secondary">
-                이 페이지에 접근할 권한이 없습니다.
-              </Typography>
-              <Typography variant="body2" color="text.disabled">
-                관리자에게 권한을 요청하세요.
-              </Typography>
-            </Box>
-          ) : !canReadData ? (
+          {/* 권한 체크: KPI관리 패턴 (깜빡임 방지) */}
+          {canViewCategory && !canReadData ? (
             <Box
               sx={{
                 flex: 1,
@@ -3029,6 +3160,8 @@ export default function VOCManagement() {
                   canEditOwn={canEditOwn}
                   canEditOthers={canEditOthers}
                   users={users}
+                  snackbar={snackbar}
+                  setSnackbar={setSnackbar}
                 />
               </Box>
             </TabPanel>
@@ -3077,6 +3210,9 @@ export default function VOCManagement() {
                   getVocTypeName={getVocTypeName}
                   getPriorityName={getPriorityName}
                   getStatusName={getStatusName}
+                  updateVoc={updateVoc}
+                  snackbar={snackbar}
+                  setSnackbar={setSnackbar}
                 />
               </Box>
             </TabPanel>
@@ -3222,8 +3358,25 @@ export default function VOCManagement() {
           canCreateData={canCreateData}
           canEditOwn={canEditOwn}
           canEditOthers={canEditOthers}
+          setSnackbar={setSnackbar}
         />
       )}
+
+      {/* 알림 Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

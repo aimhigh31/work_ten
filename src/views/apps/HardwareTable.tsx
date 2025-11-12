@@ -84,6 +84,11 @@ interface HardwareTableProps {
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
+  setSnackbar?: React.Dispatch<React.SetStateAction<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>>;
 }
 
 export default function HardwareTable({
@@ -100,7 +105,8 @@ export default function HardwareTable({
   users = [],
   canCreateData = true,
   canEditOwn = true,
-  canEditOthers = true
+  canEditOthers = true,
+  setSnackbar = undefined
 }: HardwareTableProps) {
   const theme = useTheme();
   const { data: session } = useSession();
@@ -300,6 +306,9 @@ export default function HardwareTable({
   const handleDeleteSelected = async () => {
     if (selected.length === 0) return;
 
+    // 삭제할 항목들의 정보를 미리 저장
+    const deletedHardwares = data.filter((task) => selected.includes(task.id));
+
     try {
       // Supabase 삭제 (soft delete)
       if (deleteMultipleHardware) {
@@ -307,8 +316,7 @@ export default function HardwareTable({
 
         // 삭제될 업무들의 정보를 변경로그에 추가
         if (addChangeLog) {
-          const deletedTasks = data.filter((task) => selected.includes(task.id));
-          deletedTasks.forEach((task) => {
+          deletedHardwares.forEach((task) => {
             const assetName = task.assetName || task.workContent || '하드웨어';
             addChangeLog(
               '하드웨어 삭제',
@@ -327,11 +335,47 @@ export default function HardwareTable({
         if (setTasks) {
           setTasks((prevTasks) => prevTasks.filter((task) => !selected.includes(task.id)));
         }
+
+        // 토스트 알림 (삭제)
+        if (setSnackbar) {
+          if (deletedHardwares.length === 1) {
+            const assetName = deletedHardwares[0].assetName || deletedHardwares[0].workContent || '하드웨어';
+            const getKoreanParticle = (word: string): string => {
+              const lastChar = word.charAt(word.length - 1);
+              const code = lastChar.charCodeAt(0);
+              if (code >= 0xAC00 && code <= 0xD7A3) {
+                const hasJongseong = (code - 0xAC00) % 28 !== 0;
+                return hasJongseong ? '이' : '가';
+              }
+              return '가';
+            };
+            const josa = getKoreanParticle(assetName);
+            setSnackbar({
+              open: true,
+              message: `${assetName}${josa} 성공적으로 삭제되었습니다.`,
+              severity: 'error'
+            });
+          } else {
+            setSnackbar({
+              open: true,
+              message: `${deletedHardwares.length}개 하드웨어가 성공적으로 삭제되었습니다.`,
+              severity: 'error'
+            });
+          }
+        }
       }
 
       setSelected([]);
     } catch (error) {
       console.error('❌ 하드웨어 삭제 실패:', error);
+      // 토스트 알림 (에러)
+      if (setSnackbar) {
+        setSnackbar({
+          open: true,
+          message: '삭제에 실패했습니다.',
+          severity: 'error'
+        });
+      }
     }
   };
 

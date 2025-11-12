@@ -37,7 +37,9 @@ import {
   Pagination,
   Stack,
   Avatar,
-  Button
+  Button,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
@@ -113,6 +115,16 @@ interface KanbanViewProps {
   users?: any[];
   onSaveInvestment?: (investmentData: InvestmentData) => Promise<void>;
   updateInvestmentData?: (investmentDataId: number, updates: Partial<any>) => Promise<void>;
+  snackbar?: {
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  };
+  setSnackbar?: React.Dispatch<React.SetStateAction<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>>;
 }
 
 function KanbanView({
@@ -128,7 +140,9 @@ function KanbanView({
   canEditOthers = true,
   users = [],
   onSaveInvestment,
-  updateInvestmentData
+  updateInvestmentData,
+  snackbar,
+  setSnackbar
 }: KanbanViewProps) {
   const theme = useTheme();
 
@@ -224,26 +238,39 @@ function KanbanView({
       );
 
       // DB에 상태 변경 저장
-      if (updateInvestmentData && currentInvestment.investmentDataId) {
+      if (updateInvestmentData && currentInvestment.id) {
         try {
           console.log('🔄 칸반 드래그: 상태 변경 DB 저장 시작', {
-            investmentDataId: currentInvestment.investmentDataId,
+            investmentId: currentInvestment.id,
             oldStatus,
             newStatus
           });
 
-          await updateInvestmentData(currentInvestment.investmentDataId, {
+          await updateInvestmentData(currentInvestment.id, {
             status: newStatus
           });
 
           console.log('✅ 칸반 드래그: 상태 변경 DB 저장 성공');
+
+          // 토스트 알림 추가
+          const investmentTitle = currentInvestment.investmentName || '투자';
+          setSnackbar({
+            open: true,
+            message: `${investmentTitle}의 상태가 ${oldStatus} → ${newStatus}로 변경되었습니다.`,
+            severity: 'success'
+          });
         } catch (error) {
           console.error('🔴 칸반 드래그: 상태 변경 DB 저장 실패:', error);
           // 실패 시 원래 상태로 되돌림
           setInvestments((prev) =>
             prev.map((investment) => (investment.id === investmentId ? { ...investment, status: oldStatus } : investment))
           );
-          alert('상태 변경 저장에 실패했습니다.');
+          // 토스트 알림 추가 (에러)
+          setSnackbar({
+            open: true,
+            message: '상태 변경 저장에 실패했습니다.',
+            severity: 'error'
+          });
           return;
         }
       }
@@ -2224,18 +2251,19 @@ export default function InvestmentManagement() {
   // 🏪 공용 창고에서 재료 가져오기
   const { users, departments, masterCodes } = useCommonData();
 
-  // Supabase 투자관리 연동
+  // ⭐ Investment 패턴: 데이터 로딩 함수만 가져오기 (KPI 패턴 적용)
   const {
+    investments: investmentsFromHook,
     getInvestments,
     createInvestment,
     updateInvestment,
     deleteInvestment,
     convertToInvestmentData,
     convertToDbInvestmentData,
-    loading,
+    loading: investmentLoading,
     error
   } = useSupabaseInvestment();
-  const { saveFinanceItems } = useSupabaseInvestmentFinance();
+  // 투자금액 저장은 InvestmentEditDialog에서 처리
 
   // Supabase 변경로그 연동
   const { data: session } = useSession();
@@ -2311,6 +2339,13 @@ export default function InvestmentManagement() {
   // 편집 다이얼로그 상태
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [currentInvestment, setCurrentInvestment] = useState<InvestmentTableData | null>(null);
+
+  // 알림 상태
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error' | 'warning' | 'info'
+  });
 
   // 변경로그 상태
   const [changeLogPage, setChangeLogPage] = useState(0);
@@ -2401,32 +2436,54 @@ export default function InvestmentManagement() {
     console.log('📊 changeLogs (변환된 데이터):', changeLogs);
   }, [changeLogData, changeLogs]);
 
-  // Supabase에서 투자 데이터 로드
-  useEffect(() => {
-    const loadInvestments = async () => {
+  // ⭐ 초기 데이터 로딩
+  React.useEffect(() => {
+    const loadAllData = async () => {
       try {
-        const dbInvestments = await getInvestments();
-        const convertedInvestments = dbInvestments.map((dbInv) => {
-          const converted = convertToInvestmentData(dbInv);
+        console.time('⚡ InvestmentManagement - 페이지 데이터 로딩');
 
-          // subcode를 subcode_name으로 변환
-          return {
-            ...converted,
-            investmentType: getInvestmentTypeName(converted.investmentType) || converted.investmentType,
-            investmentDetailType: getInvestmentDetailTypeName(converted.investmentDetailType) || converted.investmentDetailType,
-            status: getStatusName(converted.status) || converted.status
-          };
-        });
+        // ⚡ investment만 로딩! (users, departments, masterCodes는 CommonData에 이미 있음)
+        await getInvestments(); // ✅ 훅 내부에서 setInvestments 호출됨 (KPI 패턴)
 
-        // NO 필드를 프론트엔드에서 역순으로 할당 (최신이 1번)
-        setInvestments(assignNoToInvestments(convertedInvestments));
+        console.timeEnd('⚡ InvestmentManagement - 페이지 데이터 로딩');
+
+        console.log('✅ InvestmentManagement 로딩 완료');
       } catch (error) {
-        console.error('투자 데이터 로드 실패:', error);
+        console.error('❌ 데이터 로딩 실패:', error);
       }
     };
 
-    loadInvestments();
-  }, [getInvestments, convertToInvestmentData, getInvestmentTypeName, getInvestmentDetailTypeName, getStatusName]);
+    loadAllData();
+  }, [getInvestments]);
+
+  // Supabase 데이터가 변경되면 investments 상태 업데이트 (즉시 렌더링)
+  useEffect(() => {
+    console.log('🔍 Supabase 투자 데이터 상태:', {
+      length: investmentsFromHook.length,
+      error,
+      sampleData: investmentsFromHook.slice(0, 2)
+    });
+
+    const convertedInvestments = investmentsFromHook.map((dbInv) => {
+      const converted = convertToInvestmentData(dbInv);
+
+      // subcode를 subcode_name으로 변환
+      return {
+        ...converted,
+        investmentType: getInvestmentTypeName(converted.investmentType) || converted.investmentType,
+        investmentDetailType: getInvestmentDetailTypeName(converted.investmentDetailType) || converted.investmentDetailType,
+        status: getStatusName(converted.status) || converted.status
+      };
+    });
+
+    // NO 필드를 프론트엔드에서 역순으로 할당 (최신이 1번)
+    setInvestments(assignNoToInvestments(convertedInvestments));
+    console.log('🔄 Supabase 투자 데이터를 InvestmentTableData로 변환 완료:', convertedInvestments.length + '개');
+
+    if (convertedInvestments.length > 0) {
+      console.log('📝 변환된 첫 번째 투자 샘플:', convertedInvestments[0]);
+    }
+  }, [investmentsFromHook, error, convertToInvestmentData, getInvestmentTypeName, getInvestmentDetailTypeName, getStatusName]);
 
   // NO 할당 헬퍼 함수
   const assignNoToInvestments = (investments: InvestmentData[]) => {
@@ -2681,29 +2738,7 @@ export default function InvestmentManagement() {
         const success = await updateInvestment(currentInvestment.id, dbData);
         console.log('✅ 업데이트 결과:', success);
         if (success) {
-          // 투자금액 데이터 저장
-          const getCurrentAmountData = (window as any).getCurrentAmountData;
-          console.log('🔍 getCurrentAmountData 함수 존재 여부:', !!getCurrentAmountData);
-
-          if (getCurrentAmountData) {
-            const amountData = getCurrentAmountData();
-            console.log('💰 투자금액 데이터:', amountData?.length || 0, '개', amountData);
-
-            if (amountData && amountData.length > 0) {
-              const financeItems = amountData.map((item: any, index: number) => ({
-                investment_id: currentInvestment.id,
-                item_order: index + 1,
-                investment_category: getInvestmentDetailTypeName(item.investmentCategory) || '',
-                item_name: item.itemName || '',
-                budget_amount: parseFloat(item.budgetAmount) || 0,
-                execution_amount: parseFloat(item.executionAmount) || 0,
-                remarks: item.remarks || ''
-              }));
-
-              await saveFinanceItems(currentInvestment.id, financeItems);
-              console.log('✅ 투자금액 데이터 저장 완료');
-            }
-          }
+          // 투자금액 데이터 저장은 InvestmentEditDialog에서 처리
 
           // 데이터 새로고침 및 NO 재할당
           const dbInvestments = await getInvestments();
@@ -2721,11 +2756,28 @@ export default function InvestmentManagement() {
         }
       } else {
         // 생성
-        // 코드 자동 생성 (DB의 id 기반)
+        // 코드 자동 생성 (DB에서 직접 조회 - 캐시 무시)
         const currentYear = new Date().getFullYear().toString().slice(-2);
-        const dbInvestments = await getInvestments();
-        const maxId = Math.max(...dbInvestments.map((inv) => inv.id || 0), 0);
-        const newCode = `PLAN-INV-${currentYear}-${String(maxId + 1).padStart(3, '0')}`;
+
+        // DB에서 직접 최신 코드 조회 (캐시 무시)
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        const { data: latestInvestments } = await supabase
+          .from('plan_investment_data')
+          .select('code')
+          .like('code', `PLAN-INV-${currentYear}-%`)
+          .order('code', { ascending: false })
+          .limit(1);
+
+        let maxNumber = 0;
+        if (latestInvestments && latestInvestments.length > 0) {
+          const match = latestInvestments[0].code?.match(/PLAN-INV-\d{2}-(\d{3})$/);
+          maxNumber = match ? parseInt(match[1], 10) : 0;
+        }
+
+        const newCode = `PLAN-INV-${currentYear}-${String(maxNumber + 1).padStart(3, '0')}`;
 
         const newInvestmentData = {
           ...dbData,
@@ -2737,29 +2789,7 @@ export default function InvestmentManagement() {
         console.log('📊 생성된 투자:', newInvestment);
 
         if (newInvestment) {
-          // 투자금액 데이터 저장
-          const getCurrentAmountData = (window as any).getCurrentAmountData;
-          console.log('🔍 getCurrentAmountData 함수 존재 여부:', !!getCurrentAmountData);
-
-          if (getCurrentAmountData) {
-            const amountData = getCurrentAmountData();
-            console.log('💰 투자금액 데이터:', amountData?.length || 0, '개', amountData);
-
-            if (amountData && amountData.length > 0) {
-              const financeItems = amountData.map((item: any, index: number) => ({
-                investment_id: newInvestment.id,
-                item_order: index + 1,
-                investment_category: getInvestmentDetailTypeName(item.investmentCategory) || '',
-                item_name: item.itemName || '',
-                budget_amount: parseFloat(item.budgetAmount) || 0,
-                execution_amount: parseFloat(item.executionAmount) || 0,
-                remarks: item.remarks || ''
-              }));
-
-              await saveFinanceItems(newInvestment.id, financeItems);
-              console.log('✅ 투자금액 데이터 저장 완료');
-            }
-          }
+          // 투자금액 데이터 저장은 InvestmentEditDialog에서 처리
 
           // 데이터 새로고침 및 NO 재할당
           const updatedDbInvestments = await getInvestments();
@@ -2790,7 +2820,11 @@ export default function InvestmentManagement() {
           console.log('✅ 신규 투자 생성 완료');
         } else {
           console.error('❌ 투자 생성 실패: createInvestment가 null을 반환했습니다.');
-          alert('투자 생성에 실패했습니다. 다시 시도해주세요.');
+          setSnackbar({
+            open: true,
+            message: '투자 생성에 실패했습니다. 콘솔 로그를 확인해주세요.',
+            severity: 'error'
+          });
           return;
         }
       }
@@ -2799,7 +2833,11 @@ export default function InvestmentManagement() {
       setCurrentInvestment(null);
     } catch (error) {
       console.error('❌ 투자 저장 실패:', error);
-      alert(`투자 저장에 실패했습니다.\n오류: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+      setSnackbar({
+        open: true,
+        message: `투자 저장에 실패했습니다. 오류: ${error instanceof Error ? error.message : '알 수 없는 오류'}`,
+        severity: 'error'
+      });
     }
   };
 
@@ -2947,27 +2985,8 @@ export default function InvestmentManagement() {
             </Box>
           </Box>
 
-          {/* 권한 체크 */}
-          {!canViewCategory ? (
-            <Box
-              sx={{
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'column',
-                gap: 2,
-                py: 8
-              }}
-            >
-              <Typography variant="h5" color="text.secondary">
-                이 페이지에 접근할 권한이 없습니다.
-              </Typography>
-              <Typography variant="body2" color="text.disabled">
-                관리자에게 권한을 요청하세요.
-              </Typography>
-            </Box>
-          ) : !canReadData ? (
+          {/* 권한 체크: KPI관리 패턴 (깜빡임 방지) */}
+          {canViewCategory && !canReadData ? (
             <Box
               sx={{
                 flex: 1,
@@ -3232,6 +3251,8 @@ export default function InvestmentManagement() {
                   });
                 }}
                 addChangeLog={addChangeLog}
+                snackbar={snackbar}
+                setSnackbar={setSnackbar}
               />
             </TabPanel>
 
@@ -3250,6 +3271,11 @@ export default function InvestmentManagement() {
                 canEditOwn={canEditOwn}
                 canEditOthers={canEditOthers}
                 users={users}
+                updateInvestmentData={async (id: number, updates: Partial<any>) => {
+                  await updateInvestment(id, updates);
+                }}
+                snackbar={snackbar}
+                setSnackbar={setSnackbar}
               />
             </TabPanel>
 
@@ -3339,8 +3365,25 @@ export default function InvestmentManagement() {
           canEditOthers={canEditOthers}
           users={users}
           generateInvestmentCode={generateInvestmentCode}
+          setSnackbar={setSnackbar}
         />
       )}
+
+      {/* 토스트 알림 */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

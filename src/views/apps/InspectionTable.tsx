@@ -99,6 +99,11 @@ interface InspectionTableProps {
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
+  setSnackbar?: React.Dispatch<React.SetStateAction<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>>;
 }
 
 export default function InspectionTable({
@@ -115,7 +120,8 @@ export default function InspectionTable({
   canReadData = true,
   canCreateData = true,
   canEditOwn = true,
-  canEditOthers = true
+  canEditOthers = true,
+  setSnackbar = undefined
 }: InspectionTableProps) {
   const theme = useTheme();
 
@@ -514,6 +520,67 @@ export default function InspectionTable({
             '-',
             inspectionTitle
           );
+        }
+
+        // 토스트 알림
+        if (setSnackbar) {
+          if (originalInspection) {
+            // 수정
+            const changedFields: string[] = [];
+            const fieldMap: { [key: string]: string } = {
+              inspectionTitle: '점검제목',
+              inspectionType: '점검유형',
+              inspectionTarget: '점검대상',
+              inspectionContent: '점검내용',
+              status: '상태',
+              assignee: '담당자',
+              inspectionDate: '점검일',
+              completedDate: '완료일',
+              team: '팀',
+              details: '세부설명'
+            };
+
+            Object.keys(fieldMap).forEach((key) => {
+              const oldValue = (originalInspection as any)[key];
+              const newValue = (updatedInspection as any)[key];
+              if (oldValue !== newValue && !changedFields.includes(fieldMap[key])) {
+                changedFields.push(fieldMap[key]);
+              }
+            });
+
+            let message = '';
+            if (changedFields.length > 0) {
+              const fieldsText = changedFields.join(', ');
+              const lastField = changedFields[changedFields.length - 1];
+              const lastChar = lastField.charAt(lastField.length - 1);
+              const code = lastChar.charCodeAt(0);
+              const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+              const josa = hasJongseong ? '이' : '가';
+              message = `${updatedInspection.inspectionContent}의 ${fieldsText}${josa} 성공적으로 수정되었습니다.`;
+            } else {
+              const lastChar = updatedInspection.inspectionContent.charAt(updatedInspection.inspectionContent.length - 1);
+              const code = lastChar.charCodeAt(0);
+              const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+              const josa = hasJongseong ? '이' : '가';
+              message = `${updatedInspection.inspectionContent}${josa} 성공적으로 수정되었습니다.`;
+            }
+            setSnackbar({
+              open: true,
+              message: message,
+              severity: 'success'
+            });
+          } else {
+            // 추가
+            const lastChar = updatedInspection.inspectionContent.charAt(updatedInspection.inspectionContent.length - 1);
+            const code = lastChar.charCodeAt(0);
+            const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+            const josa = hasJongseong ? '이' : '가';
+            setSnackbar({
+              open: true,
+              message: `${updatedInspection.inspectionContent}${josa} 성공적으로 추가되었습니다.`,
+              severity: 'success'
+            });
+          }
         }
       } catch (error) {
         console.error('❌ Supabase 저장 실패:', error);

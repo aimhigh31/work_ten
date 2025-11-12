@@ -37,7 +37,9 @@ import {
   TableRow,
   TextField,
   Pagination,
-  Button
+  Button,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
@@ -132,6 +134,16 @@ interface KanbanViewProps {
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
+  updateInspection?: (id: number, data: Partial<any>) => Promise<any>;
+  activeInspection?: InspectionTableData | null;
+  isDraggingState?: boolean;
+  onDragStart?: (event: any) => void;
+  onDragEnd?: (event: any) => void;
+  setSnackbar?: React.Dispatch<React.SetStateAction<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>>;
 }
 
 function KanbanView({
@@ -147,7 +159,13 @@ function KanbanView({
   users = [],
   canCreateData = true,
   canEditOwn = true,
-  canEditOthers = true
+  canEditOthers = true,
+  updateInspection,
+  activeInspection,
+  isDraggingState,
+  onDragStart,
+  onDragEnd,
+  setSnackbar
 }: KanbanViewProps) {
   const theme = useTheme();
 
@@ -169,10 +187,6 @@ function KanbanView({
       inspection.assignee === currentUser.user_name
     );
   }, [currentUser]);
-
-  // 상태 관리
-  const [activeInspection, setActiveInspection] = useState<InspectionTableData | null>(null);
-  const [isDraggingState, setIsDraggingState] = useState(false);
 
   // 편집 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);
@@ -213,14 +227,6 @@ function KanbanView({
     return true;
   });
 
-  // 드래그 시작 핸들러
-  const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event;
-    const draggedInspection = inspections.find((inspection) => inspection.id === active.id);
-    setActiveInspection(draggedInspection || null);
-    setIsDraggingState(true);
-  };
-
   // 카드 클릭 핸들러
   const handleCardClick = (inspection: InspectionTableData) => {
     setEditingInspection(inspection);
@@ -240,6 +246,29 @@ function KanbanView({
     if (originalInspection) {
       // 업데이트
       setInspections((prev) => prev.map((inspection) => (inspection.id === updatedInspection.id ? updatedInspection : inspection)));
+
+      // 변경된 필드 감지 (토스트용)
+      const changedFields: string[] = [];
+      const fieldMap: { [key: string]: string } = {
+        inspectionTitle: '점검제목',
+        inspectionType: '점검유형',
+        inspectionTarget: '점검대상',
+        inspectionContent: '점검내용',
+        status: '상태',
+        assignee: '담당자',
+        inspectionDate: '점검일',
+        completedDate: '완료일',
+        team: '팀',
+        progress: '진행율'
+      };
+
+      Object.keys(fieldMap).forEach((key) => {
+        const oldValue = (originalInspection as any)[key];
+        const newValue = (updatedInspection as any)[key];
+        if (oldValue !== newValue && !changedFields.includes(fieldMap[key])) {
+          changedFields.push(fieldMap[key]);
+        }
+      });
 
       // 변경로그 추가 - 변경된 필드 확인
       const changes: string[] = [];
@@ -273,73 +302,34 @@ function KanbanView({
           updatedInspection.inspectionContent || updatedInspection.inspectionTitle
         );
       }
+
+      // 토스트 알림
+      if (setSnackbar) {
+        let message = '';
+        if (changedFields.length > 0) {
+          const fieldsText = changedFields.join(', ');
+          const lastField = changedFields[changedFields.length - 1];
+          const lastChar = lastField.charAt(lastField.length - 1);
+          const code = lastChar.charCodeAt(0);
+          const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+          const josa = hasJongseong ? '이' : '가';
+          message = `${updatedInspection.inspectionTitle}의 ${fieldsText}${josa} 성공적으로 수정되었습니다.`;
+        } else {
+          const lastChar = updatedInspection.inspectionTitle.charAt(updatedInspection.inspectionTitle.length - 1);
+          const code = lastChar.charCodeAt(0);
+          const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+          const josa = hasJongseong ? '이' : '가';
+          message = `${updatedInspection.inspectionTitle}${josa} 성공적으로 수정되었습니다.`;
+        }
+        setSnackbar({
+          open: true,
+          message: message,
+          severity: 'success'
+        });
+      }
     }
 
     handleEditDialogClose();
-  };
-
-  // 드래그 종료 핸들러
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveInspection(null);
-    setIsDraggingState(false);
-
-    if (!over) return;
-
-    const inspectionId = active.id;
-    const newStatus = over.id as InspectionStatus;
-
-    // 상태가 변경된 경우만 업데이트
-    const currentInspection = inspections.find((inspection) => inspection.id === inspectionId);
-    if (currentInspection && currentInspection.status !== newStatus) {
-      const oldStatus = currentInspection.status;
-
-      // 로컬 상태 업데이트
-      setInspections((prev) =>
-        prev.map((inspection) => (inspection.id === inspectionId ? { ...inspection, status: newStatus } : inspection))
-      );
-
-      // DB에 상태 변경 저장
-      try {
-        console.log('🔄 칸반 드래그: 상태 변경 DB 저장 시작', {
-          inspectionId,
-          oldStatus,
-          newStatus
-        });
-
-        await updateInspection(inspectionId as number, {
-          status: newStatus
-        });
-
-        console.log('✅ 칸반 드래그: 상태 변경 DB 저장 성공');
-      } catch (error) {
-        console.error('🔴 칸반 드래그: 상태 변경 DB 저장 실패:', error);
-        // 실패 시 원래 상태로 되돌림
-        setInspections((prev) =>
-          prev.map((inspection) => (inspection.id === inspectionId ? { ...inspection, status: oldStatus } : inspection))
-        );
-        alert('상태 변경 저장에 실패했습니다.');
-        return;
-      }
-
-      // 변경로그 추가
-      const inspectionCode = currentInspection.code || `TASK-${inspectionId}`;
-      const inspectionTitle = currentInspection.inspectionTitle || '점검내용 없음';
-      const inspectionContent = currentInspection.inspectionContent || inspectionTitle;
-      const description = `${inspectionTitle} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
-
-      addChangeLog(
-        '점검 상태 변경',
-        inspectionCode,
-        description,
-        currentInspection.team || '미분류',
-        oldStatus,
-        newStatus,
-        '상태',
-        inspectionContent,
-        '칸반탭'
-      );
-    }
   };
 
   // 상태별 컬럼 정의
@@ -743,7 +733,7 @@ function KanbanView({
         }
       `}</style>
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd}>
         <div className="kanban-board">
           {statusColumns.map((column) => {
             const items = getItemsByStatus(column.key);
@@ -2109,6 +2099,17 @@ export default function InspectionManagement() {
   const [inspections, setInspections] = useState<InspectionTableData[]>([]);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
 
+  // 토스트 알림 상태
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error' | 'warning' | 'info'
+  });
+
+  // Drag 관련 상태 (칸반탭)
+  const [activeInspection, setActiveInspection] = useState<InspectionTableData | null>(null);
+  const [isDraggingState, setIsDraggingState] = useState(false);
+
   // 편집 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);
   const [editingInspection, setEditingInspection] = useState<InspectionTableData | null>(null);
@@ -2440,20 +2441,29 @@ export default function InspectionManagement() {
   const handleDeleteInspections = async (ids: number[]) => {
     console.log('🗑️ handleDeleteInspections 시작:', ids);
 
+    // 삭제 전에 데이터 정보 저장 (삭제 후에는 접근 불가)
+    const deletedInspections = inspections.filter((inspection) => ids.includes(inspection.id));
+
+    let successCount = 0;
+    let failCount = 0;
+
     try {
       // 각 ID에 대해 소프트 삭제 실행
       for (const id of ids) {
         const result = await deleteInspection(id);
-        if (!result) {
-          throw new Error(`ID ${id} 삭제 실패`);
+        if (result) {
+          successCount++;
+        } else {
+          failCount++;
         }
       }
 
       // UI에서 삭제된 항목들 제거
-      setInspections((prevInspections) => prevInspections.filter((inspection) => !ids.includes(inspection.id)));
+      if (successCount > 0) {
+        setInspections((prevInspections) => prevInspections.filter((inspection) => !ids.includes(inspection.id)));
+      }
 
       // 변경로그 추가
-      const deletedInspections = inspections.filter((inspection) => ids.includes(inspection.id));
       deletedInspections.forEach((inspection) => {
         addChangeLog(
           '점검 삭제',
@@ -2468,9 +2478,136 @@ export default function InspectionManagement() {
       });
 
       console.log('✅ 보안점검 데이터 삭제 완료');
+
+      // 토스트 알림
+      if (failCount === 0) {
+        // 전체 성공
+        if (successCount === 1 && deletedInspections.length > 0) {
+          // 단일 삭제
+          const inspectionContent = deletedInspections[0].inspectionContent;
+          const lastChar = inspectionContent.charAt(inspectionContent.length - 1);
+          const code = lastChar.charCodeAt(0);
+          const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+          const josa = hasJongseong ? '이' : '가';
+          setSnackbar({
+            open: true,
+            message: `${inspectionContent}${josa} 성공적으로 삭제되었습니다.`,
+            severity: 'error'
+          });
+        } else {
+          // 다중 삭제
+          setSnackbar({
+            open: true,
+            message: `${successCount}개 점검이 성공적으로 삭제되었습니다.`,
+            severity: 'error'
+          });
+        }
+      } else if (successCount > 0) {
+        // 부분 실패
+        setSnackbar({
+          open: true,
+          message: `삭제 완료: ${successCount}개, 실패: ${failCount}개`,
+          severity: 'warning'
+        });
+      } else {
+        // 전체 실패
+        setSnackbar({
+          open: true,
+          message: '삭제에 실패했습니다.',
+          severity: 'error'
+        });
+      }
     } catch (error) {
       console.error('🔴 보안점검 데이터 삭제 중 오류:', error);
+      setSnackbar({
+        open: true,
+        message: '삭제 중 오류가 발생했습니다.',
+        severity: 'error'
+      });
       throw error; // 에러를 다시 던져서 UI에서 처리할 수 있도록
+    }
+  };
+
+  // 드래그 시작 핸들러 (칸반탭)
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    const draggedInspection = inspections.find((inspection) => inspection.id === active.id);
+    setActiveInspection(draggedInspection || null);
+    setIsDraggingState(true);
+  };
+
+  // 드래그 종료 핸들러 (칸반탭)
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveInspection(null);
+    setIsDraggingState(false);
+
+    if (!over) return;
+
+    const inspectionId = active.id;
+    const newStatus = over.id as InspectionStatus;
+
+    // 상태가 변경된 경우만 업데이트
+    const currentInspection = inspections.find((inspection) => inspection.id === inspectionId);
+    if (currentInspection && currentInspection.status !== newStatus) {
+      const oldStatus = currentInspection.status;
+
+      // 로컬 상태 업데이트
+      setInspections((prev) =>
+        prev.map((inspection) => (inspection.id === inspectionId ? { ...inspection, status: newStatus } : inspection))
+      );
+
+      // DB에 상태 변경 저장
+      try {
+        console.log('🔄 칸반 드래그: 상태 변경 DB 저장 시작', {
+          inspectionId,
+          oldStatus,
+          newStatus
+        });
+
+        await updateInspection(inspectionId as number, {
+          status: newStatus
+        });
+
+        console.log('✅ 칸반 드래그: 상태 변경 DB 저장 성공');
+
+        // 토스트 알림
+        setSnackbar({
+          open: true,
+          message: `상태가 "${oldStatus}"에서 "${newStatus}"로 변경되었습니다.`,
+          severity: 'success'
+        });
+      } catch (error) {
+        console.error('🔴 칸반 드래그: 상태 변경 DB 저장 실패:', error);
+        // 실패 시 원래 상태로 되돌림
+        setInspections((prev) =>
+          prev.map((inspection) => (inspection.id === inspectionId ? { ...inspection, status: oldStatus } : inspection))
+        );
+        setSnackbar({
+          open: true,
+          message: '상태 변경 저장에 실패했습니다.',
+          severity: 'error'
+        });
+        return;
+      }
+
+      // 변경로그 추가
+      const inspectionCode = currentInspection.code || `TASK-${inspectionId}`;
+      const inspectionTitle = currentInspection.inspectionTitle || '점검내용 없음';
+      const inspectionContent = currentInspection.inspectionContent || inspectionTitle;
+      const description = `${inspectionTitle} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
+
+      addChangeLog(
+        '점검 상태 변경',
+        inspectionCode,
+        description,
+        currentInspection.team || '미분류',
+        oldStatus,
+        newStatus,
+        '상태',
+        inspectionContent,
+        '칸반탭'
+      );
     }
   };
 
@@ -2560,27 +2697,8 @@ export default function InspectionManagement() {
             </Box>
           </Box>
 
-          {/* 권한 체크 */}
-          {!canViewCategory ? (
-            <Box
-              sx={{
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'column',
-                gap: 2,
-                py: 8
-              }}
-            >
-              <Typography variant="h5" color="text.secondary">
-                이 페이지에 접근할 권한이 없습니다.
-              </Typography>
-              <Typography variant="body2" color="text.disabled">
-                관리자에게 권한을 요청하세요.
-              </Typography>
-            </Box>
-          ) : !canReadData ? (
+          {/* 권한 체크: KPI관리 패턴 (깜빡임 방지) */}
+          {canViewCategory && !canReadData ? (
             <Box
               sx={{
                 flex: 1,
@@ -2860,6 +2978,7 @@ export default function InspectionManagement() {
                   canCreateData={canCreateData}
                   canEditOwn={canEditOwn}
                   canEditOthers={canEditOthers}
+                  setSnackbar={setSnackbar}
                 />
               </Box>
             </TabPanel>
@@ -2906,6 +3025,12 @@ export default function InspectionManagement() {
                   canCreateData={canCreateData}
                   canEditOwn={canEditOwn}
                   canEditOthers={canEditOthers}
+                  updateInspection={updateInspection}
+                  activeInspection={activeInspection}
+                  isDraggingState={isDraggingState}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                  setSnackbar={setSnackbar}
                 />
               </Box>
             </TabPanel>
@@ -3357,6 +3482,22 @@ export default function InspectionManagement() {
           canEditOthers={canEditOthers}
         />
       )}
+
+      {/* 알림 Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

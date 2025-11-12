@@ -38,6 +38,7 @@ console.log('🔗 Supabase 클라이언트 검증:', {
 });
 
 export interface UseSupabaseSolutionReturn {
+  solutions: DbSolutionData[];
   getSolutions: () => Promise<DbSolutionData[]>;
   getSolutionById: (id: number) => Promise<DbSolutionData | null>;
   createSolution: (solution: Omit<DbSolutionData, 'id' | 'created_at' | 'updated_at'>) => Promise<DbSolutionData | null>;
@@ -50,6 +51,7 @@ export interface UseSupabaseSolutionReturn {
 }
 
 export const useSupabaseSolution = (): UseSupabaseSolutionReturn => {
+  const [solutions, setSolutions] = useState<DbSolutionData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,6 +61,7 @@ export const useSupabaseSolution = (): UseSupabaseSolutionReturn => {
     const cachedData = loadFromCache<DbSolutionData[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
     if (cachedData) {
       console.log('⚡ [Solution] 캐시 데이터 반환 (깜빡임 방지)');
+      setSolutions(cachedData); // ✅ 캐시 데이터로 상태 업데이트 (KPI 패턴)
       return cachedData;
     }
 
@@ -80,7 +83,10 @@ export const useSupabaseSolution = (): UseSupabaseSolutionReturn => {
 
       console.log('✅ getSolutions 성공:', data?.length || 0, '개');
 
-      // 2. 캐시에 저장
+      // 2. 상태 업데이트 (KPI 패턴)
+      setSolutions(data || []);
+
+      // 3. 캐시에 저장
       saveToCache(CACHE_KEY, data || []);
 
       return data || [];
@@ -220,6 +226,9 @@ export const useSupabaseSolution = (): UseSupabaseSolutionReturn => {
 
         console.log('✅ createSolution 성공! 생성된 데이터:', data);
 
+        // ✅ 로컬 상태 즉시 업데이트 (KPI 패턴)
+        setSolutions((prev) => [data, ...prev]);
+
         // 캐시 무효화 (최신 데이터 보장)
         sessionStorage.removeItem(CACHE_KEY);
 
@@ -317,6 +326,11 @@ export const useSupabaseSolution = (): UseSupabaseSolutionReturn => {
       }
 
       console.log('✅ updateSolution 성공:', data);
+
+      // ✅ 로컬 상태 즉시 업데이트 (KPI 패턴)
+      if (data && data.length > 0) {
+        setSolutions((prev) => prev.map((sol) => (sol.id === id ? data[0] : sol)));
+      }
 
       // 캐시 무효화 (최신 데이터 보장)
       sessionStorage.removeItem(CACHE_KEY);
@@ -446,6 +460,7 @@ export const useSupabaseSolution = (): UseSupabaseSolutionReturn => {
   }, []);
 
   return {
+    solutions,
     getSolutions,
     getSolutionById,
     createSolution,

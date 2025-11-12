@@ -676,6 +676,11 @@ interface InvestmentEditDialogProps {
   canEditOthers?: boolean;
   users?: any[];
   generateInvestmentCode?: () => Promise<string>;
+  setSnackbar?: React.Dispatch<React.SetStateAction<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>>;
 }
 
 // 기록 탭 컴포넌트 (보안교육관리와 동일)
@@ -1418,46 +1423,21 @@ class InvestmentAmountDataManager {
   }
 }
 
-const InvestmentAmountTab = memo(({ mode, investmentId, canEdit = true }: { mode: 'add' | 'edit'; investmentId?: number; canEdit?: boolean }) => {
-  // 투자금액 DB 연동
-  const { getFinanceItems, saveFinanceItems, deleteFinanceItem } = useSupabaseInvestmentFinance();
+// 투자금액 탭 인터페이스 (하드웨어 관리 패턴)
+interface InvestmentAmountTabProps {
+  mode: 'add' | 'edit';
+  investmentId?: number;
+  amountItems: any[];
+  setAmountItems: React.Dispatch<React.SetStateAction<any[]>>;
+  investmentDetailTypesFromDB: Array<{ subcode: string; subcode_name: string }>;
+  canEdit?: boolean;
+}
 
+const InvestmentAmountTab = memo(({ mode, investmentId, amountItems, setAmountItems, investmentDetailTypesFromDB, canEdit = true }: InvestmentAmountTabProps) => {
   // ✅ 공용 창고에서 마스터코드 데이터 가져오기
   const { masterCodes } = useCommonData();
 
   console.log('🔍 [InvestmentAmountTab] masterCodes:', masterCodes?.length);
-
-  // Supabase 클라이언트 생성 (DB 직접 조회용)
-  const supabaseClient = React.useMemo(() => {
-    return createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-  }, []);
-
-  // DB 직접 조회 상태
-  const [investmentDetailTypesFromDB, setInvestmentDetailTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
-
-  // Dialog 열릴 때마다 DB에서 직접 조회
-  useEffect(() => {
-    const fetchMasterCodeData = async () => {
-      // GROUP026: 투자세부유형
-      const { data: group026Data } = await supabaseClient
-        .from('admin_mastercode_data')
-        .select('subcode, subcode_name, subcode_order')
-        .eq('codetype', 'subcode')
-        .eq('group_code', 'GROUP026')
-        .eq('is_active', true)
-        .order('subcode_order', { ascending: true });
-
-      if (group026Data) {
-        setInvestmentDetailTypesFromDB(group026Data);
-        console.log('✅ [InvestmentAmountTab] GROUP026 투자세부유형 DB 조회 완료:', group026Data.length, '개');
-      }
-    };
-
-    fetchMasterCodeData();
-  }, [supabaseClient]);
 
   // 투자금액 샘플 데이터
   const mockAmountData = [
@@ -1633,60 +1613,7 @@ const InvestmentAmountTab = memo(({ mode, investmentId, canEdit = true }: { mode
     }
   ];
 
-  const [amountItems, setAmountItems] = useState<any[]>([]);
-  const amountItemsRef = useRef<any[]>([]);
-
-  // amountItems 변경 시 ref 업데이트
-  useEffect(() => {
-    amountItemsRef.current = amountItems;
-  }, [amountItems]);
-
-  // mode와 investmentId에 따라 초기 데이터 설정
-  useEffect(() => {
-    const loadData = async () => {
-      if (mode === 'add') {
-        setAmountItems([]);
-      } else if (investmentId) {
-        // DB에서 데이터 로드
-        console.log('📊 투자금액 데이터 로드 시작:', investmentId);
-        const dbData = await getFinanceItems(investmentId);
-
-        if (dbData && dbData.length > 0) {
-          // DB 데이터를 UI 형식으로 변환
-          const uiData = dbData.map((item) => {
-            // subcode_name을 subcode로 역변환 (DB: "서버" → UI: "GROUP026-SUB001")
-            const categorySubcode = investmentDetailTypesFromDB.find(
-              t => t.subcode_name === item.investment_category
-            )?.subcode || item.investment_category;
-
-            return {
-              id: item.id.toString(),
-              no: item.item_order,
-              investmentCategory: categorySubcode,
-              itemName: item.item_name,
-              budgetAmount: item.budget_amount,
-              executionAmount: item.execution_amount,
-              remarks: item.remarks || ''
-            };
-          });
-          console.log('✅ DB 데이터 로드 완료:', uiData.length, '개');
-          setAmountItems(uiData);
-        } else {
-          console.log('ℹ️ DB 데이터 없음, 빈 배열 설정');
-          setAmountItems([]);
-        }
-      }
-    };
-
-    loadData();
-  }, [mode, investmentId, getFinanceItems, investmentDetailTypesFromDB]);
-
-  // 외부에서 현재 데이터를 가져갈 수 있도록 노출
-  useEffect(() => {
-    (window as any).getCurrentAmountData = () => amountItemsRef.current;
-    console.log('✅ getCurrentAmountData 함수 등록됨, investmentId:', investmentId);
-    // cleanup 제거 - 함수가 계속 유지되어야 저장 시 접근 가능
-  }, [investmentId]);
+  // 부모 컴포넌트에서 amountItems와 setAmountItems를 props로 받아 사용 (하드웨어 관리 패턴)
 
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
@@ -1926,14 +1853,8 @@ const InvestmentAmountTab = memo(({ mode, investmentId, canEdit = true }: { mode
     );
   };
 
+  // 총 투자금액 계산 (부모에서 관리하므로 로컬 표시용으로만 사용)
   const totalAmount = amountItems.reduce((sum, item) => sum + (item.budgetAmount || 0) + (item.executionAmount || 0), 0);
-
-  // 총 투자금액이 변경될 때마다 개요탭으로 업데이트
-  useEffect(() => {
-    if ((window as any).updateTotalInvestmentAmount) {
-      (window as any).updateTotalInvestmentAmount(totalAmount);
-    }
-  }, [totalAmount]);
 
   return (
     <Box sx={{ height: '650px', display: 'flex', flexDirection: 'column', p: 3, position: 'relative', overflow: 'hidden' }}>
@@ -2240,7 +2161,8 @@ function InvestmentEditDialog({
   canEditOwn = true,
   canEditOthers = true,
   users: propsUsers = [],
-  generateInvestmentCode
+  generateInvestmentCode,
+  setSnackbar
 }: InvestmentEditDialogProps) {
   // 세션 정보
   const { data: session } = useSession();
@@ -2284,6 +2206,9 @@ function InvestmentEditDialog({
     deleteFeedback
   } = useSupabaseFeedback(PAGE_IDENTIFIERS.INVESTMENT, investment?.id);
 
+  // 투자금액 훅 사용 (하드웨어 관리 패턴)
+  const { getFinanceItems, saveFinanceItems, deleteFinanceItem } = useSupabaseInvestmentFinance();
+
   const [tabValue, setTabValue] = useState(0);
 
   // feedbacks를 comments 형식으로 변환
@@ -2307,30 +2232,90 @@ function InvestmentEditDialog({
   // 유효성 검증 에러 상태
   const [validationError, setValidationError] = useState<string>('');
 
-  // 투자금액탭의 총합 계산
-  const [totalInvestmentAmount, setTotalInvestmentAmount] = useState(0);
+  // 투자금액 상태 관리 (하드웨어 관리 패턴)
+  const [amountItems, setAmountItems] = useState<any[]>([]);
 
-  // 투자금액탭 데이터가 변경될 때마다 총합 업데이트
-  useEffect(() => {
-    // 전역에서 투자금액탭의 데이터에 접근할 수 있도록 함수 설정
-    (window as any).updateTotalInvestmentAmount = (amount: number) => {
-      setTotalInvestmentAmount(amount);
-    };
-
-    return () => {
-      delete (window as any).updateTotalInvestmentAmount;
-    };
+  // Supabase 클라이언트 생성 (DB 직접 조회용)
+  const supabaseClient = useMemo(() => {
+    return createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
   }, []);
 
-  // 다이얼로그가 열릴 때 기존 투자의 amount 값을 초기 설정
+  // DB 직접 조회 상태 (투자세부유형)
+  const [investmentDetailTypesFromDB, setInvestmentDetailTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
+
+  // Dialog 열릴 때마다 DB에서 투자세부유형 직접 조회
   useEffect(() => {
-    if (open && investment?.amount) {
-      setTotalInvestmentAmount(investment.amount);
-    } else if (open && !investment) {
-      // 새 투자일 경우 0으로 초기화
-      setTotalInvestmentAmount(0);
+    const fetchMasterCodeData = async () => {
+      // GROUP026: 투자세부유형
+      const { data: group026Data } = await supabaseClient
+        .from('admin_mastercode_data')
+        .select('subcode, subcode_name, subcode_order')
+        .eq('codetype', 'subcode')
+        .eq('group_code', 'GROUP026')
+        .eq('is_active', true)
+        .order('subcode_order', { ascending: true });
+
+      if (group026Data) {
+        setInvestmentDetailTypesFromDB(group026Data);
+        console.log('✅ [InvestmentEditDialog] GROUP026 투자세부유형 DB 조회 완료:', group026Data.length, '개');
+      }
+    };
+
+    if (open) {
+      fetchMasterCodeData();
     }
-  }, [open, investment]);
+  }, [open, supabaseClient]);
+
+  // 투자금액 데이터 로드 (하드웨어 관리 패턴)
+  useEffect(() => {
+    const loadAmountItems = async () => {
+      if (open && investment?.id) {
+        console.log('🔄 투자금액 데이터 로드 중:', { investmentId: investment.id });
+        try {
+          const dbData = await getFinanceItems(investment.id);
+
+          if (dbData && dbData.length > 0) {
+            // DB 데이터를 UI 형식으로 변환
+            const uiData = dbData.map((item) => {
+              // subcode_name을 subcode로 역변환 (DB: "서버" → UI: "GROUP026-SUB001")
+              const categorySubcode = investmentDetailTypesFromDB.find(
+                t => t.subcode_name === item.investment_category
+              )?.subcode || item.investment_category;
+
+              return {
+                id: item.id.toString(),
+                no: item.item_order,
+                investmentCategory: categorySubcode,
+                itemName: item.item_name,
+                budgetAmount: item.budget_amount,
+                executionAmount: item.execution_amount,
+                remarks: item.remarks || ''
+              };
+            });
+            setAmountItems(uiData);
+            console.log('✅ 투자금액 데이터 로드 완료:', { count: uiData.length });
+          } else {
+            setAmountItems([]);
+          }
+        } catch (error) {
+          console.error('❌ 투자금액 데이터 로드 실패:', error);
+          setAmountItems([]);
+        }
+      } else if (open && !investment) {
+        setAmountItems([]);
+      }
+    };
+
+    loadAmountItems();
+  }, [open, investment?.id, getFinanceItems, investmentDetailTypesFromDB]);
+
+  // 투자금액탭의 총합 계산 (amountItems 기반)
+  const totalInvestmentAmount = useMemo(() => {
+    return amountItems.reduce((sum, item) => sum + (item.budgetAmount || 0) + (item.executionAmount || 0), 0);
+  }, [amountItems]);
 
   const [investmentState, setInvestmentState] = useReducer(
     (state: any, action: { type: string; payload?: any }) => {
@@ -2545,11 +2530,75 @@ function InvestmentEditDialog({
 
     console.log('💾 InvestmentEditDialog에서 저장할 데이터:', savedData);
 
-    // 기본 투자 정보 저장 (투자금액 저장은 InvestmentManagement에서 처리)
+    // 기본 투자 정보 저장
     onSave(savedData);
 
+    // 투자금액 데이터 저장 (하드웨어 관리 패턴)
+    if (savedData.id) {
+      try {
+        console.log('💾 투자금액 데이터 저장 중...', { investmentId: savedData.id, count: amountItems.length });
+
+        if (amountItems && amountItems.length > 0) {
+          const financeItems = amountItems.map((item: any, index: number) => {
+            // subcode를 subcode_name으로 변환 (UI: "GROUP026-SUB001" → DB: "서버")
+            const categoryName = investmentDetailTypesFromDB.find(
+              t => t.subcode === item.investmentCategory
+            )?.subcode_name || item.investmentCategory;
+
+            return {
+              investment_id: savedData.id,
+              item_order: index + 1,
+              investment_category: categoryName,
+              item_name: item.itemName || '',
+              budget_amount: parseFloat(item.budgetAmount) || 0,
+              execution_amount: parseFloat(item.executionAmount) || 0,
+              remarks: item.remarks || ''
+            };
+          });
+
+          await saveFinanceItems(savedData.id, financeItems);
+          console.log('✅ 투자금액 데이터 저장 완료');
+
+          // 캐시 무효화 (최신 데이터 보장)
+          sessionStorage.removeItem('cache_investment_data');
+        }
+      } catch (error) {
+        console.error('❌ 투자금액 저장 중 오류:', error);
+      }
+    }
+
+    // 토스트 알림 추가
+    if (setSnackbar) {
+      const isNewInvestment = !investment;
+      const investmentName = currentValues.investmentName || '투자';
+
+      if (isNewInvestment) {
+        // 신규 등록
+        const lastChar = investmentName.charAt(investmentName.length - 1);
+        const code = lastChar.charCodeAt(0);
+        const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+        const josa = hasJongseong ? '이' : '가';
+        setSnackbar({
+          open: true,
+          message: `${investmentName}${josa} 등록되었습니다.`,
+          severity: 'success'
+        });
+      } else {
+        // 수정
+        const lastChar = investmentName.charAt(investmentName.length - 1);
+        const code = lastChar.charCodeAt(0);
+        const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+        const josa = hasJongseong ? '이' : '가';
+        setSnackbar({
+          open: true,
+          message: `${investmentName}${josa} 수정되었습니다.`,
+          severity: 'success'
+        });
+      }
+    }
+
     handleClose();
-  }, [investment, investmentState, totalInvestmentAmount, onSave, handleClose]);
+  }, [investment, investmentState, totalInvestmentAmount, amountItems, investmentDetailTypesFromDB, saveFinanceItems, onSave, handleClose, setSnackbar]);
 
   return (
     <Dialog
@@ -2644,7 +2693,7 @@ function InvestmentEditDialog({
               totalInvestmentAmount={totalInvestmentAmount}
             />
           )}
-          {tabValue === 1 && <InvestmentAmountTab mode={investment ? 'edit' : 'add'} investmentId={investment?.id} canEdit={canEdit} />}
+          {tabValue === 1 && <InvestmentAmountTab mode={investment ? 'edit' : 'add'} investmentId={investment?.id} amountItems={amountItems} setAmountItems={setAmountItems} investmentDetailTypesFromDB={investmentDetailTypesFromDB} canEdit={canEdit} />}
           {tabValue === 2 && (
             <InvestmentRecordTab
               comments={comments}

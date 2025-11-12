@@ -83,6 +83,11 @@ interface SolutionTableProps {
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
+  setSnackbar?: React.Dispatch<React.SetStateAction<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>>;
 }
 
 export default function SolutionTable({
@@ -96,7 +101,8 @@ export default function SolutionTable({
   users = [],
   canCreateData = true,
   canEditOwn = true,
-  canEditOthers = true
+  canEditOthers = true,
+  setSnackbar = undefined
 }: SolutionTableProps) {
   const theme = useTheme();
 
@@ -331,9 +337,11 @@ export default function SolutionTable({
 
     console.log('🗑️ 선택된 항목 삭제 시작:', selected);
 
+    // 삭제할 항목들의 정보를 미리 저장
+    const deletedSolutions = data.filter((solution) => selected.includes(solution.id));
+
     // 삭제될 업무들의 정보를 변경로그에 추가
     if (addChangeLog) {
-      const deletedSolutions = data.filter((solution) => selected.includes(solution.id));
       deletedSolutions.forEach((solution) => {
         const solutionTitle = solution.title || solution.workContent || '업무';
         addChangeLog(
@@ -367,13 +375,53 @@ export default function SolutionTable({
         if (setSolutions) {
           setSolutions(updatedData);
         }
+
+        // 토스트 알림 (삭제)
+        if (setSnackbar) {
+          if (deletedSolutions.length === 1) {
+            const solutionTitle = deletedSolutions[0].title || deletedSolutions[0].workContent || '솔루션';
+            const getKoreanParticle = (word: string): string => {
+              const lastChar = word.charAt(word.length - 1);
+              const code = lastChar.charCodeAt(0);
+              if (code >= 0xAC00 && code <= 0xD7A3) {
+                const hasJongseong = (code - 0xAC00) % 28 !== 0;
+                return hasJongseong ? '이' : '가';
+              }
+              return '가';
+            };
+            const josa = getKoreanParticle(solutionTitle);
+            setSnackbar({
+              open: true,
+              message: `${solutionTitle}${josa} 성공적으로 삭제되었습니다.`,
+              severity: 'error'
+            });
+          } else {
+            setSnackbar({
+              open: true,
+              message: `${deletedSolutions.length}개 솔루션이 성공적으로 삭제되었습니다.`,
+              severity: 'error'
+            });
+          }
+        }
       } else {
         console.log('❌ 삭제 실패: 모든 항목 삭제에 실패했습니다.');
-        alert('삭제에 실패했습니다. 다시 시도해주세요.');
+        if (setSnackbar) {
+          setSnackbar({
+            open: true,
+            message: '삭제에 실패했습니다.',
+            severity: 'error'
+          });
+        }
       }
     } catch (error) {
       console.log('❌ 삭제 중 오류 발생:', error);
-      alert('삭제 중 오류가 발생했습니다.');
+      if (setSnackbar) {
+        setSnackbar({
+          open: true,
+          message: '삭제 중 오류가 발생했습니다.',
+          severity: 'error'
+        });
+      }
     } finally {
       setSelected([]);
     }
@@ -549,15 +597,8 @@ export default function SolutionTable({
         }
 
         // DB 저장 작업 수행
-        // subcode_name을 subcode로 변환
-        const solutionWithSubcodes = {
-          ...updatedSolution,
-          status: getStatusSubcode(updatedSolution.status),
-          solutionType: getSolutionTypeSubcode(updatedSolution.solutionType),
-          developmentType: getDevelopmentTypeSubcode(updatedSolution.developmentType)
-        };
-
-        const dbData = convertToDbSolutionData(solutionWithSubcodes);
+        // ✅ 서브코드명(subcode_name) 그대로 저장 (CLAUDE.md 규칙)
+        const dbData = convertToDbSolutionData(updatedSolution);
         console.log('🔄 DB 형식으로 변환된 데이터:', dbData);
         console.log('📝 업데이트할 솔루션 ID:', updatedSolution.id);
 
@@ -576,9 +617,35 @@ export default function SolutionTable({
           }
 
           console.log('✅ 솔루션 업데이트 완료');
+
+          // 토스트 알림 (수정)
+          if (setSnackbar) {
+            const solutionTitle = updatedSolution.title || updatedSolution.detailContent || '솔루션';
+            const getKoreanParticle = (word: string): string => {
+              const lastChar = word.charAt(word.length - 1);
+              const code = lastChar.charCodeAt(0);
+              if (code >= 0xAC00 && code <= 0xD7A3) {
+                const hasJongseong = (code - 0xAC00) % 28 !== 0;
+                return hasJongseong ? '이' : '가';
+              }
+              return '가';
+            };
+            const josa = getKoreanParticle(solutionTitle);
+            setSnackbar({
+              open: true,
+              message: `${solutionTitle}${josa} 성공적으로 수정되었습니다.`,
+              severity: 'success'
+            });
+          }
         } else {
           console.log('❌ 솔루션 업데이트 실패');
-          alert('솔루션 업데이트에 실패했습니다. 다시 시도해주세요.');
+          if (setSnackbar) {
+            setSnackbar({
+              open: true,
+              message: '솔루션 업데이트에 실패했습니다.',
+              severity: 'error'
+            });
+          }
           return;
         }
       } catch (error) {
@@ -587,7 +654,13 @@ export default function SolutionTable({
           message: error instanceof Error ? error.message : '알 수 없는 오류',
           stack: error instanceof Error ? error.stack : undefined
         });
-        alert(`솔루션 업데이트 중 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+        if (setSnackbar) {
+          setSnackbar({
+            open: true,
+            message: `솔루션 업데이트 중 오류가 발생했습니다.`,
+            severity: 'error'
+          });
+        }
         return;
       }
     } else {
@@ -597,30 +670,41 @@ export default function SolutionTable({
       try {
         // 입력 데이터 검증
         if (!updatedSolution.title?.trim()) {
-          alert('제목을 입력해주세요.');
+          if (setSnackbar) {
+            setSnackbar({
+              open: true,
+              message: '제목을 입력해주세요.',
+              severity: 'warning'
+            });
+          }
           return;
         }
         if (!updatedSolution.detailContent?.trim()) {
-          alert('상세내용을 입력해주세요.');
+          if (setSnackbar) {
+            setSnackbar({
+              open: true,
+              message: '상세내용을 입력해주세요.',
+              severity: 'warning'
+            });
+          }
           return;
         }
         if (!updatedSolution.assignee?.trim()) {
-          alert('담당자를 입력해주세요.');
+          if (setSnackbar) {
+            setSnackbar({
+              open: true,
+              message: '담당자를 입력해주세요.',
+              severity: 'warning'
+            });
+          }
           return;
         }
 
         console.log('📋 입력 데이터 검증 완료');
 
         // DB 저장 작업 수행
-        // subcode_name을 subcode로 변환
-        const solutionWithSubcodes = {
-          ...updatedSolution,
-          status: getStatusSubcode(updatedSolution.status),
-          solutionType: getSolutionTypeSubcode(updatedSolution.solutionType),
-          developmentType: getDevelopmentTypeSubcode(updatedSolution.developmentType)
-        };
-
-        const dbData = convertToDbSolutionData(solutionWithSubcodes);
+        // ✅ 서브코드명(subcode_name) 그대로 저장 (CLAUDE.md 규칙)
+        const dbData = convertToDbSolutionData(updatedSolution);
         console.log('🔄 DB 형식으로 변환된 데이터:', dbData);
 
         const createdDbSolution = await createSolution(dbData);
@@ -664,9 +748,35 @@ export default function SolutionTable({
           }
 
           console.log('✅ 새 솔루션 생성 완료:', createdSolution);
+
+          // 토스트 알림 (추가)
+          if (setSnackbar) {
+            const solutionTitle = createdSolution.title || createdSolution.detailContent || '솔루션';
+            const getKoreanParticle = (word: string): string => {
+              const lastChar = word.charAt(word.length - 1);
+              const code = lastChar.charCodeAt(0);
+              if (code >= 0xAC00 && code <= 0xD7A3) {
+                const hasJongseong = (code - 0xAC00) % 28 !== 0;
+                return hasJongseong ? '이' : '가';
+              }
+              return '가';
+            };
+            const josa = getKoreanParticle(solutionTitle);
+            setSnackbar({
+              open: true,
+              message: `${solutionTitle}${josa} 성공적으로 추가되었습니다.`,
+              severity: 'success'
+            });
+          }
         } else {
           console.log('❌ 새 솔루션 생성 실패 - createSolution이 null 반환');
-          alert('솔루션 생성에 실패했습니다. 입력 데이터를 확인하고 다시 시도해주세요.');
+          if (setSnackbar) {
+            setSnackbar({
+              open: true,
+              message: '솔루션 생성에 실패했습니다.',
+              severity: 'error'
+            });
+          }
           return;
         }
       } catch (error) {
@@ -675,7 +785,13 @@ export default function SolutionTable({
           message: error instanceof Error ? error.message : '알 수 없는 오류',
           stack: error instanceof Error ? error.stack : undefined
         });
-        alert(`솔루션 생성 중 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+        if (setSnackbar) {
+          setSnackbar({
+            open: true,
+            message: `솔루션 생성 중 오류가 발생했습니다.`,
+            severity: 'error'
+          });
+        }
         return;
       }
     }

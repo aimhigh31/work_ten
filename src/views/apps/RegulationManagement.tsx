@@ -50,7 +50,9 @@ import {
   SelectChangeEvent,
   Avatar,
   CircularProgress,
-  Skeleton
+  Skeleton,
+  Snackbar,
+  Alert
 } from '@mui/material';
 
 // 아이콘을 텍스트로 대체 (Material-UI Icons 패키지 미설치로 인함)
@@ -396,6 +398,7 @@ interface OverviewTabProps {
     user_code: string;
     avatar?: string;
   }>;
+  setValidationError?: (error: string) => void;
 }
 
 const OverviewTab = React.memo(
@@ -407,7 +410,8 @@ const OverviewTab = React.memo(
     onDataChange,
     documentTypes,
     statusTypes,
-    assigneeList
+    assigneeList,
+    setValidationError
   }: OverviewTabProps) => {
     const theme = useTheme();
 
@@ -498,12 +502,18 @@ const OverviewTab = React.memo(
     const handleDocumentTypeChange = React.useCallback(
       (event: any) => {
         const newDocumentType = event.target.value;
+
+        // 에러 초기화
+        setValidationError?.('');
+
         setDocumentType(newDocumentType);
+
+        // selectedFile 업데이트 (저장 버튼 검증용)
         setTimeout(() => {
           onUpdateItem?.({ ...selectedItem, documentType: newDocumentType });
         }, 0);
       },
-      [selectedItem, onUpdateItem]
+      [selectedItem, onUpdateItem, setValidationError]
     );
 
     // 담당자는 읽기 전용이므로 handleAssigneeChange 제거됨
@@ -2146,6 +2156,11 @@ interface FolderViewProps {
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
+  setSnackbar?: React.Dispatch<React.SetStateAction<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>>;
 }
 
 function FolderView({
@@ -2166,7 +2181,8 @@ function FolderView({
   setSharedAttachedFiles,
   canCreateData = true,
   canEditOwn = true,
-  canEditOthers = true
+  canEditOthers = true,
+  setSnackbar
 }: FolderViewProps) {
   const theme = useTheme();
   const user = useUser(); // 로그인한 사용자 정보
@@ -2291,15 +2307,48 @@ function FolderView({
             if (selectedItem?.id === itemToDelete.id) {
               setSelectedItem(null);
             }
+
+            // 성공 알림
+            if (setSnackbar) {
+              const itemName = `${itemToDelete.name}${itemToDelete.type === 'folder' ? '(폴더)' : ''}`;
+              // 마지막 글자의 받침 유무에 따라 조사 결정
+              const lastChar = itemName.charAt(itemName.length - 1);
+              const code = lastChar.charCodeAt(0);
+              const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+              const josa = hasJongseong ? '이' : '가';
+              setSnackbar({
+                open: true,
+                message: `${itemName}${josa} 성공적으로 삭제되었습니다.`,
+                severity: 'error'
+              });
+            }
           } else {
             console.error('삭제에 실패했습니다.');
+
+            // 실패 알림
+            if (setSnackbar) {
+              setSnackbar({
+                open: true,
+                message: '삭제에 실패했습니다.',
+                severity: 'error'
+              });
+            }
           }
         } catch (error) {
           console.error('삭제 오류:', error);
+
+          // 실패 알림
+          if (setSnackbar) {
+            setSnackbar({
+              open: true,
+              message: '삭제 중 오류가 발생했습니다.',
+              severity: 'error'
+            });
+          }
         }
       }
     },
-    [selectedItem, deleteItemDB, fetchTree]
+    [selectedItem, deleteItemDB, fetchTree, setSnackbar]
   );
 
   // 아이템 업데이트 함수
@@ -2345,12 +2394,81 @@ function FolderView({
         const success = await updateItem(Number(selectedItem.id), dbUpdateData);
         if (!success) {
           console.warn('⚠️ DB 업데이트 실패 - selectedItem:', selectedItem.id, 'dbUpdateData:', dbUpdateData);
+
+          // 실패 알림
+          if (setSnackbar) {
+            setSnackbar({
+              open: true,
+              message: '업데이트에 실패했습니다.',
+              severity: 'error'
+            });
+          }
+        } else {
+          // 변경된 필드 찾기 - 원본 데이터와 비교
+          const changedFields: string[] = [];
+          const fieldMap: { [key: string]: string } = {
+            name: '파일명',
+            description: '설명',
+            status: '상태',
+            documentType: '보안문서유형',
+            team: '팀',
+            assignee: '담당자',
+            revision: '리비전'
+          };
+
+          Object.keys(updatedItem).forEach((key) => {
+            if (fieldMap[key]) {
+              const oldValue = (selectedItem as any)[key];
+              const newValue = (updatedItem as any)[key];
+
+              // 실제로 값이 변경된 경우만 추가
+              if (oldValue !== newValue && !changedFields.includes(fieldMap[key])) {
+                changedFields.push(fieldMap[key]);
+              }
+            }
+          });
+
+          // 성공 알림
+          let message = '';
+          if (changedFields.length > 0) {
+            const fieldsText = changedFields.join(', ');
+            // 마지막 필드명의 받침 유무에 따라 조사 결정
+            const lastField = changedFields[changedFields.length - 1];
+            const lastChar = lastField.charAt(lastField.length - 1);
+            const code = lastChar.charCodeAt(0);
+            const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+            const josa = hasJongseong ? '이' : '가';
+            message = `${selectedItem.name}의 ${fieldsText}${josa} 성공적으로 수정되었습니다.`;
+          } else {
+            // 파일명의 받침 유무에 따라 조사 결정
+            const lastChar = selectedItem.name.charAt(selectedItem.name.length - 1);
+            const code = lastChar.charCodeAt(0);
+            const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+            const josa = hasJongseong ? '이' : '가';
+            message = `${selectedItem.name}${josa} 성공적으로 수정되었습니다.`;
+          }
+          if (setSnackbar) {
+            setSnackbar({
+              open: true,
+              message: message,
+              severity: 'success'
+            });
+          }
         }
       } catch (error) {
         console.warn('⚠️ DB 업데이트 오류:', error);
+
+        // 실패 알림
+        if (setSnackbar) {
+          setSnackbar({
+            open: true,
+            message: '업데이트 중 오류가 발생했습니다.',
+            severity: 'error'
+          });
+        }
       }
     },
-    [selectedItem, updateItem]
+    [selectedItem, updateItem, setSnackbar]
   );
 
   return (
@@ -2572,6 +2690,12 @@ interface KanbanViewProps {
   }>;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
+  updateItem?: (id: number, data: any) => Promise<boolean>;
+  setSnackbar?: React.Dispatch<React.SetStateAction<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>>;
 }
 
 function KanbanView({
@@ -2589,7 +2713,9 @@ function KanbanView({
   getAllFilesFromFolders,
   assigneeList,
   canEditOwn = true,
-  canEditOthers = true
+  canEditOthers = true,
+  updateItem,
+  setSnackbar
 }: KanbanViewProps) {
   const theme = useTheme();
 
@@ -2701,7 +2827,7 @@ function KanbanView({
   };
 
   // 드래그 종료 핸들러
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveTask(null);
     setIsDraggingState(false);
@@ -2730,6 +2856,7 @@ function KanbanView({
         // 칸반 상태를 폴더 상태로 변환하여 업데이트
         const folderStatus = mapKanbanStatusToFolder(newStatus as '대기' | '진행' | '완료' | '홀딩');
 
+        // 로컬 상태 업데이트
         setFolderData((prev) => {
           const updateItemInArray = (items: FolderItem[]): FolderItem[] => {
             return items.map((item) => {
@@ -2744,6 +2871,92 @@ function KanbanView({
           };
           return updateItemInArray(prev);
         });
+
+        // DB에 저장
+        if (updateItem) {
+          try {
+            console.log('🔄 칸반 드래그: 상태 변경 DB 저장 시작', {
+              fileId: correspondingFile.id,
+              oldStatus,
+              newStatus: folderStatus
+            });
+
+            const success = await updateItem(Number(correspondingFile.id), {
+              status: folderStatus
+            });
+
+            if (success) {
+              console.log('✅ 칸반 드래그: 상태 변경 DB 저장 성공');
+
+              // 성공 알림
+              if (setSnackbar) {
+                setSnackbar({
+                  open: true,
+                  message: `상태가 "${oldStatus}"에서 "${newStatus}"로 변경되었습니다.`,
+                  severity: 'success'
+                });
+              }
+            } else {
+              console.error('🔴 칸반 드래그: 상태 변경 DB 저장 실패');
+
+              // 실패 시 로컬 상태 되돌림
+              setFolderData((prev) => {
+                const revertItemInArray = (items: FolderItem[]): FolderItem[] => {
+                  return items.map((item) => {
+                    if (item.id === correspondingFile.id) {
+                      const originalStatus = mapKanbanStatusToFolder(oldStatus as '대기' | '진행' | '완료' | '홀딩');
+                      return { ...item, status: originalStatus };
+                    }
+                    if (item.children) {
+                      return { ...item, children: revertItemInArray(item.children) };
+                    }
+                    return item;
+                  });
+                };
+                return revertItemInArray(prev);
+              });
+
+              // 실패 알림
+              if (setSnackbar) {
+                setSnackbar({
+                  open: true,
+                  message: '상태 변경 저장에 실패했습니다.',
+                  severity: 'error'
+                });
+              }
+              return;
+            }
+          } catch (error) {
+            console.error('🔴 칸반 드래그: 상태 변경 DB 저장 오류:', error);
+
+            // 실패 시 로컬 상태 되돌림
+            setFolderData((prev) => {
+              const revertItemInArray = (items: FolderItem[]): FolderItem[] => {
+                return items.map((item) => {
+                  if (item.id === correspondingFile.id) {
+                    const originalStatus = mapKanbanStatusToFolder(oldStatus as '대기' | '진행' | '완료' | '홀딩');
+                    return { ...item, status: originalStatus };
+                  }
+                  if (item.children) {
+                    return { ...item, children: revertItemInArray(item.children) };
+                  }
+                  return item;
+                });
+              };
+              return revertItemInArray(prev);
+            });
+
+            // 실패 알림
+            if (setSnackbar) {
+              setSnackbar({
+                open: true,
+                message: '상태 변경 저장에 실패했습니다.',
+                severity: 'error'
+              });
+            }
+            return;
+          }
+        }
       }
 
       // 변경로그 추가
@@ -5004,6 +5217,16 @@ export default function RegulationManagement() {
   const theme = useTheme();
   const [value, setValue] = useState(0);
 
+  // 알림 상태
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error' | 'warning' | 'info'
+  });
+
+  // 유효성 검증 에러 상태
+  const [validationError, setValidationError] = useState<string>('');
+
   // 🔐 권한 체크
   const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers } = useMenuPermission('/security/regulation');
 
@@ -5121,6 +5344,7 @@ export default function RegulationManagement() {
   // 폴더 상세보기 팝업 관련 상태
   const [folderDetailDialog, setFolderDetailDialog] = useState(false);
   const [selectedFile, setSelectedFile] = useState<FolderItem | null>(null);
+  const [originalFile, setOriginalFile] = useState<FolderItem | null>(null); // 원본 데이터 저장 (변경 감지용)
   const [selectedTab, setSelectedTab] = useState(0);
 
   // Feedback/Record hook (Dialog용) - selectedFile 선언 후에 위치
@@ -5343,13 +5567,24 @@ export default function RegulationManagement() {
         return updateItemInArray(prevData);
       });
 
+      // selectedFile도 함께 업데이트 (저장 버튼 검증용)
+      setSelectedFile((prev) => {
+        if (prev && prev.id === itemId) {
+          return { ...prev, ...updates };
+        }
+        return prev;
+      });
+
       // DB에 저장 (필드명 매핑)
       const dbUpdateData: any = {};
 
       if (updates.name !== undefined) dbUpdateData.name = updates.name;
       if (updates.description !== undefined) dbUpdateData.description = updates.description;
       if (updates.status !== undefined) dbUpdateData.status = updates.status;
-      if (updates.documentType !== undefined) dbUpdateData.document_type = updates.documentType;
+      // "선택" 값이 아닐 때만 DB에 저장
+      if (updates.documentType !== undefined && updates.documentType !== '선택' && updates.documentType.trim()) {
+        dbUpdateData.document_type = updates.documentType;
+      }
       if (updates.team !== undefined) dbUpdateData.team = updates.team;
       if (updates.assignee !== undefined) dbUpdateData.assignee = updates.assignee;
       if (updates.code !== undefined) dbUpdateData.code = updates.code;
@@ -5376,7 +5611,10 @@ export default function RegulationManagement() {
   // 파일 카드 클릭 핸들러 (칸반에서 폴더 팝업 열기)
   const handleFileCardClick = (file: FolderItem) => {
     setSelectedFile(file);
+    // 원본 데이터를 깊은 복사로 저장 (변경 감지용)
+    setOriginalFile(JSON.parse(JSON.stringify(file)));
     setFolderDetailDialog(true);
+    setValidationError(''); // 팝업 열 때 에러 초기화
   };
 
   // 편집 다이얼로그 닫기
@@ -5389,6 +5627,8 @@ export default function RegulationManagement() {
   const handleFolderDetailDialogClose = () => {
     setFolderDetailDialog(false);
     setSelectedFile(null);
+    setOriginalFile(null); // 원본 데이터 초기화
+    setValidationError(''); // 팝업 닫을 때 에러 초기화
   };
 
   // 새 파일 추가 핸들러 (팝업에서)
@@ -5442,20 +5682,75 @@ export default function RegulationManagement() {
 
     // 유효성 검사
     if (!selectedFile.name || !selectedFile.name.trim()) {
-      alert('제목을 입력해주세요.');
+      setValidationError('제목을 입력해주세요.');
       return;
     }
 
-    if (!selectedFile.documentType || !selectedFile.documentType.trim()) {
-      alert('보안문서유형을 선택해주세요.');
+    if (!selectedFile.documentType || !selectedFile.documentType.trim() || selectedFile.documentType === '선택') {
+      setValidationError('보안문서유형을 선택해주세요.');
       return;
     }
+
+    // 에러 초기화
+    setValidationError('');
 
     // OverviewPanel에서 편집된 내용이 자동으로 handleUpdateItem을 통해 저장되므로
-    // 여기서는 저장 완료 메시지만 표시하고 팝업을 닫습니다
+    // 여기서는 변경 감지 및 토스트 메시지 표시만 수행합니다
+
+    // 변경된 필드 찾기
+    const changedFields: string[] = [];
+    const fieldMap: { [key: string]: string } = {
+      name: '파일명',
+      description: '설명',
+      status: '상태',
+      documentType: '보안문서유형',
+      team: '팀',
+      assignee: '담당자',
+      revision: '리비전'
+    };
+
+    if (originalFile) {
+      Object.keys(fieldMap).forEach((key) => {
+        const oldValue = (originalFile as any)[key];
+        const newValue = (selectedFile as any)[key];
+
+        // 실제로 값이 변경된 경우만 추가
+        if (oldValue !== newValue && !changedFields.includes(fieldMap[key])) {
+          changedFields.push(fieldMap[key]);
+        }
+      });
+    }
 
     // 변경로그 추가
-    addChangeLog('수정', selectedFile.code || selectedFile.id, `파일 "${selectedFile.name}" 저장 완료`, '시스템');
+    if (changedFields.length > 0) {
+      addChangeLog('수정', selectedFile.code || selectedFile.id, `파일 "${selectedFile.name}" - ${changedFields.join(', ')} 변경`, '시스템');
+    }
+
+    // 성공 알림
+    let message = '';
+    if (changedFields.length > 0) {
+      const fieldsText = changedFields.join(', ');
+      // 마지막 필드명의 받침 유무에 따라 조사 결정
+      const lastField = changedFields[changedFields.length - 1];
+      const lastChar = lastField.charAt(lastField.length - 1);
+      const code = lastChar.charCodeAt(0);
+      const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+      const josa = hasJongseong ? '이' : '가';
+      message = `${selectedFile.name}의 ${fieldsText}${josa} 성공적으로 수정되었습니다.`;
+    } else {
+      // 파일명의 받침 유무에 따라 조사 결정
+      const lastChar = selectedFile.name.charAt(selectedFile.name.length - 1);
+      const code = lastChar.charCodeAt(0);
+      const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+      const josa = hasJongseong ? '이' : '가';
+      message = `${selectedFile.name}${josa} 성공적으로 수정되었습니다.`;
+    }
+
+    setSnackbar({
+      open: true,
+      message: message,
+      severity: 'success'
+    });
 
     // 팝업 닫기
     handleFolderDetailDialogClose();
@@ -5548,25 +5843,72 @@ export default function RegulationManagement() {
       // 업데이트
       setTasks((prevTasks) => prevTasks.map((task) => (task.id === updatedTask.id ? { ...updatedTask } : task)));
 
+      // 변경된 필드 찾기
+      const changedFields: string[] = [];
+      const fieldMap: { [key: string]: string } = {
+        workContent: '업무내용',
+        type: '문서유형',
+        status: '상태',
+        assignee: '담당자',
+        team: '팀',
+        department: '부서',
+        startDate: '시작일',
+        completedDate: '완료일'
+      };
+
+      Object.keys(fieldMap).forEach((key) => {
+        const oldValue = (originalTask as any)[key];
+        const newValue = (updatedTask as any)[key];
+
+        if (oldValue !== newValue && !changedFields.includes(fieldMap[key])) {
+          changedFields.push(fieldMap[key]);
+        }
+      });
+
       // 변경로그 추가
-      const changes = [];
-      if (originalTask.status !== updatedTask.status) {
-        changes.push(`상태: ${originalTask.status} → ${updatedTask.status}`);
-      }
-      if (originalTask.assignee !== updatedTask.assignee) {
-        changes.push(`담당자: ${originalTask.assignee} → ${updatedTask.assignee}`);
-      }
-      if (originalTask.completedDate !== updatedTask.completedDate) {
-        changes.push(`완료일: ${originalTask.completedDate} → ${updatedTask.completedDate}`);
+      if (changedFields.length > 0) {
+        addChangeLog('수정', updatedTask.code, `${updatedTask.workContent} - ${changedFields.join(', ')} 변경`, updatedTask.team);
       }
 
-      if (changes.length > 0) {
-        addChangeLog('수정', updatedTask.code, changes.join(', '), updatedTask.team);
+      // 성공 알림
+      let message = '';
+      if (changedFields.length > 0) {
+        const fieldsText = changedFields.join(', ');
+        // 마지막 필드명의 받침 유무에 따라 조사 결정
+        const lastField = changedFields[changedFields.length - 1];
+        const lastChar = lastField.charAt(lastField.length - 1);
+        const code = lastChar.charCodeAt(0);
+        const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+        const josa = hasJongseong ? '이' : '가';
+        message = `${updatedTask.workContent}의 ${fieldsText}${josa} 성공적으로 수정되었습니다.`;
+      } else {
+        // 업무내용의 받침 유무에 따라 조사 결정
+        const lastChar = updatedTask.workContent.charAt(updatedTask.workContent.length - 1);
+        const code = lastChar.charCodeAt(0);
+        const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+        const josa = hasJongseong ? '이' : '가';
+        message = `${updatedTask.workContent}${josa} 성공적으로 수정되었습니다.`;
       }
+      setSnackbar({
+        open: true,
+        message: message,
+        severity: 'success'
+      });
     } else {
       // 새로 생성
       setTasks((prevTasks) => [...prevTasks, updatedTask]);
       addChangeLog('추가', updatedTask.code, `새로운 업무가 생성되었습니다: ${updatedTask.workContent}`, updatedTask.team);
+
+      // 성공 알림
+      const lastChar = updatedTask.workContent.charAt(updatedTask.workContent.length - 1);
+      const code = lastChar.charCodeAt(0);
+      const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+      const josa = hasJongseong ? '이' : '가';
+      setSnackbar({
+        open: true,
+        message: `${updatedTask.workContent}${josa} 성공적으로 추가되었습니다.`,
+        severity: 'success'
+      });
     }
 
     handleEditDialogClose();
@@ -5663,27 +6005,8 @@ export default function RegulationManagement() {
             </Box>
           </Box>
 
-          {/* 권한 체크 */}
-          {!canViewCategory ? (
-            <Box
-              sx={{
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'column',
-                gap: 2,
-                py: 8
-              }}
-            >
-              <Typography variant="h5" color="text.secondary">
-                이 페이지에 접근할 권한이 없습니다.
-              </Typography>
-              <Typography variant="body2" color="text.disabled">
-                관리자에게 권한을 요청하세요.
-              </Typography>
-            </Box>
-          ) : canViewCategory && !canReadData ? (
+          {/* 권한 체크: KPI관리 패턴 (깜빡임 방지) */}
+          {canViewCategory && !canReadData ? (
             <Box
               sx={{
                 flex: 1,
@@ -5961,6 +6284,7 @@ export default function RegulationManagement() {
                     canCreateData={canCreateData}
                     canEditOwn={canEditOwn}
                     canEditOthers={canEditOthers}
+                    setSnackbar={setSnackbar}
                   />
                 )}
               </Box>
@@ -6002,6 +6326,8 @@ export default function RegulationManagement() {
                     assigneeList={assigneeList}
                     canEditOwn={canEditOwn}
                     canEditOthers={canEditOthers}
+                    updateItem={updateItem}
+                    setSnackbar={setSnackbar}
                   />
                 )}
               </Box>
@@ -6065,10 +6391,12 @@ export default function RegulationManagement() {
                         })) || []
                     };
                     setSelectedFile(fileItem);
+                    setOriginalFile(JSON.parse(JSON.stringify(fileItem)));
                     setFolderDetailDialog(true);
                   }}
                   onFolderFileClick={(file) => {
                     setSelectedFile(file);
+                    setOriginalFile(JSON.parse(JSON.stringify(file)));
                     setFolderDetailDialog(true);
                   }}
                 />
@@ -6295,6 +6623,7 @@ export default function RegulationManagement() {
                   documentTypes={documentTypes}
                   statusTypes={statusTypes}
                   assigneeList={assigneeList}
+                  setValidationError={setValidationError}
                 />
               )}
               {selectedTab === 1 && (
@@ -6337,8 +6666,33 @@ export default function RegulationManagement() {
               )}
             </Box>
           )}
+
+          {/* 에러 메시지 표시 */}
+          {validationError && (
+            <Box sx={{ px: 2, pb: 2 }}>
+              <Alert severity="error" sx={{ mt: 1 }}>
+                {validationError}
+              </Alert>
+            </Box>
+          )}
         </DialogContent>
       </Dialog>
+
+      {/* 알림 Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

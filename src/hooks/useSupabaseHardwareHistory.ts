@@ -310,8 +310,8 @@ export const useSupabaseHardwareHistory = () => {
     }
   };
 
-  // 하드웨어 구매/수리이력 조회 (데이터를 직접 반환)
-  const getMaintenanceHistories = async (hardwareId: number): Promise<HardwareHistory[]> => {
+  // 하드웨어 구매/수리이력 조회 (데이터를 직접 반환) - useCallback으로 안정적인 참조 유지
+  const getMaintenanceHistories = useCallback(async (hardwareId: number): Promise<HardwareHistory[]> => {
     console.log('🔍 getMaintenanceHistories 호출:', hardwareId);
 
     try {
@@ -342,10 +342,10 @@ export const useSupabaseHardwareHistory = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []); // 의존성 없음 - supabase 클라이언트는 안정적인 참조
 
-  // HardwareHistory를 MaintenanceHistory(프론트엔드 형식)로 변환
-  const convertToMaintenanceHistory = (item: HardwareHistory): MaintenanceHistory => {
+  // HardwareHistory를 MaintenanceHistory(프론트엔드 형식)로 변환 - useCallback으로 안정적인 참조 유지
+  const convertToMaintenanceHistory = useCallback((item: HardwareHistory): MaintenanceHistory => {
     return {
       id: item.id.toString(),
       registrationDate: item.registration_date || '',
@@ -358,10 +358,10 @@ export const useSupabaseHardwareHistory = () => {
       startDate: item.start_date || '',
       completionDate: item.completion_date || ''
     };
-  };
+  }, []); // 의존성 없음 - 순수 변환 함수
 
-  // 구매/수리이력 일괄 저장 함수
-  const saveMaintenanceHistories = async (hardwareId: number, histories: MaintenanceHistory[]): Promise<boolean> => {
+  // 구매/수리이력 일괄 저장 함수 - useCallback으로 안정적인 참조 유지
+  const saveMaintenanceHistories = useCallback(async (hardwareId: number, histories: MaintenanceHistory[]): Promise<boolean> => {
     console.log('💾 하드웨어 구매/수리이력 일괄 저장 시작:', { hardwareId, count: histories.length });
 
     try {
@@ -482,7 +482,7 @@ export const useSupabaseHardwareHistory = () => {
       setError(errorMessage);
       return false;
     }
-  };
+  }, []); // 의존성 없음 - supabase 클라이언트는 안정적인 참조
 
   return {
     histories,

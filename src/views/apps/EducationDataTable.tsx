@@ -74,6 +74,7 @@ interface EducationDataTableProps {
     changedField?: string,
     title?: string
   ) => void;
+  setSnackbar?: React.Dispatch<React.SetStateAction<{ open: boolean; message: string; severity: 'success' | 'error' | 'warning' | 'info' }>>;
   // 🔐 권한 관리
   canCreateData?: boolean;
   canEditOwn?: boolean;
@@ -88,6 +89,7 @@ export default function EducationDataTable({
   educations,
   setEducations,
   addChangeLog,
+  setSnackbar,
   canCreateData = true,
   canEditOwn = true,
   canEditOthers = true
@@ -382,6 +384,7 @@ export default function EducationDataTable({
 
     try {
       const deletedEducations = data.filter((education) => selected.includes(education.id));
+      const deleteCount = deletedEducations.length;
 
       // Supabase에서 삭제 (soft delete)
       for (const education of deletedEducations) {
@@ -414,9 +417,33 @@ export default function EducationDataTable({
       if (setEducations) {
         setEducations(updatedData);
       }
+
+      // 토스트 알림
+      if (setSnackbar) {
+        let message = '';
+        if (deleteCount === 1) {
+          const firstTitle = deletedEducations[0].title || '개인교육관리';
+          message = `${firstTitle} 성공적으로 삭제되었습니다.`;
+        } else {
+          message = `${deleteCount}개 항목이 성공적으로 삭제되었습니다.`;
+        }
+        setSnackbar({
+          open: true,
+          message,
+          severity: 'error'
+        });
+      }
     } catch (error) {
       console.error('❌ 개인교육관리 삭제 실패:', error);
-      alert('개인교육관리 삭제 중 오류가 발생했습니다.');
+      if (setSnackbar) {
+        setSnackbar({
+          open: true,
+          message: '개인교육관리 삭제 중 오류가 발생했습니다.',
+          severity: 'error'
+        });
+      } else {
+        alert('개인교육관리 삭제 중 오류가 발생했습니다.');
+      }
     }
   };
 
@@ -446,6 +473,9 @@ export default function EducationDataTable({
           'title 변경됨?': originalEducation.title !== updatedEducation.title
         });
 
+        // 변경된 필드 추적
+        const changedFields: string[] = [];
+
         // 변경로그 추가 - DB 저장 전에 실행 (필드별 상세 추적)
         if (addChangeLog) {
           console.log('🔥🔥🔥 addChangeLog 함수 실행!');
@@ -454,6 +484,7 @@ export default function EducationDataTable({
 
           // 0. 교육명 변경
           if (originalEducation.title !== updatedEducation.title) {
+            changedFields.push('제목');
             addChangeLog(
               '수정',
               educationCode,
@@ -468,6 +499,7 @@ export default function EducationDataTable({
 
           // 1. Education유형 변경
           if (originalEducation.educationType !== updatedEducation.educationType) {
+            changedFields.push('교육유형');
             addChangeLog(
               '수정',
               educationCode,
@@ -482,6 +514,7 @@ export default function EducationDataTable({
 
           // 2. 고객명 변경
           if (originalEducation.customerName !== updatedEducation.customerName) {
+            changedFields.push('교육분야');
             addChangeLog(
               '수정',
               educationCode,
@@ -496,6 +529,7 @@ export default function EducationDataTable({
 
           // 3. 회사명 변경
           if (originalEducation.companyName !== updatedEducation.companyName) {
+            changedFields.push('회사명');
             addChangeLog(
               '수정',
               educationCode,
@@ -510,6 +544,7 @@ export default function EducationDataTable({
 
           // 4. 요청내용 변경
           if (originalEducation.content !== updatedEducation.content) {
+            changedFields.push('설명');
             addChangeLog(
               '수정',
               educationCode,
@@ -524,6 +559,7 @@ export default function EducationDataTable({
 
           // 5. 처리내용 변경
           if (originalEducation.responseContent !== updatedEducation.responseContent) {
+            changedFields.push('처리내용');
             addChangeLog(
               '수정',
               educationCode,
@@ -538,6 +574,7 @@ export default function EducationDataTable({
 
           // 6. 우선순위 변경
           if (originalEducation.priority !== updatedEducation.priority) {
+            changedFields.push('우선순위');
             addChangeLog(
               '수정',
               educationCode,
@@ -552,6 +589,7 @@ export default function EducationDataTable({
 
           // 7. 상태 변경
           if (originalEducation.status !== updatedEducation.status) {
+            changedFields.push('상태');
             addChangeLog(
               '수정',
               educationCode,
@@ -566,6 +604,7 @@ export default function EducationDataTable({
 
           // 8. 담당자 변경
           if (originalEducation.assignee !== updatedEducation.assignee) {
+            changedFields.push('담당자');
             addChangeLog(
               '수정',
               educationCode,
@@ -580,6 +619,7 @@ export default function EducationDataTable({
 
           // 9. 팀 변경
           if (originalEducation.team !== updatedEducation.team) {
+            changedFields.push('팀');
             addChangeLog(
               '수정',
               educationCode,
@@ -594,6 +634,7 @@ export default function EducationDataTable({
 
           // 10. 접수일 변경
           if (originalEducation.receptionDate !== updatedEducation.receptionDate) {
+            changedFields.push('접수일');
             addChangeLog(
               '수정',
               educationCode,
@@ -608,6 +649,7 @@ export default function EducationDataTable({
 
           // 11. 완료일 변경
           if (originalEducation.resolutionDate !== updatedEducation.resolutionDate) {
+            changedFields.push('완료일');
             addChangeLog(
               '수정',
               educationCode,
@@ -622,6 +664,7 @@ export default function EducationDataTable({
 
           // 12. 채널 변경
           if (originalEducation.channel !== updatedEducation.channel) {
+            changedFields.push('채널');
             addChangeLog(
               '수정',
               educationCode,
@@ -649,6 +692,24 @@ export default function EducationDataTable({
             setEducations(updatedData);
           }
 
+          // 토스트 알림
+          if (setSnackbar) {
+            const educationTitle = updatedEducation.title || '개인교육관리';
+            let message = '';
+            if (changedFields.length > 0) {
+              const fieldsText = changedFields.join(', ');
+              const josa = changedFields.length === 1 ? '이' : '가';
+              message = `${educationTitle}의 ${fieldsText}${josa} 수정되었습니다.`;
+            } else {
+              message = `${educationTitle}이 성공적으로 수정되었습니다.`;
+            }
+            setSnackbar({
+              open: true,
+              message,
+              severity: 'success'
+            });
+          }
+
           console.log('✅ 기존 개인교육관리 업데이트 완료');
         } else {
           throw new Error('개인교육관리 업데이트 실패');
@@ -669,9 +730,10 @@ export default function EducationDataTable({
           }
 
           // 변경로그 추가 - 새 개인교육관리 생성
+          const educationCode = `MAIN-EDU-${new Date(createdEducation.registration_date).getFullYear().toString().slice(-2)}-${String(createdEducation.no).padStart(3, '0')}`;
+          const educationTitle = newEducationData.title || '새 개인교육관리';
+
           if (addChangeLog) {
-            const educationCode = `MAIN-EDU-${new Date(createdEducation.registration_date).getFullYear().toString().slice(-2)}-${String(createdEducation.no).padStart(3, '0')}`;
-            const educationTitle = newEducationData.title || '새 개인교육관리';
             addChangeLog(
               '추가',
               educationCode,
@@ -682,6 +744,15 @@ export default function EducationDataTable({
               undefined,
               educationTitle
             );
+          }
+
+          // 토스트 알림
+          if (setSnackbar) {
+            setSnackbar({
+              open: true,
+              message: `${educationTitle}이 성공적으로 등록되었습니다.`,
+              severity: 'success'
+            });
           }
 
           console.log('✅ 새 개인교육관리 추가 완료:', newEducationData);
@@ -695,7 +766,17 @@ export default function EducationDataTable({
       handleEditDialogClose();
     } catch (error) {
       console.error('❌ 개인교육관리 저장 실패:', error);
-      alert(`개인교육관리 저장 중 오류가 발생했습니다.\n\n${error instanceof Error ? error.message : String(error)}`);
+
+      // 토스트 알림
+      if (setSnackbar) {
+        setSnackbar({
+          open: true,
+          message: `개인교육관리 저장 중 오류가 발생했습니다.`,
+          severity: 'error'
+        });
+      } else {
+        alert(`개인교육관리 저장 중 오류가 발생했습니다.\n\n${error instanceof Error ? error.message : String(error)}`);
+      }
     }
   };
 

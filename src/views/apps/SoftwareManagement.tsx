@@ -37,7 +37,9 @@ import {
   TableRow,
   TextField,
   Pagination,
-  Button
+  Button,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
@@ -137,6 +139,11 @@ interface KanbanViewProps {
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
+  updateSoftware?: (id: number, data: Partial<any>) => Promise<any>;
+  activeTask?: TaskTableData | null;
+  isDraggingState?: boolean;
+  onDragStart?: (event: any) => void;
+  onDragEnd?: (event: any) => void;
 }
 
 function KanbanView({
@@ -155,7 +162,12 @@ function KanbanView({
   users = [],
   canCreateData = true,
   canEditOwn = true,
-  canEditOthers = true
+  canEditOthers = true,
+  updateSoftware,
+  activeTask,
+  isDraggingState,
+  onDragStart,
+  onDragEnd
 }: KanbanViewProps) {
   const theme = useTheme();
   const { masterCodes } = useCommonData();
@@ -192,10 +204,6 @@ function KanbanView({
     return isCreator || isAssignee;
   }, [currentUser]);
 
-  // 상태 관리
-  const [activeTask, setActiveTask] = useState<TaskTableData | null>(null);
-  const [isDraggingState, setIsDraggingState] = useState(false);
-
   // 편집 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskTableData | null>(null);
@@ -229,14 +237,6 @@ function KanbanView({
     return true;
   });
 
-  // 드래그 시작 핸들러
-  const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event;
-    const draggedTask = tasks.find((task) => task.id === active.id);
-    setActiveTask(draggedTask || null);
-    setIsDraggingState(true);
-  };
-
   // 카드 클릭 핸들러
   const handleCardClick = (task: TaskTableData) => {
     setEditingTask(task);
@@ -266,61 +266,60 @@ function KanbanView({
     handleEditDialogClose();
   };
 
-  // 드래그 종료 핸들러
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveTask(null);
-    setIsDraggingState(false);
-
-    if (!over) return;
-
-    const taskId = active.id;
-    const newStatus = over.id as TaskStatus;
-
-    // 상태가 변경된 경우만 업데이트
-    const currentTask = tasks.find((task) => task.id === taskId);
-    if (currentTask && currentTask.status !== newStatus) {
-      const oldStatus = currentTask.status;
-
-      // 로컬 상태 업데이트
-      setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: newStatus } : task)));
-
-      // DB에 상태 변경 저장
-      try {
-        console.log('🔄 칸반 드래그: 상태 변경 DB 저장 시작', {
-          id: currentTask.id,
-          oldStatus,
-          newStatus
-        });
-
-        await updateSoftware(currentTask.id, {
-          status: newStatus
-        });
-
-        console.log('✅ 칸반 드래그: 상태 변경 DB 저장 성공');
-      } catch (error) {
-        console.error('🔴 칸반 드래그: 상태 변경 DB 저장 실패:', error);
-        // 실패 시 원래 상태로 되돌림
-        setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: oldStatus } : task)));
-        alert('상태 변경 저장에 실패했습니다.');
-        return;
-      }
-
-      // 변경로그는 SoftwareTable.tsx에서 자동으로 처리됨
+  // 상태별 컬럼 정의 (동적 생성 - 하드웨어관리와 동일한 방식)
+  const statusColumns = React.useMemo(() => {
+    if (softwareStatusOptions.length === 0) {
+      console.log('⚠️ 칸반: softwareStatusOptions가 비어있음, 기본 컬럼 사용');
+      return [
+        { key: '대기', title: '대기', pillBg: '#F5F5F5', pillColor: '#757575' },
+        { key: '진행', title: '진행', pillBg: '#E3F2FD', pillColor: '#1976D2' },
+        { key: '완료', title: '완료', pillBg: '#E8F5E9', pillColor: '#388E3C' },
+        { key: '홀딩', title: '홀딩', pillBg: '#FFEBEE', pillColor: '#D32F2F' }
+      ];
     }
-  };
 
-  // 상태별 컬럼 정의 (표준화된 포맷)
-  const statusColumns = [
-    { key: '대기', title: '대기', pillBg: '#ECEFF1', pillColor: '#90A4AE' },
-    { key: '진행', title: '진행', pillBg: '#E8EAF6', pillColor: '#7986CB' },
-    { key: '완료', title: '완료', pillBg: '#E8F5E9', pillColor: '#81C784' },
-    { key: '홀딩', title: '홀딩', pillBg: '#FFEBEE', pillColor: '#E57373' }
-  ];
+    const colorPalette = [
+      { pillBg: '#F5F5F5', pillColor: '#757575' }, // 대기
+      { pillBg: '#E3F2FD', pillColor: '#1976D2' }, // 진행
+      { pillBg: '#E8F5E9', pillColor: '#388E3C' }, // 완료
+      { pillBg: '#FFEBEE', pillColor: '#D32F2F' }, // 홀딩
+      { pillBg: '#FFF3E0', pillColor: '#F57C00' },
+      { pillBg: '#F3E5F5', pillColor: '#7B1FA2' }
+    ];
+
+    const columns = softwareStatusOptions.map((statusName, index) => ({
+      key: statusName,
+      title: statusName,
+      pillBg: colorPalette[index % colorPalette.length].pillBg,
+      pillColor: colorPalette[index % colorPalette.length].pillColor
+    }));
+
+    console.log('✅ 칸반 컬럼 생성 완료:', columns);
+    return columns;
+  }, [softwareStatusOptions]);
 
   // 상태별 아이템 가져오기 (서브코드를 서브코드명으로 변환해서 비교)
   const getItemsByStatus = (status: string) => {
-    return filteredData.filter((item) => getStatusName(item.status) === status);
+    const items = filteredData.filter((item) => {
+      const convertedStatus = getStatusName(item.status);
+      const matches = convertedStatus === status;
+
+      // 디버깅 로그 (첫 5개 항목만)
+      if (filteredData.indexOf(item) < 5) {
+        console.log('🔍 칸반 아이템 필터링:', {
+          itemId: item.id,
+          originalStatus: item.status,
+          convertedStatus,
+          targetStatus: status,
+          matches
+        });
+      }
+
+      return matches;
+    });
+
+    console.log(`📊 칸반 컬럼 "${status}": ${items.length}개 아이템`);
+    return items;
   };
 
   // 팀별 색상 매핑 (데이터 테이블과 동일)
@@ -366,26 +365,36 @@ function KanbanView({
     정운영: '/assets/images/users/avatar-5.png'
   };
 
-  // 상태 태그 스타일 함수
+  // 상태 태그 스타일 함수 (동적)
   const getStatusTagStyle = (status: string) => {
-    switch (status) {
-      case '대기':
-        return { backgroundColor: 'rgba(144, 164, 174, 0.15)', color: '#90A4AE' };
-      case '진행':
-        return { backgroundColor: 'rgba(121, 134, 203, 0.15)', color: '#7986CB' };
-      case '완료':
-        return { backgroundColor: 'rgba(129, 199, 132, 0.15)', color: '#81C784' };
-      case '홀딩':
-        return { backgroundColor: 'rgba(229, 115, 115, 0.15)', color: '#E57373' };
-      default:
-        return { backgroundColor: 'rgba(156, 163, 175, 0.15)', color: '#4b5563' };
+    const column = statusColumns.find((col) => col.key === status);
+    if (column) {
+      return {
+        backgroundColor: column.pillBg,
+        color: column.pillColor
+      };
     }
+    return { backgroundColor: '#F5F5F5', color: '#757575' };
   };
 
   // 드래그 가능한 카드 컴포넌트 (표준화된 4단계 구조)
   function DraggableCard({ task, canEditOwn = true, canEditOthers = true }: { task: TaskTableData; canEditOwn?: boolean; canEditOthers?: boolean }) {
     // 🔐 권한 체크: 드래그 가능 여부 (타인 데이터 편집 권한 OR (나의 데이터 편집 권한 AND 데이터 소유자))
-    const isDragDisabled = !(canEditOthers || (canEditOwn && isDataOwner(task)));
+    const isOwner = isDataOwner(task);
+    const isDragDisabled = !(canEditOthers || (canEditOwn && isOwner));
+
+    // 디버깅 로그
+    console.log('🎯 DraggableCard 권한 체크:', {
+      taskId: task.id,
+      taskCode: task.code,
+      canEditOwn,
+      canEditOthers,
+      isOwner,
+      isDragDisabled,
+      currentUser: currentUser?.user_name,
+      createdBy: task.createdBy,
+      assignee: task.assignee
+    });
 
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
       id: task.id,
@@ -712,7 +721,7 @@ function KanbanView({
         }
       `}</style>
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd}>
         <div className="kanban-board">
           {statusColumns.map((column) => {
             const items = getItemsByStatus(column.key);
@@ -2417,8 +2426,9 @@ export default function SoftwareManagement() {
     });
   }, [canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers]);
 
-  // ⭐ Investment 패턴: 데이터 로딩 함수만 가져오기
+  // ⭐ Investment 패턴: 데이터 로딩 함수만 가져오기 (KPI 패턴 적용)
   const {
+    software: softwareFromHook,
     getSoftware,
     createSoftware,
     updateSoftware,
@@ -2429,8 +2439,6 @@ export default function SoftwareManagement() {
   } = useSupabaseSoftware();
   const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 모두 가져오기
 
-  // ⭐ 페이지 레벨 상태 관리
-  const [software, setSoftware] = useState<SoftwareData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // 변경로그 Supabase 훅
@@ -2453,18 +2461,14 @@ export default function SoftwareManagement() {
         setIsLoading(true);
 
         // ⚡ software만 로딩! (users, departments, masterCodes는 CommonData에 이미 있음)
-        const softwareData = await getSoftware();
+        await getSoftware(); // ✅ 훅 내부에서 setSoftware 호출됨 (KPI 패턴)
 
         console.timeEnd('⚡ SoftwareManagement - 페이지 데이터 로딩');
-
-        // 상태 업데이트
-        setSoftware(softwareData);
 
         console.log('✅ SoftwareManagement 로딩 완료', {
           users: users.length,
           departments: departments.length,
-          masterCodes: masterCodes.length,
-          software: softwareData.length
+          masterCodes: masterCodes.length
         });
       } catch (error) {
         console.error('❌ 데이터 로딩 실패:', error);
@@ -2574,6 +2578,21 @@ export default function SoftwareManagement() {
   const [editDialog, setEditDialog] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskTableData | null>(null);
 
+  // Snackbar 상태
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
+
+  // Drag 관련 상태 (칸반탭)
+  const [activeTask, setActiveTask] = useState<TaskTableData | null>(null);
+  const [isDraggingState, setIsDraggingState] = useState(false);
+
   // Supabase 데이터를 TaskTableData 형식으로 변환하는 함수
   const convertSoftwareToTask = (softwareItem: SoftwareData): TaskTableData => {
     const converted = {
@@ -2620,25 +2639,22 @@ export default function SoftwareManagement() {
     return converted;
   };
 
-  // Supabase 데이터가 변경되면 tasks 상태 업데이트
+  // Supabase 데이터가 변경되면 tasks 상태 업데이트 (즉시 렌더링)
   useEffect(() => {
     console.log('🔍 Supabase 소프트웨어 데이터 상태:', {
-      length: software.length,
-      loading: softwareLoading,
+      length: softwareFromHook.length,
       error,
-      sampleData: software.slice(0, 2)
+      sampleData: softwareFromHook.slice(0, 2)
     });
 
-    if (!softwareLoading) {
-      const convertedTasks = software.map(convertSoftwareToTask);
-      setTasks(convertedTasks);
-      console.log('🔄 Supabase 소프트웨어 데이터를 TaskTableData로 변환 완료:', convertedTasks.length + '개');
+    const convertedTasks = softwareFromHook.map(convertSoftwareToTask);
+    setTasks(convertedTasks);
+    console.log('🔄 Supabase 소프트웨어 데이터를 TaskTableData로 변환 완료:', convertedTasks.length + '개');
 
-      if (convertedTasks.length > 0) {
-        console.log('📝 변환된 첫 번째 태스크 샘플:', convertedTasks[0]);
-      }
+    if (convertedTasks.length > 0) {
+      console.log('📝 변환된 첫 번째 태스크 샘플:', convertedTasks[0]);
     }
-  }, [software, softwareLoading]);
+  }, [softwareFromHook, error]);
 
   // 변경로그 데이터 변환 (Supabase → UI)
   const changeLogs = React.useMemo(() => {
@@ -2747,24 +2763,128 @@ export default function SoftwareManagement() {
 
   // Task 저장 핸들러
   const handleEditTaskSave = async (updatedTask: TaskTableData) => {
-    console.log('💾 SoftwareManagement - Task 저장 핸들러 호출:', updatedTask);
+    console.log('🎯 handleEditTaskSave 호출:', updatedTask);
 
-    const originalTask = tasks.find((t) => t.id === updatedTask.id);
+    // tasks 배열에서 해당 ID가 있는지 확인하여 추가/수정 구분
+    const existingTask = tasks.find((t) => t.id === updatedTask.id);
+    const isNewTask = !existingTask;
+    const softwareName = updatedTask.softwareName || updatedTask.workContent || '소프트웨어';
 
-    if (originalTask) {
-      // 즉시 UI 업데이트 (낙관적 업데이트)
+    console.log('🔍 existingTask:', existingTask);
+    console.log('🔍 isNewTask:', isNewTask);
+
+    // 한국어 조사 판별 함수
+    const getKoreanParticle = (word: string): string => {
+      const lastChar = word.charAt(word.length - 1);
+      const code = lastChar.charCodeAt(0);
+      if (code >= 0xAC00 && code <= 0xD7A3) {
+        const hasJongseong = (code - 0xAC00) % 28 !== 0;
+        return hasJongseong ? '이' : '가';
+      }
+      return '가';
+    };
+
+    if (!isNewTask) {
+      // 기존 데이터 수정
+      console.log('✅ 소프트웨어 데이터 수정');
+
+      // UI 업데이트
       setTasks((prevTasks) => prevTasks.map((task) => (task.id === updatedTask.id ? { ...updatedTask } : task)));
-      console.log('✅ 소프트웨어 업데이트 완료 (즉시 UI 반영)');
+
+      // 성공 알림 with Korean particle detection
+      const josa = getKoreanParticle(softwareName);
+      const message = `${softwareName}${josa} 성공적으로 수정되었습니다.`;
+
+      console.log('📢 토스트 알림 설정:', message);
+      setSnackbar({
+        open: true,
+        message: message,
+        severity: 'success'
+      });
+      console.log('📢 snackbar state 업데이트 완료:', { open: true, message, severity: 'success' });
 
       // 변경로그는 SoftwareTable.tsx에서 자동으로 처리됨
     } else {
-      // 새로 생성
+      // 새 데이터 추가
+      console.log('✅ 새 소프트웨어 데이터 추가');
+
+      // UI 업데이트
       setTasks((prevTasks) => [...prevTasks, updatedTask]);
-      console.log('✅ 새 소프트웨어 추가 완료 (즉시 UI 반영)');
+
+      // 성공 알림 with Korean particle detection
+      const josa = getKoreanParticle(softwareName);
+      const addMessage = `${softwareName}${josa} 성공적으로 추가되었습니다.`;
+
+      console.log('📢 토스트 알림 설정 (추가):', addMessage);
+      setSnackbar({
+        open: true,
+        message: addMessage,
+        severity: 'success'
+      });
+      console.log('📢 snackbar state 업데이트 완료 (추가):', { open: true, message: addMessage, severity: 'success' });
+
       // 변경로그는 SoftwareTable.tsx에서 자동으로 처리됨
     }
 
     handleEditDialogClose();
+  };
+
+  // 드래그 시작 핸들러 (칸반탭)
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    const draggedTask = tasks.find((task) => task.id === active.id);
+    setActiveTask(draggedTask || null);
+    setIsDraggingState(true);
+  };
+
+  // 드래그 종료 핸들러 (칸반탭)
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveTask(null);
+    setIsDraggingState(false);
+
+    if (!over) return;
+
+    const taskId = active.id;
+    const newStatus = over.id as SoftwareStatus;
+
+    const currentTask = tasks.find((task) => task.id === taskId);
+    if (currentTask && currentTask.status !== newStatus) {
+      const oldStatus = currentTask.status;
+
+      // 로컬 상태 업데이트
+      setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: newStatus } : task)));
+
+      // DB에 상태 변경 저장
+      try {
+        await updateSoftware(currentTask.id, {
+          status: newStatus
+        });
+
+        // 토스트 알림
+        setSnackbar({
+          open: true,
+          message: `상태가 "${oldStatus}"에서 "${newStatus}"로 변경되었습니다.`,
+          severity: 'success'
+        });
+      } catch (error) {
+        // 실패 시 원래 상태로 되돌림
+        setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: oldStatus } : task)));
+        setSnackbar({
+          open: true,
+          message: '상태 변경 저장에 실패했습니다.',
+          severity: 'error'
+        });
+        return;
+      }
+
+      // 변경로그 추가
+      const taskCode = currentTask.code || `TASK-${taskId}`;
+      const softwareName = currentTask.softwareName || '소프트웨어';
+      const description = `${softwareName} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
+
+      addChangeLog('수정', taskCode, description, currentTask.team || '미분류', oldStatus, newStatus, '상태', softwareName);
+    }
   };
 
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -2853,27 +2973,8 @@ export default function SoftwareManagement() {
             </Box>
           </Box>
 
-          {/* 권한 체크 */}
-          {!canViewCategory ? (
-            <Box
-              sx={{
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'column',
-                gap: 2,
-                py: 8
-              }}
-            >
-              <Typography variant="h5" color="text.secondary">
-                이 페이지에 접근할 권한이 없습니다.
-              </Typography>
-              <Typography variant="body2" color="text.disabled">
-                관리자에게 권한을 요청하세요.
-              </Typography>
-            </Box>
-          ) : !canReadData ? (
+          {/* 권한 체크: KPI관리 패턴 (깜빡임 방지) */}
+          {canViewCategory && !canReadData ? (
             <Box
               sx={{
                 flex: 1,
@@ -3151,6 +3252,7 @@ export default function SoftwareManagement() {
                   canEditOwn={canEditOwn}
                   canEditOthers={canEditOthers}
                   users={users}
+                  setSnackbar={setSnackbar}
                 />
               </Box>
             </TabPanel>
@@ -3200,6 +3302,11 @@ export default function SoftwareManagement() {
                   canCreateData={canCreateData}
                   canEditOwn={canEditOwn}
                   canEditOthers={canEditOthers}
+                  updateSoftware={updateSoftware}
+                  activeTask={activeTask}
+                  isDraggingState={isDraggingState}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
                 />
               </Box>
             </TabPanel>
@@ -3548,6 +3655,18 @@ export default function SoftwareManagement() {
           canEditOthers={canEditOthers}
         />
       )}
+
+      {/* Snackbar 토스트 알림 */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

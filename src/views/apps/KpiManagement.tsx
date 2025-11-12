@@ -35,7 +35,9 @@ import {
   TableRow,
   TextField,
   Pagination,
-  Button
+  Button,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 
@@ -76,6 +78,26 @@ import { TableDocument, Chart, Calendar, Element, DocumentText } from '@wanderso
 
 // ==============================|| KPI관리 메인 페이지 ||============================== //
 
+// 한국어 조사 처리 함수
+const getJosa = (word: string, josaType: '이/가' | '을/를' | '은/는'): string => {
+  if (!word) return josaType.split('/')[0]; // 빈 문자열일 경우 첫 번째 조사 반환
+
+  const lastChar = word[word.length - 1];
+  const code = lastChar.charCodeAt(0);
+
+  // 한글인 경우
+  if (code >= 0xAC00 && code <= 0xD7A3) {
+    const hasJongseong = (code - 0xAC00) % 28 > 0;
+
+    if (josaType === '이/가') return hasJongseong ? '이' : '가';
+    if (josaType === '을/를') return hasJongseong ? '을' : '를';
+    if (josaType === '은/는') return hasJongseong ? '은' : '는';
+  }
+
+  // 영어나 숫자인 경우 (받침 없음으로 처리)
+  return josaType.split('/')[1];
+};
+
 interface TabPanelProps {
   children?: React.ReactNode;
   index: number;
@@ -115,6 +137,7 @@ interface KanbanViewProps {
   tasks: TaskTableData[];
   setTasks: React.Dispatch<React.SetStateAction<TaskTableData[]>>;
   addChangeLog: (action: string, target: string, description: string, team?: string) => void;
+  setSnackbar: React.Dispatch<React.SetStateAction<{ open: boolean; message: string; severity: 'success' | 'error' | 'warning' | 'info' }>>;
   fetchKpis?: () => Promise<void>;
   assigneeList?: any[];
   assignees: string[];
@@ -136,6 +159,7 @@ function KanbanView({
   tasks,
   setTasks,
   addChangeLog,
+  setSnackbar,
   fetchKpis,
   assigneeList,
   assignees,
@@ -289,22 +313,28 @@ function KanbanView({
 
         // 변경로그 추가 - 변경된 필드 확인
         const changes: string[] = [];
+        const changedFields: string[] = [];
         const taskCode = updatedTask.code || `TASK-${updatedTask.id}`;
 
         if (originalTask.status !== updatedTask.status) {
           changes.push(`상태: "${getStatusName(originalTask.status)}" → "${getStatusName(updatedTask.status)}"`);
+          changedFields.push('상태');
         }
         if (originalTask.assignee !== updatedTask.assignee) {
           changes.push(`담당자: "${originalTask.assignee || '미할당'}" → "${updatedTask.assignee || '미할당'}"`);
+          changedFields.push('담당자');
         }
         if (originalTask.workContent !== updatedTask.workContent) {
           changes.push(`업무내용 수정`);
+          changedFields.push('업무내용');
         }
         if (originalTask.progress !== updatedTask.progress) {
           changes.push(`진행율: ${originalTask.progress || 0}% → ${updatedTask.progress || 0}%`);
+          changedFields.push('진행률');
         }
         if (originalTask.completedDate !== updatedTask.completedDate) {
           changes.push(`완료일: "${originalTask.completedDate || '미정'}" → "${updatedTask.completedDate || '미정'}"`);
+          changedFields.push('완료일');
         }
 
         if (changes.length > 0) {
@@ -315,12 +345,48 @@ function KanbanView({
             updatedTask.team || '미분류'
           );
         }
+
+        // 토스트 알림
+        const workContent = updatedTask.workContent || 'KPI';
+
+        if (changedFields.length > 0) {
+          const firstField = changedFields[0];
+          const josaField = getJosa(firstField, '이/가');
+
+          if (changedFields.length === 1) {
+            // 1개 필드만 수정된 경우
+            setSnackbar({
+              open: true,
+              message: `${workContent}의 ${firstField}${josaField} 성공적으로 수정되었습니다.`,
+              severity: 'success'
+            });
+          } else {
+            // 여러 필드가 수정된 경우
+            setSnackbar({
+              open: true,
+              message: `${workContent}의 ${changedFields.length}개 항목이 성공적으로 수정되었습니다.`,
+              severity: 'success'
+            });
+          }
+        } else {
+          // 변경사항이 없는 경우도 성공 메시지 표시
+          const josa = getJosa(workContent, '이/가');
+          setSnackbar({
+            open: true,
+            message: `${workContent}${josa} 성공적으로 저장되었습니다.`,
+            severity: 'success'
+          });
+        }
       }
 
       handleEditDialogClose();
     } catch (error) {
       console.error('❌ 칸반뷰 - Task 저장 실패:', error);
-      alert('업무 정보 저장에 실패했습니다.');
+      setSnackbar({
+        open: true,
+        message: 'KPI 정보 저장에 실패했습니다.',
+        severity: 'error'
+      });
     }
   };
 
@@ -369,9 +435,20 @@ function KanbanView({
           const description = `${workContent} 상태를 "${oldStatusName}"에서 "${newStatusName}"로 변경`;
 
           addChangeLog('수정', taskCode, description, currentTask.team || '미분류', oldStatusName, newStatusName, '상태', workContent, '칸반탭');
+
+          // 토스트 알림
+          setSnackbar({
+            open: true,
+            message: `${workContent}의 상태가 ${oldStatusName} → ${newStatusName}로 변경되었습니다.`,
+            severity: 'success'
+          });
         } catch (error) {
           console.error('❌ 칸반뷰 - DB 업데이트 실패:', error);
-          alert('상태 업데이트에 실패했습니다.');
+          setSnackbar({
+            open: true,
+            message: '상태 변경에 실패했습니다.',
+            severity: 'error'
+          });
         }
       }
     }
@@ -2557,6 +2634,13 @@ export default function KpiManagement() {
   // 🔐 권한 관리
   const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers, loading: permissionLoading } = useMenuPermission('/apps/kpi');
 
+  // 토스트 알림 상태
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error' | 'warning' | 'info'
+  });
+
   // 변경로그탭이 활성화될 때 데이터 강제 새로고침
   React.useEffect(() => {
     if (value === 4 && fetchChangeLogs) {
@@ -2898,6 +2982,36 @@ export default function KpiManagement() {
             );
           }
         }
+
+        // 토스트 알림 (수정)
+        if (changes.length > 0) {
+          const firstField = changes[0].fieldKorean;
+          const josaField = getJosa(firstField, '이/가');
+
+          if (changes.length === 1) {
+            // 1개 필드만 수정된 경우
+            setSnackbar({
+              open: true,
+              message: `${kpiTitle}의 ${firstField}${josaField} 성공적으로 수정되었습니다.`,
+              severity: 'success'
+            });
+          } else {
+            // 여러 필드가 수정된 경우
+            setSnackbar({
+              open: true,
+              message: `${kpiTitle}의 ${changes.length}개 항목이 성공적으로 수정되었습니다.`,
+              severity: 'success'
+            });
+          }
+        } else {
+          // 변경사항이 없는 경우도 성공 메시지 표시
+          const josa = getJosa(kpiTitle, '이/가');
+          setSnackbar({
+            open: true,
+            message: `${kpiTitle}${josa} 성공적으로 저장되었습니다.`,
+            severity: 'success'
+          });
+        }
       } else {
         // 새로 생성
         console.log('📝 신규 KPI 생성 시작:', updatedTask);
@@ -2940,12 +3054,24 @@ export default function KpiManagement() {
           '개요탭',
           kpiTitle
         );
+
+        // 토스트 알림 (추가)
+        const josaAdd = getJosa(kpiTitle, '이/가');
+        setSnackbar({
+          open: true,
+          message: `${kpiTitle}${josaAdd} 성공적으로 등록되었습니다.`,
+          severity: 'success'
+        });
       }
 
       handleEditDialogClose();
     } catch (error) {
       console.error('KPI 저장 오류:', error);
-      alert('KPI 저장 중 오류가 발생했습니다.');
+      setSnackbar({
+        open: true,
+        message: 'KPI 저장 중 오류가 발생했습니다.',
+        severity: 'error'
+      });
     }
   };
 
@@ -3309,6 +3435,7 @@ export default function KpiManagement() {
                   tasks={tasks}
                   setTasks={setTasks}
                   addChangeLog={addChangeLog}
+                  setSnackbar={setSnackbar}
                   users={users}
                   onDeleteKpis={deleteKpis}
                   onSaveKpi={handleEditTaskSave}
@@ -3355,6 +3482,7 @@ export default function KpiManagement() {
                   tasks={tasks}
                   setTasks={setTasks}
                   addChangeLog={addChangeLog}
+                  setSnackbar={setSnackbar}
                   fetchKpis={fetchKpis}
                   assigneeList={users.filter((user) => user.status === 'active')}
                   assignees={assignees}
@@ -3510,6 +3638,22 @@ export default function KpiManagement() {
           canEditOthers={canEditOthers}
         />
       )}
+
+      {/* 토스트 알림 Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

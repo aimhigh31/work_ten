@@ -30,7 +30,9 @@ import {
   TextField,
   Pagination,
   Stack,
-  Button
+  Button,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 
@@ -1728,7 +1730,7 @@ export default function SalesManagement() {
 
   // 🏪 공용 창고에서 재료 가져오기
   const { users, departments, masterCodes } = useCommonData();
-  const { getSales, createSales, updateSales, loading: salesLoading, error: salesError } = useSupabaseSales();
+  const { getSales, createSales, updateSales, deleteSales, loading: salesLoading, error: salesError } = useSupabaseSales();
 
   // Supabase 변경로그 연동
   const { data: session } = useSession();
@@ -1805,6 +1807,13 @@ export default function SalesManagement() {
   // 편집 다이얼로그 상태 (모든 탭에서 공용)
   const [editDialog, setEditDialog] = useState(false);
   const [editingSales, setEditingSales] = useState<SalesRecord | null>(null);
+
+  // Snackbar 상태
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error' | 'warning' | 'info'
+  });
 
   // 대시보드용 최근 상태 필터
   const [selectedRecentStatus, setSelectedRecentStatus] = useState('전체');
@@ -2115,27 +2124,8 @@ export default function SalesManagement() {
             </Box>
           </Box>
 
-          {/* 권한 체크 */}
-          {!canViewCategory ? (
-            <Box
-              sx={{
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'column',
-                gap: 2,
-                py: 8
-              }}
-            >
-              <Typography variant="h5" color="text.secondary">
-                이 페이지에 접근할 권한이 없습니다.
-              </Typography>
-              <Typography variant="body2" color="text.disabled">
-                관리자에게 권한을 요청하세요.
-              </Typography>
-            </Box>
-          ) : !canReadData ? (
+          {/* 권한 체크: KPI관리 패턴 (깜빡임 방지) */}
+          {canViewCategory && !canReadData ? (
             <Box
               sx={{
                 flex: 1,
@@ -2422,6 +2412,9 @@ export default function SalesManagement() {
                   canEditOwn={canEditOwn}
                   canEditOthers={canEditOthers}
                   users={users}
+                  snackbar={snackbar}
+                  setSnackbar={setSnackbar}
+                  deleteSales={deleteSales}
                 />
               </Box>
             </TabPanel>
@@ -2468,6 +2461,8 @@ export default function SalesManagement() {
                   users={users}
                   canEditOwn={canEditOwn}
                   canEditOthers={canEditOthers}
+                  snackbar={snackbar}
+                  setSnackbar={setSnackbar}
                 />
               </Box>
             </TabPanel>
@@ -2609,6 +2604,7 @@ export default function SalesManagement() {
         canEditOthers={canEditOthers}
         users={users}
         generateSalesCode={generateSalesCode}
+        setSnackbar={setSnackbar}
         onSave={async (updatedRecord) => {
           console.log('💾 [SalesManagement] onSave 호출됨, editingSales:', editingSales);
           console.log('📦 [SalesManagement] updatedRecord:', updatedRecord);
@@ -2617,6 +2613,9 @@ export default function SalesManagement() {
           if (editingSales) {
             // 기존 데이터 업데이트
             const originalSales = sales.find((s) => s.id === editingSales.id);
+            // 변경된 필드 추적 (try 블록 밖에서 선언)
+            let changedFields: string[] = [];
+
             try {
               console.log('🔄 기존 매출 수정 시작, ID:', editingSales.id);
 
@@ -2655,6 +2654,7 @@ export default function SalesManagement() {
 
                 // 각 필드별 변경사항 추적
                 if (originalSales.customerName !== updateInput.customerName) {
+                  changedFields.push('고객명');
                   await addChangeLog(
                     '수정',
                     salesCode,
@@ -2668,6 +2668,7 @@ export default function SalesManagement() {
                 }
 
                 if (originalSales.salesType !== updateInput.salesType) {
+                  changedFields.push('판매유형');
                   await addChangeLog(
                     '수정',
                     salesCode,
@@ -2681,6 +2682,7 @@ export default function SalesManagement() {
                 }
 
                 if (originalSales.businessUnit !== updateInput.businessUnit) {
+                  changedFields.push('사업부');
                   await addChangeLog(
                     '수정',
                     salesCode,
@@ -2694,6 +2696,7 @@ export default function SalesManagement() {
                 }
 
                 if (originalSales.itemName !== updateInput.itemName) {
+                  changedFields.push('품목명');
                   await addChangeLog(
                     '수정',
                     salesCode,
@@ -2707,6 +2710,7 @@ export default function SalesManagement() {
                 }
 
                 if (originalSales.status !== updateInput.status) {
+                  changedFields.push('상태');
                   await addChangeLog(
                     '수정',
                     salesCode,
@@ -2720,6 +2724,7 @@ export default function SalesManagement() {
                 }
 
                 if (originalSales.team !== updateInput.team) {
+                  changedFields.push('팀');
                   await addChangeLog(
                     '수정',
                     salesCode,
@@ -2733,6 +2738,7 @@ export default function SalesManagement() {
                 }
 
                 if (originalSales.registrant !== updateInput.registrant) {
+                  changedFields.push('등록자');
                   await addChangeLog(
                     '수정',
                     salesCode,
@@ -2746,6 +2752,7 @@ export default function SalesManagement() {
                 }
 
                 if (originalSales.modelCode !== updatedRecord.modelCode) {
+                  changedFields.push('모델코드');
                   await addChangeLog(
                     '수정',
                     salesCode,
@@ -2759,6 +2766,7 @@ export default function SalesManagement() {
                 }
 
                 if (originalSales.itemCode !== updatedRecord.itemCode) {
+                  changedFields.push('품목코드');
                   await addChangeLog(
                     '수정',
                     salesCode,
@@ -2772,6 +2780,7 @@ export default function SalesManagement() {
                 }
 
                 if (originalSales.quantity !== updatedRecord.quantity) {
+                  changedFields.push('수량');
                   await addChangeLog(
                     '수정',
                     salesCode,
@@ -2785,6 +2794,7 @@ export default function SalesManagement() {
                 }
 
                 if (originalSales.unitPrice !== updatedRecord.unitPrice) {
+                  changedFields.push('단가');
                   await addChangeLog(
                     '수정',
                     salesCode,
@@ -2798,6 +2808,7 @@ export default function SalesManagement() {
                 }
 
                 if (originalSales.totalAmount !== updatedRecord.totalAmount) {
+                  changedFields.push('총액');
                   await addChangeLog(
                     '수정',
                     salesCode,
@@ -2811,6 +2822,7 @@ export default function SalesManagement() {
                 }
 
                 if (originalSales.deliveryDate !== updatedRecord.deliveryDate) {
+                  changedFields.push('납품일');
                   await addChangeLog(
                     '수정',
                     salesCode,
@@ -2824,6 +2836,7 @@ export default function SalesManagement() {
                 }
 
                 if (originalSales.notes !== updatedRecord.notes) {
+                  changedFields.push('비고');
                   await addChangeLog(
                     '수정',
                     salesCode,
@@ -2838,6 +2851,17 @@ export default function SalesManagement() {
               }
 
               console.log('✅ 매출 수정 완료');
+
+              // 토스트 알림 추가
+              if (changedFields.length > 0) {
+                const salesCode = updateInput.code || `SALES-${updateInput.id}`;
+                const fieldsText = changedFields.join(', ');
+                setSnackbar({
+                  open: true,
+                  message: `${salesCode}의 ${fieldsText}이 수정되었습니다.`,
+                  severity: 'success'
+                });
+              }
             } catch (error) {
               console.error('❌ 매출 데이터 업데이트 실패:', error);
             }
@@ -2899,6 +2923,14 @@ export default function SalesManagement() {
                   '개요탭',
                   newSales.itemName
                 );
+
+                // 토스트 알림 추가
+                const salesCode = newSales.code;
+                setSnackbar({
+                  open: true,
+                  message: `${salesCode}이 성공적으로 등록되었습니다.`,
+                  severity: 'success'
+                });
               }
             } catch (error) {
               console.error('❌ 매출 데이터 생성 실패:', error);
@@ -2909,6 +2941,22 @@ export default function SalesManagement() {
           handleEditDialogClose();
         }}
       />
+
+      {/* Snackbar 알림 */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
@@ -2951,6 +2999,16 @@ interface SalesKanbanViewProps {
   users?: any[];
   canEditOwn?: boolean;
   canEditOthers?: boolean;
+  snackbar?: {
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  };
+  setSnackbar?: React.Dispatch<React.SetStateAction<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>>;
 }
 
 function SalesKanbanView({
@@ -2965,7 +3023,9 @@ function SalesKanbanView({
   assigneeList,
   users,
   canEditOwn = true,
-  canEditOthers = true
+  canEditOthers = true,
+  snackbar,
+  setSnackbar
 }: SalesKanbanViewProps) {
   const theme = useTheme();
   const { data: session } = useSession();
@@ -3256,6 +3316,14 @@ function SalesKanbanView({
           } catch (logError) {
             console.error('변경로그 추가 중 오류:', logError);
           }
+
+          // 토스트 알림 추가
+          const salesCode = currentSales.code || `SALES-${salesId}`;
+          setSnackbar({
+            open: true,
+            message: `${salesCode}의 상태가 ${oldStatus} → ${newStatus}로 변경되었습니다.`,
+            severity: 'success'
+          });
         } catch (error) {
           console.error('매출 상태 업데이트 실패:', error);
         }

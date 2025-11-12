@@ -3,6 +3,7 @@ import { useSession } from 'next-auth/react';
 import { useSWRConfig } from 'swr';
 import { supabase } from '../lib/supabase';
 import { useSupabaseAccidentReport } from '../hooks/useSupabaseAccidentReport';
+import { useSupabaseImprovements } from '../hooks/useSupabaseImprovements'; // 재발방지계획 훅 추가
 import { useCommonData } from '../contexts/CommonDataContext'; // ✅ 공용 창고
 import { useSupabaseFeedback } from '../hooks/useSupabaseFeedback';
 import { useSupabaseFiles } from '../hooks/useSupabaseFiles';
@@ -832,7 +833,7 @@ interface SecurityIncidentEditDialogProps {
   open: boolean;
   onClose: () => void;
   task: SecurityIncidentRecord | null;
-  onSave: (task: SecurityIncidentRecord) => void;
+  onSave: (task: SecurityIncidentRecord) => void | Promise<void>;
   assignees: string[];
   assigneeAvatars: Record<string, string>;
   statusOptions: string[];
@@ -901,6 +902,14 @@ const SecurityIncidentEditDialog = memo(
 
     // 사고보고 데이터 관리를 위한 훅
     const { loading: reportLoading, error: reportError, fetchReportByAccidentId, saveReport, deleteReport } = useSupabaseAccidentReport();
+
+    // 재발방지계획(개선사항) 데이터 관리를 위한 훅 (커리큘럼탭과 동일한 패턴)
+    const {
+      items: improvementItems,
+      loading: improvementLoading,
+      fetchImprovementsByAccidentId,
+      replaceAllImprovements
+    } = useSupabaseImprovements();
 
     // 피드백/기록 훅
     const {
@@ -1051,6 +1060,10 @@ const SecurityIncidentEditDialog = memo(
     // 사고대응단계 상태
     const [responseStage, setResponseStage] = useState<string>('사고 탐지');
 
+    // 재발방지계획(개선사항) 상태 관리 (커리큘럼탭과 동일한 패턴)
+    const [improvementItemsState, setImprovementItemsState] = useState<any[]>([]);
+    const [selectedImprovementRows, setSelectedImprovementRows] = useState<string[]>([]);
+
     // 에러 상태
     const [validationError, setValidationError] = useState<string>('');
 
@@ -1177,6 +1190,20 @@ const SecurityIncidentEditDialog = memo(
         };
 
         loadIncidentReport();
+
+        // 재발방지계획(개선사항) 데이터 로드 (커리큘럼탭과 동일한 패턴)
+        const loadImprovements = async () => {
+          try {
+            console.log('🔄 [다이얼로그 열림] 개선사항 데이터 새로고침 시작');
+            await fetchImprovementsByAccidentId(task.id);
+            console.log('✅ [다이얼로그 열림] 개선사항 데이터 새로고침 완료');
+          } catch (error) {
+            console.error('🔴 개선사항 데이터 로드 실패:', error);
+          }
+        };
+
+        loadImprovements();
+
         // postMeasures 초기화
         if (task.postMeasures) {
           setPostMeasures(task.postMeasures);
@@ -1286,7 +1313,50 @@ const SecurityIncidentEditDialog = memo(
           preventionDetails: ''
         });
       }
-    }, [task, open, getCurrentDate, currentUser, user]);
+    }, [task, open, getCurrentDate, currentUser, user, fetchImprovementsByAccidentId]);
+
+    // improvementItems가 업데이트될 때마다 자동으로 state에 반영 (커리큘럼탭과 동일한 패턴)
+    useEffect(() => {
+      console.log('🔧 [improvementItems useEffect] 실행됨', {
+        open,
+        taskId: task?.id,
+        improvementItemsLength: improvementItems?.length,
+        improvementItems: improvementItems
+      });
+
+      if (open && task?.id && improvementItems) {
+        console.log('🔄 [improvementItems 변경 감지] 데이터 형식 변환 시작');
+        console.log('🔧 전체 improvementItems:', improvementItems);
+
+        try {
+          const formattedItems = improvementItems.map((item, index) => {
+            if (!item || typeof item !== 'object') {
+              console.warn(`⚠️ 잘못된 개선사항 데이터 [${index}]:`, item);
+              return null;
+            }
+
+            return {
+              id: item.id || Date.now() + index,
+              plan: String(item.plan || ''),
+              status: String(item.status || '미완료'),
+              completionDate: String(item.completion_date || ''),
+              assignee: String(item.assignee || '')
+            };
+          }).filter(Boolean); // null 제거
+
+          console.log('✅ [improvementItems 변경 감지] 형식 변환 완료:', formattedItems.length, '개');
+          console.log('🔧 변환된 개선사항:', formattedItems);
+          setImprovementItemsState(formattedItems);
+        } catch (error) {
+          console.error('🔴 개선사항 데이터 형식 변환 중 오류:', error);
+          setImprovementItemsState([]);
+        }
+      } else if (open && !task?.id) {
+        // 신규 모드일 때는 빈 배열로 초기화
+        console.log('📝 신규 모드 - 개선사항 빈 배열로 초기화');
+        setImprovementItemsState([]);
+      }
+    }, [improvementItems, open, task?.id]);
 
     // 최적화된 핸들러들
     const handleFieldChange = useCallback((field: keyof EditSecurityIncidentState, value: string) => {
@@ -1504,70 +1574,40 @@ const SecurityIncidentEditDialog = memo(
             console.warn('⚠️ finalAccidentId가 없어 사고보고 저장 불가');
           }
 
-          // 신규 사고의 경우 개선사항 저장 (강화된 안전 처리)
-          if ((window as any).saveSecurityImprovements) {
+          // 신규 사고의 경우 개선사항 저장 (커리큘럼탭과 동일한 패턴: replaceAllImprovements 사용)
+          if (finalAccidentId && improvementItemsState.length > 0) {
             console.group('💾 신규 사고 개선사항 저장 프로세스');
-            console.log('🚀 시작, ID:', newTask.id);
+            console.log('🚀 시작, ID:', finalAccidentId);
+            console.log('📋 저장할 개선사항:', improvementItemsState);
 
             try {
-              const saveFunction = (window as any).saveSecurityImprovements;
-              console.log('🔍 함수 확인:', typeof saveFunction);
+              // 커리큘럼탭과 동일: improvementItemsState를 DB 형식으로 변환
+              const improvementRequests = improvementItemsState.map((item) => ({
+                accident_id: finalAccidentId,
+                plan: item.plan || '',
+                status: item.status || '미완료',
+                completion_date: item.completionDate || undefined,
+                assignee: item.assignee || undefined
+              }));
 
-              if (typeof saveFunction !== 'function') {
-                console.warn('⚠️ saveSecurityImprovements가 함수가 아님');
-                console.groupEnd();
-                return;
-              }
+              console.log('📝 DB 저장용 데이터:', improvementRequests);
 
-              console.log('🔄 함수 호출 중...');
-              const savePromise = saveFunction(newTask.id);
-              console.log('🔄 호출 결과:', typeof savePromise, savePromise);
+              const success = await replaceAllImprovements(finalAccidentId, improvementRequests);
 
-              // Promise 검증을 더 엄격하게
-              if (savePromise === null || savePromise === undefined) {
-                console.warn('⚠️ saveSecurityImprovements가 null/undefined 반환');
-                console.groupEnd();
-                return;
-              }
-
-              if (typeof savePromise !== 'object' || typeof savePromise.then !== 'function') {
-                console.warn('⚠️ saveSecurityImprovements가 Promise를 반환하지 않음:', savePromise);
-                console.groupEnd();
-                return;
-              }
-
-              console.log('✅ Promise 검증 통과, await 중...');
-
-              // timeout 설정으로 무한 대기 방지
-              const timeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error('Timeout: 10초 초과')), 10000);
-              });
-
-              const success = await Promise.race([savePromise, timeoutPromise]);
-              console.log('✅ 저장 완료:', success);
-
-              if (!success) {
-                console.warn('⚠️ 개선사항 저장 실패 (신규 모드)');
+              if (success) {
+                console.log('✅ 개선사항 저장 성공');
+              } else {
+                console.warn('⚠️ 개선사항 저장 실패');
               }
 
               console.groupEnd();
             } catch (improvementError) {
-              console.group('🔴 신규 사고 개선사항 저장 오류 분석');
-              console.error('오류 타입:', typeof improvementError);
-              console.error('오류 생성자:', improvementError?.constructor?.name);
-              console.error('오류 메시지:', improvementError instanceof Error ? improvementError.message : String(improvementError));
-              console.error('오류 스택:', improvementError instanceof Error ? improvementError.stack : 'No stack');
-              console.error('전체 오류 객체:', improvementError);
-
-              // Event 객체 오류인지 확인
-              if (improvementError && improvementError.constructor?.name === 'Event') {
-                console.warn('🚨 Event 객체 감지됨 - 이벤트 핸들러 문제일 수 있음');
-              }
-
+              console.group('🔴 신규 사고 개선사항 저장 오류');
+              console.error('오류:', improvementError);
               console.groupEnd();
-              console.groupEnd();
-              // 에러를 재발생시키지 않음
             }
+          } else {
+            console.log('📝 저장할 개선사항 없음 (신규 모드)');
           }
         } else {
           // 기존 보안사고 수정
@@ -1706,73 +1746,40 @@ const SecurityIncidentEditDialog = memo(
             console.warn('⚠️ finalAccidentId가 없어 사고보고 저장 불가');
           }
 
-          // 수정 모드에서도 개선사항 저장 (sessionStorage에 임시 데이터가 있는 경우)
-          const tempKey = updatedTask.id ? `tempSecurityImprovements_${updatedTask.id}` : 'tempSecurityImprovements';
-          const hasTemporaryImprovements = sessionStorage.getItem(tempKey) || sessionStorage.getItem('tempSecurityImprovements');
-          if ((window as any).saveSecurityImprovements && hasTemporaryImprovements) {
+          // 수정 모드에서도 개선사항 저장 (커리큘럼탭과 동일한 패턴: replaceAllImprovements 사용)
+          if (updatedTask.id) {
             console.group('💾 수정 모드 개선사항 저장 프로세스');
-            console.log('🚀 시작, ID:', updatedTask.id, 'tempKey:', tempKey);
-            console.log('📦 임시 데이터:', hasTemporaryImprovements);
+            console.log('🚀 시작, ID:', updatedTask.id);
+            console.log('📋 저장할 개선사항:', improvementItemsState);
 
             try {
-              const saveFunction = (window as any).saveSecurityImprovements;
-              console.log('🔍 함수 확인:', typeof saveFunction);
+              // 커리큘럼탭과 동일: improvementItemsState를 DB 형식으로 변환
+              const improvementRequests = improvementItemsState.map((item) => ({
+                accident_id: updatedTask.id,
+                plan: item.plan || '',
+                status: item.status || '미완료',
+                completion_date: item.completionDate || undefined,
+                assignee: item.assignee || undefined
+              }));
 
-              if (typeof saveFunction !== 'function') {
-                console.warn('⚠️ saveSecurityImprovements가 함수가 아님');
-                console.groupEnd();
-                return;
-              }
+              console.log('📝 DB 저장용 데이터:', improvementRequests);
 
-              console.log('🔄 함수 호출 중...');
-              const savePromise = saveFunction(updatedTask.id);
-              console.log('🔄 호출 결과:', typeof savePromise, savePromise);
+              const success = await replaceAllImprovements(updatedTask.id, improvementRequests);
 
-              // Promise 검증을 더 엄격하게
-              if (savePromise === null || savePromise === undefined) {
-                console.warn('⚠️ saveSecurityImprovements가 null/undefined 반환');
-                console.groupEnd();
-                return;
-              }
-
-              if (typeof savePromise !== 'object' || typeof savePromise.then !== 'function') {
-                console.warn('⚠️ saveSecurityImprovements가 Promise를 반환하지 않음 (수정 모드):', savePromise);
-                console.groupEnd();
-                return;
-              }
-
-              console.log('✅ Promise 검증 통과, await 중...');
-
-              // timeout 설정으로 무한 대기 방지
-              const timeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error('Timeout: 10초 초과')), 10000);
-              });
-
-              const success = await Promise.race([savePromise, timeoutPromise]);
-              console.log('✅ 저장 완료:', success);
-
-              if (!success) {
-                console.warn('⚠️ 개선사항 저장 실패 (수정 모드)');
+              if (success) {
+                console.log('✅ 개선사항 저장 성공');
+              } else {
+                console.warn('⚠️ 개선사항 저장 실패');
               }
 
               console.groupEnd();
             } catch (improvementError) {
-              console.group('🔴 수정 모드 개선사항 저장 오류 분석');
-              console.error('오류 타입:', typeof improvementError);
-              console.error('오류 생성자:', improvementError?.constructor?.name);
-              console.error('오류 메시지:', improvementError instanceof Error ? improvementError.message : String(improvementError));
-              console.error('오류 스택:', improvementError instanceof Error ? improvementError.stack : 'No stack');
-              console.error('전체 오류 객체:', improvementError);
-
-              // Event 객체 오류인지 확인
-              if (improvementError && improvementError.constructor?.name === 'Event') {
-                console.warn('🚨 Event 객체 감지됨 - 이벤트 핸들러 문제일 수 있음');
-              }
-
+              console.group('🔴 수정 모드 개선사항 저장 오류');
+              console.error('오류:', improvementError);
               console.groupEnd();
-              console.groupEnd();
-              // 에러를 재발생시키지 않음
             }
+          } else {
+            console.log('⚠️ updatedTask.id가 없어 개선사항 저장 불가');
           }
         }
 
@@ -1855,7 +1862,13 @@ const SecurityIncidentEditDialog = memo(
       feedbacks,
       addFeedback,
       updateFeedback,
-      deleteFeedback
+      deleteFeedback,
+      improvementItemsState,
+      replaceAllImprovements,
+      saveReport,
+      fetchReportByAccidentId,
+      reportLoading,
+      reportError
     ]);
 
     const handleClose = useCallback(() => {
@@ -2167,6 +2180,11 @@ const SecurityIncidentEditDialog = memo(
               responseStage={responseStage}
               onResponseStageChange={setResponseStage}
               accidentId={task?.id}
+              // 커리큘럼탭과 동일한 패턴: 부모 state 전달
+              improvementItems={improvementItemsState}
+              setImprovementItems={setImprovementItemsState}
+              selectedRows={selectedImprovementRows}
+              setSelectedRows={setSelectedImprovementRows}
             />
           )}
           {editTab === 2 && (

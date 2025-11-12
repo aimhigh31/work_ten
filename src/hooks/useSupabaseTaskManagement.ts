@@ -139,13 +139,24 @@ export const useSupabaseTaskManagement = () => {
         assignee_id: task.assignee_id || null,
         assignee_name: task.assignee_name || null,
         progress: task.progress || 0,
-        status: task.status || '대기'
+        status: task.status || '대기',
+        task_type: task.task_type || '일반',
+        kpi_id: task.kpi_id || null,
+        kpi_record_id: task.kpi_record_id || null,
+        kpi_work_content: task.kpi_work_content || null
       };
+
+      console.log('📤 Supabase에 전송할 데이터:', insertData);
 
       const { data, error } = await supabase.from('main_task_data').insert([insertData]).select().single();
 
       if (error) {
-        console.log('❌ Supabase 생성 오류:', error);
+        console.log('❌ Supabase 생성 오류 상세:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
         throw error;
       }
 

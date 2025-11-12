@@ -121,11 +121,17 @@ interface ITEducationTableProps {
     changedField?: string,
     title?: string
   ) => void;
+  onDelete?: (ids: number[]) => Promise<void>;
   users?: any[]; // CommonData에서 전달받은 사용자 목록
   // 🔐 권한 관리
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
+  setSnackbar?: React.Dispatch<React.SetStateAction<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>>;
 }
 
 export default function ITEducationTable({
@@ -136,10 +142,12 @@ export default function ITEducationTable({
   tasks,
   setTasks,
   addChangeLog,
+  onDelete,
   users = [], // CommonData에서 전달받은 사용자 목록
   canCreateData = true,
   canEditOwn = true,
-  canEditOthers = true
+  canEditOthers = true,
+  setSnackbar = undefined
 }: ITEducationTableProps) {
   const theme = useTheme();
   const { data: session } = useSession();
@@ -395,6 +403,14 @@ export default function ITEducationTable({
     if (selected.length === 0) return;
 
     try {
+      // onDelete prop이 있으면 부모 컴포넌트에서 삭제 처리 (토스트 알림 포함)
+      if (onDelete) {
+        await onDelete(selected);
+        setSelected([]);
+        return;
+      }
+
+      // onDelete가 없으면 기존 로직 사용 (하위 호환성)
       const deletedTasks = data.filter((task) => selected.includes(task.id));
 
       // 각 선택된 항목을 Supabase에서 소프트 삭제
@@ -611,6 +627,67 @@ export default function ITEducationTable({
           }
         }
 
+        // 토스트 알림 (수정)
+        if (setSnackbar) {
+          // FieldMap 정의
+          const fieldMap: { [key: string]: string } = {
+            educationType: '교육유형',
+            educationName: '교육명',
+            location: '장소',
+            attendeeCount: '참석수',
+            status: '상태',
+            assignee: '담당자',
+            team: '팀',
+            executionDate: '실행일',
+            description: '교육설명'
+          };
+
+          // 받침 감지 함수
+          const getKoreanParticle = (word: string): string => {
+            const lastChar = word.charAt(word.length - 1);
+            const code = lastChar.charCodeAt(0);
+            if (code >= 0xAC00 && code <= 0xD7A3) {
+              const hasJongseong = (code - 0xAC00) % 28 !== 0;
+              return hasJongseong ? '이' : '가';
+            }
+            return '가';
+          };
+
+          // 변경된 필드 찾기
+          const changedFields: string[] = [];
+          const normalizeValue = (value: any): string => {
+            if (value === null || value === undefined || value === '') return '';
+            return String(value);
+          };
+
+          Object.keys(fieldMap).forEach((key) => {
+            const oldValue = normalizeValue((originalTask as any)[key]);
+            const newValue = normalizeValue((updatedTask as any)[key]);
+            if (oldValue !== newValue && !changedFields.includes(fieldMap[key])) {
+              changedFields.push(fieldMap[key]);
+            }
+          });
+
+          // 메시지 생성
+          const educationName = updatedTask.educationName || 'IT교육';
+          let message = '';
+          if (changedFields.length > 0) {
+            const fieldsText = changedFields.join(', ');
+            const lastField = changedFields[changedFields.length - 1];
+            const josa = getKoreanParticle(lastField);
+            message = `${educationName}의 ${fieldsText}${josa} 성공적으로 수정되었습니다.`;
+          } else {
+            const josa = getKoreanParticle(educationName);
+            message = `${educationName}${josa} 성공적으로 수정되었습니다.`;
+          }
+
+          setSnackbar({
+            open: true,
+            message: message,
+            severity: 'success'
+          });
+        }
+
         console.log('✅ 기존 Task 업데이트 완료');
       } else {
         // 새 Task 추가 - Supabase 저장 후 전체 데이터 다시 로드
@@ -647,12 +724,40 @@ export default function ITEducationTable({
           }
 
           console.log('✅ 새 데이터 로드 완료');
+
+          // 토스트 알림 (추가)
+          if (setSnackbar) {
+            const educationName = updatedTask.educationName || 'IT교육';
+            const getKoreanParticle = (word: string): string => {
+              const lastChar = word.charAt(word.length - 1);
+              const code = lastChar.charCodeAt(0);
+              if (code >= 0xAC00 && code <= 0xD7A3) {
+                const hasJongseong = (code - 0xAC00) % 28 !== 0;
+                return hasJongseong ? '이' : '가';
+              }
+              return '가';
+            };
+            const josa = getKoreanParticle(educationName);
+            setSnackbar({
+              open: true,
+              message: `${educationName}${josa} 성공적으로 추가되었습니다.`,
+              severity: 'success'
+            });
+          }
         } catch (error) {
           console.error('❌ 데이터 로드 실패:', error);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Task 저장 중 오류:', error);
+      // 토스트 알림 (에러)
+      if (setSnackbar) {
+        setSnackbar({
+          open: true,
+          message: `저장 실패: ${error?.message || '알 수 없는 오류가 발생했습니다.'}`,
+          severity: 'error'
+        });
+      }
     }
 
     handleEditDialogClose();

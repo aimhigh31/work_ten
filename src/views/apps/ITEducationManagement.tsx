@@ -37,7 +37,9 @@ import {
   TableRow,
   TextField,
   Pagination,
-  Button
+  Button,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
@@ -122,6 +124,18 @@ interface KanbanViewProps {
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
+  updateItEducation?: (id: number, data: Partial<any>) => Promise<any>;
+  setSnackbar?: React.Dispatch<React.SetStateAction<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>>;
+  originalTask?: ITEducationTableData | null;
+  setOriginalTask?: React.Dispatch<React.SetStateAction<ITEducationTableData | null>>;
+  activeTask?: ITEducationTableData | null;
+  isDraggingState?: boolean;
+  onDragStart?: (event: any) => void;
+  onDragEnd?: (event: any) => void;
 }
 
 function KanbanView({
@@ -134,9 +148,17 @@ function KanbanView({
   addChangeLog,
   assigneeList,
   users = [],
+  setSnackbar,
+  originalTask,
+  setOriginalTask,
   canCreateData = true,
   canEditOwn = true,
-  canEditOthers = true
+  canEditOthers = true,
+  updateItEducation,
+  activeTask,
+  isDraggingState,
+  onDragStart,
+  onDragEnd
 }: KanbanViewProps) {
   const theme = useTheme();
   const { data: session } = useSession();
@@ -173,13 +195,10 @@ function KanbanView({
     );
   }, [currentUser]);
 
-  // 상태 관리
-  const [activeTask, setActiveTask] = useState<ITEducationTableData | null>(null);
-  const [isDraggingState, setIsDraggingState] = useState(false);
-
   // 편집 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);
   const [editingTask, setEditingTask] = useState<ITEducationTableData | null>(null);
+  // 원본 데이터는 props로 받음 (originalTask, setOriginalTask)
 
   // 센서 설정
   const sensors = useSensors(
@@ -210,17 +229,12 @@ function KanbanView({
     return true;
   });
 
-  // 드래그 시작 핸들러
-  const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event;
-    const draggedTask = tasks.find((task) => task.id === active.id);
-    setActiveTask(draggedTask || null);
-    setIsDraggingState(true);
-  };
-
   // 카드 클릭 핸들러
   const handleCardClick = (task: ITEducationTableData) => {
     setEditingTask(task);
+    if (setOriginalTask) {
+      setOriginalTask(JSON.parse(JSON.stringify(task))); // Deep copy - 원본 데이터 저장
+    }
     setEditDialog(true);
   };
 
@@ -228,79 +242,71 @@ function KanbanView({
   const handleEditDialogClose = () => {
     setEditDialog(false);
     setEditingTask(null);
+    if (setOriginalTask) {
+      setOriginalTask(null);
+    }
   };
 
   // Task 저장 핸들러
   const handleEditTaskSave = (updatedTask: ITEducationTableData) => {
-    const originalTask = tasks.find((t) => t.id === updatedTask.id);
+    const taskFromList = tasks.find((t) => t.id === updatedTask.id);
 
-    if (originalTask) {
+    if (taskFromList) {
       // 업데이트
       setTasks((prev) => prev.map((task) => (task.id === updatedTask.id ? updatedTask : task)));
 
-      // 변경로그는 ITEducationTable.tsx에서 자동으로 처리됨
+      // 변경된 필드 찾기 - originalTask state 사용
+      const changedFields: string[] = [];
+      const fieldMap: { [key: string]: string } = {
+        educationName: '교육명',
+        educationType: '교육유형',
+        status: '상태',
+        assignee: '담당자',
+        executionDate: '실시일',
+        completedDate: '완료일',
+        location: '장소',
+        attendeeCount: '참석수',
+        team: '팀'
+      };
+
+      if (originalTask) {
+        Object.keys(fieldMap).forEach((key) => {
+          const oldValue = (originalTask as any)[key];
+          const newValue = (updatedTask as any)[key];
+          if (oldValue !== newValue && !changedFields.includes(fieldMap[key])) {
+            changedFields.push(fieldMap[key]);
+          }
+        });
+      }
+
+      // 토스트 알림 with Korean particle detection
+      if (setSnackbar) {
+        let message = '';
+        if (changedFields.length > 0) {
+          const fieldsText = changedFields.join(', ');
+          const lastField = changedFields[changedFields.length - 1];
+          const lastChar = lastField.charAt(lastField.length - 1);
+          const code = lastChar.charCodeAt(0);
+          const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+          const josa = hasJongseong ? '이' : '가';
+          message = `${updatedTask.educationName}의 ${fieldsText}${josa} 성공적으로 수정되었습니다.`;
+        } else {
+          const lastChar = updatedTask.educationName.charAt(updatedTask.educationName.length - 1);
+          const code = lastChar.charCodeAt(0);
+          const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+          const josa = hasJongseong ? '이' : '가';
+          message = `${updatedTask.educationName}${josa} 성공적으로 수정되었습니다.`;
+        }
+
+        setSnackbar({
+          open: true,
+          message: message,
+          severity: 'success'
+        });
+      }
     }
 
     handleEditDialogClose();
-  };
-
-  // 드래그 종료 핸들러
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveTask(null);
-    setIsDraggingState(false);
-
-    if (!over) return;
-
-    const taskId = active.id;
-    const newStatus = over.id as ITEducationStatus;
-
-    // 상태가 변경된 경우만 업데이트
-    const currentTask = tasks.find((task) => task.id === taskId);
-    if (currentTask && currentTask.status !== newStatus) {
-      const oldStatus = currentTask.status;
-
-      // 로컬 상태 업데이트
-      setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: newStatus } : task)));
-
-      // DB에 상태 변경 저장
-      try {
-        console.log('🔄 칸반 드래그: 상태 변경 DB 저장 시작', {
-          id: currentTask.id,
-          oldStatus,
-          newStatus
-        });
-
-        await updateItEducation(currentTask.id, {
-          status: newStatus
-        });
-
-        console.log('✅ 칸반 드래그: 상태 변경 DB 저장 성공');
-      } catch (error) {
-        console.error('🔴 칸반 드래그: 상태 변경 DB 저장 실패:', error);
-        // 실패 시 원래 상태로 되돌림
-        setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: oldStatus } : task)));
-        alert('상태 변경 저장에 실패했습니다.');
-        return;
-      }
-
-      // 변경로그 추가
-      const taskCode = currentTask.code || `ITEDU-${taskId}`;
-      const educationName = currentTask.educationName || '교육명 없음';
-      const description = `${educationName} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
-
-      addChangeLog(
-        'IT교육 상태 변경',
-        taskCode,
-        description,
-        currentTask.educationType || '미분류',
-        oldStatus,
-        newStatus,
-        '상태',
-        educationName,
-        '칸반탭'
-      );
-    }
   };
 
   // 상태별 컬럼 정의
@@ -691,7 +697,7 @@ function KanbanView({
         }
       `}</style>
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd}>
         <div className="kanban-board">
           {statusColumns.map((column) => {
             const items = getItemsByStatus(column.key);
@@ -2048,6 +2054,13 @@ export default function ITEducationManagement() {
   const theme = useTheme();
   const [value, setValue] = useState(0);
 
+  // 알림 상태
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error' | 'warning' | 'info'
+  });
+
   // Supabase 훅 사용
   const { loading, error, getItEducationData, updateItEducation } = useSupabaseItEducation();
   const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 가져오기
@@ -2096,9 +2109,14 @@ export default function ITEducationManagement() {
   // 공유 Tasks 상태
   const [tasks, setTasks] = useState<ITEducationTableData[]>([]);
 
+  // Drag 관련 상태 (칸반탭)
+  const [activeTask, setActiveTask] = useState<ITEducationTableData | null>(null);
+  const [isDraggingState, setIsDraggingState] = useState(false);
+
   // 편집 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);
   const [editingTask, setEditingTask] = useState<ITEducationTableData | null>(null);
+  const [originalTask, setOriginalTask] = useState<ITEducationTableData | null>(null); // 원본 데이터 저장 (변경 감지용)
 
   // 변경로그 페이지네이션 상태
   const [changeLogPage, setChangeLogPage] = useState(0);
@@ -2285,6 +2303,7 @@ export default function ITEducationManagement() {
   // 카드 클릭 핸들러
   const handleCardClick = (task: ITEducationTableData) => {
     setEditingTask(task);
+    setOriginalTask(JSON.parse(JSON.stringify(task))); // Deep copy - 원본 데이터 저장
     setEditDialog(true);
   };
 
@@ -2292,6 +2311,7 @@ export default function ITEducationManagement() {
   const handleEditDialogClose = () => {
     setEditDialog(false);
     setEditingTask(null);
+    setOriginalTask(null);
   };
 
   // 데이터 새로고침 함수
@@ -2323,39 +2343,295 @@ export default function ITEducationManagement() {
 
   // Task 저장 핸들러
   const handleEditTaskSave = (updatedTask: ITEducationTableData) => {
-    const originalTask = tasks.find((t) => t.id === updatedTask.id);
+    // ⚠️ 중요: ITEducationEditDialog에서 이미 DB 저장을 완료했으므로
+    // 여기서는 토스트 메시지, 데이터 새로고침, 변경로그만 처리
 
-    if (originalTask) {
-      // 업데이트
+    // tasks 배열에서 해당 ID가 있는지 확인하여 추가/수정 구분
+    const existingTask = tasks.find((t) => t.id === updatedTask.id);
+    const isNewTask = !existingTask;
+
+    if (!isNewTask) {
+      // 기존 데이터 수정 - DB 저장 없이 토스트만
+      console.log('✅ 교육 데이터 수정 (ITEducationEditDialog에서 이미 저장됨)');
+
+      // UI 업데이트
       setTasks((prevTasks) => prevTasks.map((task) => (task.id === updatedTask.id ? { ...updatedTask } : task)));
+
+      // 변경된 필드 찾기 - 원본 데이터와 비교 (state에 저장된 originalTask 사용)
+      const changedFields: string[] = [];
+      const fieldMap: { [key: string]: string } = {
+        educationName: '교육명',
+        educationType: '교육유형',
+        status: '상태',
+        assignee: '담당자',
+        executionDate: '실시일',
+        completedDate: '완료일',
+        location: '장소',
+        attendeeCount: '참석수',
+        team: '팀'
+      };
+
+      if (originalTask) {
+        Object.keys(fieldMap).forEach((key) => {
+          const oldValue = (originalTask as any)[key];
+          const newValue = (updatedTask as any)[key];
+          if (oldValue !== newValue && !changedFields.includes(fieldMap[key])) {
+            changedFields.push(fieldMap[key]);
+          }
+        });
+      }
+
+      // 성공 알림 with Korean particle detection
+      let message = '';
+      if (changedFields.length > 0) {
+        const fieldsText = changedFields.join(', ');
+        // 마지막 필드명의 받침 유무에 따라 조사 결정
+        const lastField = changedFields[changedFields.length - 1];
+        const lastChar = lastField.charAt(lastField.length - 1);
+        const code = lastChar.charCodeAt(0);
+        const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+        const josa = hasJongseong ? '이' : '가';
+        message = `${updatedTask.educationName}의 ${fieldsText}${josa} 성공적으로 수정되었습니다.`;
+      } else {
+        // 필드 변경이 없는 경우
+        const lastChar = updatedTask.educationName.charAt(updatedTask.educationName.length - 1);
+        const code = lastChar.charCodeAt(0);
+        const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+        const josa = hasJongseong ? '이' : '가';
+        message = `${updatedTask.educationName}${josa} 성공적으로 수정되었습니다.`;
+      }
+
+      setSnackbar({
+        open: true,
+        message: message,
+        severity: 'success'
+      });
 
       // Supabase 데이터 새로고침
       refreshData();
 
       // 변경로그 추가
       const changes = [];
-      if (originalTask.status !== updatedTask.status) {
-        changes.push(`상태: ${originalTask.status} → ${updatedTask.status}`);
+      if (originalTask?.status !== updatedTask.status) {
+        changes.push(`상태: ${originalTask?.status} → ${updatedTask.status}`);
       }
-      if (originalTask.assignee !== updatedTask.assignee) {
-        changes.push(`담당자: ${originalTask.assignee} → ${updatedTask.assignee}`);
+      if (originalTask?.assignee !== updatedTask.assignee) {
+        changes.push(`담당자: ${originalTask?.assignee} → ${updatedTask.assignee}`);
       }
-      if (originalTask.completedDate !== updatedTask.completedDate) {
-        changes.push(`완료일: ${originalTask.completedDate} → ${updatedTask.completedDate}`);
+      if (originalTask?.completedDate !== updatedTask.completedDate) {
+        changes.push(`완료일: ${originalTask?.completedDate} → ${updatedTask.completedDate}`);
       }
 
       if (changes.length > 0) {
         addChangeLog('수정', updatedTask.code, changes.join(', '));
       }
     } else {
-      // 새로 생성
+      // 새 데이터 추가 - DB 저장 없이 토스트만
+      console.log('✅ 새 교육 데이터 추가 (ITEducationEditDialog에서 이미 저장됨)');
+
+      // UI 업데이트
       setTasks((prevTasks) => [...prevTasks, updatedTask]);
+
+      // 성공 알림 with Korean particle detection
+      const lastChar = updatedTask.educationName.charAt(updatedTask.educationName.length - 1);
+      const code = lastChar.charCodeAt(0);
+      const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+      const josa = hasJongseong ? '이' : '가';
+
+      setSnackbar({
+        open: true,
+        message: `${updatedTask.educationName}${josa} 성공적으로 추가되었습니다.`,
+        severity: 'success'
+      });
+
       // Supabase 데이터 새로고침
       refreshData();
+
+      // 변경로그 추가
       addChangeLog('추가', updatedTask.code, `새로운 교육이 생성되었습니다: ${updatedTask.educationName}`);
     }
 
     handleEditDialogClose();
+  };
+
+  // Education 삭제 핸들러
+  // 드래그 시작 핸들러 (칸반탭)
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    const draggedTask = tasks.find((task) => task.id === active.id);
+    setActiveTask(draggedTask || null);
+    setIsDraggingState(true);
+  };
+
+  // 드래그 종료 핸들러 (칸반탭)
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveTask(null);
+    setIsDraggingState(false);
+
+    if (!over) return;
+
+    const taskId = active.id;
+    const newStatus = over.id as ITEducationStatus;
+
+    // 상태가 변경된 경우만 업데이트
+    const currentTask = tasks.find((task) => task.id === taskId);
+    if (currentTask && currentTask.status !== newStatus) {
+      const oldStatus = currentTask.status;
+
+      // 로컬 상태 업데이트
+      setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: newStatus } : task)));
+
+      // DB에 상태 변경 저장
+      try {
+        console.log('🔄 칸반 드래그: 상태 변경 DB 저장 시작', {
+          id: currentTask.id,
+          oldStatus,
+          newStatus
+        });
+
+        await updateItEducation(currentTask.id, {
+          status: newStatus
+        });
+
+        console.log('✅ 칸반 드래그: 상태 변경 DB 저장 성공');
+
+        // 토스트 알림
+        setSnackbar({
+          open: true,
+          message: `상태가 "${oldStatus}"에서 "${newStatus}"로 변경되었습니다.`,
+          severity: 'success'
+        });
+      } catch (error) {
+        console.error('🔴 칸반 드래그: 상태 변경 DB 저장 실패:', error);
+        // 실패 시 원래 상태로 되돌림
+        setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: oldStatus } : task)));
+        setSnackbar({
+          open: true,
+          message: '상태 변경 저장에 실패했습니다.',
+          severity: 'error'
+        });
+        return;
+      }
+
+      // 변경로그 추가
+      const taskCode = currentTask.code || `ITEDU-${taskId}`;
+      const educationName = currentTask.educationName || '교육명 없음';
+      const description = `${educationName} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
+
+      addChangeLog(
+        'IT교육 상태 변경',
+        taskCode,
+        description,
+        currentTask.educationType || '미분류',
+        oldStatus,
+        newStatus,
+        '상태',
+        educationName,
+        '칸반탭'
+      );
+    }
+  };
+
+  const handleDeleteEducations = async (ids: number[]) => {
+    console.log('🗑️ handleDeleteEducations 시작:', ids);
+
+    // 삭제할 교육 데이터 정보 미리 저장 (변경로그용)
+    const deletedEducations = tasks.filter((task) => ids.includes(task.id));
+
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      // 각 교육을 개별적으로 삭제
+      for (const id of ids) {
+        try {
+          const supabase = createClient();
+          const { error } = await supabase.from('it_education').update({ is_deleted: true }).eq('id', id);
+
+          if (error) {
+            console.error(`🔴 교육 ID ${id} 삭제 실패:`, error);
+            failCount++;
+          } else {
+            console.log(`✅ 교육 ID ${id} 삭제 성공`);
+            successCount++;
+          }
+        } catch (err) {
+          console.error(`🔴 교육 ID ${id} 삭제 중 오류:`, err);
+          failCount++;
+        }
+      }
+
+      // 성공한 경우에만 로컬 상태 업데이트
+      if (successCount > 0) {
+        // UI 업데이트 - 삭제된 항목 제거
+        setTasks((prevTasks) => prevTasks.filter((task) => !ids.includes(task.id)));
+
+        // 변경로그 추가
+        deletedEducations.forEach((education) => {
+          addChangeLog(
+            '삭제',
+            education.code || `IT-EDU-${education.id}`,
+            `${education.educationName} - 삭제됨`,
+            education.team,
+            undefined,
+            undefined,
+            undefined,
+            education.educationName
+          );
+        });
+      }
+
+      // 토스트 알림
+      if (successCount === ids.length) {
+        // 전체 성공
+        if (successCount === 1 && deletedEducations.length > 0) {
+          // 단일 삭제 - Korean particle detection
+          const educationName = deletedEducations[0].educationName;
+          const lastChar = educationName.charAt(educationName.length - 1);
+          const code = lastChar.charCodeAt(0);
+          const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+          const josa = hasJongseong ? '이' : '가';
+
+          setSnackbar({
+            open: true,
+            message: `${educationName}${josa} 성공적으로 삭제되었습니다.`,
+            severity: 'error'
+          });
+        } else {
+          // 다중 삭제
+          setSnackbar({
+            open: true,
+            message: `${successCount}개 교육이 성공적으로 삭제되었습니다.`,
+            severity: 'error'
+          });
+        }
+        console.log('✅ 교육 데이터 삭제 완료');
+      } else if (successCount > 0) {
+        // 부분 실패
+        setSnackbar({
+          open: true,
+          message: `삭제 완료: ${successCount}개, 실패: ${failCount}개`,
+          severity: 'warning'
+        });
+        console.log(`⚠️ 교육 데이터 부분 삭제: 성공 ${successCount}, 실패 ${failCount}`);
+      } else {
+        // 전체 실패
+        setSnackbar({
+          open: true,
+          message: '교육 삭제에 실패했습니다.',
+          severity: 'error'
+        });
+        console.error('🔴 교육 데이터 삭제 전체 실패');
+      }
+    } catch (error) {
+      console.error('🔴 교육 삭제 중 오류:', error);
+      setSnackbar({
+        open: true,
+        message: '교육 삭제 중 오류가 발생했습니다.',
+        severity: 'error'
+      });
+    }
   };
 
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -2444,27 +2720,8 @@ export default function ITEducationManagement() {
             </Box>
           </Box>
 
-          {/* 권한 체크 */}
-          {!canViewCategory ? (
-            <Box
-              sx={{
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'column',
-                gap: 2,
-                py: 8
-              }}
-            >
-              <Typography variant="h5" color="text.secondary">
-                이 페이지에 접근할 권한이 없습니다.
-              </Typography>
-              <Typography variant="body2" color="text.disabled">
-                관리자에게 권한을 요청하세요.
-              </Typography>
-            </Box>
-          ) : !canReadData ? (
+          {/* 권한 체크: KPI관리 패턴 (깜빡임 방지) */}
+          {canViewCategory && !canReadData ? (
             <Box
               sx={{
                 flex: 1,
@@ -2737,10 +2994,12 @@ export default function ITEducationManagement() {
                   tasks={tasks}
                   setTasks={setTasks}
                   addChangeLog={addChangeLog}
+                  onDelete={handleDeleteEducations}
                   users={users}
                   canCreateData={canCreateData}
                   canEditOwn={canEditOwn}
                   canEditOthers={canEditOthers}
+                  setSnackbar={setSnackbar}
                 />
               </Box>
             </TabPanel>
@@ -2786,6 +3045,14 @@ export default function ITEducationManagement() {
                   canCreateData={canCreateData}
                   canEditOwn={canEditOwn}
                   canEditOthers={canEditOthers}
+                  updateItEducation={updateItEducation}
+                  setSnackbar={setSnackbar}
+                  originalTask={originalTask}
+                  setOriginalTask={setOriginalTask}
+                  activeTask={activeTask}
+                  isDraggingState={isDraggingState}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
                 />
               </Box>
             </TabPanel>
@@ -3236,6 +3503,22 @@ export default function ITEducationManagement() {
           canEditOthers={canEditOthers}
         />
       )}
+
+      {/* 알림 Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

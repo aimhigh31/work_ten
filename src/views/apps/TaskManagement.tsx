@@ -38,7 +38,9 @@ import {
   TableRow,
   TextField,
   Pagination,
-  Button
+  Button,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
@@ -81,6 +83,26 @@ interface ChangeLog {
 import { TableDocument, Chart, Calendar, Element, DocumentText } from '@wandersonalwes/iconsax-react';
 
 // ==============================|| 업무관리 메인 페이지 ||============================== //
+
+// 한국어 조사 처리 함수
+const getJosa = (word: string, josaType: '이/가' | '을/를' | '은/는'): string => {
+  if (!word) return josaType.split('/')[0]; // 빈 문자열일 경우 첫 번째 조사 반환
+
+  const lastChar = word[word.length - 1];
+  const code = lastChar.charCodeAt(0);
+
+  // 한글인 경우
+  if (code >= 0xAC00 && code <= 0xD7A3) {
+    const hasJongseong = (code - 0xAC00) % 28 > 0;
+
+    if (josaType === '이/가') return hasJongseong ? '이' : '가';
+    if (josaType === '을/를') return hasJongseong ? '을' : '를';
+    if (josaType === '은/는') return hasJongseong ? '은' : '는';
+  }
+
+  // 영어나 숫자인 경우 (받침 없음으로 처리)
+  return josaType.split('/')[1];
+};
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -136,6 +158,11 @@ interface KanbanViewProps {
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
+  setSnackbar?: React.Dispatch<React.SetStateAction<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>>;
 }
 
 function KanbanView({
@@ -150,7 +177,8 @@ function KanbanView({
   kpiData = [],
   canCreateData = true,
   canEditOwn = true,
-  canEditOthers = true
+  canEditOthers = true,
+  setSnackbar
 }: KanbanViewProps) {
   const theme = useTheme();
 
@@ -342,15 +370,37 @@ function KanbanView({
       // ✅ Use supabaseId for updates
       const supabaseId = (currentTask as any).supabaseId || String(taskId);
 
-      // Supabase 업데이트
-      await onUpdateTask(supabaseId, { status: newStatus });
+      try {
+        // Supabase 업데이트
+        await onUpdateTask(supabaseId, { status: newStatus });
 
-      // 변경로그 추가
-      const taskCode = currentTask.code || `TASK-${taskId}`;
-      const workContent = currentTask.workContent || '업무내용 없음';
-      const description = `업무관리 ${workContent}(${taskCode}) 정보의 칸반탭 상태가 ${oldStatus} → ${newStatus} 로 수정 되었습니다.`;
+        // 변경로그 추가
+        const taskCode = currentTask.code || `TASK-${taskId}`;
+        const workContent = currentTask.workContent || '업무내용 없음';
+        const description = `업무관리 ${workContent}(${taskCode}) 정보의 칸반탭 상태가 ${oldStatus} → ${newStatus} 로 수정 되었습니다.`;
 
-      await addChangeLog('수정', taskCode, description, currentTask.team || '시스템', oldStatus, newStatus, '상태', workContent, '칸반탭');
+        await addChangeLog('수정', taskCode, description, currentTask.team || '시스템', oldStatus, newStatus, '상태', workContent, '칸반탭');
+
+        // 성공 알림
+        if (setSnackbar) {
+          setSnackbar({
+            open: true,
+            message: `${workContent}의 상태가 ${oldStatus} → ${newStatus}로 변경되었습니다.`,
+            severity: 'success'
+          });
+        }
+      } catch (error) {
+        console.error('상태 변경 실패:', error);
+
+        // 실패 알림
+        if (setSnackbar) {
+          setSnackbar({
+            open: true,
+            message: '상태 변경 저장에 실패했습니다.',
+            severity: 'error'
+          });
+        }
+      }
     }
   };
 
@@ -2513,6 +2563,13 @@ export default function TaskManagement() {
   const [value, setValue] = useState(0);
   const user = useUser(); // 사용자 정보
 
+  // 알림 상태
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error' | 'warning' | 'info'
+  });
+
   // 🔐 권한 관리
   const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers, loading: permissionLoading } = useMenuPermission('/apps/task');
 
@@ -2976,6 +3033,36 @@ export default function TaskManagement() {
 
         // ✅ updateTask가 내부에서 setTasks 호출 (KPI 패턴)
         console.log('✅ 로컬 상태에서 업무 정보 즉시 갱신 완료');
+
+        // 성공 알림
+        if (changes.length > 0) {
+          const firstField = changes[0].fieldKorean;
+          const josaField = getJosa(firstField, '이/가');
+
+          if (changes.length === 1) {
+            // 1개 필드만 수정된 경우
+            setSnackbar({
+              open: true,
+              message: `${taskTitle}의 ${firstField}${josaField} 성공적으로 수정되었습니다.`,
+              severity: 'success'
+            });
+          } else {
+            // 여러 필드가 수정된 경우
+            setSnackbar({
+              open: true,
+              message: `${taskTitle}의 ${changes.length}개 항목이 성공적으로 수정되었습니다.`,
+              severity: 'success'
+            });
+          }
+        } else {
+          // 변경사항이 없는 경우도 성공 메시지 표시
+          const josa = getJosa(taskTitle, '이/가');
+          setSnackbar({
+            open: true,
+            message: `${taskTitle}${josa} 성공적으로 저장되었습니다.`,
+            severity: 'success'
+          });
+        }
       } else {
         // 새로 생성
         console.log('💾 [TaskManagement] 새 업무 생성 시작:', {
@@ -3019,12 +3106,26 @@ export default function TaskManagement() {
 
         // ✅ addTaskToDb가 내부에서 setTasks 호출 (KPI 패턴)
         console.log('✅ 로컬 상태에 새 업무 즉시 추가 완료');
+
+        // 성공 알림
+        const josaAdd = getJosa(taskTitle, '이/가');
+        setSnackbar({
+          open: true,
+          message: `${taskTitle}${josaAdd} 성공적으로 등록되었습니다.`,
+          severity: 'success'
+        });
       }
 
       handleEditDialogClose();
     } catch (error) {
       console.error('Task 저장 오류:', error);
-      alert('Task 저장 중 오류가 발생했습니다.');
+
+      // 실패 알림
+      setSnackbar({
+        open: true,
+        message: 'Task 저장 중 오류가 발생했습니다.',
+        severity: 'error'
+      });
     }
   };
 
@@ -3044,7 +3145,11 @@ export default function TaskManagement() {
 
         if (supabaseIds.length === 0) {
           console.error('❌ 삭제할 업무를 찾을 수 없음');
-          alert('삭제할 업무를 찾을 수 없습니다. 페이지를 새로고침해주세요.');
+          setSnackbar({
+            open: true,
+            message: '삭제할 업무를 찾을 수 없습니다. 페이지를 새로고침해주세요.',
+            severity: 'error'
+          });
           return;
         }
 
@@ -3069,9 +3174,40 @@ export default function TaskManagement() {
           }
 
           console.log('✅ 모든 업무 삭제 완료');
+
+          // 삭제 알림
+          if (tasksToDelete.length === 1) {
+            const taskTitle = tasksToDelete[0].workContent || '업무';
+            const josa = getJosa(taskTitle, '이/가');
+            setSnackbar({
+              open: true,
+              message: `${taskTitle}${josa} 성공적으로 삭제되었습니다.`,
+              severity: 'error'
+            });
+          } else {
+            setSnackbar({
+              open: true,
+              message: `${tasksToDelete.length}개 항목이 성공적으로 삭제되었습니다.`,
+              severity: 'error'
+            });
+          }
+        } else {
+          // 실패 알림
+          setSnackbar({
+            open: true,
+            message: '업무 삭제에 실패했습니다.',
+            severity: 'error'
+          });
         }
       } catch (error) {
         console.error('❌ 업무 삭제 오류:', error);
+
+        // 실패 알림
+        setSnackbar({
+          open: true,
+          message: '업무 삭제에 실패했습니다.',
+          severity: 'error'
+        });
         throw error;
       }
     },
@@ -3112,8 +3248,17 @@ export default function TaskManagement() {
 
         return false;
       } catch (error) {
-        console.error('❌ 업무 추가 오류:', error);
-        throw error;
+        console.log('❌ 업무 추가 오류:', error);
+        console.log('❌ 에러 상세:', JSON.stringify(error, null, 2));
+
+        // 실패 알림
+        setSnackbar({
+          open: true,
+          message: '업무 추가에 실패했습니다.',
+          severity: 'error'
+        });
+
+        return false;
       }
     },
     [addTaskToDb, addChangeLog, getTasks]
@@ -3484,6 +3629,7 @@ export default function TaskManagement() {
                   onDeleteTasks={handleDeleteTasks}
                   onAddTask={handleAddTask}
                   addChangeLog={addChangeLog}
+                  setSnackbar={setSnackbar}
                   canCreateData={canCreateData}
                   canEditOwn={canEditOwn}
                   canEditOthers={canEditOthers}
@@ -3532,6 +3678,7 @@ export default function TaskManagement() {
                   canCreateData={canCreateData}
                   canEditOwn={canEditOwn}
                   canEditOthers={canEditOthers}
+                  setSnackbar={setSnackbar}
                 />
               </Box>
             </TabPanel>
@@ -3677,6 +3824,22 @@ export default function TaskManagement() {
           canEditOthers={canEditOthers}
         />
       )}
+
+      {/* 알림 Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

@@ -63,6 +63,26 @@ const columnWidths = {
   action: 80
 };
 
+// 한국어 조사 처리 함수
+const getJosa = (word: string, josaType: '이/가' | '을/를' | '은/는'): string => {
+  if (!word) return josaType.split('/')[0]; // 빈 문자열일 경우 첫 번째 조사 반환
+
+  const lastChar = word[word.length - 1];
+  const code = lastChar.charCodeAt(0);
+
+  // 한글인 경우
+  if (code >= 0xAC00 && code <= 0xD7A3) {
+    const hasJongseong = (code - 0xAC00) % 28 > 0;
+
+    if (josaType === '이/가') return hasJongseong ? '이' : '가';
+    if (josaType === '을/를') return hasJongseong ? '을' : '를';
+    if (josaType === '은/는') return hasJongseong ? '은' : '는';
+  }
+
+  // 영어나 숫자인 경우 (받침 없음으로 처리)
+  return josaType.split('/')[1];
+};
+
 interface TaskTableProps {
   selectedYear?: string;
   selectedTeam?: string;
@@ -80,6 +100,7 @@ interface TaskTableProps {
     changedField?: string,
     title?: string
   ) => void;
+  setSnackbar?: React.Dispatch<React.SetStateAction<{ open: boolean; message: string; severity: 'success' | 'error' | 'warning' | 'info' }>>;
   users?: any[];
   onDeleteKpis?: (ids: number[]) => Promise<void>;
   onSaveKpi?: (task: TaskTableData) => Promise<void>;
@@ -97,6 +118,7 @@ export default function KpiTable({
   tasks,
   setTasks,
   addChangeLog,
+  setSnackbar,
   users = [],
   onDeleteKpis,
   onSaveKpi,
@@ -297,6 +319,9 @@ export default function KpiTable({
     if (!confirmDelete) return;
 
     try {
+      const deletedTasks = data.filter((task) => selected.includes(task.id));
+      const deleteCount = deletedTasks.length;
+
       // Supabase에서 삭제
       if (onDeleteKpis) {
         await onDeleteKpis(selected);
@@ -311,7 +336,6 @@ export default function KpiTable({
 
       // 삭제될 업무들의 정보를 변경로그에 추가
       if (addChangeLog) {
-        const deletedTasks = data.filter((task) => selected.includes(task.id));
         for (const task of deletedTasks) {
           const kpiTitle = task.workContent || 'KPI';
           const codeToUse = task.code || `TASK-${task.id}`;
@@ -329,10 +353,34 @@ export default function KpiTable({
       }
 
       setSelected([]);
-      alert('선택한 KPI가 삭제되었습니다.');
+
+      // 토스트 알림
+      if (setSnackbar) {
+        let message = '';
+        if (deleteCount === 1) {
+          const firstTitle = deletedTasks[0].workContent || 'KPI';
+          const josa = getJosa(firstTitle, '이/가');
+          message = `${firstTitle}${josa} 성공적으로 삭제되었습니다.`;
+        } else {
+          message = `${deleteCount}개 항목이 성공적으로 삭제되었습니다.`;
+        }
+        setSnackbar({
+          open: true,
+          message,
+          severity: 'error'
+        });
+      }
     } catch (error) {
       console.error('삭제 오류:', error);
-      alert('삭제 중 오류가 발생했습니다.');
+      if (setSnackbar) {
+        setSnackbar({
+          open: true,
+          message: 'KPI 삭제 중 오류가 발생했습니다.',
+          severity: 'error'
+        });
+      } else {
+        alert('삭제 중 오류가 발생했습니다.');
+      }
     }
   };
 

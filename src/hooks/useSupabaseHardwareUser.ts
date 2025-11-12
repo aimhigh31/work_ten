@@ -17,7 +17,7 @@ interface UserHistory {
   startDate: string;
   endDate: string;
   reason: string;
-  status: 'active' | 'inactive';
+  status: string; // 서브코드 저장 규칙: subcode_name 사용 (예: '대기', '사용중', '종료')
 }
 
 // 하드웨어 사용자 이력 인터페이스
@@ -29,7 +29,7 @@ export interface HardwareUserHistory {
   start_date: string;
   end_date?: string | null;
   reason: string;
-  status: 'active' | 'inactive';
+  status: string; // 서브코드 저장 규칙: subcode_name 저장 (예: '대기', '사용중', '종료')
   registration_date: string;
   created_at: string;
   updated_at: string;
@@ -46,7 +46,7 @@ export interface CreateHardwareUserRequest {
   start_date: string;
   end_date?: string | null;
   reason: string;
-  status?: 'active' | 'inactive';
+  status?: string; // 서브코드 저장 규칙: subcode_name 사용 (예: '대기', '사용중', '종료')
 }
 
 // 사용자 이력 수정 요청 타입
@@ -56,7 +56,7 @@ export interface UpdateHardwareUserRequest {
   start_date?: string;
   end_date?: string | null;
   reason?: string;
-  status?: 'active' | 'inactive';
+  status?: string; // 서브코드 저장 규칙: subcode_name 사용 (예: '대기', '사용중', '종료')
 }
 
 export const useSupabaseHardwareUser = () => {
@@ -175,7 +175,7 @@ export const useSupabaseHardwareUser = () => {
       start_date: userHistoryData.start_date,
       end_date: userHistoryData.end_date || null,
       reason: userHistoryData.reason || '',
-      status: userHistoryData.status || 'GROUP020-SUB001',
+      status: userHistoryData.status || '대기', // 서브코드 저장 규칙: subcode_name 사용
       registration_date: new Date().toISOString().split('T')[0],
       created_by: 'system',
       updated_by: 'system',
@@ -291,7 +291,7 @@ export const useSupabaseHardwareUser = () => {
         .from('it_hardware_user')
         .select('*')
         .eq('hardware_id', hardwareId)
-        .eq('status', 'active')
+        .eq('status', '사용중') // 서브코드 저장 규칙: subcode_name 사용
         .eq('is_active', true)
         .is('end_date', null)
         .single();
@@ -320,8 +320,9 @@ export const useSupabaseHardwareUser = () => {
       }
 
       const total = data.length;
-      const active = data.filter((item) => item.status === 'active').length;
-      const inactive = data.filter((item) => item.status === 'inactive').length;
+      // 서브코드 저장 규칙: subcode_name 사용
+      const active = data.filter((item) => item.status === '사용중').length;
+      const inactive = data.filter((item) => item.status === '종료' || item.status === '대기').length;
 
       return { total, active, inactive };
     } catch (err: any) {
@@ -330,8 +331,8 @@ export const useSupabaseHardwareUser = () => {
     }
   };
 
-  // 하드웨어 사용자이력 조회 (데이터를 직접 반환)
-  const getUserHistories = async (hardwareId: number): Promise<HardwareUserHistory[]> => {
+  // 하드웨어 사용자이력 조회 (데이터를 직접 반환) - useCallback으로 안정적인 참조 유지
+  const getUserHistories = useCallback(async (hardwareId: number): Promise<HardwareUserHistory[]> => {
     console.log('🔍 getUserHistories 호출:', hardwareId);
 
     try {
@@ -347,7 +348,14 @@ export const useSupabaseHardwareUser = () => {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('❌ getUserHistories 조회 실패:', error);
+        console.error('❌ getUserHistories 조회 실패 상세:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+          hardwareId,
+          fullError: JSON.stringify(error)
+        });
         setError(`사용자 이력을 불러오는데 실패했습니다: ${error.message}`);
         return [];
       }
@@ -356,24 +364,23 @@ export const useSupabaseHardwareUser = () => {
       console.log('📋 조회된 데이터:', data);
       return data || [];
     } catch (err: any) {
-      console.error('❌ getUserHistories 오류:', err);
+      console.error('❌ getUserHistories catch 오류:', {
+        message: err?.message,
+        name: err?.name,
+        stack: err?.stack,
+        type: typeof err,
+        stringified: JSON.stringify(err)
+      });
       setError('사용자 이력을 불러오는데 실패했습니다.');
       return [];
     } finally {
       setLoading(false);
     }
-  };
+  }, []); // 의존성 없음 - supabase 클라이언트는 안정적인 참조
 
-  // HardwareUserHistory를 UserHistory(프론트엔드 형식)로 변환
-  const convertToUserHistory = (item: HardwareUserHistory): UserHistory => {
-    // status 값 변환: DB의 GROUP020-SUB001 등을 프론트엔드 형식으로 변환
-    let frontendStatus: 'active' | 'inactive' = 'active';
-    if (item.status === 'GROUP020-SUB001' || item.status === 'active') {
-      frontendStatus = 'active';
-    } else if (item.status === 'GROUP020-SUB002' || item.status === 'inactive') {
-      frontendStatus = 'inactive';
-    }
-
+  // HardwareUserHistory를 UserHistory(프론트엔드 형식)로 변환 - useCallback으로 안정적인 참조 유지
+  const convertToUserHistory = useCallback((item: HardwareUserHistory): UserHistory => {
+    // 서브코드 저장 규칙: status는 DB에서 이미 subcode_name으로 저장되어 있으므로 변환 없이 그대로 사용
     return {
       id: item.id.toString(),
       registrationDate: item.registration_date || '',
@@ -383,12 +390,12 @@ export const useSupabaseHardwareUser = () => {
       startDate: item.start_date || '',
       endDate: item.end_date || '',
       reason: item.reason || '',
-      status: frontendStatus
+      status: item.status || '대기' // DB의 subcode_name을 그대로 사용
     };
-  };
+  }, []); // 의존성 없음 - 순수 변환 함수
 
-  // 소프트웨어와 동일한 사용자 이력 일괄 저장 함수
-  const saveUserHistories = async (hardwareId: number, histories: HardwareUserHistory[]) => {
+  // 소프트웨어와 동일한 사용자 이력 일괄 저장 함수 - useCallback으로 안정적인 참조 유지
+  const saveUserHistories = useCallback(async (hardwareId: number, histories: HardwareUserHistory[]) => {
     console.log('💾 하드웨어 사용자이력 일괄 저장 시작:', { hardwareId, count: histories.length });
 
     try {
@@ -431,14 +438,7 @@ export const useSupabaseHardwareUser = () => {
             return null;
           };
 
-          // status 값 정규화
-          let normalizedStatus = 'GROUP020-SUB001'; // 기본값: 사용중
-          if (history.status === 'active' || history.status === '사용중') {
-            normalizedStatus = 'GROUP020-SUB001';
-          } else if (history.status === 'inactive' || history.status === '종료') {
-            normalizedStatus = 'GROUP020-SUB002';
-          }
-
+          // 서브코드 저장 규칙: status는 이미 subcode_name이므로 그대로 사용 (변환 불필요)
           const convertedData = {
             hardware_id: hardwareId,
             user_name: history.user_name?.trim() || '',
@@ -446,7 +446,7 @@ export const useSupabaseHardwareUser = () => {
             start_date: formatDate(history.start_date) || new Date().toISOString().split('T')[0],
             end_date: formatDate(history.end_date),
             reason: history.reason?.trim() || '',
-            status: normalizedStatus,
+            status: history.status?.trim() || '대기', // subcode_name 그대로 저장
             registration_date: new Date().toISOString().split('T')[0],
             created_by: 'system',
             updated_by: 'system',
@@ -494,7 +494,7 @@ export const useSupabaseHardwareUser = () => {
       console.error('❌ saveUserHistories 오류:', error);
       return false;
     }
-  };
+  }, []); // 의존성 없음 - supabase 클라이언트는 안정적인 참조
 
   return {
     userHistories,

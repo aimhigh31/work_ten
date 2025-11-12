@@ -20,6 +20,7 @@ import Box from '@mui/material/Box';
 import { useGetMenuMaster } from 'api/menu';
 import Avatar from 'components/@extended/Avatar';
 import useUser from 'hooks/useUser';
+import { useCommonData } from 'contexts/CommonDataContext';
 
 // assets
 import { ArrowRight2 } from '@wandersonalwes/iconsax-react';
@@ -54,6 +55,21 @@ export default function UserList() {
 
   const { data: session } = useSession();
   const provider = session?.provider;
+
+  // 마스터코드에서 직책(role) 서브코드명 가져오기
+  const { masterCodes } = useCommonData();
+  const getRoleName = (roleSubcode: string | undefined) => {
+    if (!roleSubcode) return '';
+    // 서브코드 형식(GROUP004-SUB001)이면 서브코드명으로 변환
+    if (roleSubcode.includes('GROUP004-SUB')) {
+      const found = masterCodes.find(
+        (code) => code.codetype === 'subcode' && code.subcode === roleSubcode && code.group_code === 'GROUP004'
+      );
+      return found ? found.subcode_name : roleSubcode;
+    }
+    // 이미 서브코드명이면 그대로 반환
+    return roleSubcode;
+  };
 
   const handleLogout = () => {
     switch (provider) {
@@ -109,7 +125,7 @@ export default function UserList() {
             <Avatar alt="Avatar" src={user ? user.avatar : avatar1} sx={{ ...(drawerOpen && { width: 46, height: 46 }) }} />
           </ListItemAvatar>
           <ListItemText
-            primary={user ? `${user.name} ${user.role || ''}` : ''}
+            primary={user ? `${user.name} ${getRoleName(user.role)}` : ''}
             sx={{ ...(!drawerOpen && { display: 'none' }) }}
             secondary={<span>{user?.department || ''}</span>}
           />

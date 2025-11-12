@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
@@ -44,8 +44,8 @@ export const useSupabaseSoftwareUser = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 특정 소프트웨어의 사용자이력 조회
-  const getUserHistories = async (softwareId: number): Promise<SoftwareUserData[]> => {
+  // 특정 소프트웨어의 사용자이력 조회 - useCallback으로 안정적인 참조 유지
+  const getUserHistories = useCallback(async (softwareId: number): Promise<SoftwareUserData[]> => {
     console.log('🔍 소프트웨어 사용자이력 조회:', softwareId);
 
     // 1. 동적 캐시 키 생성
@@ -100,7 +100,7 @@ export const useSupabaseSoftwareUser = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []); // 의존성 없음 - supabase 클라이언트는 안정적인 참조
 
   // 사용자이력 생성
   const createUserHistory = async (userData: Omit<SoftwareUserData, 'id'>): Promise<SoftwareUserData | null> => {
@@ -407,6 +407,12 @@ export const useSupabaseSoftwareUser = () => {
         console.log('📝 저장할 사용자이력 데이터가 없음');
       }
 
+      // 캐시 무효화 - 최신 데이터를 다시 로드하도록
+      const cacheKey = createCacheKey('software_user', `sw_${softwareId}`);
+      sessionStorage.removeItem(cacheKey);
+      sessionStorage.removeItem(`${cacheKey}_timestamp`);
+      console.log('🗑️ 캐시 무효화 완료:', cacheKey);
+
       console.log('🎉 사용자이력 일괄 저장 완료');
       return true;
     } catch (err: any) {
@@ -442,8 +448,8 @@ export const useSupabaseSoftwareUser = () => {
     }
   };
 
-  // SoftwareUserData를 UserHistory로 변환
-  const convertToUserHistory = (userData: SoftwareUserData): UserHistory => {
+  // SoftwareUserData를 UserHistory로 변환 - useCallback으로 안정적인 참조 유지
+  const convertToUserHistory = useCallback((userData: SoftwareUserData): UserHistory => {
     return {
       id: userData.id?.toString() || '',
       userName: userData.user_name,
@@ -456,7 +462,7 @@ export const useSupabaseSoftwareUser = () => {
       startDate: userData.start_date || '',
       endDate: userData.end_date || ''
     };
-  };
+  }, []); // 의존성 없음 - 순수 변환 함수
 
   return {
     loading,

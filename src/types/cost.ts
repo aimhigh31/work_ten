@@ -12,6 +12,7 @@ export interface CostRecord {
   assignee_id: string | null;
   assignee: string;
   costType: '솔루션' | '하드웨어' | '출장경비' | '행사경비' | '사무경비';
+  title?: string; // 제목 필드
   content: string;
   quantity: number;
   unitPrice: number;

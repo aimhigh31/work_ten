@@ -39,7 +39,9 @@ import {
   DialogContent,
   DialogActions,
   Button,
-  Divider
+  Divider,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 
@@ -130,6 +132,16 @@ interface CostKanbanViewProps {
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
+  snackbar?: {
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  };
+  setSnackbar?: React.Dispatch<React.SetStateAction<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>>;
 }
 
 function CostKanbanView({
@@ -144,7 +156,9 @@ function CostKanbanView({
   assigneeList,
   canCreateData = true,
   canEditOwn = true,
-  canEditOthers = true
+  canEditOthers = true,
+  snackbar,
+  setSnackbar
 }: CostKanbanViewProps) {
   const { data: session } = useSession();
   const { users } = useCommonData();
@@ -286,8 +300,22 @@ function CostKanbanView({
         const content = currentCost.content || '비용내용 없음';
         const description = `비용관리 ${content}(${costCode}) 정보의 칸반탭 상태가 ${oldStatus} → ${newStatus} 로 수정 되었습니다.`;
         await addChangeLog('수정', costCode, description, currentCost.team || '미분류', oldStatus, newStatus, '상태', content, '칸반탭');
+
+        // 칸반용 토스트 알림 (updateCostRecord의 토스트를 덮어씀)
+        setSnackbar({
+          open: true,
+          message: `${costCode}의 상태가 ${oldStatus} → ${newStatus}로 변경되었습니다.`,
+          severity: 'success'
+        });
       } catch (error) {
         console.error('드래그 상태 업데이트 실패:', error);
+        if (setSnackbar) {
+          setSnackbar({
+            open: true,
+            message: '상태 변경에 실패했습니다.',
+            severity: 'error'
+          });
+        }
       }
     }
   };
@@ -337,7 +365,7 @@ function CostKanbanView({
         case '대기':
           return { backgroundColor: 'rgba(144, 164, 174, 0.15)', color: '#90A4AE' };
         case '진행':
-          return { backgroundColor: 'rgba(121, 134, 203, 0.15)', color: '#7986CB' };
+          return { backgroundColor: '#E3F2FD', color: '#1976D2' };
         case '완료':
           return { backgroundColor: 'rgba(129, 199, 132, 0.15)', color: '#81C784' };
         case '홀딩':
@@ -748,6 +776,8 @@ function CostKanbanView({
           canCreateData={canCreateData}
           canEditOwn={canEditOwn}
           canEditOthers={canEditOthers}
+          snackbar={snackbar}
+          setSnackbar={setSnackbar}
           externalDialogControl={{
             open: editDialog.open,
             recordId: editDialog.recordId,
@@ -2402,6 +2432,13 @@ export default function CostManagement() {
 
   const [costRecords, setCostRecords] = useState<CostRecord[]>([]);
 
+  // 토스트 알림 state
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error' | 'warning' | 'info'
+  });
+
   // 초기 데이터 로드
   useEffect(() => {
     const loadData = async () => {
@@ -2553,6 +2590,38 @@ export default function CostManagement() {
     if (updated) {
       const allData = await getCosts();
       setCostRecords(allData);
+
+      // 변경된 필드 추적
+      const fieldNameMap: { [key: string]: string } = {
+        'registration_date': '등록일자',
+        'start_date': '시작일자',
+        'team': '팀',
+        'assignee': '담당자',
+        'costType': '비용유형',
+        'content': '내용',
+        'quantity': '수량',
+        'unitPrice': '단가',
+        'amount': '금액',
+        'status': '상태',
+        'completion_date': '완료일자'
+      };
+
+      const changedFields = Object.keys(updates)
+        .filter(key => key !== 'id' && key !== 'updated_at' && key !== 'created_at')
+        .map(key => fieldNameMap[key] || key);
+
+      // 토스트 알림 추가 (status만 변경된 경우는 칸반에서 처리하므로 제외)
+      const isOnlyStatusChange = Object.keys(updates).length === 1 && updates.status !== undefined;
+      if (changedFields.length > 0 && !isOnlyStatusChange) {
+        const costCode = updated.code || `COST-${updated.id}`;
+        const fieldsText = changedFields.join(', ');
+        setSnackbar({
+          open: true,
+          message: `${costCode}의 ${fieldsText}이 수정되었습니다.`,
+          severity: 'success'
+        });
+      }
+
       return updated;
     }
     throw new Error('비용 수정 실패');
@@ -2664,27 +2733,8 @@ export default function CostManagement() {
             </Box>
           </Box>
 
-          {/* 권한 체크 */}
-          {!canViewCategory ? (
-            <Box
-              sx={{
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'column',
-                gap: 2,
-                py: 8
-              }}
-            >
-              <Typography variant="h5" color="text.secondary">
-                이 페이지에 접근할 권한이 없습니다.
-              </Typography>
-              <Typography variant="body2" color="text.disabled">
-                관리자에게 권한을 요청하세요.
-              </Typography>
-            </Box>
-          ) : !canReadData ? (
+          {/* 권한 체크: KPI관리 패턴 (깜빡임 방지) */}
+          {canViewCategory && !canReadData ? (
             <Box
               sx={{
                 flex: 1,
@@ -2963,6 +3013,15 @@ export default function CostManagement() {
                       // 신규 생성된 레코드에 isNew 플래그 설정
                       const updatedWithNew = updated.map((cost) => (cost.id === created.id ? { ...cost, isNew: true } : cost));
                       setCostRecords(updatedWithNew);
+
+                      // 토스트 알림 추가
+                      const costCode = created.code || `COST-${created.id}`;
+                      setSnackbar({
+                        open: true,
+                        message: `${costCode}이 성공적으로 등록되었습니다.`,
+                        severity: 'success'
+                      });
+
                       return created;
                     }
                     throw new Error('비용 생성 실패');
@@ -2987,6 +3046,8 @@ export default function CostManagement() {
                   }}
                   checkCodeExists={checkCodeExists}
                   addChangeLog={addChangeLog}
+                  snackbar={snackbar}
+                  setSnackbar={setSnackbar}
                   externalDialogControl={{
                     open: editDialog.open,
                     recordId: editDialog.recordId,
@@ -3038,6 +3099,8 @@ export default function CostManagement() {
                   canCreateData={canCreateData}
                   canEditOwn={canEditOwn}
                   canEditOthers={canEditOthers}
+                  snackbar={snackbar}
+                  setSnackbar={setSnackbar}
                 />
               </Box>
             </TabPanel>
@@ -3175,6 +3238,8 @@ export default function CostManagement() {
           costs={costRecords}
           setCosts={() => {}}
           checkCodeExists={checkCodeExists}
+          snackbar={snackbar}
+          setSnackbar={setSnackbar}
           externalDialogControl={{
             open: editDialog.open,
             recordId: editDialog.recordId,
@@ -3182,6 +3247,22 @@ export default function CostManagement() {
           }}
         />
       </Box>
+
+      {/* 토스트 알림 Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

@@ -37,7 +37,9 @@ import {
   TableRow,
   TextField,
   Pagination,
-  Button
+  Button,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
@@ -135,6 +137,11 @@ interface KanbanViewProps {
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
+  updateHardware?: (id: number, data: Partial<any>) => Promise<any>;
+  activeHardware?: HardwareTableData | null;
+  isDraggingState?: boolean;
+  onDragStart?: (event: any) => void;
+  onDragEnd?: (event: any) => void;
 }
 
 function KanbanView({
@@ -151,7 +158,12 @@ function KanbanView({
   onHardwareSave,
   canCreateData = true,
   canEditOwn = true,
-  canEditOthers = true
+  canEditOthers = true,
+  updateHardware,
+  activeHardware,
+  isDraggingState,
+  onDragStart,
+  onDragEnd
 }: KanbanViewProps) {
   const theme = useTheme();
   const { data: session } = useSession();
@@ -189,10 +201,6 @@ function KanbanView({
     );
   }, [currentUser]);
 
-  // 상태 관리
-  const [activeHardware, setActiveHardware] = useState<HardwareTableData | null>(null);
-  const [isDraggingState, setIsDraggingState] = useState(false);
-
   // 편집 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);
   const [editingHardware, setEditingHardware] = useState<HardwareTableData | null>(null);
@@ -227,13 +235,6 @@ function KanbanView({
   });
 
   // 드래그 시작 핸들러
-  const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event;
-    const draggedHardware = hardware.find((task) => task.id === active.id);
-    setActiveHardware(draggedHardware || null);
-    setIsDraggingState(true);
-  };
-
   // 카드 클릭 핸들러
   const handleCardClick = (hardware: HardwareTableData) => {
     setEditingHardware(hardware);
@@ -248,71 +249,22 @@ function KanbanView({
 
   // Hardware 저장 핸들러
 
-  // 드래그 종료 핸들러
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveHardware(null);
-    setIsDraggingState(false);
-
-    if (!over) return;
-
-    const taskId = active.id;
-    const newStatus = over.id as HardwareStatus;
-
-    // 상태가 변경된 경우만 업데이트
-    const currentHardware = hardware.find((task) => task.id === taskId);
-    if (currentHardware && currentHardware.status !== newStatus) {
-      const oldStatus = currentHardware.status;
-
-      // 로컬 상태 업데이트
-      setHardware((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: newStatus } : task)));
-
-      // DB에 상태 변경 저장
-      try {
-        console.log('🔄 칸반 드래그: 상태 변경 DB 저장 시작', {
-          id: currentHardware.id,
-          oldStatus,
-          newStatus
-        });
-
-        await updateHardware(currentHardware.id, {
-          status: newStatus
-        });
-
-        console.log('✅ 칸반 드래그: 상태 변경 DB 저장 성공');
-      } catch (error) {
-        console.error('🔴 칸반 드래그: 상태 변경 DB 저장 실패:', error);
-        // 실패 시 원래 상태로 되돌림
-        setHardware((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: oldStatus } : task)));
-        alert('상태 변경 저장에 실패했습니다.');
-        return;
-      }
-
-      // 변경로그 추가
-      const taskCode = currentHardware.code || `TASK-${taskId}`;
-      const workContent = currentHardware.workContent || '업무내용 없음';
-      const description = `${workContent} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
-
-      addChangeLog('수정', taskCode, description, currentHardware.team || '미분류', oldStatus, newStatus, '상태', workContent, '칸반탭');
-    }
-  };
-
   // 상태별 컬럼 정의 (동적 생성)
   const statusColumns = React.useMemo(() => {
     if (statusTypes.length === 0) {
       return [
-        { key: '대기', title: '대기', pillBg: '#ECEFF1', pillColor: '#90A4AE' },
-        { key: '진행', title: '진행', pillBg: '#E8EAF6', pillColor: '#7986CB' },
-        { key: '완료', title: '완료', pillBg: '#E8F5E9', pillColor: '#81C784' },
-        { key: '홀딩', title: '홀딩', pillBg: '#FFEBEE', pillColor: '#E57373' }
+        { key: '대기', title: '대기', pillBg: '#F5F5F5', pillColor: '#757575' },
+        { key: '진행', title: '진행', pillBg: '#E3F2FD', pillColor: '#1976D2' },
+        { key: '완료', title: '완료', pillBg: '#E8F5E9', pillColor: '#388E3C' },
+        { key: '홀딩', title: '홀딩', pillBg: '#FFEBEE', pillColor: '#D32F2F' }
       ];
     }
 
     const colorPalette = [
-      { pillBg: '#ECEFF1', pillColor: '#90A4AE' },
-      { pillBg: '#E8EAF6', pillColor: '#7986CB' },
-      { pillBg: '#E8F5E9', pillColor: '#81C784' },
-      { pillBg: '#FFEBEE', pillColor: '#E57373' },
+      { pillBg: '#F5F5F5', pillColor: '#757575' }, // 대기
+      { pillBg: '#E3F2FD', pillColor: '#1976D2' }, // 진행
+      { pillBg: '#E8F5E9', pillColor: '#388E3C' }, // 완료
+      { pillBg: '#FFEBEE', pillColor: '#D32F2F' }, // 홀딩
       { pillBg: '#FFF3E0', pillColor: '#F57C00' },
       { pillBg: '#F3E5F5', pillColor: '#7B1FA2' }
     ];
@@ -377,24 +329,12 @@ function KanbanView({
   const getStatusTagStyle = (status: string) => {
     const column = statusColumns.find((col) => col.key === status);
     if (column) {
-      // pillColor를 기반으로 투명도 적용한 배경색 생성
-      const hexToRgb = (hex: string) => {
-        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        return result
-          ? {
-              r: parseInt(result[1], 16),
-              g: parseInt(result[2], 16),
-              b: parseInt(result[3], 16)
-            }
-          : null;
-      };
-      const rgb = hexToRgb(column.pillColor);
       return {
-        backgroundColor: rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)` : 'rgba(156, 163, 175, 0.15)',
+        backgroundColor: column.pillBg,
         color: column.pillColor
       };
     }
-    return { backgroundColor: 'rgba(156, 163, 175, 0.15)', color: '#4b5563' };
+    return { backgroundColor: '#F5F5F5', color: '#757575' };
   };
 
   // 드래그 가능한 카드 컴포넌트 (표준화된 5단계 구조)
@@ -730,7 +670,7 @@ function KanbanView({
         }
       `}</style>
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd}>
         <div className="kanban-board">
           {statusColumns.map((column) => {
             const items = getItemsByStatus(column.key);
@@ -2200,6 +2140,21 @@ export default function HardwareManagement() {
   const [editDialog, setEditDialog] = useState(false);
   const [editingHardware, setEditingHardware] = useState<HardwareTableData | null>(null);
 
+  // Snackbar 상태
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
+
+  // Drag 관련 상태 (칸반탭)
+  const [activeHardware, setActiveHardware] = useState<HardwareTableData | null>(null);
+  const [isDraggingState, setIsDraggingState] = useState(false);
+
   // Supabase 데이터를 HardwareTableData 형식으로 변환하는 함수
   const convertHardwareToTask = (hardwareItem: HardwareData): HardwareTableData => {
     console.log('🔄 convertHardwareToTask - asset_description:', hardwareItem.asset_description);
@@ -2425,6 +2380,24 @@ export default function HardwareManagement() {
 
         // ✅ updateHardware가 내부에서 setHardware 호출 (KPI 패턴)
         console.log('✅ 하드웨어 업데이트 성공');
+
+        // 토스트 알림 (수정)
+        const assetName = updatedHardware.assetName || '하드웨어';
+        const getKoreanParticle = (word: string): string => {
+          const lastChar = word.charAt(word.length - 1);
+          const code = lastChar.charCodeAt(0);
+          if (code >= 0xAC00 && code <= 0xD7A3) {
+            const hasJongseong = (code - 0xAC00) % 28 !== 0;
+            return hasJongseong ? '이' : '가';
+          }
+          return '가';
+        };
+        const josa = getKoreanParticle(assetName);
+        setSnackbar({
+          open: true,
+          message: `${assetName}${josa} 성공적으로 수정되었습니다.`,
+          severity: 'success'
+        });
       } else {
         // 새로 생성 - HardwareRecord를 Supabase 형식으로 변환
         const hardwareData: any = {
@@ -2472,12 +2445,93 @@ export default function HardwareManagement() {
         // ✅ createHardware가 내부에서 setHardware 호출 (KPI 패턴)
         console.log('✅ 하드웨어 생성 성공');
         addChangeLog('추가', hardwareData.code, `새로운 하드웨어가 생성되었습니다: ${updatedHardware.assetName}`, '개발팀');
+
+        // 토스트 알림 (추가)
+        const assetName = updatedHardware.assetName || '하드웨어';
+        const getKoreanParticle = (word: string): string => {
+          const lastChar = word.charAt(word.length - 1);
+          const code = lastChar.charCodeAt(0);
+          if (code >= 0xAC00 && code <= 0xD7A3) {
+            const hasJongseong = (code - 0xAC00) % 28 !== 0;
+            return hasJongseong ? '이' : '가';
+          }
+          return '가';
+        };
+        const josa = getKoreanParticle(assetName);
+        setSnackbar({
+          open: true,
+          message: `${assetName}${josa} 성공적으로 추가되었습니다.`,
+          severity: 'success'
+        });
       }
 
       handleEditDialogClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ 하드웨어 저장 실패:', error);
-      alert('하드웨어 저장 중 오류가 발생했습니다.');
+      setSnackbar({
+        open: true,
+        message: `저장 실패: ${error?.message || '알 수 없는 오류가 발생했습니다.'}`,
+        severity: 'error'
+      });
+    }
+  };
+
+  // 드래그 시작 핸들러 (칸반탭)
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    const draggedHardware = tasks.find((task) => task.id === active.id);
+    setActiveHardware(draggedHardware || null);
+    setIsDraggingState(true);
+  };
+
+  // 드래그 종료 핸들러 (칸반탭)
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveHardware(null);
+    setIsDraggingState(false);
+
+    if (!over) return;
+
+    const taskId = active.id;
+    const newStatus = over.id as HardwareStatus;
+
+    // 상태가 변경된 경우만 업데이트
+    const currentHardware = tasks.find((task) => task.id === taskId);
+    if (currentHardware && currentHardware.status !== newStatus) {
+      const oldStatus = currentHardware.status;
+
+      // 로컬 상태 업데이트
+      setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: newStatus } : task)));
+
+      // DB에 상태 변경 저장
+      try {
+        await updateHardware(currentHardware.id, {
+          status: newStatus
+        });
+
+        // 토스트 알림
+        setSnackbar({
+          open: true,
+          message: `상태가 "${oldStatus}"에서 "${newStatus}"로 변경되었습니다.`,
+          severity: 'success'
+        });
+      } catch (error) {
+        // 실패 시 원래 상태로 되돌림
+        setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: oldStatus } : task)));
+        setSnackbar({
+          open: true,
+          message: '상태 변경 저장에 실패했습니다.',
+          severity: 'error'
+        });
+        return;
+      }
+
+      // 변경로그 추가
+      const taskCode = currentHardware.code || `TASK-${taskId}`;
+      const workContent = currentHardware.workContent || '업무내용 없음';
+      const description = `${workContent} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
+
+      addChangeLog('수정', taskCode, description, currentHardware.team || '미분류', oldStatus, newStatus, '상태', workContent, '칸반탭');
     }
   };
 
@@ -2567,27 +2621,8 @@ export default function HardwareManagement() {
             </Box>
           </Box>
 
-          {/* 권한 체크 */}
-          {!canViewCategory ? (
-            <Box
-              sx={{
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'column',
-                gap: 2,
-                py: 8
-              }}
-            >
-              <Typography variant="h5" color="text.secondary">
-                이 페이지에 접근할 권한이 없습니다.
-              </Typography>
-              <Typography variant="body2" color="text.disabled">
-                관리자에게 권한을 요청하세요.
-              </Typography>
-            </Box>
-          ) : !canReadData ? (
+          {/* 권한 체크: KPI관리 패턴 (깜빡임 방지) */}
+          {canViewCategory && !canReadData ? (
             <Box
               sx={{
                 flex: 1,
@@ -2867,6 +2902,7 @@ export default function HardwareManagement() {
                   canCreateData={canCreateData}
                   canEditOwn={canEditOwn}
                   canEditOthers={canEditOthers}
+                  setSnackbar={setSnackbar}
                 />
               </Box>
             </TabPanel>
@@ -2914,6 +2950,11 @@ export default function HardwareManagement() {
                   canCreateData={canCreateData}
                   canEditOwn={canEditOwn}
                   canEditOthers={canEditOthers}
+                  updateHardware={updateHardware}
+                  activeHardware={activeHardware}
+                  isDraggingState={isDraggingState}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
                 />
               </Box>
             </TabPanel>
@@ -3296,6 +3337,22 @@ export default function HardwareManagement() {
           onSave={handleEditHardwareSave}
         />
       )}
+
+      {/* 알림 Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

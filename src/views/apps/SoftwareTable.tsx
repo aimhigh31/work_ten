@@ -88,6 +88,11 @@ interface SoftwareTableProps {
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
+  setSnackbar?: React.Dispatch<React.SetStateAction<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>>;
 }
 
 export default function SoftwareTable({
@@ -102,7 +107,8 @@ export default function SoftwareTable({
   users = [],
   canCreateData = true,
   canEditOwn = true,
-  canEditOthers = true
+  canEditOthers = true,
+  setSnackbar = undefined
 }: SoftwareTableProps) {
   const theme = useTheme();
   const [data, setData] = useState<TaskTableData[]>([]);
@@ -332,11 +338,13 @@ export default function SoftwareTable({
   const handleDeleteSelected = async () => {
     if (selected.length === 0) return;
 
+    // 삭제할 항목들의 정보를 미리 저장
+    const deletedSoftwares = data.filter((task) => selected.includes(task.id));
+
     try {
       // 삭제될 업무들의 정보를 변경로그에 추가
       if (addChangeLog) {
-        const deletedTasks = data.filter((task) => selected.includes(task.id));
-        deletedTasks.forEach((task) => {
+        deletedSoftwares.forEach((task) => {
           const softwareName = task.softwareName || task.workContent || '소프트웨어';
           addChangeLog(
             '소프트웨어 삭제',
@@ -365,6 +373,34 @@ export default function SoftwareTable({
         if (setTasks) {
           setTasks(updatedData);
         }
+
+        // 토스트 알림 (삭제)
+        if (setSnackbar) {
+          if (deletedSoftwares.length === 1) {
+            const softwareName = deletedSoftwares[0].softwareName || deletedSoftwares[0].workContent || '소프트웨어';
+            const getKoreanParticle = (word: string): string => {
+              const lastChar = word.charAt(word.length - 1);
+              const code = lastChar.charCodeAt(0);
+              if (code >= 0xAC00 && code <= 0xD7A3) {
+                const hasJongseong = (code - 0xAC00) % 28 !== 0;
+                return hasJongseong ? '이' : '가';
+              }
+              return '가';
+            };
+            const josa = getKoreanParticle(softwareName);
+            setSnackbar({
+              open: true,
+              message: `${softwareName}${josa} 성공적으로 삭제되었습니다.`,
+              severity: 'error'
+            });
+          } else {
+            setSnackbar({
+              open: true,
+              message: `${deletedSoftwares.length}개 소프트웨어가 성공적으로 삭제되었습니다.`,
+              severity: 'error'
+            });
+          }
+        }
       } else {
         // Supabase 연결이 없는 경우 로컬에서만 삭제 (개발용)
         console.warn('⚠️ deleteMultipleSoftware 함수가 없습니다. 로컬 상태만 업데이트합니다.');
@@ -378,7 +414,14 @@ export default function SoftwareTable({
       }
     } catch (error) {
       console.error('❌ 삭제 중 오류 발생:', error);
-      alert('삭제 중 오류가 발생했습니다.');
+      // 토스트 알림 (에러)
+      if (setSnackbar) {
+        setSnackbar({
+          open: true,
+          message: '삭제에 실패했습니다.',
+          severity: 'error'
+        });
+      }
     } finally {
       // 선택 초기화 (성공/실패 관계없이)
       setSelected([]);
@@ -614,6 +657,26 @@ export default function SoftwareTable({
       }
 
       console.log('✅ 기존 Task 업데이트 완료');
+
+      // 토스트 알림 (수정)
+      if (setSnackbar) {
+        const softwareName = updatedTask.softwareName || updatedTask.workContent || '소프트웨어';
+        const getKoreanParticle = (word: string): string => {
+          const lastChar = word.charAt(word.length - 1);
+          const code = lastChar.charCodeAt(0);
+          if (code >= 0xAC00 && code <= 0xD7A3) {
+            const hasJongseong = (code - 0xAC00) % 28 !== 0;
+            return hasJongseong ? '이' : '가';
+          }
+          return '가';
+        };
+        const josa = getKoreanParticle(softwareName);
+        setSnackbar({
+          open: true,
+          message: `${softwareName}${josa} 성공적으로 수정되었습니다.`,
+          severity: 'success'
+        });
+      }
     } else {
       // 새 Task 추가 - DB 저장 후 정확한 코드로 추가
       // updatedTask에는 이미 SoftwareEditDialog에서 생성된 정확한 코드가 포함되어 있음
@@ -650,6 +713,26 @@ export default function SoftwareTable({
       }
 
       console.log('✅ 새 Task 추가 완료:', newTaskWithNumber);
+
+      // 토스트 알림 (추가)
+      if (setSnackbar) {
+        const softwareName = newTaskWithNumber.softwareName || newTaskWithNumber.workContent || '소프트웨어';
+        const getKoreanParticle = (word: string): string => {
+          const lastChar = word.charAt(word.length - 1);
+          const code = lastChar.charCodeAt(0);
+          if (code >= 0xAC00 && code <= 0xD7A3) {
+            const hasJongseong = (code - 0xAC00) % 28 !== 0;
+            return hasJongseong ? '이' : '가';
+          }
+          return '가';
+        };
+        const josa = getKoreanParticle(softwareName);
+        setSnackbar({
+          open: true,
+          message: `${softwareName}${josa} 성공적으로 추가되었습니다.`,
+          severity: 'success'
+        });
+      }
     }
 
     handleEditDialogClose();

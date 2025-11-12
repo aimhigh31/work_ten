@@ -91,6 +91,17 @@ interface SalesDataTableProps {
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
+  snackbar?: {
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  };
+  setSnackbar?: React.Dispatch<React.SetStateAction<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>>;
+  deleteSales?: (id: number) => Promise<boolean>;
 }
 
 const SalesDataTable: React.FC<SalesDataTableProps> = ({
@@ -109,7 +120,10 @@ const SalesDataTable: React.FC<SalesDataTableProps> = ({
   users,
   canCreateData = true,
   canEditOwn = true,
-  canEditOthers = true
+  canEditOthers = true,
+  snackbar,
+  setSnackbar,
+  deleteSales
 }) => {
   const theme = useTheme();
   const { data: session } = useSession();
@@ -628,6 +642,13 @@ const SalesDataTable: React.FC<SalesDataTableProps> = ({
       // 삭제될 레코드들의 정보를 먼저 저장
       const recordsToDelete = sales.filter((record) => selectedRecords.includes(record.id));
 
+      // DB에서 실제로 삭제
+      if (deleteSales) {
+        for (const record of recordsToDelete) {
+          await deleteSales(record.id);
+        }
+      }
+
       // 각 레코드에 대해 변경로그 추가
       for (const record of recordsToDelete) {
         const salesCode = record.code || `SALES-${record.id}`;
@@ -646,6 +667,22 @@ const SalesDataTable: React.FC<SalesDataTableProps> = ({
 
       setSales((prev) => prev.filter((record) => !selectedRecords.includes(record.id)));
       setSelectedRecords([]);
+
+      // 토스트 알림 추가
+      if (setSnackbar) {
+        let message = '';
+        if (recordsToDelete.length === 1) {
+          const salesTitle = recordsToDelete[0].itemName || '매출';
+          message = `${salesTitle}이 삭제되었습니다.`;
+        } else {
+          message = `${recordsToDelete.length}건의 데이터가 삭제되었습니다.`;
+        }
+        setSnackbar({
+          open: true,
+          message: message,
+          severity: 'error'
+        });
+      }
     }
   };
 

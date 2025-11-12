@@ -20,6 +20,7 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
 });
 
 export interface UseSupabaseVocReturn {
+  vocs: DbVocData[];
   getVocs: () => Promise<DbVocData[]>;
   getVocById: (id: number) => Promise<DbVocData | null>;
   createVoc: (voc: Omit<DbVocData, 'id' | 'created_at' | 'updated_at'>) => Promise<DbVocData | null>;
@@ -33,6 +34,7 @@ export interface UseSupabaseVocReturn {
 }
 
 export const useSupabaseVoc = (): UseSupabaseVocReturn => {
+  const [vocs, setVocs] = useState<DbVocData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,6 +47,7 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
     const cachedData = loadFromCache<DbVocData[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
     if (cachedData) {
       console.log('⚡ [VOC] 캐시 데이터 반환 (깜빡임 방지)');
+      setVocs(cachedData); // ✅ 캐시 데이터로 상태 업데이트 (KPI 패턴)
       return cachedData;
     }
 
@@ -66,7 +69,10 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
 
       console.log('✅ getVocs 성공:', data?.length || 0, '개');
 
-      // 2. 캐시에 저장
+      // 2. 상태 업데이트 (KPI 패턴)
+      setVocs(data || []);
+
+      // 3. 캐시에 저장
       saveToCache(CACHE_KEY, data || []);
 
       return data || [];
@@ -148,6 +154,9 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
 
       console.log('✅ createVoc 성공:', data);
 
+      // ✅ 로컬 상태 즉시 업데이트 (KPI 패턴)
+      setVocs((prev) => [data, ...prev]);
+
       // 캐시 무효화 (최신 데이터 보장)
       sessionStorage.removeItem(CACHE_KEY);
 
@@ -173,7 +182,7 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
         updated_at: new Date().toISOString()
       };
 
-      const { error: supabaseError } = await supabase.from('it_voc_data').update(updateData).eq('id', id).eq('is_active', true);
+      const { data, error: supabaseError } = await supabase.from('it_voc_data').update(updateData).eq('id', id).eq('is_active', true).select();
 
       if (supabaseError) {
         console.log('❌ Supabase 업데이트 오류:', supabaseError);
@@ -181,7 +190,12 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
         return false;
       }
 
-      console.log('✅ updateVoc 성공');
+      console.log('✅ updateVoc 성공:', data);
+
+      // ✅ 로컬 상태 즉시 업데이트 (KPI 패턴)
+      if (data && data.length > 0) {
+        setVocs((prev) => prev.map((v) => (v.id === id ? data[0] : v)));
+      }
 
       // 캐시 무효화 (최신 데이터 보장)
       sessionStorage.removeItem(CACHE_KEY);
@@ -347,6 +361,7 @@ export const useSupabaseVoc = (): UseSupabaseVocReturn => {
   }, []); // getVocs 의존성 제거 - 직접 쿼리
 
   return {
+    vocs,
     getVocs,
     getVocById,
     createVoc,

@@ -104,6 +104,11 @@ interface SecurityIncidentTableProps {
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
+  setSnackbar?: React.Dispatch<React.SetStateAction<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>>;
 }
 
 export default function SecurityIncidentTable({
@@ -114,11 +119,13 @@ export default function SecurityIncidentTable({
   tasks,
   setTasks,
   addChangeLog,
+  onDelete,
   error = null,
   onDataRefresh,
   canCreateData = true,
   canEditOwn = true,
-  canEditOthers = true
+  canEditOthers = true,
+  setSnackbar = undefined
 }: SecurityIncidentTableProps) {
   const theme = useTheme();
   const { users } = useSupabaseUsers();
@@ -327,6 +334,14 @@ export default function SecurityIncidentTable({
     if (selected.length === 0) return;
 
     try {
+      // onDelete prop이 있으면 부모 컴포넌트에서 삭제 처리 (토스트 알림 포함)
+      if (onDelete) {
+        await onDelete(selected);
+        setSelected([]);
+        return;
+      }
+
+      // onDelete가 없으면 기존 로직 사용 (하위 호환성)
       // 삭제될 보안사고들의 정보를 변경로그에 추가
       if (addChangeLog) {
         const deletedTasks = tasks.filter((task) => selected.includes(task.id));
@@ -536,6 +551,53 @@ export default function SecurityIncidentTable({
           setTasks((prevTasks) => prevTasks.map((task) => (task.id === updatedIncident.id ? updatedIncident : task)));
           console.log('✅ 기존 보안사고 업데이트 완료');
 
+          // 토스트 알림 with Korean particle detection
+          if (setSnackbar) {
+            // 변경된 필드 찾기
+            const changedFields: string[] = [];
+            const fieldMap: { [key: string]: string } = {
+              mainContent: '사고내용',
+              incidentType: '사고유형',
+              status: '상태',
+              assignee: '담당자',
+              completedDate: '완료일',
+              responseAction: '대응조치',
+              team: '팀',
+              startDate: '시작일'
+            };
+
+            Object.keys(fieldMap).forEach((key) => {
+              const oldValue = (originalIncident as any)[key];
+              const newValue = (updatedIncident as any)[key];
+              if (oldValue !== newValue && !changedFields.includes(fieldMap[key])) {
+                changedFields.push(fieldMap[key]);
+              }
+            });
+
+            let message = '';
+            if (changedFields.length > 0) {
+              const fieldsText = changedFields.join(', ');
+              const lastField = changedFields[changedFields.length - 1];
+              const lastChar = lastField.charAt(lastField.length - 1);
+              const code = lastChar.charCodeAt(0);
+              const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+              const josa = hasJongseong ? '이' : '가';
+              message = `${updatedIncident.mainContent}의 ${fieldsText}${josa} 성공적으로 수정되었습니다.`;
+            } else {
+              const lastChar = updatedIncident.mainContent.charAt(updatedIncident.mainContent.length - 1);
+              const code = lastChar.charCodeAt(0);
+              const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+              const josa = hasJongseong ? '이' : '가';
+              message = `${updatedIncident.mainContent}${josa} 성공적으로 수정되었습니다.`;
+            }
+
+            setSnackbar({
+              open: true,
+              message: message,
+              severity: 'success'
+            });
+          }
+
           return updatedIncident; // 수정된 데이터 반환
         }
         return null; // 실패 시 null 반환
@@ -613,6 +675,19 @@ export default function SecurityIncidentTable({
           // tasks 상태에 새 보안사고 추가
           setTasks((prevTasks) => [...prevTasks, createdRecord]);
           console.log('✅ tasks 상태 업데이트 완료');
+
+          // 토스트 알림 with Korean particle detection
+          if (setSnackbar) {
+            const lastChar = updatedIncident.mainContent.charAt(updatedIncident.mainContent.length - 1);
+            const code = lastChar.charCodeAt(0);
+            const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+            const josa = hasJongseong ? '이' : '가';
+            setSnackbar({
+              open: true,
+              message: `${updatedIncident.mainContent}${josa} 성공적으로 추가되었습니다.`,
+              severity: 'success'
+            });
+          }
 
           return createdRecord;
         }

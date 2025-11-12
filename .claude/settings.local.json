@@ -8,7 +8,8 @@
       "Bash(notepad:*)",
       "Bash(dir:*)",
       "Bash(findstr:*)",
-      "Read(//c/Users/11/AppData/Roaming/Claude/**)"
+      "Read(//c/Users/11/AppData/Roaming/Claude/**)",
+      "Bash(netstat:*)"
     ],
     "deny": [
       "mcp__chrome-devtools__*"

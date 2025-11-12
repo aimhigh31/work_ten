@@ -1730,6 +1730,16 @@ const SolutionEditDialog = memo(
         return;
       }
 
+      if (!solutionState.detailContent || !solutionState.detailContent.trim()) {
+        setValidationError('상세내용은 필수 입력 항목입니다.');
+        return;
+      }
+
+      if (!solutionState.assignee || !solutionState.assignee.trim()) {
+        setValidationError('담당자를 선택해주세요.');
+        return;
+      }
+
       if (!solutionState.solutionType || !solutionState.solutionType.trim()) {
         setValidationError('솔루션유형을 선택해주세요.');
         return;

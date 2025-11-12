@@ -79,6 +79,16 @@ interface VOCDataTableProps {
   canEditOwn?: boolean;
   canEditOthers?: boolean;
   users?: any[];
+  snackbar?: {
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  };
+  setSnackbar?: React.Dispatch<React.SetStateAction<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>>;
 }
 
 export default function VOCDataTable({
@@ -92,7 +102,9 @@ export default function VOCDataTable({
   canCreateData = true,
   canEditOwn = true,
   canEditOthers = true,
-  users = []
+  users = [],
+  snackbar,
+  setSnackbar
 }: VOCDataTableProps) {
   const [data, setData] = useState<VocData[]>(vocs ? vocs : []);
   const [selected, setSelected] = useState<number[]>([]);
@@ -416,9 +428,42 @@ export default function VOCDataTable({
       if (setVOCs) {
         setVOCs(updatedData);
       }
+
+      // 토스트 알림 - 삭제
+      if (setSnackbar) {
+        let message = '';
+        if (deletedVOCs.length === 1) {
+          // 단일 삭제
+          const vocTitle = deletedVOCs[0].content || 'VOC';
+          const lastChar = vocTitle.charAt(vocTitle.length - 1);
+          const code = lastChar.charCodeAt(0);
+          const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+          const josa = hasJongseong ? '이' : '가';
+          message = `${vocTitle}${josa} 삭제되었습니다.`;
+        } else {
+          // 다중 삭제
+          message = `${deletedVOCs.length}건의 데이터가 삭제되었습니다.`;
+        }
+
+        setSnackbar({
+          open: true,
+          message: message,
+          severity: 'error'
+        });
+      }
     } catch (error) {
       console.error('❌ VOC 삭제 실패:', error);
-      alert('VOC 삭제 중 오류가 발생했습니다.');
+
+      // 에러 토스트 알림
+      if (setSnackbar) {
+        setSnackbar({
+          open: true,
+          message: 'VOC 삭제 중 오류가 발생했습니다.',
+          severity: 'error'
+        });
+      } else {
+        alert('VOC 삭제 중 오류가 발생했습니다.');
+      }
     }
   };
 
@@ -628,6 +673,60 @@ export default function VOCDataTable({
             setVOCs(updatedData);
           }
 
+          // 토스트 알림 with Korean particle detection
+          if (setSnackbar) {
+            // 변경된 필드 감지
+            const fieldMap: { [key: string]: string } = {
+              vocType: 'VOC유형',
+              content: '요청내용',
+              responseContent: '처리내용',
+              priority: '우선순위',
+              status: '상태',
+              assignee: '담당자',
+              team: '팀',
+              customerName: '고객명',
+              companyName: '회사명',
+              channel: '채널',
+              receptionDate: '접수일',
+              resolutionDate: '완료일'
+            };
+
+            const changedFields: string[] = [];
+            Object.keys(fieldMap).forEach((key) => {
+              const oldValue = (originalVOC as any)[key];
+              const newValue = (updatedVOC as any)[key];
+              if (oldValue !== newValue && !changedFields.includes(fieldMap[key])) {
+                changedFields.push(fieldMap[key]);
+              }
+            });
+
+            let message = '';
+            if (changedFields.length > 0) {
+              const fieldsText = changedFields.join(', ');
+              // 마지막 필드명의 받침 유무에 따라 조사 결정
+              const lastField = changedFields[changedFields.length - 1];
+              const lastChar = lastField.charAt(lastField.length - 1);
+              const code = lastChar.charCodeAt(0);
+              const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+              const josa = hasJongseong ? '이' : '가';
+              message = `${updatedVOC.content || 'VOC'}의 ${fieldsText}${josa} 성공적으로 수정되었습니다.`;
+            } else {
+              // 필드 변경이 없는 경우
+              const vocTitle = updatedVOC.content || 'VOC';
+              const lastChar = vocTitle.charAt(vocTitle.length - 1);
+              const code = lastChar.charCodeAt(0);
+              const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+              const josa = hasJongseong ? '이' : '가';
+              message = `${vocTitle}${josa} 성공적으로 수정되었습니다.`;
+            }
+
+            setSnackbar({
+              open: true,
+              message: message,
+              severity: 'success'
+            });
+          }
+
           console.log('✅ 기존 VOC 업데이트 완료');
         } else {
           throw new Error('VOC 업데이트 실패');
@@ -661,6 +760,22 @@ export default function VOCDataTable({
               undefined,
               vocContent
             );
+          }
+
+          // 토스트 알림 with Korean particle detection
+          if (setSnackbar) {
+            const vocTitle = newVocData.content || 'VOC';
+            const lastChar = vocTitle.charAt(vocTitle.length - 1);
+            const code = lastChar.charCodeAt(0);
+            const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+            const josa = hasJongseong ? '이' : '가';
+
+            const addMessage = `${vocTitle}${josa} 성공적으로 추가되었습니다.`;
+            setSnackbar({
+              open: true,
+              message: addMessage,
+              severity: 'success'
+            });
           }
 
           console.log('✅ 새 VOC 추가 완료:', newVocData);
@@ -1131,6 +1246,7 @@ export default function VOCDataTable({
           canCreateData={canCreateData}
           canEditOwn={canEditOwn}
           canEditOthers={canEditOthers}
+          setSnackbar={setSnackbar}
         />
       )}
     </Box>

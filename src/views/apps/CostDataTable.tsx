@@ -489,6 +489,16 @@ interface CostDataTableProps {
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
+  snackbar?: {
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  };
+  setSnackbar?: React.Dispatch<React.SetStateAction<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>>;
 }
 
 export default function CostDataTable({
@@ -508,7 +518,9 @@ export default function CostDataTable({
   externalDialogControl,
   canCreateData = true,
   canEditOwn = true,
-  canEditOthers = true
+  canEditOthers = true,
+  snackbar,
+  setSnackbar
 }: CostDataTableProps) {
   const theme = useTheme();
 
@@ -717,7 +729,7 @@ export default function CostDataTable({
   }, [users]);
 
   // 상태 관리
-  const [selectedRecords, setSelectedRecords] = useState<number[]>([]);
+  const [selectedRecords, setSelectedRecords] = useState<string[]>([]);
   const [tabValue, setTabValue] = useState(0);
   const [validationError, setValidationError] = useState<string>('');
 
@@ -1252,6 +1264,16 @@ export default function CostDataTable({
             );
           }
 
+          // 토스트 알림
+          if (savedCost && setSnackbar) {
+            const costTitle = savedCost.content || '비용';
+            setSnackbar({
+              open: true,
+              message: `${costTitle}이 성공적으로 등록되었습니다.`,
+              severity: 'success'
+            });
+          }
+
           // Supabase에 금액 데이터 저장 (data_relation.md 패턴)
           console.log('💾 [신규] 금액 데이터 저장 시작');
           console.log('💾 [신규] savedCost:', savedCost);
@@ -1347,12 +1369,15 @@ export default function CostDataTable({
           console.log('레코드가 수정되었습니다.');
 
           // 변경로그 추가 (필드별)
+          let changedFields: string[] = [];
+
           if (originalCost && addChangeLog) {
             const costCode = overviewData.code;
             const costTitle = overviewData.content;
 
             // 각 필드별 변경사항 추적
             if (originalCost.title !== overviewData.title) {
+              changedFields.push('제목');
               await addChangeLog(
                 '수정',
                 costCode,
@@ -1366,6 +1391,7 @@ export default function CostDataTable({
             }
 
             if (originalCost.content !== overviewData.content) {
+              changedFields.push('비용내용');
               await addChangeLog(
                 '수정',
                 costCode,
@@ -1379,6 +1405,7 @@ export default function CostDataTable({
             }
 
             if (originalCost.costType !== overviewData.costType) {
+              changedFields.push('비용유형');
               await addChangeLog(
                 '수정',
                 costCode,
@@ -1392,6 +1419,7 @@ export default function CostDataTable({
             }
 
             if (originalCost.team !== overviewData.team) {
+              changedFields.push('팀');
               await addChangeLog(
                 '수정',
                 costCode,
@@ -1405,6 +1433,7 @@ export default function CostDataTable({
             }
 
             if (originalCost.assignee !== overviewData.assignee) {
+              changedFields.push('담당자');
               await addChangeLog(
                 '수정',
                 costCode,
@@ -1418,6 +1447,7 @@ export default function CostDataTable({
             }
 
             if (originalCost.status !== overviewData.status) {
+              changedFields.push('상태');
               await addChangeLog(
                 '수정',
                 costCode,
@@ -1431,6 +1461,7 @@ export default function CostDataTable({
             }
 
             if (originalCost.startDate !== overviewData.startDate) {
+              changedFields.push('시작일');
               await addChangeLog(
                 '수정',
                 costCode,
@@ -1444,6 +1475,7 @@ export default function CostDataTable({
             }
 
             if (originalCost.completionDate !== overviewData.completionDate) {
+              changedFields.push('완료일');
               await addChangeLog(
                 '수정',
                 costCode,
@@ -1457,6 +1489,7 @@ export default function CostDataTable({
             }
 
             if (originalCost.amount !== totalAmount) {
+              changedFields.push('금액');
               await addChangeLog(
                 '수정',
                 costCode,
@@ -1468,6 +1501,17 @@ export default function CostDataTable({
                 costTitle
               );
             }
+          }
+
+          // 토스트 알림
+          if (changedFields.length > 0 && setSnackbar) {
+            const costTitle = overviewData.content || '비용';
+            const fieldsText = changedFields.join(', ');
+            setSnackbar({
+              open: true,
+              message: `${costTitle}의 ${fieldsText}이 수정되었습니다.`,
+              severity: 'success'
+            });
           }
 
           // Supabase에 금액 데이터 저장 (data_relation.md 패턴 - 삭제 후 재저장)
@@ -1577,35 +1621,76 @@ export default function CostDataTable({
   const handleDeleteRecords = async () => {
     try {
       // 삭제될 레코드들의 정보를 먼저 저장
-      const recordsToDelete = costs.filter((record) => selectedRecords.includes(Number(record.id)));
+      const recordsToDelete = costs.filter((record) => selectedRecords.includes(record.id));
+
+      console.log('🗑️ 삭제 정보:', {
+        selectedRecords,
+        recordsToDelete: recordsToDelete.length,
+        firstRecord: recordsToDelete[0],
+        'firstRecord.id': recordsToDelete[0]?.id,
+        'firstRecord.title': recordsToDelete[0]?.title,
+        'firstRecord.content': recordsToDelete[0]?.content,
+        'firstRecord.code': recordsToDelete[0]?.code,
+        '전체필드': recordsToDelete[0] ? Object.keys(recordsToDelete[0]) : []
+      });
+
+      // 토스트 알림용 정보 미리 저장
+      const deleteCount = selectedRecords.length;
+      const firstRecordTitle = recordsToDelete.length > 0
+        ? (recordsToDelete[0].title || recordsToDelete[0].content || '비용')
+        : '비용';
+
+      console.log('🗑️ 토스트 메시지 디버깅:');
+      console.log('  deleteCount:', deleteCount);
+      console.log('  firstRecordTitle:', firstRecordTitle);
+      console.log('  recordsToDelete[0]?.title:', recordsToDelete[0]?.title);
+      console.log('  recordsToDelete[0]?.content:', recordsToDelete[0]?.content);
+      console.log('  title이 비어있나?:', !recordsToDelete[0]?.title);
+      console.log('  content가 비어있나?:', !recordsToDelete[0]?.content);
+      console.log('  최종 메시지:', deleteCount === 1 ? `${firstRecordTitle}이 삭제되었습니다.` : `${deleteCount}건의 데이터가 삭제되었습니다.`);
 
       if (deleteCostRecord) {
         // Supabase API를 통해 삭제
         for (const recordId of selectedRecords) {
-          await deleteCostRecord(recordId.toString());
+          await deleteCostRecord(recordId);
         }
         console.log(`${selectedRecords.length}개 레코드가 삭제되었습니다.`);
       } else {
         // Fallback: 직접 상태 업데이트
-        setCosts((prev) => prev.filter((record) => !selectedRecords.includes(Number(record.id))));
+        setCosts((prev) => prev.filter((record) => !selectedRecords.includes(record.id)));
       }
 
       // 각 레코드에 대해 변경로그 추가
       if (addChangeLog) {
         for (const record of recordsToDelete) {
           const costCode = record.code || `COST-${record.id}`;
-          const costTitle = record.content || '비용';
+          const costTitle = record.title || record.content || '비용';
           await addChangeLog(
             '삭제',
             costCode,
             `비용관리 ${costTitle}(${costCode}) 정보의 데이터탭 데이터가 삭제 되었습니다.`,
             record.team || '미분류',
-            `${record.content} - ${Number(record.amount).toLocaleString()}원`,
+            `${costTitle} - ${Number(record.amount).toLocaleString()}원`,
             '',
             '데이터탭',
             costTitle
           );
         }
+      }
+
+      // 토스트 알림
+      if (setSnackbar) {
+        let message = '';
+        if (deleteCount === 1) {
+          message = `${firstRecordTitle}이 삭제되었습니다.`;
+        } else {
+          message = `${deleteCount}건의 데이터가 삭제되었습니다.`;
+        }
+        setSnackbar({
+          open: true,
+          message: message,
+          severity: 'error'
+        });
       }
 
       setSelectedRecords([]);
@@ -1624,7 +1709,7 @@ export default function CostDataTable({
   };
 
   // 개별 선택
-  const handleSelectRecord = (recordId: number) => {
+  const handleSelectRecord = (recordId: string) => {
     setSelectedRecords((prev) => (prev.includes(recordId) ? prev.filter((id) => id !== recordId) : [...prev, recordId]));
   };
 

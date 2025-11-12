@@ -1387,10 +1387,15 @@ interface VOCEditDialogProps {
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
+  setSnackbar?: React.Dispatch<React.SetStateAction<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>>;
 }
 
 const VOCEditDialog = memo(
-  ({ open, onClose, voc, onSave, assignees, assigneeAvatars, statusOptions, statusColors, teams, canCreateData = true, canEditOwn = true, canEditOthers = true }: VOCEditDialogProps) => {
+  ({ open, onClose, voc, onSave, assignees, assigneeAvatars, statusOptions, statusColors, teams, canCreateData = true, canEditOwn = true, canEditOthers = true, setSnackbar }: VOCEditDialogProps) => {
     // 성능 모니터링
     // const { renderCount, logStats } = usePerformanceMonitor('VOCEditDialog');
 

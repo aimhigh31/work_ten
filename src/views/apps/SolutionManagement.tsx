@@ -39,7 +39,9 @@ import {
   TableRow,
   TextField,
   Pagination,
-  Button
+  Button,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
@@ -126,6 +128,10 @@ interface KanbanViewProps {
   canEditOthers?: boolean;
   updateSolution?: (id: number, data: Partial<DbSolutionData>) => Promise<boolean>;
   onSaveSolution?: (updatedSolution: SolutionTableData) => Promise<void>;
+  activeTask?: SolutionTableData | null;
+  isDraggingState?: boolean;
+  onDragStart?: (event: any) => void;
+  onDragEnd?: (event: any) => void;
 }
 
 function KanbanView({
@@ -142,7 +148,11 @@ function KanbanView({
   canEditOwn = true,
   canEditOthers = true,
   updateSolution,
-  onSaveSolution
+  onSaveSolution,
+  activeTask,
+  isDraggingState,
+  onDragStart,
+  onDragEnd
 }: KanbanViewProps) {
   const theme = useTheme();
 
@@ -163,10 +173,6 @@ function KanbanView({
     const isAssignee = solution.assignee === currentUser.user_name;
     return isCreator || isAssignee;
   }, [currentUser]);
-
-  // 상태 관리
-  const [activeSolution, setActiveSolution] = useState<SolutionTableData | null>(null);
-  const [isDraggingState, setIsDraggingState] = useState(false);
 
   // 편집 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);
@@ -200,14 +206,6 @@ function KanbanView({
 
     return true;
   });
-
-  // 드래그 시작 핸들러
-  const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event;
-    const draggedSolution = solutions.find((solution) => solution.id === active.id);
-    setActiveSolution(draggedSolution || null);
-    setIsDraggingState(true);
-  };
 
   // 카드 클릭 핸들러
   const handleCardClick = (solution: SolutionTableData) => {
@@ -259,62 +257,12 @@ function KanbanView({
     handleEditDialogClose();
   };
 
-  // 드래그 종료 핸들러
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveSolution(null);
-    setIsDraggingState(false);
-
-    if (!over) return;
-
-    const solutionId = active.id;
-    const newStatus = over.id as SolutionStatus;
-
-    // 상태가 변경된 경우만 업데이트
-    const currentSolution = solutions.find((solution) => solution.id === solutionId);
-    if (currentSolution && currentSolution.status !== newStatus) {
-      const oldStatus = currentSolution.status;
-
-      // 로컬 상태 업데이트
-      setSolutions((prev) => prev.map((solution) => (solution.id === solutionId ? { ...solution, status: newStatus } : solution)));
-
-      // DB에 상태 변경 저장
-      try {
-        console.log('🔄 칸반 드래그: 상태 변경 DB 저장 시작', {
-          id: currentSolution.id,
-          oldStatus,
-          newStatus
-        });
-
-        await updateSolution(currentSolution.id, {
-          status: newStatus
-        });
-
-        console.log('✅ 칸반 드래그: 상태 변경 DB 저장 성공');
-      } catch (error) {
-        console.error('🔴 칸반 드래그: 상태 변경 DB 저장 실패:', error);
-        // 실패 시 원래 상태로 되돌림
-        setSolutions((prev) => prev.map((solution) => (solution.id === solutionId ? { ...solution, status: oldStatus } : solution)));
-        alert('상태 변경 저장에 실패했습니다.');
-        return;
-      }
-
-      // 변경로그 추가
-      const solutionCode = currentSolution.code || `TASK-${solutionId}`;
-      const workContent = currentSolution.detailContent || '업무내용 없음';
-      const description = `${workContent} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
-
-      addChangeLog('수정', solutionCode, description, currentSolution.team || '미분류', oldStatus, newStatus, '상태', workContent, '칸반탭');
-    }
-  };
-
-  // 상태별 컬럼 정의
   // 상태별 컬럼 정의 (표준화된 칸반 디자인)
   const statusColumns = [
-    { key: '대기', title: '대기', pillBg: '#ECEFF1', pillColor: '#90A4AE' },
-    { key: '진행', title: '진행', pillBg: '#E8EAF6', pillColor: '#7986CB' },
-    { key: '완료', title: '완료', pillBg: '#E8F5E9', pillColor: '#81C784' },
-    { key: '홀딩', title: '홀딩', pillBg: '#FFEBEE', pillColor: '#E57373' }
+    { key: '대기', title: '대기', pillBg: '#F5F5F5', pillColor: '#757575' },
+    { key: '진행', title: '진행', pillBg: '#E3F2FD', pillColor: '#1976D2' },
+    { key: '완료', title: '완료', pillBg: '#E8F5E9', pillColor: '#388E3C' },
+    { key: '홀딩', title: '홀딩', pillBg: '#FFEBEE', pillColor: '#D32F2F' }
   ];
 
   // 상태별 아이템 가져오기
@@ -331,20 +279,16 @@ function KanbanView({
     정구현: '/assets/images/users/avatar-5.png'
   };
 
-  // 상태 태그 스타일 함수
+  // 상태 태그 스타일 함수 (동적)
   const getStatusTagStyle = (status: string) => {
-    switch (status) {
-      case '대기':
-        return { backgroundColor: 'rgba(144, 164, 174, 0.15)', color: '#90A4AE' };
-      case '진행':
-        return { backgroundColor: 'rgba(121, 134, 203, 0.15)', color: '#7986CB' };
-      case '완료':
-        return { backgroundColor: 'rgba(129, 199, 132, 0.15)', color: '#81C784' };
-      case '홀딩':
-        return { backgroundColor: 'rgba(229, 115, 115, 0.15)', color: '#E57373' };
-      default:
-        return { backgroundColor: 'rgba(156, 163, 175, 0.15)', color: '#4b5563' };
+    const column = statusColumns.find((col) => col.key === status);
+    if (column) {
+      return {
+        backgroundColor: column.pillBg,
+        color: column.pillColor
+      };
     }
+    return { backgroundColor: '#F5F5F5', color: '#757575' };
   };
 
   // 팀별 색상 매핑 (데이터 테이블과 동일)
@@ -741,7 +685,7 @@ function KanbanView({
         }
       `}</style>
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd}>
         <div className="kanban-board">
           {statusColumns.map((column) => {
             const items = getItemsByStatus(column.key);
@@ -772,7 +716,7 @@ function KanbanView({
           })}
         </div>
 
-        <DragOverlay>{activeSolution ? <DraggableCard solution={activeSolution} canEditOwn={canEditOwn} canEditOthers={canEditOthers} /> : null}</DragOverlay>
+        <DragOverlay>{activeTask ? <DraggableCard solution={activeTask} canEditOwn={canEditOwn} canEditOthers={canEditOthers} /> : null}</DragOverlay>
       </DndContext>
 
       {/* Solution 편집 다이얼로그 */}
@@ -2402,10 +2346,18 @@ export default function SolutionManagement() {
   const [value, setValue] = useState(0);
   const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers } = useMenuPermission('/it/solution');
 
-  // 공유 Solutions 상태
-  // DB 연동 훅
-  const { getSolutions, convertToSolutionData, createSolution, updateSolution, deleteSolution, convertToDbSolutionData } =
-    useSupabaseSolution();
+  // ⭐ Investment 패턴: 데이터 로딩 함수만 가져오기 (KPI 패턴 적용)
+  const {
+    solutions: solutionsFromHook,
+    getSolutions,
+    convertToSolutionData,
+    createSolution,
+    updateSolution,
+    deleteSolution,
+    convertToDbSolutionData,
+    loading: solutionLoading,
+    error
+  } = useSupabaseSolution();
   const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 가져오기
 
   // 변경로그 Supabase 훅
@@ -2513,39 +2465,76 @@ export default function SolutionManagement() {
   const [editDialog, setEditDialog] = useState(false);
   const [editingSolution, setEditingSolution] = useState<SolutionTableData | null>(null);
 
-  // 초기 데이터 로드 (즉시 렌더링)
-  useEffect(() => {
-    const loadSolutions = async () => {
+  // Snackbar 상태
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
+
+  // Drag 관련 상태 (칸반탭)
+  const [activeTask, setActiveTask] = useState<SolutionTableData | null>(null);
+  const [isDraggingState, setIsDraggingState] = useState(false);
+
+  // ⭐ 초기 데이터 로딩
+  React.useEffect(() => {
+    const loadAllData = async () => {
       try {
-        console.log('🔄 솔루션 데이터 로드 시작');
+        console.time('⚡ SolutionManagement - 페이지 데이터 로딩');
+        setLoading(true);
 
-        const dbSolutions = await getSolutions();
-        console.log('📊 DB에서 로드된 솔루션:', dbSolutions.length + '개');
+        // ⚡ solution만 로딩! (users, departments, masterCodes는 CommonData에 이미 있음)
+        await getSolutions(); // ✅ 훅 내부에서 setSolutions 호출됨 (KPI 패턴)
 
-        const convertedSolutions = dbSolutions.map((dbSolution: DbSolutionData) => {
-          const converted = convertToSolutionData(dbSolution);
-          // 서브코드를 서브코드명으로 변환
-          return {
-            ...converted,
-            status: getStatusName(converted.status),
-            solutionType: getSolutionTypeName(converted.solutionType),
-            developmentType: getDevelopmentTypeName(converted.developmentType),
-            createdBy: dbSolution.created_by, // 데이터 생성자 (권한 체크용)
-            isEditing: false
-          };
+        console.timeEnd('⚡ SolutionManagement - 페이지 데이터 로딩');
+
+        console.log('✅ SolutionManagement 로딩 완료', {
+          users: users.length,
+          departments: departments.length,
+          masterCodes: masterCodes.length
         });
-
-        setSolutions(convertedSolutions);
-        console.log('✅ 솔루션 데이터 로드 완료');
       } catch (error) {
-        console.error('❌ 솔루션 데이터 로드 실패:', error);
-        // 실패 시 기본 데이터 사용
-        setSolutions(solutionData);
+        console.error('❌ 데이터 로딩 실패:', error);
+      } finally {
+        setLoading(false);
       }
     };
 
-    loadSolutions();
-  }, [getSolutions, convertToSolutionData, getStatusName, getSolutionTypeName, getDevelopmentTypeName]);
+    loadAllData();
+  }, [getSolutions]);
+
+  // Supabase 데이터가 변경되면 solutions 상태 업데이트 (즉시 렌더링)
+  useEffect(() => {
+    console.log('🔍 Supabase 솔루션 데이터 상태:', {
+      length: solutionsFromHook.length,
+      error,
+      sampleData: solutionsFromHook.slice(0, 2)
+    });
+
+    const convertedSolutions = solutionsFromHook.map((dbSolution: DbSolutionData) => {
+      const converted = convertToSolutionData(dbSolution);
+      // 서브코드를 서브코드명으로 변환
+      return {
+        ...converted,
+        status: getStatusName(converted.status),
+        solutionType: getSolutionTypeName(converted.solutionType),
+        developmentType: getDevelopmentTypeName(converted.developmentType),
+        createdBy: dbSolution.created_by, // 데이터 생성자 (권한 체크용)
+        isEditing: false
+      };
+    });
+
+    setSolutions(convertedSolutions);
+    console.log('🔄 Supabase 솔루션 데이터를 SolutionTableData로 변환 완료:', convertedSolutions.length + '개');
+
+    if (convertedSolutions.length > 0) {
+      console.log('📝 변환된 첫 번째 솔루션 샘플:', convertedSolutions[0]);
+    }
+  }, [solutionsFromHook, error, convertToSolutionData, getStatusName, getSolutionTypeName, getDevelopmentTypeName]);
 
   // URL 쿼리 파라미터 처리
   useEffect(() => {
@@ -2668,16 +2657,13 @@ export default function SolutionManagement() {
           console.warn('⚠️ [SolutionManagement] 저장 시점 팀 필드 검증 실패:', updatedSolution.team, '→ 빈 문자열로 대체');
         }
 
-        // 서브코드명을 서브코드로 변환 (DB 저장용)
-        const solutionWithSubcodes = {
+        // ✅ 서브코드명(subcode_name) 그대로 저장 (CLAUDE.md 규칙)
+        const solutionForDb = {
           ...updatedSolution,
-          team: validatedTeam,
-          status: getStatusSubcode(updatedSolution.status),
-          solutionType: getSolutionTypeSubcode(updatedSolution.solutionType),
-          developmentType: getDevelopmentTypeSubcode(updatedSolution.developmentType)
+          team: validatedTeam
         };
 
-        const dbData = convertToDbSolutionData(solutionWithSubcodes);
+        const dbData = convertToDbSolutionData(solutionForDb);
         console.log('🔄 DB 형식으로 변환된 데이터:', dbData);
 
         const success = await updateSolution(updatedSolution.id, dbData);
@@ -2689,15 +2675,40 @@ export default function SolutionManagement() {
             prevSolutions.map((solution) => (solution.id === updatedSolution.id ? updatedSolutionForUI : solution))
           );
           console.log('✅ 솔루션 업데이트 성공');
-          alert('솔루션이 성공적으로 업데이트되었습니다.');
+
+          // 토스트 알림 (수정)
+          const solutionName = updatedSolution.title || updatedSolution.detailContent || '솔루션';
+          const getKoreanParticle = (word: string): string => {
+            const lastChar = word.charAt(word.length - 1);
+            const code = lastChar.charCodeAt(0);
+            if (code >= 0xAC00 && code <= 0xD7A3) {
+              const hasJongseong = (code - 0xAC00) % 28 !== 0;
+              return hasJongseong ? '이' : '가';
+            }
+            return '가';
+          };
+          const josa = getKoreanParticle(solutionName);
+          setSnackbar({
+            open: true,
+            message: `${solutionName}${josa} 성공적으로 수정되었습니다.`,
+            severity: 'success'
+          });
         } else {
           console.warn('⚠️ 솔루션 업데이트 실패');
-          alert('솔루션 업데이트에 실패했습니다. 다시 시도해주세요.');
+          setSnackbar({
+            open: true,
+            message: '솔루션 업데이트에 실패했습니다.',
+            severity: 'error'
+          });
           return;
         }
       } catch (error) {
         console.warn('⚠️ 솔루션 업데이트 오류:', error);
-        alert(`솔루션 업데이트 중 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+        setSnackbar({
+          open: true,
+          message: `솔루션 업데이트 중 오류가 발생했습니다.`,
+          severity: 'error'
+        });
         return;
       }
     } else {
@@ -2729,16 +2740,13 @@ export default function SolutionManagement() {
           console.warn('⚠️ [SolutionManagement] 새 솔루션 생성 시 팀 필드 검증 실패:', updatedSolution.team, '→ 빈 문자열로 대체');
         }
 
-        // 서브코드명을 서브코드로 변환 (DB 저장용)
-        const solutionWithSubcodes = {
+        // ✅ 서브코드명(subcode_name) 그대로 저장 (CLAUDE.md 규칙)
+        const solutionForDb = {
           ...updatedSolution,
-          team: validatedTeam,
-          status: getStatusSubcode(updatedSolution.status),
-          solutionType: getSolutionTypeSubcode(updatedSolution.solutionType),
-          developmentType: getDevelopmentTypeSubcode(updatedSolution.developmentType)
+          team: validatedTeam
         };
 
-        const dbData = convertToDbSolutionData(solutionWithSubcodes);
+        const dbData = convertToDbSolutionData(solutionForDb);
         console.log('🔄 DB 형식으로 변환된 데이터:', dbData);
 
         const createdDbSolution = await createSolution(dbData);
@@ -2775,10 +2783,31 @@ export default function SolutionManagement() {
           }
 
           console.log('✅ 새 솔루션 생성 완료:', createdSolution);
-          alert('새 솔루션이 성공적으로 생성되었습니다.');
+
+          // 토스트 알림 (추가)
+          const solutionName = createdSolution.title || createdSolution.detailContent || '솔루션';
+          const getKoreanParticle = (word: string): string => {
+            const lastChar = word.charAt(word.length - 1);
+            const code = lastChar.charCodeAt(0);
+            if (code >= 0xAC00 && code <= 0xD7A3) {
+              const hasJongseong = (code - 0xAC00) % 28 !== 0;
+              return hasJongseong ? '이' : '가';
+            }
+            return '가';
+          };
+          const josa = getKoreanParticle(solutionName);
+          setSnackbar({
+            open: true,
+            message: `${solutionName}${josa} 성공적으로 추가되었습니다.`,
+            severity: 'success'
+          });
         } else {
           console.warn('⚠️ 새 솔루션 생성 실패 - createSolution이 null 반환');
-          alert('솔루션 생성에 실패했습니다. 입력 데이터를 확인하고 다시 시도해주세요.');
+          setSnackbar({
+            open: true,
+            message: '솔루션 생성에 실패했습니다.',
+            severity: 'error'
+          });
           return;
         }
       } catch (error) {
@@ -2787,13 +2816,84 @@ export default function SolutionManagement() {
           message: error instanceof Error ? error.message : '알 수 없는 오류',
           stack: error instanceof Error ? error.stack : undefined
         });
-        alert(`솔루션 생성 중 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+        setSnackbar({
+          open: true,
+          message: `솔루션 생성 중 오류가 발생했습니다.`,
+          severity: 'error'
+        });
         return;
       }
     }
 
     console.log('🏁 handleEditSolutionSave 완료');
     handleEditDialogClose();
+  };
+
+  // 드래그 시작 핸들러 (칸반탭)
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    const draggedSolution = solutions.find((solution) => solution.id === active.id);
+    setActiveTask(draggedSolution || null);
+    setIsDraggingState(true);
+  };
+
+  // 드래그 종료 핸들러 (칸반탭)
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveTask(null);
+    setIsDraggingState(false);
+
+    if (!over) return;
+
+    const solutionId = active.id;
+    const newStatus = over.id as SolutionStatus;
+
+    const currentSolution = solutions.find((solution) => solution.id === solutionId);
+    if (currentSolution && currentSolution.status !== newStatus) {
+      const oldStatus = currentSolution.status;
+
+      // 로컬 상태 업데이트
+      setSolutions((prev) => prev.map((solution) => (solution.id === solutionId ? { ...solution, status: newStatus } : solution)));
+
+      // DB에 상태 변경 저장
+      try {
+        // ✅ 서브코드명(subcode_name) 그대로 저장 (CLAUDE.md 규칙)
+        await updateSolution(currentSolution.id, {
+          status: newStatus
+        });
+
+        // 토스트 알림
+        setSnackbar({
+          open: true,
+          message: `상태가 "${oldStatus}"에서 "${newStatus}"로 변경되었습니다.`,
+          severity: 'success'
+        });
+      } catch (error) {
+        // 실패 시 원래 상태로 되돌림
+        setSolutions((prev) => prev.map((solution) => (solution.id === solutionId ? { ...solution, status: oldStatus } : solution)));
+        setSnackbar({
+          open: true,
+          message: '상태 변경 저장에 실패했습니다.',
+          severity: 'error'
+        });
+        return;
+      }
+
+      // 변경로그 추가
+      const solutionCode = currentSolution.code || `TASK-${solutionId}`;
+      const workContent = currentSolution.detailContent || currentSolution.title || '솔루션';
+
+      addChangeLog(
+        '수정',
+        solutionCode,
+        `${workContent} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`,
+        currentSolution.team || '미분류',
+        oldStatus,
+        newStatus,
+        '상태',
+        workContent
+      );
+    }
   };
 
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -2882,27 +2982,8 @@ export default function SolutionManagement() {
             </Box>
           </Box>
 
-          {/* 권한 체크 */}
-          {!canViewCategory ? (
-            <Box
-              sx={{
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'column',
-                gap: 2,
-                py: 8
-              }}
-            >
-              <Typography variant="h5" color="text.secondary">
-                이 페이지에 접근할 권한이 없습니다.
-              </Typography>
-              <Typography variant="body2" color="text.disabled">
-                관리자에게 권한을 요청하세요.
-              </Typography>
-            </Box>
-          ) : !canReadData ? (
+          {/* 권한 체크: KPI관리 패턴 (깜빡임 방지) */}
+          {canViewCategory && !canReadData ? (
             <Box
               sx={{
                 flex: 1,
@@ -3179,6 +3260,7 @@ export default function SolutionManagement() {
                   canCreateData={canCreateData}
                   canEditOwn={canEditOwn}
                   canEditOthers={canEditOthers}
+                  setSnackbar={setSnackbar}
                 />
               </Box>
             </TabPanel>
@@ -3224,6 +3306,11 @@ export default function SolutionManagement() {
                   canCreateData={canCreateData}
                   canEditOwn={canEditOwn}
                   canEditOthers={canEditOthers}
+                  updateSolution={updateSolution}
+                  activeTask={activeTask}
+                  isDraggingState={isDraggingState}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
                 />
               </Box>
             </TabPanel>
@@ -3575,6 +3662,18 @@ export default function SolutionManagement() {
           canEditOthers={canEditOthers}
         />
       )}
+
+      {/* Snackbar 토스트 알림 */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

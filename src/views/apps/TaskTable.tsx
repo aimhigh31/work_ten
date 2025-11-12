@@ -62,6 +62,24 @@ const columnWidths = {
   action: 80
 };
 
+// 한국어 조사 처리 함수
+const getJosa = (word: string, josaType: '이/가' | '을/를' | '은/는'): string => {
+  if (!word) return josaType.split('/')[0];
+
+  const lastChar = word[word.length - 1];
+  const code = lastChar.charCodeAt(0);
+
+  if (code >= 0xAC00 && code <= 0xD7A3) {
+    const hasJongseong = (code - 0xAC00) % 28 > 0;
+
+    if (josaType === '이/가') return hasJongseong ? '이' : '가';
+    if (josaType === '을/를') return hasJongseong ? '을' : '를';
+    if (josaType === '은/는') return hasJongseong ? '은' : '는';
+  }
+
+  return josaType.split('/')[1];
+};
+
 interface TaskTableProps {
   selectedYear?: string;
   selectedTeam?: string;
@@ -83,6 +101,7 @@ interface TaskTableProps {
     changedField?: string,
     title?: string
   ) => void;
+  setSnackbar?: React.Dispatch<React.SetStateAction<{ open: boolean; message: string; severity: 'success' | 'error' | 'warning' | 'info' }>>;
   // 🔐 권한 관리
   canCreateData?: boolean;
   canEditOwn?: boolean;
@@ -101,6 +120,7 @@ export default function TaskTable({
   onDeleteTasks,
   onAddTask,
   addChangeLog,
+  setSnackbar,
   canCreateData = true,
   canEditOwn = true,
   canEditOthers = true
@@ -207,7 +227,7 @@ export default function TaskTable({
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Excel 다운로드 중 오류 발생:', error);
+      console.log('Excel 다운로드 중 오류 발생:', error);
       alert('Excel 다운로드 중 오류가 발생했습니다.');
     }
   };
@@ -291,10 +311,8 @@ export default function TaskTable({
       }
 
       setSelected([]);
-      alert('선택한 업무가 삭제되었습니다.');
     } catch (error) {
-      console.error('삭제 오류:', error);
-      alert('삭제 중 오류가 발생했습니다.');
+      console.log('삭제 오류:', error);
     }
   };
 
@@ -344,7 +362,7 @@ export default function TaskTable({
           .eq('id', supabaseId);
 
         if (error) {
-          console.error('❌ [TaskTable] Supabase 업데이트 실패:', error);
+          console.log('❌ [TaskTable] Supabase 업데이트 실패:', error);
           throw error;
         }
 
@@ -400,6 +418,36 @@ export default function TaskTable({
                 change.fieldKorean,
                 taskTitle
               );
+            }
+
+            // 토스트 알림 (수정)
+            if (setSnackbar) {
+              const firstField = changes[0].fieldKorean;
+              const josaField = getJosa(firstField, '이/가');
+
+              if (changes.length === 1) {
+                setSnackbar({
+                  open: true,
+                  message: `${taskTitle}의 ${firstField}${josaField} 성공적으로 수정되었습니다.`,
+                  severity: 'success'
+                });
+              } else {
+                setSnackbar({
+                  open: true,
+                  message: `${taskTitle}의 ${changes.length}개 항목이 성공적으로 수정되었습니다.`,
+                  severity: 'success'
+                });
+              }
+            }
+          } else {
+            // 변경사항이 없는 경우
+            if (setSnackbar) {
+              const josa = getJosa(taskTitle, '이/가');
+              setSnackbar({
+                open: true,
+                message: `${taskTitle}${josa} 성공적으로 저장되었습니다.`,
+                severity: 'success'
+              });
             }
           }
         }
@@ -484,23 +532,31 @@ export default function TaskTable({
           const success = await onAddTask(taskInput);
           if (success) {
             console.log('✅ 새 Task 추가 완료 (테이블 즉시 반영):', newTaskCode);
+
+            // 토스트 알림 (추가)
+            if (setSnackbar) {
+              const taskTitle = taskInput.work_content || '업무';
+              const josa = getJosa(taskTitle, '이/가');
+              setSnackbar({
+                open: true,
+                message: `${taskTitle}${josa} 성공적으로 등록되었습니다.`,
+                severity: 'success'
+              });
+            }
           } else {
-            console.error('❌ 새 Task 추가 실패');
-            alert('업무 추가에 실패했습니다.');
+            console.log('❌ 새 Task 추가 실패');
             return;
           }
         } else {
-          console.error('❌ onAddTask prop이 없습니다');
-          alert('업무 추가 기능을 사용할 수 없습니다.');
+          console.log('❌ onAddTask prop이 없습니다');
           return;
         }
       }
 
       handleEditDialogClose();
     } catch (error: any) {
-      console.error('❌ handleEditTaskSave 전체 오류:', error);
-      console.error('❌ 오류 스택:', error.stack);
-      alert(`업무 저장 중 오류가 발생했습니다.\n오류: ${error.message || error}`);
+      console.log('❌ handleEditTaskSave 전체 오류:', error);
+      console.log('❌ 오류 스택:', error.stack);
     }
   };
 

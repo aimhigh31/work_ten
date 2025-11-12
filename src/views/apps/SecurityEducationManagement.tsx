@@ -49,6 +49,8 @@ import { teams, assignees, securityEducationStatusOptions, securityEducationStat
 import { SecurityEducationTableData, SecurityEducationStatus, SecurityEducationRecord } from 'types/security-education';
 import { ThemeMode } from 'config';
 import { useSupabaseSecurityEducation, SecurityEducationItem } from '../../hooks/useSupabaseSecurityEducation';
+import { useSupabaseSecurityCurriculum } from '../../hooks/useSupabaseSecurityCurriculum'; // 커리큘럼 훅 추가
+import { useSupabaseSecurityAttendee } from '../../hooks/useSupabaseSecurityAttendee'; // 참석자 훅 추가
 import { useCommonData } from 'contexts/CommonDataContext'; // 🏪 공용 창고
 import { useSupabaseChangeLog } from '../../hooks/useSupabaseChangeLog';
 import { ChangeLogData } from '../../types/changelog';
@@ -933,6 +935,12 @@ function KanbanView({
           canCreateData={canCreateData}
           canEditOwn={canEditOwn}
           canEditOthers={canEditOthers}
+          curriculumData={curriculumData}
+          curriculumLoading={curriculumLoading}
+          fetchCurriculum={fetchCurriculum}
+          attendeeData={attendeeData}
+          attendeeLoading={attendeeLoading}
+          fetchAttendee={fetchAttendee}
         />
       )}
     </Box>
@@ -2647,6 +2655,23 @@ export default function SecurityEducationManagement() {
     fetchEducations
   } = useSupabaseSecurityEducation();
 
+  // Supabase 커리큘럼 hook (비용관리 금액탭 패턴)
+  const {
+    data: curriculumData,
+    loading: curriculumLoading,
+    addCurriculum,
+    updateCurriculum,
+    deleteCurriculum,
+    fetchData: fetchCurriculum
+  } = useSupabaseSecurityCurriculum();
+
+  // 참석자 데이터 훅 (커리큘럼탭과 동일한 패턴)
+  const {
+    data: attendeeData = [],
+    loading: attendeeLoading,
+    fetchData: fetchAttendee
+  } = useSupabaseSecurityAttendee();
+
   // 마스터코드에서 상태 옵션 가져오기 (GROUP002의 서브코드만 필터링)
   const statusTypes = React.useMemo(() => {
     return masterCodes
@@ -3135,27 +3160,8 @@ export default function SecurityEducationManagement() {
             </Box>
           </Box>
 
-          {/* 권한 체크 */}
-          {!canViewCategory ? (
-            <Box
-              sx={{
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'column',
-                gap: 2,
-                py: 8
-              }}
-            >
-              <Typography variant="h5" color="text.secondary">
-                이 페이지에 접근할 권한이 없습니다.
-              </Typography>
-              <Typography variant="body2" color="text.disabled">
-                관리자에게 권한을 요청하세요.
-              </Typography>
-            </Box>
-          ) : !canReadData ? (
+          {/* 권한 체크: KPI관리 패턴 (깜빡임 방지) */}
+          {canViewCategory && !canReadData ? (
             <Box
               sx={{
                 flex: 1,
@@ -3441,6 +3447,12 @@ export default function SecurityEducationManagement() {
                   canCreateData={canCreateData}
                   canEditOwn={canEditOwn}
                   canEditOthers={canEditOthers}
+                  curriculumData={curriculumData}
+                  curriculumLoading={curriculumLoading}
+                  fetchCurriculum={fetchCurriculum}
+                  attendeeData={attendeeData}
+                  attendeeLoading={attendeeLoading}
+                  fetchAttendee={fetchAttendee}
                 />
               </Box>
             </TabPanel>
@@ -3647,6 +3659,12 @@ export default function SecurityEducationManagement() {
           canCreateData={canCreateData}
           canEditOwn={canEditOwn}
           canEditOthers={canEditOthers}
+          curriculumData={curriculumData}
+          curriculumLoading={curriculumLoading}
+          fetchCurriculum={fetchCurriculum}
+          attendeeData={attendeeData}
+          attendeeLoading={attendeeLoading}
+          fetchAttendee={fetchAttendee}
         />
       )}
     </Box>

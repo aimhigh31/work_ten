@@ -716,12 +716,12 @@ const OverviewTab = memo(
   }
 );
 
-// 사용자 이력 탭 컴포넌트
+// 사용자 이력 탭 컴포넌트 (커리큘럼탭과 동일한 패턴: 부모 state 사용)
 interface UserHistoryTabProps {
   mode: 'add' | 'edit';
   hardwareId?: string;
   userHistories: UserHistory[];
-  onUserHistoriesChange: (histories: UserHistory[]) => void;
+  setUserHistories: React.Dispatch<React.SetStateAction<UserHistory[]>>;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
 }
@@ -736,108 +736,19 @@ interface MaintenanceHistoryTabRef {
 
 const UserHistoryTab = memo(
   React.forwardRef<UserHistoryTabRef, UserHistoryTabProps>(
-    ({ mode, hardwareId, userHistories: initialUserHistories, onUserHistoriesChange, canEditOwn = true, canEditOthers = true }, ref) => {
-      const { getUserHistories, convertToUserHistory } = useSupabaseHardwareUser();
-
-      // 사용자 액션 추적을 위한 ref들을 컴포넌트 최상단에 선언
-      const userActionRef = useRef(false);
-      const loadedRef = useRef(false);
-      const initializedRef = useRef(false);
-      const prevUserHistoriesRef = useRef<UserHistory[]>([]);
-      const prevTempDataRef = useRef<string>('');
+    ({ mode, hardwareId, userHistories, setUserHistories, canEditOwn = true, canEditOthers = true }, ref) => {
+      // 커리큘럼탭과 동일한 패턴: 부모 state 직접 사용 (로컬 state 제거)
 
       // 임시저장 키 생성
       const tempStorageKey = useMemo(() => {
         return `hardware_user_history_${mode}_${hardwareId || 'new'}`;
       }, [mode, hardwareId]);
 
-      // 로컬 사용자이력 상태 - DB 연동을 위해 초기값으로 props 사용
-      const [userHistories, setUserHistories] = useState<UserHistory[]>(initialUserHistories);
-
       // DB에서 직접 조회한 마스터코드 데이터
       const [statusFromDB, setStatusFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
 
-      // 하드웨어 ID가 변경되면 모든 상태 초기화
-      useEffect(() => {
-        console.log('🔄 하드웨어 ID 변경됨, 모든 상태 초기화:', hardwareId);
-        loadedRef.current = false;
-        initializedRef.current = false;
-        userActionRef.current = false;
-        // 편집 모드에서는 UI 초기화
-        if (mode === 'edit') {
-          setUserHistories([]);
-        }
-      }, [hardwareId, mode]);
-
-      // DB에서 사용자이력 로드 (편집 모드인 경우)
-      useEffect(() => {
-        let isMounted = true;
-        let timeoutId: NodeJS.Timeout;
-
-        const loadUserHistories = async () => {
-          // 사용자 액션 중인 경우 건너뛰기
-          if (userActionRef.current) {
-            console.log('⏸️ 사용자 액션 중이므로 DB 로드 건너뛰기');
-            return;
-          }
-
-          if (mode === 'edit' && hardwareId && !loadedRef.current && isMounted) {
-            console.log('🔍 하드웨어 사용자 이력 조회 시작:', hardwareId);
-            loadedRef.current = true; // 로드 시작 표시
-
-            try {
-              const hardwareIdNum = parseInt(hardwareId);
-              console.log('📞 getUserHistories 호출 전');
-              const userData = await getUserHistories(hardwareIdNum);
-              console.log('📞 getUserHistories 응답:', userData?.length || 0, '개');
-
-              if (isMounted && !userActionRef.current) {
-                const convertedData = userData.map(convertToUserHistory);
-                console.log('🔄 DB에서 로드한 사용자이력:', convertedData.length, '개');
-                console.log('📋 변환된 데이터 상세:', convertedData);
-
-                // 상태 업데이트
-                setUserHistories(convertedData);
-                console.log('✅ setUserHistories 호출 완료');
-
-                // 부모에게 알림
-                onUserHistoriesChange(convertedData);
-                console.log('✅ onUserHistoriesChange 호출 완료');
-              }
-            } catch (error) {
-              if (isMounted) {
-                console.warn('⚠️ 사용자이력 로드 중 오류:', error);
-                setUserHistories([]);
-              }
-            }
-          } else if (mode === 'add' && isMounted && !loadedRef.current) {
-            loadedRef.current = true;
-            // add 모드에서는 임시저장 데이터 복원 시도
-            try {
-              const tempData = localStorage.getItem(tempStorageKey);
-              if (tempData) {
-                const parsedData = JSON.parse(tempData);
-                console.log('📋 사용자이력 임시저장 데이터 복원:', parsedData);
-                setUserHistories(parsedData);
-              }
-            } catch (error) {
-              console.warn('사용자이력 임시저장 데이터 복원 실패:', error);
-            }
-          }
-        };
-
-        // 약간의 지연을 주어 컴포넌트가 완전히 마운트된 후 실행
-        timeoutId = setTimeout(() => {
-          loadUserHistories();
-        }, 100);
-
-        return () => {
-          isMounted = false;
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-          }
-        };
-      }, [mode, hardwareId]); // 하드웨어 ID 변경 시 다시 로드
+      // 커리큘럼탭과 동일한 패턴: 데이터 로드와 임시저장은 부모에서 관리
+      // userHistories는 props로 받아서 사용
 
       // GROUP044 상태 데이터 조회 (Dialog가 열릴 때마다)
       useEffect(() => {
@@ -863,16 +774,7 @@ const UserHistoryTab = memo(
         fetchStatusData();
       }, []);
 
-      // 이력 변경 시 부모 컴포넌트에 알림 - 사용자 액션에서만
-      useEffect(() => {
-        // 사용자 액션으로 인한 변경이고, 실제로 데이터가 변경된 경우에만 부모에게 알림
-        if (userActionRef.current && JSON.stringify(userHistories) !== JSON.stringify(prevUserHistoriesRef.current)) {
-          console.log('📤 부모 컴포넌트에 사용자이력 변경 알림');
-          onUserHistoriesChange(userHistories);
-          userActionRef.current = false;
-          prevUserHistoriesRef.current = [...userHistories];
-        }
-      }, [userHistories]); // onUserHistoriesChange 제거하여 순환 의존성 방지
+      // 커리큘럼탭과 동일한 패턴: 부모 알림과 임시저장 로직 제거
 
       const [selectedRows, setSelectedRows] = useState<string[]>([]);
       const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
@@ -887,23 +789,6 @@ const UserHistoryTab = memo(
       const startIndex = (currentPage - 1) * itemsPerPage;
       const endIndex = startIndex + itemsPerPage;
       const currentItems = userHistories.slice(startIndex, endIndex);
-
-      // 사용자이력 임시저장 - 사용자 액션이 있을 때만 저장
-      useEffect(() => {
-        // 사용자 액션이 있거나 add 모드일 때만 임시저장
-        if (mode === 'add' || userActionRef.current) {
-          const dataString = JSON.stringify(userHistories);
-          if (dataString !== prevTempDataRef.current) {
-            try {
-              localStorage.setItem(tempStorageKey, dataString);
-              prevTempDataRef.current = dataString;
-              console.log('💾 사용자이력 임시저장 완료:', userHistories.length + '개');
-            } catch (error) {
-              console.warn('사용자이력 임시저장 실패:', error);
-            }
-          }
-        }
-      }, [userHistories, tempStorageKey, mode]);
 
       // ref를 통해 임시저장 삭제 함수 노출
       React.useImperativeHandle(
@@ -935,9 +820,8 @@ const UserHistoryTab = memo(
       };
 
       const handleAddHistory = useCallback(() => {
-        // "대기" 상태의 subcode 찾기
-        const daegiStatus = statusFromDB.find((s) => s.subcode_name === '대기');
-        const defaultStatus = daegiStatus ? daegiStatus.subcode : '';
+        // "대기" 상태의 subcode_name 사용 (서브코드 저장 규칙: subcode_name을 DB에 저장)
+        const defaultStatus = '대기'; // 서브코드명 직접 사용
 
         const newHistory: UserHistory = {
           id: Date.now().toString(),
@@ -953,26 +837,24 @@ const UserHistoryTab = memo(
         setUserHistories((prev) => {
           const newList = [newHistory, ...prev];
           console.log('📝 행 추가:', newHistory.id, '총 개수:', newList.length);
-          userActionRef.current = true; // 사용자 액션 플래그 설정
           return newList;
         });
-      }, [statusFromDB]);
+      }, [setUserHistories]);
 
       const handleDeleteSelected = useCallback(() => {
         setUserHistories((prev) => {
           const filtered = prev.filter((h) => !selectedRows.includes(h.id));
           console.log('🗑️ 행 삭제:', selectedRows.length, '개, 남은 개수:', filtered.length);
-          userActionRef.current = true; // 사용자 액션 플래그 설정
           return filtered;
         });
         setSelectedRows([]);
-      }, [selectedRows]);
+      }, [selectedRows, setUserHistories]);
 
       const handleEditHistory = useCallback((id: string, field: keyof UserHistory, value: string) => {
         setUserHistories((prev) => {
-          // 상태를 '사용중'으로 변경하려는 경우 검증
-          if (field === 'status' && value === 'active') {
-            const hasActiveUser = prev.some((h) => h.id !== id && h.status === 'active');
+          // 상태를 '사용중'으로 변경하려는 경우 검증 (서브코드 저장 규칙: subcode_name 사용)
+          if (field === 'status' && value === '사용중') {
+            const hasActiveUser = prev.some((h) => h.id !== id && h.status === '사용중');
             if (hasActiveUser) {
               setStatusWarning('이미 다른 사용자가 사용중입니다. 사용중인 항목은 하나만 선택 가능합니다.');
               setTimeout(() => setStatusWarning(''), 3000);
@@ -983,10 +865,9 @@ const UserHistoryTab = memo(
           setStatusWarning('');
           const updated = prev.map((h) => (h.id === id ? { ...h, [field]: value } : h));
           console.log('✏️ 행 편집:', id, field, value);
-          userActionRef.current = true; // 사용자 액션 플래그 설정
           return updated;
         });
-      }, []);
+      }, [setUserHistories]);
 
       const handleSelectRow = (id: string) => {
         if (selectedRows.includes(id)) {
@@ -1073,14 +954,8 @@ const UserHistoryTab = memo(
                 value={displayValue}
                 onChange={(e) => {
                   const newValue = e.target.value;
-                  // subcode_name을 subcode로 변환하여 저장
-                  if (field === 'status') {
-                    const statusItem = statusFromDB.find((s) => s.subcode_name === newValue);
-                    const subcodeValue = statusItem ? statusItem.subcode : newValue;
-                    handleEditHistory(history.id, 'status', subcodeValue);
-                  } else {
-                    handleEditHistory(history.id, field as keyof UserHistory, newValue);
-                  }
+                  // 서브코드 저장 규칙: subcode_name을 그대로 저장 (변환하지 않음)
+                  handleEditHistory(history.id, field as keyof UserHistory, newValue);
                 }}
                 onBlur={handleCellBlur}
                 size="small"
@@ -1275,7 +1150,7 @@ const UserHistoryTab = memo(
             <Table size="small" sx={{ tableLayout: 'fixed' }}>
               <TableHead>
                 <TableRow sx={{ backgroundColor: 'grey.50' }}>
-                  <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
+                  <TableCell padding="checkbox" align="center" sx={{ width: columnWidths.checkbox }}>
                     <Checkbox
                       checked={selectedRows.length === userHistories.length && userHistories.length > 0}
                       onChange={handleSelectAll}
@@ -1309,7 +1184,7 @@ const UserHistoryTab = memo(
                       '&:hover': { backgroundColor: 'action.hover' }
                     }}
                   >
-                    <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
+                    <TableCell padding="checkbox" align="center" sx={{ width: columnWidths.checkbox }}>
                       <Checkbox
                         checked={selectedRows.includes(history.id)}
                         onChange={() => handleSelectRow(history.id)}
@@ -1340,11 +1215,8 @@ const UserHistoryTab = memo(
                     </TableCell>
                     <TableCell sx={{ width: columnWidths.status }} onClick={() => handleCellClick(history.id, 'status')}>
                       {(() => {
-                        // subcode를 subcode_name으로 변환 (빈 값이면 "대기")
-                        let statusName = history.status ? statusFromDB.find((s) => s.subcode === history.status)?.subcode_name : '';
-                        if (!statusName) {
-                          statusName = '대기';
-                        }
+                        // 서브코드 저장 규칙: status는 이미 subcode_name (빈 값이면 "대기")
+                        const statusName = history.status || '대기';
                         return renderEditableCell(history, 'status', statusName, statusOptions);
                       })()}
                     </TableCell>
@@ -1441,7 +1313,7 @@ const UserHistoryTab = memo(
 // useImperativeHandle을 사용하여 ref 함수 노출
 UserHistoryTab.displayName = 'UserHistoryTab';
 
-// 구매/수리 이력 탭 컴포넌트
+// 구매/수리 이력 탭 컴포넌트 (커리큘럼탭과 동일한 패턴: 부모 state 사용)
 const MaintenanceHistoryTab = memo(
   React.forwardRef<
     MaintenanceHistoryTabRef,
@@ -1449,111 +1321,23 @@ const MaintenanceHistoryTab = memo(
       hardwareId: number;
       mode: 'add' | 'edit';
       maintenanceHistories: MaintenanceHistory[];
-      onMaintenanceHistoriesChange: (histories: MaintenanceHistory[]) => void;
+      setMaintenanceHistories: React.Dispatch<React.SetStateAction<MaintenanceHistory[]>>;
       canEditOwn?: boolean;
       canEditOthers?: boolean;
     }
-  >(({ hardwareId, mode, maintenanceHistories: initialHistories, onMaintenanceHistoriesChange, canEditOwn = true, canEditOthers = true }, ref) => {
-    const { getMaintenanceHistories, convertToMaintenanceHistory } = useSupabaseHardwareHistory();
-
-    // 사용자 액션 추적을 위한 ref들을 컴포넌트 최상단에 선언
-    const userActionRef = useRef(false);
-    const loadedRef = useRef(false);
-    const initializedRef = useRef(false);
-    const prevMaintenanceHistoriesRef = useRef<MaintenanceHistory[]>([]);
-    const prevTempDataRef = useRef<string>('');
+  >(({ hardwareId, mode, maintenanceHistories, setMaintenanceHistories, canEditOwn = true, canEditOthers = true }, ref) => {
+    // 커리큘럼탭과 동일한 패턴: 부모 state 직접 사용 (로컬 state 제거)
 
     // 임시저장 키 생성
     const tempMaintenanceKey = useMemo(() => {
       return `hardware_maintenance_history_${mode}_${hardwareId || 'new'}`;
     }, [mode, hardwareId]);
 
-    // 로컬 구매/수리이력 상태 - DB 연동을 위해 초기값으로 props 사용
-    const [maintenanceHistories, setMaintenanceHistories] = useState<MaintenanceHistory[]>(initialHistories);
-
     // DB에서 직접 조회한 마스터코드 데이터
     const [statusFromDB, setStatusFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
 
-    // 하드웨어 ID가 변경되면 모든 상태 초기화
-    useEffect(() => {
-      console.log('🔄 하드웨어 ID 변경됨, 모든 상태 초기화:', hardwareId);
-      loadedRef.current = false;
-      initializedRef.current = false;
-      userActionRef.current = false;
-      // 편집 모드에서는 UI 초기화
-      if (mode === 'edit') {
-        setMaintenanceHistories([]);
-      }
-    }, [hardwareId, mode]);
-
-    // DB에서 구매/수리이력 로드 (편집 모드인 경우)
-    useEffect(() => {
-      let isMounted = true;
-      let timeoutId: NodeJS.Timeout;
-
-      const loadMaintenanceHistories = async () => {
-        // 사용자 액션 중인 경우 건너뛰기
-        if (userActionRef.current) {
-          console.log('⏸️ 사용자 액션 중이므로 DB 로드 건너뛰기');
-          return;
-        }
-
-        if (mode === 'edit' && hardwareId && !loadedRef.current && isMounted) {
-          console.log('🔍 하드웨어 구매/수리 이력 조회 시작:', hardwareId);
-          loadedRef.current = true; // 로드 시작 표시
-
-          try {
-            console.log('📞 getMaintenanceHistories 호출 전');
-            const historyData = await getMaintenanceHistories(hardwareId);
-            console.log('📞 getMaintenanceHistories 응답:', historyData?.length || 0, '개');
-
-            if (isMounted && !userActionRef.current) {
-              const convertedData = historyData.map(convertToMaintenanceHistory);
-              console.log('🔄 DB에서 로드한 구매/수리이력:', convertedData.length, '개');
-              console.log('📋 변환된 데이터 상세:', convertedData);
-
-              // 상태 업데이트
-              setMaintenanceHistories(convertedData);
-              console.log('✅ setMaintenanceHistories 호출 완료');
-
-              // 부모에게 알림
-              onMaintenanceHistoriesChange(convertedData);
-              console.log('✅ onMaintenanceHistoriesChange 호출 완료');
-            }
-          } catch (error) {
-            if (isMounted) {
-              console.warn('⚠️ 구매/수리이력 로드 중 오류:', error);
-              setMaintenanceHistories([]);
-            }
-          }
-        } else if (mode === 'add' && isMounted && !loadedRef.current) {
-          loadedRef.current = true;
-          // add 모드에서는 임시저장 데이터 복원 시도
-          try {
-            const tempData = localStorage.getItem(tempStorageKey);
-            if (tempData) {
-              const parsedData = JSON.parse(tempData);
-              console.log('📋 구매/수리이력 임시저장 데이터 복원:', parsedData);
-              setMaintenanceHistories(parsedData);
-            }
-          } catch (error) {
-            console.warn('구매/수리이력 임시저장 데이터 복원 실패:', error);
-          }
-        }
-      };
-
-      // 약간의 지연을 주어 컴포넌트가 완전히 마운트된 후 실행
-      timeoutId = setTimeout(() => {
-        loadMaintenanceHistories();
-      }, 100);
-
-      return () => {
-        isMounted = false;
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-        }
-      };
-    }, [mode, hardwareId]); // 하드웨어 ID 변경 시 다시 로드
+    // 커리큘럼탭과 동일한 패턴: 데이터 로드와 임시저장은 부모에서 관리
+    // maintenanceHistories는 props로 받아서 사용
 
     // GROUP002 상태 데이터 조회 (Dialog가 열릴 때마다)
     useEffect(() => {
@@ -1579,31 +1363,7 @@ const MaintenanceHistoryTab = memo(
       fetchStatusData();
     }, []);
 
-    // 이력 변경 시 부모 컴포넌트에 알림 - 사용자 액션에서만
-    useEffect(() => {
-      // 사용자 액션으로 인한 변경이고, 실제로 데이터가 변경된 경우에만 부모에게 알림
-      if (userActionRef.current && JSON.stringify(maintenanceHistories) !== JSON.stringify(prevMaintenanceHistoriesRef.current)) {
-        console.log('📤 부모 컴포넌트에 구매/수리이력 변경 알림');
-        onMaintenanceHistoriesChange(maintenanceHistories);
-        userActionRef.current = false;
-        prevMaintenanceHistoriesRef.current = [...maintenanceHistories];
-      }
-    }, [maintenanceHistories]); // onMaintenanceHistoriesChange 제거하여 순환 의존성 방지
-
-    // 구매/수리이력 임시저장 - 사용자 액션이 있을 때만 저장
-    useEffect(() => {
-      // 사용자 액션이 있거나 add 모드일 때만 임시저장
-      if (userActionRef.current || mode === 'add') {
-        try {
-          if (maintenanceHistories.length > 0) {
-            localStorage.setItem(tempMaintenanceKey, JSON.stringify(maintenanceHistories));
-            console.log('💾 구매/수리이력 임시저장 완료:', maintenanceHistories.length + '개');
-          }
-        } catch (error) {
-          console.warn('구매/수리이력 임시저장 실패:', error);
-        }
-      }
-    }, [maintenanceHistories, tempMaintenanceKey, mode]);
+    // 커리큘럼탭과 동일한 패턴: 부모 알림과 임시저장 로직 제거
 
     // ref를 통해 임시저장 삭제 함수 노출
     useImperativeHandle(
@@ -1648,10 +1408,9 @@ const MaintenanceHistoryTab = memo(
       setEditingCell(null);
     };
 
-    const handleAddHistory = () => {
-      // 기본 상태로 "대기" 또는 "예비" 찾기
-      const defaultStatusItem = statusFromDB.find((s) => s.subcode_name === '대기' || s.subcode_name === '예비');
-      const defaultStatus = defaultStatusItem ? defaultStatusItem.subcode : '';
+    const handleAddHistory = useCallback(() => {
+      // 서브코드 저장 규칙: 기본 상태로 subcode_name '대기' 사용
+      const defaultStatus = '대기';
 
       const newHistory: MaintenanceHistory = {
         id: Date.now().toString(),
@@ -1667,27 +1426,27 @@ const MaintenanceHistoryTab = memo(
       };
       setMaintenanceHistories((prev) => {
         const newList = [newHistory, ...prev];
-        userActionRef.current = true; // 사용자 액션 플래그 설정
+        console.log('📝 행 추가:', newHistory.id, '총 개수:', newList.length);
         return newList;
       });
-    };
+    }, [setMaintenanceHistories]);
 
-    const handleDeleteSelected = () => {
+    const handleDeleteSelected = useCallback(() => {
       setMaintenanceHistories((prev) => {
         const newList = prev.filter((h) => !selectedRows.includes(h.id));
-        userActionRef.current = true; // 사용자 액션 플래그 설정
+        console.log('🗑️ 행 삭제:', selectedRows.length, '개, 남은 개수:', newList.length);
         return newList;
       });
       setSelectedRows([]);
-    };
+    }, [selectedRows, setMaintenanceHistories]);
 
-    const handleEditHistory = (id: string, field: keyof MaintenanceHistory, value: string | number) => {
+    const handleEditHistory = useCallback((id: string, field: keyof MaintenanceHistory, value: string | number) => {
       setMaintenanceHistories((prev) => {
         const newList = prev.map((h) => (h.id === id ? { ...h, [field]: value } : h));
-        userActionRef.current = true; // 사용자 액션 플래그 설정
+        console.log('✏️ 행 편집:', id, field, value);
         return newList;
       });
-    };
+    }, [setMaintenanceHistories]);
 
     const handleSelectRow = (id: string) => {
       if (selectedRows.includes(id)) {
@@ -1768,8 +1527,8 @@ const MaintenanceHistoryTab = memo(
     // 상태별 배경/글자 색상 (Chip용)
     const getStatusColor = useCallback(
       (status: string) => {
-        const statusItem = statusFromDB.find((s) => s.subcode === status || s.subcode_name === status);
-        const statusName = statusItem ? statusItem.subcode_name : status;
+        // 서브코드 저장 규칙: status는 이미 subcode_name이므로 그대로 사용
+        const statusName = status;
 
         switch (statusName) {
           case '대기':
@@ -1790,7 +1549,7 @@ const MaintenanceHistoryTab = memo(
             return { backgroundColor: '#F5F5F5', color: '#757575' };
         }
       },
-      [statusFromDB]
+      [] // 의존성 없음 - status는 이미 subcode_name
     );
 
     // 컬럼 너비 및 높이 정의 (편집/읽기 모드 공통)
@@ -2103,7 +1862,7 @@ const MaintenanceHistoryTab = memo(
           <Table size="small" sx={{ tableLayout: 'fixed' }}>
             <TableHead>
               <TableRow sx={{ backgroundColor: 'grey.50' }}>
-                <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
+                <TableCell padding="checkbox" align="center" sx={{ width: columnWidths.checkbox }}>
                   <Checkbox
                     checked={selectedRows.length === maintenanceHistories.length && maintenanceHistories.length > 0}
                     onChange={handleSelectAll}
@@ -2139,7 +1898,7 @@ const MaintenanceHistoryTab = memo(
                     '&:hover': { backgroundColor: 'action.hover' }
                   }}
                 >
-                  <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
+                  <TableCell padding="checkbox" align="center" sx={{ width: columnWidths.checkbox }}>
                     <Checkbox
                       checked={selectedRows.includes(history.id)}
                       onChange={() => handleSelectRow(history.id)}
@@ -2176,8 +1935,8 @@ const MaintenanceHistoryTab = memo(
                   </TableCell>
                   <TableCell sx={{ width: columnWidths.status }} onClick={() => handleCellClick(history.id, 'status')}>
                     {(() => {
-                      // subcode를 subcode_name으로 변환
-                      const statusName = statusFromDB.find((s) => s.subcode === history.status)?.subcode_name || history.status;
+                      // 서브코드 저장 규칙: status는 이미 subcode_name
+                      const statusName = history.status || '대기';
                       return renderEditableCell(history, 'status', statusName, statusOptions);
                     })()}
                   </TableCell>
@@ -3346,9 +3105,9 @@ export default function HardwareDialog({
     return filtered;
   }, [users]);
 
-  // DB 훅들
-  const { saveUserHistories } = useSupabaseHardwareUser();
-  const { saveMaintenanceHistories } = useSupabaseHardwareHistory();
+  // DB 훅들 (커리큘럼탭 패턴: 데이터 로드와 저장 모두 부모에서 처리)
+  const { getUserHistories, convertToUserHistory, saveUserHistories } = useSupabaseHardwareUser();
+  const { getMaintenanceHistories, convertToMaintenanceHistory, saveMaintenanceHistories } = useSupabaseHardwareHistory();
 
   // 피드백 훅
   const {
@@ -3398,6 +3157,54 @@ export default function HardwareDialog({
       setInitialFeedbacks([]);
     }
   }, [open, data?.id, feedbacks]);
+
+  // 사용자이력 데이터 로드 (커리큘럼탭과 동일한 패턴)
+  useEffect(() => {
+    const loadUserHistories = async () => {
+      if (open && data?.id && mode === 'edit') {
+        console.log('🔄 사용자이력 데이터 로드 중:', { hardwareId: data.id });
+        try {
+          const hardwareIdNum = parseInt(data.id);
+          const userData = await getUserHistories(hardwareIdNum);
+          const convertedData = userData.map(convertToUserHistory);
+          setUserHistories(convertedData);
+          console.log('✅ 사용자이력 데이터 로드 완료:', { count: convertedData.length });
+        } catch (error) {
+          console.error('❌ 사용자이력 데이터 로드 실패:', error);
+          setUserHistories([]);
+        }
+      } else if (open && mode === 'add') {
+        // add 모드일 때는 초기화
+        setUserHistories([]);
+      }
+    };
+
+    loadUserHistories();
+  }, [open, data?.id, mode, getUserHistories, convertToUserHistory]);
+
+  // 구매/수리이력 데이터 로드 (커리큘럼탭과 동일한 패턴)
+  useEffect(() => {
+    const loadMaintenanceHistories = async () => {
+      if (open && data?.id && mode === 'edit') {
+        console.log('🔄 구매/수리이력 데이터 로드 중:', { hardwareId: data.id });
+        try {
+          const hardwareIdNum = parseInt(data.id);
+          const historyData = await getMaintenanceHistories(hardwareIdNum);
+          const convertedData = historyData.map(convertToMaintenanceHistory);
+          setMaintenanceHistories(convertedData);
+          console.log('✅ 구매/수리이력 데이터 로드 완료:', { count: convertedData.length });
+        } catch (error) {
+          console.error('❌ 구매/수리이력 데이터 로드 실패:', error);
+          setMaintenanceHistories([]);
+        }
+      } else if (open && mode === 'add') {
+        // add 모드일 때는 초기화
+        setMaintenanceHistories([]);
+      }
+    };
+
+    loadMaintenanceHistories();
+  }, [open, data?.id, mode, getMaintenanceHistories, convertToMaintenanceHistory]);
 
   // 코멘트 상태 - pendingFeedbacks에서 변환
   const comments = useMemo(() => {
@@ -3632,47 +3439,71 @@ export default function HardwareDialog({
       // 하드웨어 기본 정보 저장
       onSave(hardwareState);
 
-      // 사용자이력이 있고 하드웨어 ID가 있는 경우 DB에 저장
-      if (userHistories.length > 0 && data?.id) {
+      // 사용자이력 DB 저장 (커리큘럼탭 패턴)
+      if (data?.id) {
         const hardwareId = parseInt(data.id);
 
-        // UserHistory를 HardwareUserHistory 형식으로 변환
-        const convertedHistories: HardwareUserHistory[] = userHistories.map((history) => ({
-          id: parseInt(history.id) || 0,
-          hardware_id: hardwareId,
-          user_name: history.userName?.trim() || '',
-          department: history.department?.trim() || '',
-          start_date: history.startDate?.trim() || new Date().toISOString().split('T')[0],
-          end_date: history.endDate?.trim() && history.endDate.trim() !== '' ? history.endDate.trim() : null,
-          reason: history.reason?.trim() || '',
-          status: history.status as 'active' | 'inactive',
-          registration_date: history.registrationDate?.trim() || new Date().toISOString().split('T')[0],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          created_by: 'system',
-          updated_by: 'system',
-          is_active: true
-        }));
+        try {
+          console.log('💾 사용자이력 데이터 저장 중...', { hardwareId, count: userHistories.length });
 
-        console.log('🔄 사용자이력 변환:', { original: userHistories, converted: convertedHistories });
+          // UserHistory를 HardwareUserHistory 형식으로 변환
+          const convertedHistories: HardwareUserHistory[] = userHistories.map((history) => ({
+            id: parseInt(history.id) || 0,
+            hardware_id: hardwareId,
+            user_name: history.userName?.trim() || '',
+            department: history.department?.trim() || '',
+            start_date: history.startDate?.trim() || new Date().toISOString().split('T')[0],
+            end_date: history.endDate?.trim() && history.endDate.trim() !== '' ? history.endDate.trim() : null,
+            reason: history.reason?.trim() || '',
+            status: history.status as 'active' | 'inactive',
+            registration_date: history.registrationDate?.trim() || new Date().toISOString().split('T')[0],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            created_by: 'system',
+            updated_by: 'system',
+            is_active: true
+          }));
 
-        const success = await saveUserHistories(hardwareId, convertedHistories);
-        if (success) {
-          console.log('✅ 사용자이력 DB 저장 완료');
-        } else {
-          console.warn('⚠️ 사용자이력 DB 저장 실패');
+          console.log('🔄 사용자이력 변환:', { original: userHistories, converted: convertedHistories });
+
+          const success = await saveUserHistories(hardwareId, convertedHistories);
+          if (success) {
+            console.log('✅ 사용자이력 DB 저장 완료');
+
+            // 최신 데이터 다시 로드 (커리큘럼탭과 동일한 패턴)
+            const freshUserData = await getUserHistories(hardwareId);
+            const freshUserHistories = freshUserData.map(convertToUserHistory);
+            setUserHistories(freshUserHistories);
+            console.log('🔄 최신 사용자이력 데이터 로드 완료:', { count: freshUserHistories.length });
+          } else {
+            console.warn('⚠️ 사용자이력 DB 저장 실패');
+          }
+        } catch (error) {
+          console.error('❌ 사용자이력 저장 중 오류:', error);
         }
       }
 
-      // 구매/수리이력이 있고 하드웨어 ID가 있는 경우 DB에 저장
-      if (maintenanceHistories.length > 0 && data?.id) {
+      // 구매/수리이력 DB 저장 (커리큘럼탭 패턴)
+      if (data?.id) {
         const hardwareId = parseInt(data.id);
 
-        const success = await saveMaintenanceHistories(hardwareId, maintenanceHistories);
-        if (success) {
-          console.log('✅ 구매/수리이력 DB 저장 완료');
-        } else {
-          console.warn('⚠️ 구매/수리이력 DB 저장 실패');
+        try {
+          console.log('💾 구매/수리이력 데이터 저장 중...', { hardwareId, count: maintenanceHistories.length });
+
+          const success = await saveMaintenanceHistories(hardwareId, maintenanceHistories);
+          if (success) {
+            console.log('✅ 구매/수리이력 DB 저장 완료');
+
+            // 최신 데이터 다시 로드 (커리큘럼탭과 동일한 패턴)
+            const freshHistoryData = await getMaintenanceHistories(hardwareId);
+            const freshMaintenanceHistories = freshHistoryData.map(convertToMaintenanceHistory);
+            setMaintenanceHistories(freshMaintenanceHistories);
+            console.log('🔄 최신 구매/수리이력 데이터 로드 완료:', { count: freshMaintenanceHistories.length });
+          } else {
+            console.warn('⚠️ 구매/수리이력 DB 저장 실패');
+          }
+        } catch (error) {
+          console.error('❌ 구매/수리이력 저장 중 오류:', error);
         }
       }
 
@@ -3758,6 +3589,8 @@ export default function HardwareDialog({
     // 🔄 기록 탭 임시 데이터 초기화
     setPendingFeedbacks([]);
     setInitialFeedbacks([]);
+    // 사용자이력 초기화 (커리큘럼탭과 동일한 패턴)
+    setUserHistories([]);
     onClose();
   };
 
@@ -3969,7 +3802,7 @@ export default function HardwareDialog({
             mode={mode}
             hardwareId={data?.id}
             userHistories={userHistories}
-            onUserHistoriesChange={setUserHistories}
+            setUserHistories={setUserHistories}
             canEditOwn={canEditOwn && isOwner}
             canEditOthers={canEditOthers}
           />
@@ -3981,7 +3814,7 @@ export default function HardwareDialog({
             hardwareId={data?.id ? parseInt(data.id) : 0}
             mode={mode}
             maintenanceHistories={maintenanceHistories}
-            onMaintenanceHistoriesChange={setMaintenanceHistories}
+            setMaintenanceHistories={setMaintenanceHistories}
             canEditOwn={canEditOwn && isOwner}
             canEditOthers={canEditOthers}
           />

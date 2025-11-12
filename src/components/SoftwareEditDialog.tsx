@@ -65,7 +65,8 @@ import { useSupabaseUsers } from '../hooks/useSupabaseUsers';
 // Software User hook
 import { useSupabaseSoftwareUser, UserHistory } from '../hooks/useSupabaseSoftwareUser';
 // Software History hook
-import { useSupabaseSoftwareHistory, PurchaseHistory } from '../hooks/useSupabaseSoftwareHistory';
+import { useSupabaseSoftwareHistory, PurchaseHistory, MaintenanceHistory } from '../hooks/useSupabaseSoftwareHistory';
+import { createCacheKey } from '../utils/cacheUtils';
 // Feedback hook
 import { useSupabaseFeedback } from '../hooks/useSupabaseFeedback';
 import { PAGE_IDENTIFIERS } from '../types/feedback';
@@ -1414,48 +1415,18 @@ interface UserHistory {
 // 사용자이력 탭 컴포넌트
 const UserHistoryTab = memo(
   ({
-    softwareId,
-    mode,
-    userHistories: initialUserHistories,
-    onUserHistoriesChange,
+    userHistories,
+    setUserHistories,
     canEditOwn = true,
     canEditOthers = true
   }: {
-    softwareId: number;
-    mode: 'add' | 'edit';
     userHistories: UserHistory[];
-    onUserHistoriesChange: (histories: UserHistory[]) => void;
+    setUserHistories: React.Dispatch<React.SetStateAction<UserHistory[]>>;
     canEditOwn?: boolean;
     canEditOthers?: boolean;
   }) => {
-    const { getUserHistories, convertToUserHistory } = useSupabaseSoftwareUser();
-
-    // 로컬 사용자이력 상태
-    const [userHistories, setUserHistories] = useState<UserHistory[]>(initialUserHistories);
-
     // DB에서 직접 조회한 마스터코드 데이터
     const [statusFromDB, setStatusFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
-
-    // DB에서 사용자이력 로드 (편집 모드인 경우)
-    useEffect(() => {
-      const loadUserHistories = async () => {
-        if (mode === 'edit' && softwareId) {
-          try {
-            const userData = await getUserHistories(softwareId);
-            const convertedData = userData.map(convertToUserHistory);
-            setUserHistories(convertedData);
-            onUserHistoriesChange(convertedData);
-          } catch (error) {
-            console.warn('⚠️ 사용자이력 로드 중 오류:', error);
-            // 에러가 발생해도 빈 배열로 초기화하여 UI가 정상 작동하도록 함
-            setUserHistories([]);
-            onUserHistoriesChange([]);
-          }
-        }
-      };
-
-      loadUserHistories();
-    }, [mode, softwareId]);
 
     // GROUP044 상태 데이터 조회 (Dialog가 열릴 때마다)
     useEffect(() => {
@@ -1481,10 +1452,9 @@ const UserHistoryTab = memo(
       fetchStatusData();
     }, []);
 
-    // 사용자이력 변경 시 부모 컴포넌트에 알림
-    useEffect(() => {
-      onUserHistoriesChange(userHistories);
-    }, [userHistories, onUserHistoriesChange]);
+    console.log('🔍 UserHistoryTab - 데이터 확인:');
+    console.log('  - userHistories.length:', userHistories.length);
+    console.log('  - userHistories 데이터:', userHistories);
 
     // 더 많은 샘플 데이터로 페이지네이션 테스트 (add 모드일 때만 사용)
     const [sampleUserHistories] = useState<UserHistory[]>([
@@ -1625,10 +1595,9 @@ const UserHistoryTab = memo(
       setEditingCell(null);
     };
 
-    const handleAddHistory = () => {
-      // "대기" 상태의 subcode 찾기
-      const daegiStatus = statusFromDB.find((s) => s.subcode_name === '대기');
-      const defaultStatus = daegiStatus ? daegiStatus.subcode : '';
+    const handleAddHistory = useCallback(() => {
+      // "대기" 상태 기본값
+      const defaultStatus = '대기';
 
       const newHistory: UserHistory = {
         id: Date.now().toString(),
@@ -1642,19 +1611,23 @@ const UserHistoryTab = memo(
         reason: '',
         status: defaultStatus
       };
-      setUserHistories([newHistory, ...userHistories]);
-    };
 
-    const handleDeleteSelected = () => {
-      setUserHistories(userHistories.filter((h) => !selectedRows.includes(h.id)));
+      console.log('🔄 새 사용자이력 추가:', newHistory);
+      setUserHistories(prev => [newHistory, ...prev]);
+      setCurrentPage(1);
+    }, [setUserHistories]);
+
+    const handleDeleteSelected = useCallback(() => {
+      console.log('🗑️ 선택된 사용자이력 삭제:', selectedRows);
+      setUserHistories(prev => prev.filter((h) => !selectedRows.includes(h.id)));
       setSelectedRows([]);
-    };
+    }, [selectedRows, setUserHistories]);
 
-    const handleEditHistory = (id: string, field: keyof UserHistory, value: string) => {
-      // 소프트웨어는 동시 사용이 가능하므로 상태 검증 제거
-      setUserHistories(userHistories.map((h) => (h.id === id ? { ...h, [field]: value } : h)));
+    const handleEditHistory = useCallback((id: string, field: keyof UserHistory, value: string) => {
+      console.log('✏️ 사용자이력 수정:', { id, field, value });
+      setUserHistories(prev => prev.map((h) => (h.id === id ? { ...h, [field]: value } : h)));
       setStatusWarning('');
-    };
+    }, [setUserHistories]);
 
     const handleSelectRow = (id: string) => {
       if (selectedRows.includes(id)) {
@@ -1975,7 +1948,7 @@ const UserHistoryTab = memo(
             <TableBody>
               {currentItems.map((history, index) => (
                 <TableRow
-                  key={`history_${history.id}_${index}`}
+                  key={history.id}
                   hover
                   sx={{
                     height: cellHeight,
@@ -2117,7 +2090,7 @@ UserHistoryTab.displayName = 'UserHistoryTab';
 interface MaintenanceHistory {
   id: string;
   registrationDate: string;
-  type: 'purchase' | 'maintenance' | 'upgrade' | 'renewal';
+  type: string; // 서브코드명: '구매' | '유지보수' | '업그레이드' | '계약갱신'
   content: string;
   vendor: string;
   amount: number;
@@ -2130,29 +2103,15 @@ interface MaintenanceHistory {
 // 구매/유지보수이력 탭 컴포넌트
 const PurchaseMaintenanceTab = memo(
   ({
-    purchaseHistory,
+    maintenanceHistories,
+    setMaintenanceHistories,
     historyTypes,
-    onAddPurchaseHistory,
-    editingPurchaseHistoryId,
-    editingPurchaseHistoryData,
-    onEditPurchaseHistory,
-    onSavePurchaseHistoryEdit,
-    onCancelPurchaseHistoryEdit,
-    onDeletePurchaseHistory,
-    onEditPurchaseHistoryDataChange,
     canEditOwn = true,
     canEditOthers = true
   }: {
-    purchaseHistory: any[];
+    maintenanceHistories: MaintenanceHistory[];
+    setMaintenanceHistories: React.Dispatch<React.SetStateAction<MaintenanceHistory[]>>;
     historyTypes: string[];
-    onAddPurchaseHistory: (item: any) => void;
-    editingPurchaseHistoryId: number | null;
-    editingPurchaseHistoryData: any;
-    onEditPurchaseHistory: (id: number, data: any) => void;
-    onSavePurchaseHistoryEdit: () => void;
-    onCancelPurchaseHistoryEdit: () => void;
-    onDeletePurchaseHistory: (id: number) => void;
-    onEditPurchaseHistoryDataChange: (data: any) => void;
     canEditOwn?: boolean;
     canEditOthers?: boolean;
   }) => {
@@ -2184,57 +2143,9 @@ const PurchaseMaintenanceTab = memo(
       fetchMasterCodeData();
     }, [supabaseClient]);
 
-    // 설명을 기반으로 이력 타입 결정
-    const getHistoryType = (description: string): 'purchase' | 'maintenance' | 'upgrade' | 'renewal' => {
-      if (description.includes('유지보수')) return 'maintenance';
-      if (description.includes('업그레이드')) return 'upgrade';
-      if (description.includes('갱신') || description.includes('연장')) return 'renewal';
-      return 'purchase';
-    };
-
-    // memo에서 완료일 추출하는 함수
-    const extractCompletionDate = (memo: string): string => {
-      if (!memo) return '';
-      const match = memo.match(/완료일:\s*([^\|]*)/);
-      return match ? match[1].trim() : '';
-    };
-
-    // DB에서 로드된 구매이력을 MaintenanceHistory 형식으로 변환
-    const dbHistories: MaintenanceHistory[] = purchaseHistory.map((item, index) => {
-      const uniqueId = item.id ? item.id.toString() : `temp_${Date.now()}_${index}`;
-      const completionDateFromMemo = extractCompletionDate(item.memo || '');
-
-      return {
-        id: uniqueId,
-        registrationDate: item.registrationDate || item.purchaseDate || '',
-        type: getHistoryType(item.description || ''),
-        content: item.description || '',
-        vendor: item.supplier || '',
-        amount: parseFloat(item.price) || 0,
-        registrant: '시스템',
-        status: item.status || '진행중',
-        startDate: item.purchaseDate || '',
-        completionDate: completionDateFromMemo || (item.status === '완료' ? item.purchaseDate || '' : '')
-      };
-    });
-
     console.log('🔍 PurchaseMaintenanceTab - 데이터 확인:');
-    console.log('  - purchaseHistory.length:', purchaseHistory.length);
-    console.log('  - dbHistories.length:', dbHistories.length);
-    console.log('  - purchaseHistory 데이터:', purchaseHistory);
-
-    // 실제 데이터를 사용하되, DB 데이터가 없으면 빈 배열 사용
-    const maintenanceHistories: MaintenanceHistory[] = dbHistories.length > 0 ? dbHistories : [];
-
-    console.log('  - 최종 사용할 데이터:', maintenanceHistories.length + '개');
-
-    // purchaseHistory 변경시 로그 출력
-    React.useEffect(() => {
-      console.log('🔄 PurchaseMaintenanceTab - purchaseHistory 변경됨:', purchaseHistory.length + '개');
-      console.log('   변경된 데이터:', purchaseHistory);
-      console.log('   변환된 maintenanceHistories:', dbHistories.length + '개');
-      console.log('   maintenanceHistories 데이터:', dbHistories);
-    }, [purchaseHistory]);
+    console.log('  - maintenanceHistories.length:', maintenanceHistories.length);
+    console.log('  - maintenanceHistories 데이터:', maintenanceHistories);
 
     // 더 많은 샘플 데이터로 페이지네이션 테스트 (참고용 - 더 이상 사용하지 않음)
     const [fallbackHistories] = useState<MaintenanceHistory[]>([
@@ -2355,15 +2266,18 @@ const PurchaseMaintenanceTab = memo(
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(7);
 
-    // 신규행(음수 ID)을 맨 위로, 기존 행(양수 ID)을 그 아래에 정렬
+    // 신규행(음수 ID)을 맨 위로, 기존 행(양수 ID)은 DB 순서 유지 (이미 DESC로 정렬됨)
     const sortedMaintenanceHistories = [...maintenanceHistories].sort((a, b) => {
+      const aId = parseInt(a.id) || 0;
+      const bId = parseInt(b.id) || 0;
+
       // 신규행(음수 ID)을 맨 위에 배치
-      if (a.id < 0 && b.id >= 0) return -1;
-      if (a.id >= 0 && b.id < 0) return 1;
-      // 둘 다 신규행이면 ID 역순 (가장 최근 추가된 것이 위)
-      if (a.id < 0 && b.id < 0) return b.id - a.id;
-      // 둘 다 기존 행이면 ID 역순 (최신이 위)
-      return b.id - a.id;
+      if (aId < 0 && bId >= 0) return -1;
+      if (aId >= 0 && bId < 0) return 1;
+      // 둘 다 신규행이면 ID 역순 (가장 최근 추가된 것이 위, 큰 음수가 더 최근)
+      if (aId < 0 && bId < 0) return bId - aId;
+      // 둘 다 기존 행이면 원래 순서 유지 (DB에서 이미 DESC로 정렬됨)
+      return 0;
     });
 
     // 페이지네이션 계산
@@ -2385,83 +2299,48 @@ const PurchaseMaintenanceTab = memo(
       setEditingCell(null);
     };
 
-    const handleAddHistory = () => {
-      // 안전한 고유 ID 생성 (기존 ID들과 중복되지 않도록)
-      const existingIds = purchaseHistory.map((item) => item.id || 0);
-      const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 0;
-      const newId = Math.max(maxId + 1, Date.now());
+    const handleAddHistory = useCallback(() => {
+      // 고유 ID 생성 (타임스탬프를 음수로 사용하여 고유성 보장)
+      const newId = -Date.now();
 
-      const newPurchaseHistory = {
-        id: newId,
-        purchaseDate: new Date().toISOString().split('T')[0],
-        supplier: '',
-        price: '0',
-        quantity: 1,
-        contractNumber: '',
-        description: '',
-        status: '진행중',
-        memo: '',
-        registrationDate: new Date().toISOString().split('T')[0]
+      const defaultStatus = '대기';
+
+      const newHistory: MaintenanceHistory = {
+        id: newId.toString(),
+        registrationDate: new Date().toISOString().split('T')[0],
+        type: '구매', // 서브코드명 사용
+        content: '',
+        vendor: '',
+        amount: 0,
+        registrant: '시스템',
+        status: defaultStatus,
+        startDate: new Date().toISOString().split('T')[0],
+        completionDate: ''
       };
 
-      console.log('🔄 새 구매이력 추가:', newPurchaseHistory);
-      console.log('   현재 이력 수:', purchaseHistory.length);
+      console.log('🔄 새 구매/유지보수이력 추가:', newHistory);
+      console.log('   현재 이력 수:', maintenanceHistories.length);
 
-      onAddPurchaseHistory(newPurchaseHistory);
+      setMaintenanceHistories(prev => [newHistory, ...prev]);
 
       // 새 항목 추가 후 첫 번째 페이지로 이동
       setCurrentPage(1);
-    };
+    }, [setMaintenanceHistories]);
 
-    const handleDeleteSelected = () => {
-      selectedRows.forEach((id) => {
-        const numericId = parseInt(id);
-        if (!isNaN(numericId)) {
-          onDeletePurchaseHistory(numericId);
-        }
-      });
+    const handleDeleteSelected = useCallback(() => {
+      console.log('🗑️ 선택된 구매/유지보수이력 삭제:', selectedRows);
+      setMaintenanceHistories(prev => prev.filter(history => !selectedRows.includes(history.id)));
       setSelectedRows([]);
-    };
+    }, [selectedRows, setMaintenanceHistories]);
 
-    const handleEditHistory = (id: string, field: keyof MaintenanceHistory, value: string | number) => {
-      // 편집된 내용을 purchaseHistory 형식으로 변환하여 부모 컴포넌트에 전달
-      const purchaseHistoryItem = purchaseHistory.find((item) => item.id?.toString() === id);
-      if (purchaseHistoryItem) {
-        const updatedItem = { ...purchaseHistoryItem };
-
-        // MaintenanceHistory 필드를 PurchaseHistory 필드로 매핑
-        switch (field) {
-          case 'content':
-            updatedItem.description = value as string;
-            break;
-          case 'vendor':
-            updatedItem.supplier = value as string;
-            break;
-          case 'amount':
-            updatedItem.price = value.toString();
-            break;
-          case 'startDate':
-            updatedItem.purchaseDate = value as string;
-            break;
-          case 'status':
-            updatedItem.status = value as string;
-            break;
-          case 'registrationDate':
-            updatedItem.registrationDate = value as string;
-            break;
-          case 'completionDate':
-            // completionDate는 memo 필드에 저장하거나 별도 처리
-            updatedItem.memo = `완료일: ${value}${updatedItem.memo ? ' | ' + updatedItem.memo.replace(/완료일: [^\|]*(\|)?/g, '').trim() : ''}`;
-            break;
-        }
-
-        // 부모 컴포넌트의 purchaseHistory 상태 업데이트
-        const numericId = parseInt(id);
-        if (!isNaN(numericId)) {
-          onEditPurchaseHistory(numericId, updatedItem);
-        }
-      }
-    };
+    const handleEditHistory = useCallback((id: string, field: keyof MaintenanceHistory, value: string | number) => {
+      console.log('✏️ 구매/유지보수이력 수정:', { id, field, value });
+      setMaintenanceHistories(prev =>
+        prev.map(history =>
+          history.id === id ? { ...history, [field]: value } : history
+        )
+      );
+    }, [setMaintenanceHistories]);
 
     const handleSelectRow = (id: string) => {
       if (selectedRows.includes(id)) {
@@ -2481,31 +2360,16 @@ const PurchaseMaintenanceTab = memo(
 
     const getTypeColor = (type: string) => {
       switch (type) {
-        case 'purchase':
+        case '구매':
           return { backgroundColor: '#E3F2FD', color: '#000000' }; // 파스텔 블루
-        case 'maintenance':
+        case '유지보수':
           return { backgroundColor: '#E8F5E8', color: '#000000' }; // 파스텔 그린
-        case 'upgrade':
+        case '업그레이드':
           return { backgroundColor: '#FFF3E0', color: '#000000' }; // 파스텔 오렌지
-        case 'renewal':
+        case '계약갱신':
           return { backgroundColor: '#F3E5F5', color: '#000000' }; // 파스텔 퍼플
         default:
           return { backgroundColor: '#F5F5F5', color: '#000000' }; // 연한 그레이
-      }
-    };
-
-    const getTypeLabel = (type: string) => {
-      switch (type) {
-        case 'purchase':
-          return '구매';
-        case 'maintenance':
-          return '유지보수';
-        case 'upgrade':
-          return '업그레이드';
-        case 'renewal':
-          return '갱신';
-        default:
-          return '기타';
       }
     };
 
@@ -2556,7 +2420,7 @@ const PurchaseMaintenanceTab = memo(
 
       if (isEditing) {
         if (field === 'type') {
-          // 유형 필드는 DB에서 가져온 데이터 사용
+          // 유형 필드는 DB에서 가져온 데이터 사용 (서브코드명 저장)
           return (
             <Select
               value={value}
@@ -2568,13 +2432,9 @@ const PurchaseMaintenanceTab = memo(
               size="small"
               sx={{ width: '100%', minWidth: fieldWidth }}
               autoFocus
-              renderValue={(selected) => {
-                const item = historyTypesFromDB.find(t => t.subcode === selected);
-                return item ? item.subcode_name : selected;
-              }}
             >
               {historyTypesFromDB.map((option) => (
-                <MenuItem key={option.subcode} value={option.subcode}>
+                <MenuItem key={option.subcode} value={option.subcode_name}>
                   {option.subcode_name}
                 </MenuItem>
               ))}
@@ -2649,7 +2509,7 @@ const PurchaseMaintenanceTab = memo(
         >
           {field === 'type' ? (
             <Chip
-              label={getTypeLabel(value as string)}
+              label={value as string} // type이 이미 서브코드명이므로 그대로 표시
               size="small"
               sx={{
                 ...getTypeColor(value as string),
@@ -2743,7 +2603,7 @@ const PurchaseMaintenanceTab = memo(
           <Table size="small">
             <TableHead>
               <TableRow sx={{ backgroundColor: 'grey.50' }}>
-                <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
+                <TableCell padding="checkbox" align="center" sx={{ width: columnWidths.checkbox }}>
                   <Checkbox
                     checked={selectedRows.length === maintenanceHistories.length && maintenanceHistories.length > 0}
                     onChange={handleSelectAll}
@@ -2769,14 +2629,14 @@ const PurchaseMaintenanceTab = memo(
             <TableBody>
               {currentItems.map((history, index) => (
                 <TableRow
-                  key={`history_${history.id}_${index}`}
+                  key={history.id}
                   hover
                   sx={{
                     height: cellHeight,
                     '&:hover': { backgroundColor: 'action.hover' }
                   }}
                 >
-                  <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
+                  <TableCell padding="checkbox" align="center" sx={{ width: columnWidths.checkbox }}>
                     <Checkbox
                       checked={selectedRows.includes(history.id)}
                       onChange={() => handleSelectRow(history.id)}
@@ -2959,9 +2819,9 @@ const SoftwareEditDialog = memo(
     const { licenseTypes: masterLicenseTypes, loading: licenseLoading, error: licenseError } = useGroup016();
 
     // 소프트웨어 사용자이력 훅 사용
-    const { saveUserHistories, getUserHistories } = useSupabaseSoftwareUser();
-    // 소프트웨어 구매/유지보수이력 훅 사용
-    const { savePurchaseHistories, getPurchaseHistories } = useSupabaseSoftwareHistory();
+    const { saveUserHistories, getUserHistories, convertToUserHistory } = useSupabaseSoftwareUser();
+    // 소프트웨어 구매/유지보수이력 훅 사용 (커리큘럼탭 패턴: 데이터 로드와 저장 모두 부모에서 처리)
+    const { savePurchaseHistories, getPurchaseHistories, convertToMaintenanceHistory } = useSupabaseSoftwareHistory();
 
     // 피드백 훅
     const {
@@ -3175,6 +3035,9 @@ const SoftwareEditDialog = memo(
     const [editingPurchaseHistoryId, setEditingPurchaseHistoryId] = useState<number | null>(null);
     const [editingPurchaseHistoryData, setEditingPurchaseHistoryData] = useState<any>({});
 
+    // 구매/유지보수이력 상태 관리 (커리큘럼탭 패턴)
+    const [maintenanceHistories, setMaintenanceHistories] = useState<MaintenanceHistory[]>([]);
+
     // 에러 상태
     const [validationError, setValidationError] = useState<string>('');
 
@@ -3291,6 +3154,12 @@ const SoftwareEditDialog = memo(
 
               if (userHistorySaveResult) {
                 console.log('✅ 사용자이력 저장 성공');
+
+                // 최신 데이터 다시 로드 (커리큘럼탭과 동일한 패턴)
+                const freshUserData = await getUserHistories(savedData.id);
+                const freshUserHistories = freshUserData.map(convertToUserHistory);
+                setCurrentUserHistories(freshUserHistories);
+                console.log('🔄 최신 사용자이력 데이터 로드 완료:', { count: freshUserHistories.length });
               } else {
                 console.warn('⚠️ 사용자이력 저장 실패 - 소프트웨어 데이터는 저장됨');
               }
@@ -3304,24 +3173,53 @@ const SoftwareEditDialog = memo(
 
         // 구매/유지보수이력 저장 (data_relation.md 패턴)
         console.log('🔍 구매/유지보수이력 저장 체크:');
-        console.log('  - purchaseHistory.length:', purchaseHistory.length);
+        console.log('  - maintenanceHistories.length:', maintenanceHistories.length);
         console.log('  - savedData?.id:', savedData?.id);
 
-        if (purchaseHistory.length > 0) {
+        if (maintenanceHistories.length > 0) {
           if (!savedData?.id) {
             console.error('❌ 소프트웨어 ID가 없어서 구매이력을 저장할 수 없습니다.');
           } else {
             console.log('💾 구매/유지보수이력 저장 시작...', {
               softwareId: savedData.id,
-              historyCount: purchaseHistory.length,
-              histories: purchaseHistory
+              historyCount: maintenanceHistories.length,
+              histories: maintenanceHistories
             });
 
             try {
-              const purchaseHistorySaveResult = await savePurchaseHistories(savedData.id, purchaseHistory);
+              // 커리큘럼탭 패턴: maintenanceHistories를 PurchaseHistory로 변환하여 저장
+              const purchaseHistoriesToSave: PurchaseHistory[] = maintenanceHistories.map((item) => {
+                return {
+                  id: parseInt(item.id) || 0,
+                  historyType: item.type || '구매', // type을 그대로 historyType으로 (서브코드명)
+                  purchaseDate: item.startDate || '',
+                  supplier: item.vendor || '',
+                  price: item.amount?.toString() || '0',
+                  quantity: 1,
+                  contractNumber: '',
+                  description: item.content || '', // content를 그대로 description으로 (type prefix 없음)
+                  status: item.status || '진행중',
+                  memo: item.completionDate ? `완료일: ${item.completionDate}` : '',
+                  registrationDate: item.registrationDate || ''
+                };
+              });
+
+              const purchaseHistorySaveResult = await savePurchaseHistories(savedData.id, purchaseHistoriesToSave);
 
               if (purchaseHistorySaveResult) {
                 console.log('✅ 구매/유지보수이력 저장 성공');
+
+                // 캐시 무효화 (저장 후 새로운 데이터 로드를 위해)
+                const cacheKey = createCacheKey('software_history', `sw_${savedData.id}`);
+                sessionStorage.removeItem(cacheKey);
+                sessionStorage.removeItem(`${cacheKey}_timestamp`);
+                console.log('🗑️ 캐시 무효화 완료:', cacheKey);
+
+                // 최신 데이터 다시 로드 (커리큘럼탭과 동일한 패턴)
+                const freshHistoryData = await getPurchaseHistories(savedData.id);
+                const freshMaintenanceHistories = freshHistoryData.map(convertToMaintenanceHistory);
+                setMaintenanceHistories(freshMaintenanceHistories);
+                console.log('🔄 최신 구매/유지보수이력 데이터 로드 완료:', { count: freshMaintenanceHistories.length });
               } else {
                 console.warn('⚠️ 구매/유지보수이력 저장 실패 - 소프트웨어 데이터는 저장됨');
               }
@@ -3373,8 +3271,12 @@ const SoftwareEditDialog = memo(
       updateSoftware,
       currentUserHistories,
       saveUserHistories,
-      purchaseHistory,
-      savePurchaseHistories
+      getUserHistories,
+      convertToUserHistory,
+      maintenanceHistories,
+      savePurchaseHistories,
+      getPurchaseHistories,
+      convertToMaintenanceHistory
     ]);
 
     const handleClose = useCallback(() => {
@@ -3383,6 +3285,8 @@ const SoftwareEditDialog = memo(
       setChecklistItems([]);
       setUserHistory([]);
       setPurchaseHistory([]);
+      setCurrentUserHistories([]); // 사용자이력 초기화
+      setMaintenanceHistories([]); // 구매/유지보수이력 초기화
       setPurchaseHistoryLoaded(false); // 구매이력 로드 상태 초기화
       setNewComment('');
       setNewChecklistText('');
@@ -3674,10 +3578,6 @@ const SoftwareEditDialog = memo(
     }, []);
 
     // 사용자이력 변경 핸들러
-    const handleUserHistoriesChange = useCallback((histories: UserHistory[]) => {
-      setCurrentUserHistories(histories);
-    }, []);
-
     // 편집 모드일 때 구매/유지보수이력 로드 (한 번만 실행)
     const [purchaseHistoryLoaded, setPurchaseHistoryLoaded] = useState(false);
 
@@ -3711,6 +3611,67 @@ const SoftwareEditDialog = memo(
         loadPurchaseHistories();
       }
     }, [task?.id, purchaseHistoryLoaded, getPurchaseHistories]);
+
+    // 사용자이력 데이터 로드 (커리큘럼탭과 동일한 패턴)
+    useEffect(() => {
+      const loadUserHistories = async () => {
+        if (open && task?.id) {
+          console.log('🔄 사용자이력 데이터 로드 중:', { softwareId: task.id });
+          try {
+            const userData = await getUserHistories(task.id);
+            const convertedData = userData.map(convertToUserHistory);
+            setCurrentUserHistories(convertedData);
+            console.log('✅ 사용자이력 데이터 로드 완료:', { count: convertedData.length });
+          } catch (error) {
+            console.error('❌ 사용자이력 데이터 로드 실패:', error);
+            setCurrentUserHistories([]);
+          }
+        } else if (open && !task) {
+          // 신규 생성 모드일 때는 초기화
+          setCurrentUserHistories([]);
+        }
+      };
+
+      loadUserHistories();
+    }, [open, task?.id, getUserHistories, convertToUserHistory]);
+
+    // 구매/유지보수이력 데이터 로드 (커리큘럼탭과 동일한 패턴)
+    useEffect(() => {
+      const loadMaintenanceHistories = async () => {
+        if (open && task?.id) {
+          console.log('🔄 구매/유지보수이력 데이터 로드 중:', { softwareId: task.id });
+
+          // 캐시 무효화 - 항상 최신 데이터 가져오기
+          const cacheKey = createCacheKey('software_history', `sw_${task.id}`);
+          try {
+            sessionStorage.removeItem(cacheKey);
+            sessionStorage.removeItem(`${cacheKey}_timestamp`);
+            console.log('🗑️ 캐시 무효화:', cacheKey);
+          } catch (e) {
+            console.warn('캐시 삭제 실패:', e);
+          }
+
+          try {
+            const historyData = await getPurchaseHistories(task.id);
+            console.log('📦 DB에서 가져온 데이터:', historyData);
+
+            const convertedData = historyData.map(convertToMaintenanceHistory);
+            console.log('🔄 변환된 데이터:', convertedData);
+
+            setMaintenanceHistories(convertedData);
+            console.log('✅ 구매/유지보수이력 데이터 로드 완료:', { count: convertedData.length });
+          } catch (error) {
+            console.error('❌ 구매/유지보수이력 데이터 로드 실패:', error);
+            setMaintenanceHistories([]);
+          }
+        } else if (open && !task) {
+          // 신규 생성 모드일 때는 초기화
+          setMaintenanceHistories([]);
+        }
+      };
+
+      loadMaintenanceHistories();
+    }, [open, task?.id, getPurchaseHistories, convertToMaintenanceHistory]);
 
     // 메모이제이션된 탭 컴포넌트 props
     const overviewTabProps = useMemo(
@@ -3749,12 +3710,10 @@ const SoftwareEditDialog = memo(
 
     const userHistoryTabProps = useMemo(
       () => ({
-        softwareId: task?.id || 0,
-        mode: task ? ('edit' as const) : ('add' as const),
         userHistories: currentUserHistories,
-        onUserHistoriesChange: handleUserHistoriesChange
+        setUserHistories: setCurrentUserHistories
       }),
-      [task, currentUserHistories, handleUserHistoriesChange]
+      [currentUserHistories]
     );
 
     const recordTabProps = useMemo(
@@ -3791,28 +3750,14 @@ const SoftwareEditDialog = memo(
 
     const purchaseMaintenanceTabProps = useMemo(
       () => ({
-        purchaseHistory,
-        historyTypes,
-        onAddPurchaseHistory: handleAddPurchaseHistory,
-        editingPurchaseHistoryId,
-        editingPurchaseHistoryData,
-        onEditPurchaseHistory: handleEditPurchaseHistory,
-        onSaveEditPurchaseHistory: handleSaveEditPurchaseHistory,
-        onCancelEditPurchaseHistory: handleCancelEditPurchaseHistory,
-        onDeletePurchaseHistory: handleDeletePurchaseHistory,
-        onEditPurchaseHistoryDataChange: handleEditPurchaseHistoryDataChange
+        maintenanceHistories,
+        setMaintenanceHistories,
+        historyTypes
       }),
       [
-        purchaseHistory,
-        historyTypes,
-        editingPurchaseHistoryId,
-        editingPurchaseHistoryData,
-        handleAddPurchaseHistory,
-        handleEditPurchaseHistory,
-        handleSaveEditPurchaseHistory,
-        handleCancelEditPurchaseHistory,
-        handleDeletePurchaseHistory,
-        handleEditPurchaseHistoryDataChange
+        maintenanceHistories,
+        setMaintenanceHistories,
+        historyTypes
       ]
     );
 

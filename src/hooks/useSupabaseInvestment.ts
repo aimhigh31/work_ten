@@ -23,6 +23,7 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
 });
 
 export interface UseSupabaseInvestmentReturn {
+  investments: DbInvestmentData[];
   getInvestments: () => Promise<DbInvestmentData[]>;
   getInvestmentById: (id: number) => Promise<DbInvestmentData | null>;
   createInvestment: (investment: Omit<DbInvestmentData, 'id' | 'created_at' | 'updated_at'>) => Promise<DbInvestmentData | null>;
@@ -35,6 +36,7 @@ export interface UseSupabaseInvestmentReturn {
 }
 
 export const useSupabaseInvestment = (): UseSupabaseInvestmentReturn => {
+  const [investments, setInvestments] = useState<DbInvestmentData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +46,7 @@ export const useSupabaseInvestment = (): UseSupabaseInvestmentReturn => {
     const cachedData = loadFromCache<DbInvestmentData[]>(CACHE_KEY, DEFAULT_CACHE_EXPIRY_MS);
     if (cachedData) {
       console.log('⚡ [Investment] 캐시 데이터 반환 (깜빡임 방지)');
+      setInvestments(cachedData); // ✅ 캐시 데이터로 상태 업데이트 (KPI 패턴)
       return cachedData;
     }
 
@@ -65,7 +68,10 @@ export const useSupabaseInvestment = (): UseSupabaseInvestmentReturn => {
 
       console.log('✅ getInvestments 성공:', data?.length || 0, '개');
 
-      // 2. 캐시에 저장
+      // 2. 상태 업데이트 (KPI 패턴)
+      setInvestments(data || []);
+
+      // 3. 캐시에 저장
       saveToCache(CACHE_KEY, data || []);
 
       return data || [];
@@ -140,6 +146,9 @@ export const useSupabaseInvestment = (): UseSupabaseInvestmentReturn => {
 
         console.log('✅ createInvestment 성공:', data);
 
+        // ✅ 로컬 상태 즉시 업데이트 (KPI 패턴)
+        setInvestments((prev) => [data, ...prev]);
+
         // 캐시 무효화 (최신 데이터 보장)
         sessionStorage.removeItem(CACHE_KEY);
 
@@ -190,6 +199,11 @@ export const useSupabaseInvestment = (): UseSupabaseInvestmentReturn => {
 
       console.log('✅ 업데이트된 데이터:', data);
       console.log('✅ updateInvestment 성공');
+
+      // ✅ 로컬 상태 즉시 업데이트 (KPI 패턴)
+      if (data && data.length > 0) {
+        setInvestments((prev) => prev.map((inv) => (inv.id === id ? data[0] : inv)));
+      }
 
       // 캐시 무효화 (최신 데이터 보장)
       sessionStorage.removeItem(CACHE_KEY);
@@ -290,7 +304,7 @@ export const useSupabaseInvestment = (): UseSupabaseInvestmentReturn => {
       };
 
       const dbData = {
-        no: 0, // DB에는 0으로 저장 (프론트엔드에서 역순정렬로 관리)
+        no: null, // DB에는 null로 저장 (프론트엔드에서 역순정렬로 관리)
         registration_date: frontendData.registrationDate || new Date().toISOString().split('T')[0],
         code: frontendData.code || '',
         investment_type: frontendData.investmentType || '',
@@ -317,6 +331,7 @@ export const useSupabaseInvestment = (): UseSupabaseInvestmentReturn => {
   );
 
   return {
+    investments,
     getInvestments,
     getInvestmentById,
     createInvestment,

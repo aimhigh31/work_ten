@@ -597,19 +597,19 @@ export default function ChecklistTable({
     return { color: '#333333' };
   };
 
-  // ✅ 권한 없을 경우 접근 차단
-  if (!canRead && !permissionLoading) {
-    return (
-      <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Typography variant="h6" color="error">
-          이 페이지에 접근할 권한이 없습니다.
-        </Typography>
-      </Box>
-    );
-  }
+  // ✅ 권한 체크는 하단 JSX에서 KPI관리 패턴으로 처리 (깜빡임 방지)
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* 권한 체크: KPI관리 패턴 (깜빡임 방지) */}
+      {!canRead && !permissionLoading ? (
+        <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Typography variant="h6" color="error">
+            이 페이지에 접근할 권한이 없습니다.
+          </Typography>
+        </Box>
+      ) : (
+        <>
       {/* 상단 정보 및 액션 버튼 */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, mt: 3, flexShrink: 0 }}>
         <Typography variant="body2" color="text.secondary">
@@ -1042,6 +1042,8 @@ export default function ChecklistTable({
           {snackbar.message}
         </Alert>
       </Snackbar>
+        </>
+      )}
     </Box>
   );
 }

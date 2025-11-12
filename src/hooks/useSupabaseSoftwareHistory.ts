@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { loadFromCache, saveToCache, createCacheKey, DEFAULT_CACHE_EXPIRY_MS } from '../utils/cacheUtils';
 
@@ -33,6 +33,7 @@ export interface SoftwareHistoryData {
 // 프론트엔드 구매이력 인터페이스
 export interface PurchaseHistory {
   id: number;
+  historyType: string; // 서브코드명: '구매' | '유지보수' | '업그레이드' | '계약갱신'
   purchaseDate: string;
   supplier: string;
   price: string;
@@ -42,6 +43,20 @@ export interface PurchaseHistory {
   status: string;
   memo: string;
   registrationDate: string;
+}
+
+// 프론트엔드 MaintenanceHistory 인터페이스 (SoftwareEditDialog와 동일)
+export interface MaintenanceHistory {
+  id: string;
+  registrationDate: string;
+  type: string; // 서브코드명: '구매' | '유지보수' | '업그레이드' | '계약갱신'
+  content: string;
+  vendor: string;
+  amount: number;
+  registrant: string;
+  status: string;
+  startDate: string;
+  completionDate: string;
 }
 
 // 커스텀 훅
@@ -78,15 +93,16 @@ export const useSupabaseSoftwareHistory = () => {
       console.log('✅ 데이터 검증 통과');
 
       // 기존 데이터 삭제 (soft delete)
-      console.log('🗑️ 기존 데이터 비활성화 중...');
-      const { error: deleteError } = await supabase
+      console.log('🗑️ 기존 데이터 비활성화 중...', { softwareId });
+      const { data: updateData, error: deleteError } = await supabase
         .from('it_software_history')
         .update({
           is_active: false,
           updated_by: 'user',
           updated_at: new Date().toISOString()
         })
-        .eq('software_id', softwareId);
+        .eq('software_id', softwareId)
+        .select('id');
 
       if (deleteError) {
         // 테이블이 없는 경우 처리
@@ -101,7 +117,7 @@ export const useSupabaseSoftwareHistory = () => {
         return false;
       }
 
-      console.log('✅ 기존 데이터 비활성화 완료');
+      console.log('✅ 기존 데이터 비활성화 완료:', { 비활성화된_레코드_수: updateData?.length || 0 });
 
       // 새 데이터 저장
       if (purchaseHistories.length > 0) {
@@ -137,15 +153,8 @@ export const useSupabaseSoftwareHistory = () => {
             return null;
           };
 
-          // history_type 결정 (가격과 공급업체 정보로 판단)
-          let historyType = '구매'; // 기본값
-          if (item.description?.includes('유지보수') || item.supplier?.includes('유지보수')) {
-            historyType = '유지보수';
-          } else if (item.description?.includes('업그레이드')) {
-            historyType = '업그레이드';
-          } else if (item.description?.includes('계약갱신')) {
-            historyType = '계약갱신';
-          }
+          // historyType을 그대로 사용 (서브코드명)
+          const historyType = item.historyType || '구매';
 
           const historyData: Omit<SoftwareHistoryData, 'id'> = {
             software_id: softwareId,
@@ -222,6 +231,12 @@ export const useSupabaseSoftwareHistory = () => {
         console.log('📝 저장할 구매/유지보수이력 데이터가 없음');
       }
 
+      // 캐시 무효화 - 최신 데이터를 다시 로드하도록
+      const cacheKey = createCacheKey('software_history', `sw_${softwareId}`);
+      sessionStorage.removeItem(cacheKey);
+      sessionStorage.removeItem(`${cacheKey}_timestamp`);
+      console.log('🗑️ 캐시 무효화 완료:', cacheKey);
+
       console.log('🎉 구매/유지보수이력 일괄 저장 완료');
       return true;
     } catch (err: any) {
@@ -241,8 +256,8 @@ export const useSupabaseSoftwareHistory = () => {
     }
   };
 
-  // 구매/유지보수이력 조회
-  const getPurchaseHistories = async (softwareId: number): Promise<PurchaseHistory[]> => {
+  // 구매/유지보수이력 조회 - useCallback으로 안정적인 참조 유지
+  const getPurchaseHistories = useCallback(async (softwareId: number): Promise<PurchaseHistory[]> => {
     console.log('📖 구매/유지보수이력 조회:', softwareId);
 
     // 1. 동적 캐시 키 생성
@@ -262,9 +277,14 @@ export const useSupabaseSoftwareHistory = () => {
         .from('it_software_history')
         .select('*')
         .eq('software_id', softwareId)
+        .eq('is_active', true)
         .order('id', { ascending: false });
 
-      console.log('🔍 Supabase 응답:', { data: data?.length, error });
+      console.log('🔍 Supabase 응답:', {
+        dataCount: data?.length,
+        error,
+        rawData: data
+      });
 
       if (error) {
         console.warn('⚠️ Supabase 쿼리 경고:');
@@ -286,9 +306,10 @@ export const useSupabaseSoftwareHistory = () => {
       console.log('🔍 데이터 매핑 시작...');
       // 데이터 변환
       const histories: PurchaseHistory[] = (data || []).map((item: SoftwareHistoryData, index) => {
-        console.log(`🔍 매핑 중 [${index}]:`, item.id, item.supplier);
+        console.log(`🔍 매핑 중 [${index}]:`, item.id, item.supplier, item.history_type);
         return {
           id: item.id || 0,
+          historyType: item.history_type || '구매', // DB의 history_type (서브코드명)
           purchaseDate: item.purchase_date || '',
           supplier: item.supplier || '',
           price: item.price?.toString() || '0',
@@ -315,11 +336,42 @@ export const useSupabaseSoftwareHistory = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []); // 의존성 없음 - supabase 클라이언트는 안정적인 참조
+
+  // PurchaseHistory를 MaintenanceHistory로 변환 - useCallback으로 안정적인 참조 유지
+  const convertToMaintenanceHistory = useCallback((item: PurchaseHistory): MaintenanceHistory => {
+    console.log('🔄 convertToMaintenanceHistory 변환 시작:', item);
+
+    // memo에서 완료일 추출
+    const extractCompletionDate = (memo: string): string => {
+      if (!memo) return '';
+      const match = memo.match(/완료일:\s*([^\|]*)/);
+      return match ? match[1].trim() : '';
+    };
+
+    const completionDateFromMemo = extractCompletionDate(item.memo);
+
+    const result = {
+      id: item.id.toString(),
+      registrationDate: item.registrationDate || item.purchaseDate || '',
+      type: item.historyType || '구매', // DB의 history_type을 그대로 사용 (서브코드명)
+      content: item.description || '', // description을 그대로 사용 (type prefix 없음)
+      vendor: item.supplier || '',
+      amount: parseFloat(item.price) || 0,
+      registrant: '시스템',
+      status: item.status || '진행중',
+      startDate: item.purchaseDate || '',
+      completionDate: completionDateFromMemo || (item.status === '완료' ? item.purchaseDate || '' : '')
+    };
+
+    console.log('✅ convertToMaintenanceHistory 변환 완료:', result);
+    return result;
+  }, []); // 의존성 없음 - 순수 변환 함수
 
   return {
     savePurchaseHistories,
     getPurchaseHistories,
+    convertToMaintenanceHistory,
     loading,
     error
   };

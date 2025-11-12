@@ -2118,10 +2118,8 @@ const ChecklistEditDialog = memo(
 
     // Supabase 에디터 데이터를 로컬 상태와 동기화
     React.useEffect(() => {
-      if (editorItems.length > 0) {
-        console.log('📋 Supabase 에디터 데이터를 로컬 상태에 동기화:', editorItems.length, '개');
-        setChecklistItems(editorItems);
-      }
+      console.log('📋 Supabase 에디터 데이터를 로컬 상태에 동기화:', editorItems.length, '개');
+      setChecklistItems(editorItems);
     }, [editorItems]);
 
     // 최적화된 핸들러들
@@ -2274,7 +2272,7 @@ const ChecklistEditDialog = memo(
             // 저장 성공 시 임시 데이터 초기화
             setTempEditorData([]);
             setHasUnsavedEditorData(false);
-            setChecklistItems([]); // 저장 후 로컬 상태도 초기화
+            // ✅ setChecklistItems 제거 - fetchEditorItems → editorItems → useEffect로 자동 동기화됨
           } else {
             console.error('❌ 체크리스트 에디터 데이터 저장 실패');
             // 실패 시 사용자에게 알림

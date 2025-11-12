@@ -39,6 +39,11 @@ interface SecurityIncidentReportTabProps {
   responseStage?: string;
   onResponseStageChange?: (stage: string) => void;
   accidentId?: number;
+  // 커리큘럼탭과 동일한 패턴: 부모 state
+  improvementItems: any[];
+  setImprovementItems: React.Dispatch<React.SetStateAction<any[]>>;
+  selectedRows: string[];
+  setSelectedRows: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
 const SecurityIncidentReportTab = memo(
@@ -47,7 +52,12 @@ const SecurityIncidentReportTab = memo(
     onIncidentReportChange = () => {},
     responseStage = '사고탐지',
     onResponseStageChange = () => {},
-    accidentId
+    accidentId,
+    // 커리큘럼탭과 동일한 패턴: 부모 state
+    improvementItems,
+    setImprovementItems,
+    selectedRows,
+    setSelectedRows
   }: SecurityIncidentReportTabProps) => {
     // Step5 컴포넌트 초기화 로깅 (전역 오류 처리는 ProviderWrapper에서 담당)
     useEffect(() => {
@@ -70,21 +80,7 @@ const SecurityIncidentReportTab = memo(
     // 마스터코드 훅 사용
     const { getSubCodesByGroup } = useSupabaseMasterCode3();
 
-    // 개선사항 Supabase 훅 사용
-    const {
-      items: improvementItems,
-      loading: improvementLoading,
-      error: improvementError,
-      fetchImprovementsByAccidentId,
-      createImprovement,
-      updateImprovement,
-      deleteImprovement,
-      replaceAllImprovements
-    } = useSupabaseImprovements();
-
-    // 로컬 상태로 개선사항 관리 (임시 저장용)
-    const [localImprovements, setLocalImprovements] = useState<any[]>([]);
-    const [isEditMode, setIsEditMode] = useState(false);
+    // 개선사항은 부모 컴포넌트(SecurityIncidentEditDialog)에서 props로 받아서 관리 (커리큘럼탭과 동일한 패턴)
 
     // incidentReport 객체 안정화 (useEffect 의존성 배열 오류 방지)
     const stableIncidentReport = useMemo(() => {
@@ -138,139 +134,7 @@ const SecurityIncidentReportTab = memo(
       }
     }, [accidentId, stableIncidentReport, onIncidentReportChange]);
 
-    // accidentId가 있을 때 개선사항 데이터 로드 (수정 모드) - 안전성 강화
-    useEffect(() => {
-      let isMounted = true; // cleanup flag
-
-      const loadImprovements = async () => {
-        console.group('🔍 Step5 - 데이터 로드 프로세스');
-        console.log('accidentId:', accidentId, '타입:', typeof accidentId);
-
-        try {
-          if (accidentId && accidentId > 0) {
-            console.log('📊 수정 모드 - accidentId로 개선사항 데이터 로드:', accidentId);
-            if (isMounted) {
-              setIsEditMode(true);
-              await fetchImprovementsByAccidentId(accidentId);
-            }
-          } else {
-            console.log('📝 신규 모드 - sessionStorage에서 로드');
-            if (isMounted) {
-              setIsEditMode(false);
-
-              // 임시 저장 키 확인 (신규는 일반 키, 수정은 accidentId 포함 키)
-              const tempKey = 'tempSecurityImprovements';
-              const savedImprovements = sessionStorage.getItem(tempKey);
-
-              if (savedImprovements) {
-                try {
-                  const parsed = JSON.parse(savedImprovements);
-                  console.log('📦 sessionStorage에서 로드된 데이터:', { key: tempKey, data: parsed });
-                  if (isMounted) {
-                    setLocalImprovements(Array.isArray(parsed) ? parsed : []);
-                  }
-                } catch (parseError) {
-                  console.error('🔴 sessionStorage 파싱 오류:', parseError);
-                  if (isMounted) {
-                    setLocalImprovements([]);
-                  }
-                }
-              } else {
-                console.log('📦 sessionStorage에 데이터 없음, 빈 배열로 초기화');
-                if (isMounted) {
-                  setLocalImprovements([]);
-                }
-              }
-            }
-          }
-        } catch (error) {
-          console.error('🔴 데이터 로드 중 오류:', error);
-          if (isMounted) {
-            setLocalImprovements([]);
-          }
-        }
-
-        console.groupEnd();
-      };
-
-      loadImprovements();
-
-      return () => {
-        isMounted = false; // cleanup
-      };
-    }, [accidentId, fetchImprovementsByAccidentId]);
-
-    // Supabase에서 로드된 데이터를 로컬 상태에 동기화 (수정 모드) - 안전성 강화
-    useEffect(() => {
-      let isMounted = true;
-
-      if (isEditMode && Array.isArray(improvementItems)) {
-        console.log('🔄 Step5 - Supabase 데이터를 로컬에 동기화:', improvementItems);
-
-        try {
-          const formattedItems = improvementItems
-            .map((item, index) => {
-              if (!item || typeof item !== 'object') {
-                console.warn(`⚠️ 잘못된 개선사항 데이터 [${index}]:`, item);
-                return null;
-              }
-
-              return {
-                id: item.id || Date.now() + index,
-                plan: String(item.plan || ''),
-                status: String(item.status || '미완료'),
-                completionDate: String(item.completion_date || ''),
-                assignee: String(item.assignee || '')
-              };
-            })
-            .filter(Boolean); // null 제거
-
-          if (isMounted) {
-            setLocalImprovements(formattedItems);
-          }
-        } catch (error) {
-          console.error('🔴 데이터 동기화 중 오류:', error);
-          if (isMounted) {
-            setLocalImprovements([]);
-          }
-        }
-      }
-
-      return () => {
-        isMounted = false;
-      };
-    }, [improvementItems, isEditMode]);
-
-    // 로컬 데이터 변경 시 sessionStorage에 임시 저장 (data_relation.md 패턴) - 안전성 강화
-    useEffect(() => {
-      try {
-        // accidentId 기반 임시 저장 키 생성
-        const tempKey = accidentId ? `tempSecurityImprovements_${accidentId}` : 'tempSecurityImprovements';
-
-        if (Array.isArray(localImprovements) && localImprovements.length > 0) {
-          // 데이터 유효성 검증
-          const validData = localImprovements.filter(
-            (item) =>
-              item && typeof item === 'object' && (item.plan !== undefined || item.status !== undefined || item.assignee !== undefined)
-          );
-
-          if (validData.length > 0) {
-            console.log('💾 Step5 - sessionStorage에 임시 저장:', { key: tempKey, data: validData });
-            const jsonString = JSON.stringify(validData);
-            sessionStorage.setItem(tempKey, jsonString);
-          } else {
-            console.log('🧹 Step5 - 유효하지 않은 데이터, sessionStorage 키 삭제:', tempKey);
-            sessionStorage.removeItem(tempKey);
-          }
-        } else {
-          // 빈 배열이거나 유효하지 않은 경우 해당 키 삭제
-          console.log('🧹 Step5 - 빈 배열, sessionStorage 키 삭제:', tempKey);
-          sessionStorage.removeItem(tempKey);
-        }
-      } catch (error) {
-        console.error('🔴 sessionStorage 저장 중 오류:', error);
-      }
-    }, [localImprovements, accidentId]);
+    // 커리큘럼탭과 동일한 패턴: 부모 컴포넌트에서 데이터 관리하므로 여기서는 로드/저장 로직 불필요
 
     // Supabase 클라이언트 생성
     const supabaseClient = React.useMemo(() => {
@@ -445,8 +309,7 @@ const SecurityIncidentReportTab = memo(
       [onIncidentReportChange, incidentReport, accidentId]
     );
 
-    // Step 5 재발방지 대책 상태 관리
-    const [selectedRows, setSelectedRows] = React.useState<string[]>([]);
+    // Step 5 재발방지 대책 상태 관리 (selectedRows는 props로 받음)
     const [editingCell, setEditingCell] = React.useState<{ id: number; field: string } | null>(null);
 
     // 페이지네이션 상태
@@ -461,7 +324,7 @@ const SecurityIncidentReportTab = memo(
       onResponseStageChange(newStage);
     };
 
-    // Step5 개선사항 관리 함수들 (data_relation.md 패턴 적용)
+    // Step5 개선사항 관리 함수들 (커리큘럼탭과 동일한 패턴: 부모 state만 수정)
     const handleAddImprovement = useCallback(() => {
       const newImprovement = {
         id: Date.now(), // 임시 ID
@@ -471,21 +334,21 @@ const SecurityIncidentReportTab = memo(
         assignee: ''
       };
 
-      console.log('📝 Step5 - 개선사항 추가 (임시저장):', newImprovement);
-      // 항상 로컬 상태에만 추가 (신규/수정 모드 관계없이)
-      setLocalImprovements((prev) => [...prev, newImprovement]);
-    }, [statusFromDB]);
+      console.log('📝 Step5 - 개선사항 추가 (부모 state 업데이트):', newImprovement);
+      // 커리큘럼탭과 동일: 부모 state만 업데이트 (DB 저장 안함)
+      setImprovementItems((prev) => [...prev, newImprovement]);
+    }, [statusFromDB, setImprovementItems]);
 
     const handleDeleteImprovement = useCallback((index: number) => {
-      console.log('🗑️ Step5 - 개선사항 삭제 (임시저장):', index);
-      // 항상 로컬 상태에서만 삭제 (DB는 저장버튼 클릭시에만 반영)
-      setLocalImprovements((prev) => prev.filter((_, i) => i !== index));
-    }, []);
+      console.log('🗑️ Step5 - 개선사항 삭제 (부모 state 업데이트):', index);
+      // 커리큘럼탭과 동일: 부모 state에서만 제거 (DB는 저장버튼 클릭시 처리)
+      setImprovementItems((prev) => prev.filter((_, i) => i !== index));
+    }, [setImprovementItems]);
 
     const handleDeleteSelectedImprovements = useCallback(() => {
       const selectedIndices = selectedRows.map((row) => parseInt(row)).sort((a, b) => b - a);
 
-      console.log('🗑️ Step5 - 선택된 개선사항 삭제 (임시저장):', selectedIndices);
+      console.log('🗑️ Step5 - 선택된 개선사항 삭제 (부모 state 업데이트):', selectedIndices);
 
       // 역순으로 삭제하여 인덱스 변화 방지
       for (const index of selectedIndices) {
@@ -493,295 +356,15 @@ const SecurityIncidentReportTab = memo(
       }
 
       setSelectedRows([]);
-    }, [selectedRows, handleDeleteImprovement]);
+    }, [selectedRows, handleDeleteImprovement, setSelectedRows]);
 
     const handleUpdateImprovementField = useCallback((index: number, field: string, value: string) => {
-      console.log('✏️ Step5 - 필드 업데이트 (임시저장):', { index, field, value });
-      // 항상 로컬 상태에만 업데이트 (DB는 저장버튼 클릭시에만 반영)
-      setLocalImprovements((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
-    }, []);
+      console.log('✏️ Step5 - 필드 업데이트 (부모 state 업데이트):', { index, field, value });
+      // 커리큘럼탭과 동일: 부모 state만 업데이트 (DB는 저장버튼 클릭시 처리)
+      setImprovementItems((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+    }, [setImprovementItems]);
 
-    // 전체 개선사항 저장 함수 (data_relation.md 패턴: 삭제 후 재저장)
-    const saveAllImprovements = useCallback(
-      async (finalAccidentId: number) => {
-        console.group('💾 Step5 - saveAllImprovements 실행');
-        console.log('📋 입력 파라미터:', { finalAccidentId, type: typeof finalAccidentId });
-        console.log('📋 현재 상태:', {
-          localImprovements: localImprovements.length,
-          isEditMode,
-          improvementsData: localImprovements
-        });
-
-        try {
-          // 입력값 검증
-          if (!finalAccidentId || finalAccidentId <= 0) {
-            console.error('🔴 잘못된 accidentId:', finalAccidentId);
-            console.groupEnd();
-            return false;
-          }
-
-          console.log('🟡 1단계: 기존 개선사항 데이터 삭제 시작');
-          // 1단계: 기존 개선사항 데이터 삭제 (수정 모드의 경우)
-          if (isEditMode && finalAccidentId) {
-            console.log('🗑️ 기존 개선사항 삭제 중...');
-            const deletePromise = supabase.from('security_accident_improvement').delete().eq('accident_id', finalAccidentId);
-
-            const deleteResult = await deletePromise;
-            console.log('🗑️ 삭제 결과:', deleteResult);
-
-            if (deleteResult.error) {
-              console.error('🔴 기존 개선사항 삭제 실패:', deleteResult.error);
-              console.groupEnd();
-              return false;
-            }
-            console.log('✅ 기존 개선사항 삭제 성공');
-          }
-
-          console.log('🟡 2단계: 새로운 개선사항 데이터 저장 시작');
-          // 2단계: 새로운 개선사항 데이터 저장 (데이터가 있는 경우만)
-          if (localImprovements.length > 0) {
-            const improvementRequests: CreateImprovementRequest[] = localImprovements.map((item, index) => {
-              console.log(`📝 변환 중 ${index + 1}/${localImprovements.length}:`, item);
-              return {
-                accident_id: finalAccidentId,
-                plan: item.plan,
-                status: item.status as '미완료' | '진행중' | '완료',
-                completion_date: item.completionDate || undefined,
-                assignee: item.assignee || undefined
-              };
-            });
-
-            console.log('💾 삽입할 데이터:', improvementRequests);
-
-            const insertPromise = supabase.from('security_accident_improvement').insert(improvementRequests).select();
-
-            const insertResult = await insertPromise;
-            console.log('💾 삽입 결과:', insertResult);
-
-            if (insertResult.error) {
-              console.error('🔴 새 개선사항 저장 실패:', insertResult.error);
-              console.groupEnd();
-              return false;
-            }
-
-            console.log('✅ 새 개선사항 저장 성공:', insertResult.data);
-          } else {
-            console.log('📝 저장할 개선사항이 없음');
-          }
-
-          console.log('🟡 3단계: 임시 저장 데이터 정리 시작');
-          // 3단계: 임시 저장 데이터 정리
-          const tempKey = finalAccidentId ? `tempSecurityImprovements_${finalAccidentId}` : 'tempSecurityImprovements';
-          console.log('🧹 정리할 키:', tempKey);
-          sessionStorage.removeItem(tempKey);
-
-          // 캐시 무효화 (최신 데이터 보장) - createCacheKey 사용
-          const cacheKey = createCacheKey('improvements', `accident_${finalAccidentId}`);
-          sessionStorage.removeItem(cacheKey);
-          console.log('🗑️ saveAllImprovements: 캐시 무효화 완료', cacheKey);
-
-          console.log('🟡 4단계: 수정 모드로 전환 및 데이터 다시 로드 시작');
-          // 4단계: 수정 모드로 전환 및 데이터 다시 로드
-          setIsEditMode(true);
-          if (finalAccidentId) {
-            console.log('🔄 데이터 재로드 중...');
-            const fetchPromise = fetchImprovementsByAccidentId(finalAccidentId);
-            await fetchPromise;
-            console.log('🔄 데이터 재로드 완료');
-          }
-
-          console.log('✅ 전체 저장 프로세스 완료');
-          console.groupEnd();
-          return true;
-        } catch (error) {
-          console.group('🔴 Step5 - saveAllImprovements 오류 상세 분석');
-          console.error('오류 타입:', typeof error);
-          console.error('오류 생성자:', error?.constructor?.name);
-          console.error('오류 메시지:', error instanceof Error ? error.message : String(error));
-          console.error('오류 스택:', error instanceof Error ? error.stack : 'No stack');
-          console.error('전체 오류 객체:', error);
-          console.groupEnd();
-          console.groupEnd();
-
-          // 에러를 상위로 전파하지 않고 false 반환
-          return false;
-        }
-      },
-      [localImprovements, isEditMode, fetchImprovementsByAccidentId]
-    );
-
-    // 사고보고 데이터 저장 함수 (data_relation2.md 패턴 적용)
-    const saveIncidentReport = useCallback(
-      async (finalAccidentId: number) => {
-        console.group('💾 SecurityIncidentReportTab - saveIncidentReport 실행');
-        console.log('📋 입력 파라미터:', { finalAccidentId, incidentReport });
-
-        try {
-          if (!finalAccidentId || finalAccidentId <= 0) {
-            console.error('🔴 잘못된 accidentId:', finalAccidentId);
-            console.groupEnd();
-            return false;
-          }
-
-          // ✅ 핵심: sessionStorage에서 최신 데이터 우선 사용 (data_relation2.md 패턴)
-          let finalIncidentReport = incidentReport;
-          const tempKey = `incident_report_temp_${finalAccidentId}`;
-          const tempData = sessionStorage.getItem(tempKey);
-
-          if (tempData) {
-            try {
-              const parsedTempData = JSON.parse(tempData);
-              finalIncidentReport = parsedTempData;
-              console.log('🔍 sessionStorage 우선 사용:', { tempKey, data: parsedTempData });
-            } catch (parseError) {
-              console.error('🔴 sessionStorage 파싱 오류:', parseError);
-            }
-          } else {
-            console.log('🔍 sessionStorage 데이터 없음, 현재 상태 사용');
-          }
-
-          // incident_report JSON 컬럼에 모든 데이터 저장
-          const incidentReportData = {
-            // Step 1 - 사고탐지
-            discoveryDateTime: finalIncidentReport.discoveryDateTime || null,
-            discoverer: finalIncidentReport.discoverer || null,
-            discoveryMethod: finalIncidentReport.discoveryMethod || null,
-            reportDateTime: finalIncidentReport.reportDateTime || null,
-            reporter: finalIncidentReport.reporter || null,
-            reportMethod: finalIncidentReport.reportMethod || null,
-
-            // Step 2 - 현황분석
-            incidentTarget: finalIncidentReport.incidentTarget || null,
-            incidentCause: finalIncidentReport.incidentCause || null,
-            affectedSystems: finalIncidentReport.affectedSystems || null,
-            affectedData: finalIncidentReport.affectedData || null,
-            serviceImpact: finalIncidentReport.serviceImpact || null,
-            businessImpact: finalIncidentReport.businessImpact || null,
-            situationDetails: finalIncidentReport.situationDetails || null,
-
-            // Step 3 - 개선조치중
-            responseMethod: finalIncidentReport.responseMethod || null,
-            improvementExecutor: finalIncidentReport.improvementExecutor || null,
-            expectedCompletionDate: finalIncidentReport.expectedCompletionDate || null,
-            improvementDetails: finalIncidentReport.improvementDetails || null,
-
-            // Step 4 - 즉시해결
-            completionDate: finalIncidentReport.completionDate || null,
-            completionApprover: finalIncidentReport.completionApprover || null,
-            resolutionDetails: finalIncidentReport.resolutionDetails || null,
-
-            // Step 5 - 근본개선2
-            preventionDetails: finalIncidentReport.preventionDetails || null
-          };
-
-          // 사고보고 데이터 업데이트
-          const updateData = {
-            incident_report: incidentReportData, // JSON 컬럼에 저장
-            discoverer: finalIncidentReport.discoverer || null, // 기존 컬럼 호환
-            prevention_plan: finalIncidentReport.preventionDetails || null, // 기존 컬럼 호환
-            completed_date: finalIncidentReport.completionDate || null, // 기존 컬럼 호환
-            response_stage: responseStage,
-            updated_at: new Date().toISOString(),
-            updated_by: 'user'
-          };
-
-          console.log('🟡 최종 저장 데이터:', updateData);
-
-          const { data, error } = await supabase.from('security_accident_data').update(updateData).eq('id', finalAccidentId).select();
-
-          if (error) {
-            console.error('🔴 사고보고 데이터 저장 실패:');
-            console.error('- 에러 메시지:', error.message);
-            console.error('- 에러 코드:', error.code);
-            console.error('- 에러 힌트:', error.hint);
-            console.error('- 에러 상세:', error.details);
-            console.error('- 전체 에러 객체:', JSON.stringify(error, null, 2));
-            console.groupEnd();
-            return false;
-          }
-
-          // ✅ 저장 성공 후 sessionStorage 정리 (data_relation2.md 패턴)
-          sessionStorage.removeItem(tempKey);
-          console.log('🧹 임시 데이터 정리 완료:', tempKey);
-
-          console.log('✅ 사고보고 데이터 저장 성공:', data);
-          console.groupEnd();
-          return true;
-        } catch (error) {
-          console.error('🔴 saveIncidentReport 오류:');
-          console.error('- 오류 타입:', typeof error);
-          console.error('- 오류 메시지:', error instanceof Error ? error.message : String(error));
-          console.error('- 오류 스택:', error instanceof Error ? error.stack : 'No stack');
-          console.error('- 전체 오류:', JSON.stringify(error, null, 2));
-          console.groupEnd();
-          return false;
-        }
-      },
-      [incidentReport, responseStage]
-    );
-
-    // 전역 접근 가능하도록 설정 (다른 컴포넌트에서 호출용)
-    useEffect(() => {
-      // Promise rejection을 안전하게 처리하는 래퍼 함수 (개선된 진단 버전)
-      const safeSaveAllImprovements = async (finalAccidentId: number) => {
-        console.group('🛡️ Step5 - safeSaveAllImprovements 래퍼 실행');
-        console.log('📋 래퍼 입력:', { finalAccidentId, type: typeof finalAccidentId });
-
-        try {
-          console.log('🔄 내부 saveAllImprovements 호출 시작');
-
-          // Promise가 제대로 반환되는지 확인
-          const savePromise = saveAllImprovements(finalAccidentId);
-          console.log('🔄 Promise 생성됨:', typeof savePromise, savePromise);
-
-          if (!savePromise || typeof savePromise.then !== 'function') {
-            console.error('🔴 saveAllImprovements가 Promise를 반환하지 않음:', savePromise);
-            console.groupEnd();
-            return false;
-          }
-
-          const result = await savePromise;
-          console.log('🔄 내부 함수 실행 완료, 결과:', result, '타입:', typeof result);
-          console.groupEnd();
-          return result;
-        } catch (error) {
-          console.group('🔴 Step5 - safeSaveAllImprovements 래퍼 오류 분석');
-          console.error('래퍼 오류 타입:', typeof error);
-          console.error('래퍼 오류 생성자:', error?.constructor?.name);
-          console.error('래퍼 오류 메시지:', error instanceof Error ? error.message : String(error));
-          console.error('래퍼 오류 스택:', error instanceof Error ? error.stack : 'No stack');
-          console.error('전체 래퍼 오류 객체:', error);
-          console.groupEnd();
-          console.groupEnd();
-          return false;
-        }
-      };
-
-      // 사고보고 데이터 저장 래퍼 함수
-      const safeSaveIncidentReport = async (finalAccidentId: number) => {
-        console.group('🛡️ SecurityIncidentReportTab - safeSaveIncidentReport 래퍼 실행');
-        console.log('📋 래퍼 입력:', { finalAccidentId, type: typeof finalAccidentId });
-
-        try {
-          const result = await saveIncidentReport(finalAccidentId);
-          console.log('🔄 사고보고 저장 완료, 결과:', result);
-          console.groupEnd();
-          return result;
-        } catch (error) {
-          console.error('🔴 사고보고 저장 래퍼 오류:', error);
-          console.groupEnd();
-          return false;
-        }
-      };
-
-      (window as any).saveSecurityImprovements = safeSaveAllImprovements;
-      (window as any).saveSecurityIncidentReport = safeSaveIncidentReport;
-
-      return () => {
-        delete (window as any).saveSecurityImprovements;
-        delete (window as any).saveSecurityIncidentReport;
-      };
-    }, [saveAllImprovements, saveIncidentReport]);
+    // 커리큘럼탭과 동일한 패턴: DB 저장 로직은 부모 컴포넌트(SecurityIncidentEditDialog)에서 처리
 
     // Step 5 재발방지 대책 행 추가/삭제 (기존 함수들을 새로운 Supabase 로직으로 감싸기)
     const handleAddPreventionRow = () => {
@@ -810,7 +393,7 @@ const SecurityIncidentReportTab = memo(
 
     const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
       if (event.target.checked) {
-        setSelectedRows(localImprovements.map((_: any, index: number) => index.toString()));
+        setSelectedRows(improvementItems.map((_: any, index: number) => index.toString()));
       } else {
         setSelectedRows([]);
       }
@@ -818,7 +401,7 @@ const SecurityIncidentReportTab = memo(
 
     // 페이지네이션 계산
     // 개선사항 데이터는 로컬 상태에서 가져오기 (최신 항목이 위로 오도록 역순 정렬)
-    const preventionMeasures = [...localImprovements].reverse();
+    const preventionMeasures = [...improvementItems].reverse();
     const totalPages = Math.ceil(preventionMeasures.length / itemsPerPage);
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
@@ -834,7 +417,7 @@ const SecurityIncidentReportTab = memo(
     };
 
     const renderEditableCell = (item: any, field: string, value: string, type: string = 'text', options?: string[], placeholder?: string) => {
-      const isEditing = editingCell?.id === localImprovements.indexOf(item) && editingCell?.field === field;
+      const isEditing = editingCell?.id === improvementItems.indexOf(item) && editingCell?.field === field;
 
       if (isEditing) {
         if (type === 'select' && options) {
@@ -843,7 +426,7 @@ const SecurityIncidentReportTab = memo(
               <Select
                 value={value}
                 onChange={(e) => {
-                  const index = localImprovements.indexOf(item);
+                  const index = improvementItems.indexOf(item);
                   handlePreventionRowChange(index, field, e.target.value);
                   setTimeout(() => setEditingCell(null), 0);
                 }}
@@ -869,7 +452,7 @@ const SecurityIncidentReportTab = memo(
               type={type}
               value={value}
               onChange={(e) => {
-                const index = localImprovements.indexOf(item);
+                const index = improvementItems.indexOf(item);
                 handlePreventionRowChange(index, field, e.target.value);
               }}
               onBlur={() => setEditingCell(null)}
@@ -887,7 +470,7 @@ const SecurityIncidentReportTab = memo(
       } else {
         return (
           <Box
-            onClick={() => handleCellClick(localImprovements.indexOf(item), field)}
+            onClick={() => handleCellClick(improvementItems.indexOf(item), field)}
             sx={{
               width: '100%',
               padding: '8px 12px',
@@ -1466,7 +1049,7 @@ const SecurityIncidentReportTab = memo(
                       <TableRow sx={{ backgroundColor: 'grey.50' }}>
                         <TableCell padding="checkbox" sx={{ width: 50, minWidth: 50, maxWidth: 50 }}>
                           <Checkbox
-                            checked={localImprovements.length > 0 && (selectedRows || []).length === localImprovements.length}
+                            checked={improvementItems.length > 0 && (selectedRows || []).length === improvementItems.length}
                             onChange={handleSelectAll}
                             color="primary"
                             size="small"

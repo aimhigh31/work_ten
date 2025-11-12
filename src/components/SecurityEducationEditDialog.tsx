@@ -422,7 +422,7 @@ const OverviewTab = memo(
                   <MenuItem value="">선택</MenuItem>
                   {educationTypes && educationTypes.length > 0
                     ? educationTypes.map((type) => (
-                        <MenuItem key={type.subcode} value={type.subcode}>
+                        <MenuItem key={type.subcode} value={type.subcode_name}>
                           {type.subcode_name}
                         </MenuItem>
                       ))
@@ -501,7 +501,7 @@ const OverviewTab = memo(
               >
                 {statusTypes && statusTypes.length > 0
                   ? statusTypes.map((type) => (
-                      <MenuItem key={type.subcode} value={type.subcode}>
+                      <MenuItem key={type.subcode} value={type.subcode_name}>
                         <Chip
                           label={type.subcode_name}
                           size="small"
@@ -800,6 +800,22 @@ const AttachmentDialog = memo(
   }
 );
 
+// 참석자 탭 Props 타입
+interface ParticipantsTabProps {
+  mode: 'add' | 'edit';
+  educationId?: number;
+  onParticipantCountChange?: (count: number) => void;
+  attendanceTypes: any[];
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
+  // 커리큘럼탭과 동일한 패턴: 부모 state
+  participantItems: SecurityAttendeeItem[];
+  setParticipantItems: React.Dispatch<React.SetStateAction<SecurityAttendeeItem[]>>;
+  selectedRows: number[];
+  setSelectedRows: React.Dispatch<React.SetStateAction<number[]>>;
+}
+
 // 참석자 탭 컴포넌트
 const ParticipantsTab = memo(
   ({
@@ -809,62 +825,18 @@ const ParticipantsTab = memo(
     attendanceTypes,
     canCreateData = true,
     canEditOwn = true,
-    canEditOthers = true
-  }: {
-    mode: 'add' | 'edit';
-    educationId?: number;
-    onParticipantCountChange?: (count: number) => void;
-    attendanceTypes: any[];
-    canCreateData?: boolean;
-    canEditOwn?: boolean;
-    canEditOthers?: boolean;
-  }) => {
+    canEditOthers = true,
+    // 부모로부터 받은 state
+    participantItems,
+    setParticipantItems,
+    selectedRows,
+    setSelectedRows
+  }: ParticipantsTabProps) => {
     // Supabase 참석자 관리 훅
     const { fetchAttendeesByEducationId, addMultipleAttendees, updateAttendee, deleteAttendee } = useSupabaseSecurityAttendee();
 
     // ID 생성기 훅 (data_relation.md 패턴 준수)
     const { generateNextId } = useIdGenerator();
-
-    // SessionStorage 키 정의
-    const STORAGE_KEY = 'security_education_temp_participants';
-
-    // SessionStorage에서 데이터 복원
-    const loadFromSessionStorage = useCallback(() => {
-      try {
-        const savedData = sessionStorage.getItem(STORAGE_KEY);
-        if (savedData) {
-          const parsedData = JSON.parse(savedData);
-          console.log('📦 SessionStorage에서 참석자 데이터 복원:', parsedData.length, '개');
-          return parsedData;
-        }
-      } catch (error) {
-        console.error('❌ SessionStorage 복원 실패:', error);
-      }
-      return [];
-    }, [STORAGE_KEY]);
-
-    // SessionStorage에 데이터 저장
-    const saveToSessionStorage = useCallback(
-      (data: SecurityAttendeeItem[]) => {
-        try {
-          sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-          console.log('💾 SessionStorage에 참석자 데이터 저장:', data.length, '개');
-        } catch (error) {
-          console.error('❌ SessionStorage 저장 실패:', error);
-        }
-      },
-      [STORAGE_KEY]
-    );
-
-    // SessionStorage 데이터 삭제
-    const clearSessionStorage = useCallback(() => {
-      try {
-        sessionStorage.removeItem(STORAGE_KEY);
-        console.log('🗑️ SessionStorage 참석자 데이터 정리 완료');
-      } catch (error) {
-        console.error('❌ SessionStorage 정리 실패:', error);
-      }
-    }, [STORAGE_KEY]);
 
     const [statusFromDB, setStatusFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
 
@@ -919,13 +891,7 @@ const ParticipantsTab = memo(
       [statusFromDB]
     );
 
-    const [participantItems, setParticipantItems] = useState<SecurityAttendeeItem[]>(() => {
-      // 초기값을 SessionStorage에서 복원
-      if (mode === 'add') {
-        return loadFromSessionStorage();
-      }
-      return [];
-    });
+    // 커리큘럼탭과 동일한 패턴: ref로 최신 상태 추적
     const participantItemsRef = useRef<SecurityAttendeeItem[]>([]);
 
     // 참석자 데이터 변환 함수 (DB ↔ UI)
@@ -954,91 +920,38 @@ const ParticipantsTab = memo(
       };
     }, []);
 
-    // mode와 educationId에 따라 초기 데이터 설정 (data_relation.md 패턴 준수)
-    useEffect(() => {
-      if (mode === 'add') {
-        console.log('🟡 add 모드: 로컬 상태만 초기화');
-        setParticipantItems([]);
-        participantItemsRef.current = [];
-      } else if (mode === 'edit' && educationId) {
-        console.log('🟡 edit 모드: DB에서 참석자 데이터 로드', educationId);
-        loadParticipantData(educationId);
-      }
-    }, [mode, educationId]);
-
-    // DB에서 참석자 데이터 로드
-    const loadParticipantData = useCallback(
-      async (educationId: number) => {
-        try {
-          const dbItems = await fetchAttendeesByEducationId(educationId);
-          console.log('🟢 DB에서 참석자 데이터 로드 성공:', dbItems);
-
-          // 타입 변환: education_id는 항상 number로 처리
-          const convertedItems = dbItems.map((item) => ({
-            ...item,
-            education_id: typeof item.education_id === 'string' ? parseInt(item.education_id) : item.education_id
-          }));
-
-          setParticipantItems(convertedItems);
-          participantItemsRef.current = convertedItems;
-        } catch (error) {
-          console.error('❌ 참석자 데이터 로드 실패:', error);
-        }
-      },
-      [fetchAttendeesByEducationId]
-    );
-
-    // 로컬 편집 함수 (항상 로컬 상태만 변경 - 커리큘럼탭과 동일한 패턴)
-    const handleLocalEditItem = useCallback(
-      (id: number, field: string, value: string) => {
-        const updatedItems = participantItems.map((item) => (item.id === id ? { ...item, [field]: value } : item));
-        setParticipantItems(updatedItems);
-        participantItemsRef.current = updatedItems; // data_relation.md 패턴: ref 즉시 업데이트
-
-        // add 모드에서만 SessionStorage에 저장
-        if (mode === 'add') {
-          saveToSessionStorage(updatedItems);
-        }
-
-        console.log('📝 참석자 로컬 상태만 변경:', field, '=', value);
-        console.log('📝 ref 업데이트 확인:', participantItemsRef.current.length);
-      },
-      [participantItems, mode, saveToSessionStorage]
-    );
-
-    // edit 모드에서만 사용하는 DB 저장 함수 (더 이상 onChange에서 호출되지 않음)
-    const handleEditItem = useCallback(
-      async (id: number, field: string, value: string) => {
-        // edit 모드에서만 동작
-        if (mode !== 'edit') {
-          console.log('⚠️ handleEditItem은 edit 모드에서만 동작합니다.');
-          return;
-        }
-
-        console.log('🔵 edit 모드: 참석자 DB 업데이트 수행');
-
-        try {
-          const updateResult = await updateAttendee(id, { [field]: value });
-
-          if (updateResult) {
-            console.log('✅ 참석자 DB 업데이트 성공');
-          }
-        } catch (error) {
-          console.error('❌ 참석자 DB 업데이트 실패:', error);
-        }
-      },
-      [mode, updateAttendee]
-    );
-
-    // 외부 노출 함수 (체크리스트 방식 - data_relation.md 패턴)
+    // curriculumItems가 변경될 때마다 ref도 업데이트 (커리큘럼탭과 동일한 패턴)
     useEffect(() => {
       participantItemsRef.current = participantItems;
     }, [participantItems]);
 
-    // 전역 함수로 최신 참석자 데이터 노출 (저장 시 사용)
+    // 커리큘럼 데이터를 외부에 노출하는 함수 (커리큘럼탭과 동일한 패턴)
     useEffect(() => {
-      (window as any).getCurrentParticipantData = () => participantItemsRef.current;
+      // window 객체에 참석자 데이터 접근 함수 등록
+      (window as any).getCurrentParticipantData = () => {
+        // ref를 통해 항상 최신 상태를 가져옴
+        const currentData = participantItemsRef.current;
+        console.log('👥 저장 시점 - 현재 참석자 데이터 수집:', currentData.length, '개 항목');
+        return currentData || [];
+      };
+
+      return () => {
+        // cleanup
+        if ((window as any).getCurrentParticipantData) {
+          delete (window as any).getCurrentParticipantData;
+        }
+      };
     }, []);
+
+    // 로컬 편집 함수 (커리큘럼탭과 동일한 패턴)
+    const handleLocalEditItem = useCallback(
+      (id: number, field: string, value: string) => {
+        setParticipantItems((prev) =>
+          prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
+        );
+      },
+      [setParticipantItems]
+    );
 
     // 참석자 수 변경 시 콜백 호출
     useEffect(() => {
@@ -1047,7 +960,7 @@ const ParticipantsTab = memo(
       }
     }, [participantItems.length, onParticipantCountChange]);
 
-    const [selectedRows, setSelectedRows] = useState<number[]>([]);
+    // selectedRows는 props로 받음 (커리큘럼탭과 동일한 패턴)
     const [editingCell, setEditingCell] = useState<{ id: number; field: string } | null>(null);
 
     // 페이지네이션 상태
@@ -1069,19 +982,12 @@ const ParticipantsTab = memo(
       setEditingCell({ id, field });
     };
 
-    // 셀 편집 완료 시 호출 (커리큘럼탭과 동일한 패턴)
-    const handleCellBlur = async () => {
-      if (editingCell && mode === 'edit') {
-        // edit 모드에서만 DB에 저장
-        const currentValue = participantItems.find((item) => item.id === editingCell.id)?.[editingCell.field as keyof SecurityAttendeeItem];
-        if (currentValue !== undefined) {
-          await handleEditItem(editingCell.id, editingCell.field, String(currentValue));
-        }
-      }
+    // 셀 편집 완료 시 호출 (커리큘럼탭과 동일한 패턴 - DB 저장 없음)
+    const handleCellBlur = () => {
       setEditingCell(null);
     };
 
-    // 새 참석자 추가 (data_relation.md 패턴 준수)
+    // 새 참석자 추가 (커리큘럼탭과 동일한 패턴)
     const handleAddItem = useCallback(() => {
       const newId = generateNextId(); // PostgreSQL 정수 범위 내 순차 ID 생성
       console.log('🆔 새 참석자 ID 생성:', newId);
@@ -1100,37 +1006,22 @@ const ParticipantsTab = memo(
         is_active: true
       };
 
-      const updatedItems = [newItem, ...participantItems];
-      setParticipantItems(updatedItems);
-      participantItemsRef.current = updatedItems;
+      setParticipantItems((prev) => [newItem, ...prev]);
+    }, [educationId, generateNextId, statusFromDB, setParticipantItems]);
 
-      // add 모드에서만 SessionStorage에 저장
-      if (mode === 'add') {
-        saveToSessionStorage(updatedItems);
-      }
-    }, [educationId, participantItems, generateNextId, mode, saveToSessionStorage, statusFromDB]);
+    // 선택된 참석자 삭제 (커리큘럼탭과 동일한 패턴)
+    const handleDeleteSelected = useCallback(() => {
+      // 커리큘럼탭처럼 로컬 상태에서만 제거 (DB는 저장 시 처리)
+      console.log('🗑️ [삭제] selectedRows:', selectedRows);
 
-    // 선택된 참석자 삭제
-    const handleDeleteSelected = useCallback(async () => {
-      if (mode === 'edit') {
-        // edit 모드: DB에서도 삭제
-        for (const id of selectedRows) {
-          await deleteAttendee(id);
-        }
-      }
-
-      // 로컬 상태에서 삭제
-      const updatedItems = participantItems.filter((item) => !selectedRows.includes(item.id));
-      setParticipantItems(updatedItems);
-      participantItemsRef.current = updatedItems;
-
-      // add 모드에서만 SessionStorage에 저장
-      if (mode === 'add') {
-        saveToSessionStorage(updatedItems);
-      }
+      setParticipantItems((prev) => {
+        const filtered = prev.filter((item) => !selectedRows.includes(item.id));
+        console.log('🗑️ [삭제] 필터링 후 개수:', filtered.length);
+        return filtered;
+      });
 
       setSelectedRows([]);
-    }, [mode, selectedRows, participantItems, deleteAttendee, saveToSessionStorage]);
+    }, [selectedRows, setParticipantItems, setSelectedRows]);
 
     const handleSelectRow = (id: number) => {
       if (selectedRows.includes(id)) {
@@ -1197,12 +1088,8 @@ const ParticipantsTab = memo(
                     const selectedItem = statusFromDB.find((s) => s.subcode_name === selectedName);
                     const subcodeValue = selectedItem ? selectedItem.subcode : selectedName;
 
-                    // 로컬 상태 업데이트
+                    // 로컬 상태만 업데이트 (DB는 저장 버튼 클릭 시 저장)
                     handleLocalEditItem(item.id, field, subcodeValue);
-                    // edit 모드일 때만 DB도 업데이트
-                    if (mode === 'edit') {
-                      handleEditItem(item.id, field, subcodeValue);
-                    }
                   }}
                   onBlur={handleCellBlur}
                   onClick={(e) => e.stopPropagation()}
@@ -1594,87 +1481,41 @@ const ParticipantsTab = memo(
   }
 );
 
-// 커리큘럼 탭 컴포넌트 - 임시 데이터 저장 기능 추가
-const CurriculumTab = memo(({ mode, educationId, canCreateData = true, canEditOwn = true, canEditOthers = true }: { mode: 'add' | 'edit'; educationId?: number; canCreateData?: boolean; canEditOwn?: boolean; canEditOthers?: boolean }) => {
-  // Supabase 커리큘럼 hook
-  const {
-    data: curriculumData,
-    loading: curriculumLoading,
-    addCurriculum,
-    updateCurriculum,
-    deleteCurriculum
-  } = useSupabaseSecurityCurriculum();
+// 커리큘럼 탭 컴포넌트 props interface
+interface CurriculumTabProps {
+  mode: 'add' | 'edit';
+  educationId?: number;
+  canCreateData?: boolean;
+  canEditOwn?: boolean;
+  canEditOthers?: boolean;
+  // 비용관리 금액탭 패턴: 부모에서 state 관리
+  curriculumItems: SecurityCurriculumItem[];
+  setCurriculumItems: React.Dispatch<React.SetStateAction<SecurityCurriculumItem[]>>;
+  selectedRows: string[];
+  setSelectedRows: React.Dispatch<React.SetStateAction<string[]>>;
+}
 
-  // SessionStorage 키 정의
-  const STORAGE_KEY = 'security_education_temp_curriculum';
+// 커리큘럼 탭 컴포넌트 - 비용관리 금액탭 패턴
+const CurriculumTab = memo(({
+  mode,
+  educationId,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true,
+  // 부모로부터 받은 state
+  curriculumItems,
+  setCurriculumItems,
+  selectedRows,
+  setSelectedRows
+}: CurriculumTabProps) => {
+  console.log('🔵 CurriculumTab 렌더링:', { mode, educationId, curriculumItemsLength: curriculumItems.length });
 
-  // SessionStorage에서 데이터 복원
-  const loadFromSessionStorage = useCallback(() => {
-    try {
-      const savedData = sessionStorage.getItem(STORAGE_KEY);
-      if (savedData) {
-        const parsedData = JSON.parse(savedData);
-        console.log('📦 SessionStorage에서 커리큘럼 데이터 복원:', parsedData.length, '개');
-        return parsedData;
-      }
-    } catch (error) {
-      console.error('❌ SessionStorage 복원 실패:', error);
-    }
-    return [];
-  }, [STORAGE_KEY]);
-
-  // SessionStorage에 데이터 저장
-  const saveToSessionStorage = useCallback(
-    (data: SecurityCurriculumItem[]) => {
-      try {
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-        console.log('💾 SessionStorage에 커리큘럼 데이터 저장:', data.length, '개');
-      } catch (error) {
-        console.error('❌ SessionStorage 저장 실패:', error);
-      }
-    },
-    [STORAGE_KEY]
-  );
-
-  // SessionStorage 데이터 삭제
-  const clearSessionStorage = useCallback(() => {
-    try {
-      sessionStorage.removeItem(STORAGE_KEY);
-      console.log('🗑️ SessionStorage 커리큘럼 데이터 정리 완료');
-    } catch (error) {
-      console.error('❌ SessionStorage 정리 실패:', error);
-    }
-  }, [STORAGE_KEY]);
-
-  const [curriculumItems, setCurriculumItems] = useState<SecurityCurriculumItem[]>([]);
   const curriculumItemsRef = useRef<SecurityCurriculumItem[]>([]);
 
   // curriculumItems가 변경될 때마다 ref도 업데이트
   useEffect(() => {
     curriculumItemsRef.current = curriculumItems;
   }, [curriculumItems]);
-
-  // educationId에 해당하는 커리큘럼 데이터 필터링 및 설정
-  useEffect(() => {
-    console.log('🔍 CurriculumTab useEffect 실행:', { mode, educationId, curriculumDataLength: curriculumData?.length });
-
-    if (mode === 'add') {
-      // add 모드에서는 SessionStorage에서 복원
-      const restoredData = loadFromSessionStorage();
-      setCurriculumItems(restoredData);
-    } else if (educationId && curriculumData) {
-      // edit 모드에서는 DB 데이터 사용
-      console.log('🔍 필터링 전 전체 커리큘럼 데이터:', curriculumData);
-      const filteredData = curriculumData.filter((item) => {
-        const itemEducationId = typeof item.education_id === 'string' ? parseInt(item.education_id) : item.education_id;
-        const targetEducationId = typeof educationId === 'string' ? parseInt(educationId as string) : educationId;
-        console.log(`🔍 비교: item.education_id(${itemEducationId}) === educationId(${targetEducationId})`);
-        return itemEducationId === targetEducationId;
-      });
-      console.log('🔍 필터링 후 커리큘럼 데이터:', filteredData);
-      setCurriculumItems(filteredData);
-    }
-  }, [mode, educationId, curriculumData]);
 
   // 커리큘럼 데이터를 외부에 노출하는 함수 (data_relation.md 패턴 준수)
   useEffect(() => {
@@ -1713,12 +1554,9 @@ const CurriculumTab = memo(({ mode, educationId, canCreateData = true, canEditOw
     };
   }, []); // 의존성 배열을 빈 배열로 변경 (data_relation.md 패턴)
 
-  const [selectedRows, setSelectedRows] = useState<string[]>([]);
-  const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
-
   // 페이지네이션 상태
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(9);
+  const [itemsPerPage] = useState(7);
 
   // 페이지네이션 계산
   // session_order로 정렬 (오름차순 - 낮은 숫자가 위로)
@@ -1729,111 +1567,65 @@ const CurriculumTab = memo(({ mode, educationId, canCreateData = true, canEditOw
   const endIndex = startIndex + itemsPerPage;
   const currentItems = sortedCurriculumItems.slice(startIndex, endIndex);
 
+  console.log('🎨 렌더링:', {
+    curriculumItemsLength: curriculumItems.length,
+    sortedLength: sortedCurriculumItems.length,
+    currentItemsLength: currentItems.length,
+    currentPage,
+    totalPages
+  });
+
   // 페이지 변경 핸들러 (MUI Pagination 형식에 맞게 수정)
   const handlePageChange = (event: React.ChangeEvent<unknown>, page: number) => {
     setCurrentPage(page);
   };
 
-  const handleCellClick = (id: string, field: string) => {
-    setEditingCell({ id, field });
-  };
 
-  const handleCellBlur = () => {
-    setEditingCell(null);
-  };
+  const handleAddItem = () => {
+    // 비용관리 금액탭 패턴: 로컬 state에만 추가
+    const newItem: SecurityCurriculumItem = {
+      id: Date.now(),
+      education_id: educationId || 0,
+      session_order: 1, // 신규 행은 항상 1번으로 설정 (헤더 바로 아래)
+      session_title: '',
+      session_description: '',
+      duration_minutes: 0,
+      instructor: '',
+      session_type: '강의',
+      materials: '',
+      objectives: '',
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      created_by: 'user',
+      updated_by: 'user'
+    };
 
-  const handleAddItem = async () => {
-    // 현재 교육의 최대 session_order 찾기
-    const maxOrder = curriculumItems.reduce((max, item) => Math.max(max, item.session_order), 0);
-
-    if (mode === 'add') {
-      // add 모드에서는 임시 ID로 로컬 상태에만 추가 (DB 저장 안함)
-      const tempId = Math.floor(Math.random() * 1000000) + 100000; // 6자리 임시 ID 생성 (100000-1099999)
-
-      // 기존 항목들의 session_order를 1씩 증가
-      const updatedExistingItems = curriculumItems.map((item) => ({
+    // 기존 항목들의 session_order를 +1 증가시켜서 새 항목이 맨 위로 오도록 함
+    setCurriculumItems((prev) => [
+      newItem,
+      ...prev.map((item) => ({
         ...item,
         session_order: item.session_order + 1
-      }));
-
-      const newItem: SecurityCurriculumItem = {
-        id: tempId,
-        education_id: educationId || 0, // 임시값
-        session_order: 1, // 헤더 바로 아래
-        session_title: '',
-        session_description: '',
-        duration_minutes: 0,
-        instructor: '',
-        session_type: '강의',
-        materials: '',
-        objectives: '',
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        created_by: 'user',
-        updated_by: 'user'
-      };
-
-      const updatedItems = [newItem, ...updatedExistingItems];
-      setCurriculumItems(updatedItems);
-      curriculumItemsRef.current = updatedItems; // data_relation.md 패턴: ref 즉시 업데이트
-
-      // add 모드에서만 SessionStorage에 저장
-      saveToSessionStorage(updatedItems);
-
-      console.log('📋 임시 커리큘럼 항목 추가 (로컬 상태만):', newItem.session_title || '빈 제목');
-      console.log('📋 ref 업데이트 확인:', curriculumItemsRef.current.length);
-    } else if (mode === 'edit' && educationId) {
-      // edit 모드에서만 DB에 직접 추가
-      // 1. 기존 항목들의 session_order를 1씩 증가
-      for (const item of curriculumItems) {
-        await updateCurriculum(item.id, { session_order: item.session_order + 1 });
-      }
-
-      // 2. 새 항목을 session_order 1로 추가 (헤더 바로 아래)
-      const newItem = {
-        education_id: educationId,
-        session_order: 1,
-        session_title: '',
-        session_description: '',
-        duration_minutes: 0,
-        instructor: '',
-        session_type: '강의' as const,
-        materials: '',
-        objectives: '',
-        is_active: true
-      };
-
-      const result = await addCurriculum(newItem);
-      if (result) {
-        console.log('✅ 커리큘럼 항목 DB 추가 성공');
-      }
-    }
+      }))
+    ]);
   };
 
-  const handleDeleteSelected = async () => {
-    if (mode === 'add') {
-      // add 모드에서는 로컬 상태에서만 제거 (DB 삭제 안함)
-      const idsToRemove = selectedRows.map((id) => parseInt(id));
-      const updatedItems = curriculumItems.filter((item) => !idsToRemove.includes(item.id));
-      setCurriculumItems(updatedItems);
-      curriculumItemsRef.current = updatedItems; // data_relation.md 패턴: ref 즉시 업데이트
+  const handleDeleteSelected = () => {
+    // 비용관리 금액탭 패턴: 로컬 state에서만 제거
+    console.log('🗑️ [삭제] selectedRows:', selectedRows);
+    console.log('🗑️ [삭제] curriculumItems 개수:', curriculumItems.length);
 
-      // add 모드에서만 SessionStorage에 저장
-      saveToSessionStorage(updatedItems);
-
-      console.log('📋 임시 커리큘럼 항목들 제거 (로컬만):', idsToRemove.length, '개');
-      console.log('📋 ref 업데이트 확인:', curriculumItemsRef.current.length);
-    } else if (mode === 'edit') {
-      // edit 모드에서만 DB에서 삭제
-      const selectedIds = selectedRows.map((id) => parseInt(id)).filter((id) => !isNaN(id));
-
-      for (const id of selectedIds) {
-        await deleteCurriculum(id);
-        console.log('🗑️ DB에서 커리큘럼 항목 삭제:', id);
-      }
-    }
-
+    setCurriculumItems((prev) => {
+      const filtered = prev.filter((item) => {
+        const itemIdStr = item.id.toString();
+        const shouldKeep = !selectedRows.includes(itemIdStr);
+        console.log(`🗑️ [삭제] item.id: ${itemIdStr}, 유지: ${shouldKeep}`);
+        return shouldKeep;
+      });
+      console.log('🗑️ [삭제] 필터링 후 개수:', filtered.length);
+      return filtered;
+    });
     setSelectedRows([]);
   };
 
@@ -1869,82 +1661,11 @@ const CurriculumTab = memo(({ mode, educationId, canCreateData = true, canEditOw
       }
     }
 
-    // 항상 로컬 상태만 업데이트 (mode 상관없이)
-    const updatedItems = curriculumItems.map((item) => (item.id === numericId ? { ...item, [dbField]: processedValue } : item));
-
-    setCurriculumItems(updatedItems);
-    curriculumItemsRef.current = updatedItems; // data_relation.md 패턴: ref 즉시 업데이트
-
-    // add 모드에서만 SessionStorage에 저장
-    if (mode === 'add') {
-      saveToSessionStorage(updatedItems);
-    }
-
-    console.log('📝 로컬 상태만 변경:', dbField, '=', processedValue);
-    console.log(
-      '📝 업데이트된 항목:',
-      updatedItems.find((item) => item.id === numericId)
+    // 비용관리 금액탭 패턴: 로컬 state만 업데이트
+    setCurriculumItems((prev) =>
+      prev.map((item) => (item.id === numericId ? { ...item, [dbField]: processedValue } : item))
     );
-    console.log('📝 전체 curriculumItems 수:', updatedItems.length);
     console.log('📝 ref 업데이트 확인:', curriculumItemsRef.current.length);
-  };
-
-  // edit 모드에서만 사용하는 DB 저장 함수 (더 이상 onChange에서 호출되지 않음)
-  const handleEditItem = async (id: string, field: string, value: string | number) => {
-    // edit 모드에서만 동작
-    if (mode !== 'edit') {
-      console.log('⚠️ handleEditItem은 edit 모드에서만 동작합니다.');
-      return;
-    }
-
-    const numericId = parseInt(id);
-    if (isNaN(numericId)) {
-      console.error('유효하지 않은 ID:', id);
-      return;
-    }
-
-    console.log('🔵 DB 편집 시작:', { id, field, value, numericId });
-
-    // 필드명을 DB 스키마에 맞게 매핑
-    const fieldMapping: { [key: string]: string } = {
-      title: 'session_title',
-      content: 'session_description',
-      instructor: 'instructor',
-      time: 'duration_minutes',
-      educationDate: 'session_order',
-      notes: 'objectives'
-    };
-
-    const dbField = fieldMapping[field] || field;
-    let processedValue = value;
-
-    // 시간 형식 처리 (숫자만 허용)
-    if (field === 'time' && typeof value === 'string') {
-      const numericValue = parseInt(value.replace(/[^0-9]/g, ''));
-      if (!isNaN(numericValue) && numericValue >= 0) {
-        processedValue = numericValue;
-      } else {
-        processedValue = 0;
-      }
-    }
-
-    // edit 모드에서만 DB 업데이트
-    const updates: Partial<SecurityCurriculumItem> = {
-      [dbField]: processedValue
-    };
-
-    console.log('🔵 DB 업데이트 데이터:', { dbField, processedValue, updates });
-
-    try {
-      const result = await updateCurriculum(numericId, updates);
-      if (result) {
-        console.log('🟢 DB 편집 성공');
-      } else {
-        console.error('🔴 DB 편집 실패: 결과가 null');
-      }
-    } catch (error) {
-      console.error('🔴 DB 편집 중 오류:', error);
-    }
   };
 
   const handleSelectRow = (id: string) => {
@@ -1965,168 +1686,125 @@ const CurriculumTab = memo(({ mode, educationId, canCreateData = true, canEditOw
 
   // 컬럼 너비 정의
   const columnWidths = {
-    checkbox: 50,
-    no: 60,
+    checkbox: 470,
+    no: 30,
     educationDate: 100,
-    time: 100,
-    instructor: 120,
-    title: 150,
-    content: 200,
-    notes: 150
+    time: 80,
+    instructor: 100,
+    title: 100,
+    content: 170,
+    notes: 101
   };
 
   const cellHeight = 48; // 고정 셀 높이 (줄임)
 
-  // 편집 가능한 셀 렌더링 (소프트웨어관리 구매/유지보수이력 탭 방식 적용)
-  const renderEditableCell = (item: SecurityCurriculumItem, field: string, value: string | number) => {
-    const isEditing = editingCell?.id === item.id.toString() && editingCell?.field === field;
-    const fieldWidth = columnWidths[field as keyof typeof columnWidths] || 100;
-
-    if (isEditing) {
-      if (field === 'educationDate') {
-        return (
-          <Box sx={{ width: '100%', height: '48px', position: 'relative' }}>
-            <TextField
-              type="date"
-              value={value || ''}
-              onChange={(e) => handleLocalEditItem(item.id.toString(), field, e.target.value)}
-              onBlur={handleCellBlur}
-              size="small"
-              sx={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                width: '100%',
-                height: '100%',
-                '& .MuiInputBase-root': {
-                  height: '100%',
-                  width: '100%'
-                },
-                '& .MuiInputBase-input': {
-                  padding: '8px 32px 8px 12px',
-                  height: 'calc(100% - 16px)',
-                  boxSizing: 'border-box'
-                },
-                '& input[type="date"]::-webkit-calendar-picker-indicator': {
-                  position: 'absolute',
-                  right: '8px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: '16px',
-                  height: '16px',
-                  cursor: 'pointer'
-                }
-              }}
-              autoFocus
-              InputLabelProps={{ shrink: true }}
-            />
-          </Box>
-        );
-      }
-
+  // 편집 가능한 셀 렌더링 (비용관리 금액 탭 방식)
+  const renderEditableCell = (item: SecurityCurriculumItem, field: string, value: string | number, canEdit: boolean) => {
+    // 교육일자 필드
+    if (field === 'educationDate') {
       return (
-        <Box sx={{ width: '100%', height: '48px', position: 'relative' }}>
-          <TextField
-            type="text"
-            value={value || ''}
-            onChange={(e) => handleLocalEditItem(item.id.toString(), field, e.target.value)}
-            onBlur={handleCellBlur}
-            size="small"
-            multiline={field === 'content' || field === 'notes'}
-            rows={field === 'content' || field === 'notes' ? 2 : 1}
-            sx={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              width: '100%',
-              height: '100%',
-              '& .MuiInputBase-root': {
-                height: '100%',
-                width: '100%'
-              },
-              '& .MuiInputBase-input': {
-                padding: '8px 12px',
-                height: field === 'content' || field === 'notes' ? 'calc(100% - 16px)' : 'calc(100% - 16px)',
-                boxSizing: 'border-box'
-              },
-              '& .MuiInputBase-multiline': {
-                padding: '8px 12px',
-                height: '100%'
-              }
-            }}
-            autoFocus
-          />
-        </Box>
+        <TextField
+          type="date"
+          value={value || ''}
+          onChange={(e) => handleLocalEditItem(item.id.toString(), field, e.target.value)}
+          disabled={!canEdit}
+          variant="standard"
+          size="small"
+          InputProps={{
+            disableUnderline: true
+          }}
+          sx={{
+            width: '100%',
+            '& .MuiInputBase-input': {
+              padding: '8px 4px',
+              fontSize: '12px',
+              border: 'none',
+              outline: 'none'
+            },
+            '&:hover': !canEdit ? {} : {
+              backgroundColor: '#f8f9fa',
+              borderRadius: '4px'
+            }
+          }}
+        />
       );
     }
 
-    // 읽기 모드 - 완전히 고정된 높이
+    // 시간 필드
+    if (field === 'time') {
+      return (
+        <TextField
+          type="number"
+          value={typeof value === 'string' ? value.replace(/[^0-9]/g, '') : value || ''}
+          onChange={(e) => handleLocalEditItem(item.id.toString(), field, e.target.value)}
+          disabled={!canEdit}
+          variant="standard"
+          size="small"
+          placeholder="분"
+          InputProps={{
+            disableUnderline: true
+          }}
+          sx={{
+            width: '100%',
+            '& .MuiInputBase-input': {
+              padding: '8px 4px',
+              fontSize: '12px',
+              border: 'none',
+              outline: 'none'
+            },
+            '&:hover': !canEdit ? {} : {
+              backgroundColor: '#f8f9fa',
+              borderRadius: '4px'
+            }
+          }}
+        />
+      );
+    }
+
+    // 나머지 텍스트 필드 (강사, 제목, 교육내용, 비고)
     return (
-      <Box
+      <TextField
+        value={value || ''}
+        onChange={(e) => handleLocalEditItem(item.id.toString(), field, e.target.value)}
+        disabled={!canEdit}
+        variant="standard"
+        size="small"
+        multiline={field === 'content' || field === 'notes'}
+        rows={field === 'content' || field === 'notes' ? 2 : 1}
+        InputProps={{
+          disableUnderline: true
+        }}
         sx={{
           width: '100%',
-          minWidth: fieldWidth,
-          padding: '8px 12px',
-          cursor: 'text',
-          height: '48px',
-          display: 'flex',
-          alignItems: 'center',
-          '&:hover': { backgroundColor: 'action.hover' }
-        }}
-      >
-        <Typography
-          variant="body2"
-          sx={{
+          '& .MuiInputBase-input': {
+            padding: '8px 4px',
             fontSize: '12px',
-            whiteSpace: field === 'content' || field === 'notes' ? 'pre-wrap' : 'nowrap',
-            wordBreak: field === 'content' || field === 'notes' ? 'break-word' : 'normal',
-            lineHeight: field === 'content' || field === 'notes' ? 1.4 : 'normal',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            display: field === 'content' || field === 'notes' ? '-webkit-box' : 'block',
-            WebkitLineClamp: field === 'content' || field === 'notes' ? 2 : undefined,
-            WebkitBoxOrient: field === 'content' || field === 'notes' ? 'vertical' : undefined
-          }}
-        >
-          {value || '-'}
-        </Typography>
-      </Box>
+            border: 'none',
+            outline: 'none'
+          },
+          '& .MuiInputBase-inputMultiline': {
+            padding: '8px 4px'
+          },
+          '&:hover': !canEdit ? {} : {
+            backgroundColor: '#f8f9fa',
+            borderRadius: '4px'
+          }
+        }}
+      />
     );
   };
 
   return (
-    <Box sx={{ height: '650px', display: 'flex', flexDirection: 'column', p: 3, position: 'relative', overflow: 'hidden' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h6" sx={{ fontSize: '16px', fontWeight: 600 }}>
-          커리큘럼 관리
-        </Typography>
+    <Box sx={{ height: '740px', display: 'flex', flexDirection: 'column', pt: 3, px: 3, pb: 0, mb: '-18px', position: 'relative', overflow: 'hidden' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h6">커리큘럼 관리</Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
           <Button
-            variant="outlined"
-            color="error"
-            onClick={handleDeleteSelected}
-            disabled={selectedRows.length === 0 || !(canEditOwn || canEditOthers)}
-            size="small"
-            sx={{
-              '&.Mui-disabled': {
-                borderColor: 'grey.300',
-                color: 'grey.500'
-              }
-            }}
-          >
-            삭제({selectedRows.length})
-          </Button>
-          <Button
             variant="contained"
-            onClick={handleAddItem}
-            disabled={mode === 'add' ? !canCreateData : !(canEditOwn || canEditOthers)}
             size="small"
+            disabled={mode === 'add' ? !canCreateData : !(canEditOwn || canEditOthers)}
+            onClick={handleAddItem}
             sx={{
-              fontSize: '12px',
               '&.Mui-disabled': {
                 backgroundColor: 'grey.300',
                 color: 'grey.500'
@@ -2135,27 +1813,89 @@ const CurriculumTab = memo(({ mode, educationId, canCreateData = true, canEditOw
           >
             추가
           </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            color="error"
+            disabled={selectedRows.length === 0 || !(canEditOwn || canEditOthers)}
+            onClick={handleDeleteSelected}
+            sx={{
+              '&.Mui-disabled': {
+                borderColor: 'grey.300',
+                color: 'grey.500'
+              }
+            }}
+          >
+            삭제
+          </Button>
         </Box>
       </Box>
 
       <TableContainer
         sx={{
-          flex: 1,
+          mb: 0,
+          boxShadow: 'none',
+          border: '1px solid #f0f0f0',
+          borderRadius: 2,
+          maxHeight: '650px',
           overflowY: 'auto',
-          overflowX: 'auto',
-          maxHeight: '500px',
-          '& .MuiTable-root': {
-            minWidth: 800
-          }
+          overflowX: 'auto'
         }}
       >
-        <Table size="small">
+        <Table
+          size="small"
+          sx={{
+            width: '100%',
+            tableLayout: 'fixed',
+            '& .MuiTableCell-root': {
+              border: 'none',
+              padding: '12px 8px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            },
+            '& .MuiTableHead-root .MuiTableCell-root': {
+              backgroundColor: '#fafafa',
+              fontWeight: 600,
+              fontSize: '12px',
+              color: 'text.primary',
+              borderBottom: '2px solid #f0f0f0'
+            },
+            '& .MuiTableBody-root .MuiTableRow-root': {
+              '&:hover': {
+                backgroundColor: '#f8f9fa'
+              },
+              '&:not(:last-child)': {
+                borderBottom: '1px solid #f5f5f5'
+              }
+            }
+          }}
+        >
           <TableHead>
-            <TableRow sx={{ backgroundColor: 'grey.50' }}>
-              <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
+            <TableRow sx={{ '& .MuiTableCell-root': { py: 1.5 } }}>
+              <TableCell
+                padding="checkbox"
+                sx={{
+                  width: columnWidths.checkbox,
+                  textAlign: 'center',
+                  verticalAlign: 'middle',
+                  '& .MuiCheckbox-root': {
+                    display: 'block',
+                    margin: '0 auto'
+                  }
+                }}
+              >
                 <Checkbox
-                  checked={selectedRows.length === curriculumItems.length && curriculumItems.length > 0}
-                  onChange={handleSelectAll}
+                  indeterminate={selectedRows.length > 0 && selectedRows.length < curriculumItems.length}
+                  checked={curriculumItems.length > 0 && selectedRows.length === curriculumItems.length}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedRows(curriculumItems.map((item) => item.id.toString()));
+                    } else {
+                      setSelectedRows([]);
+                    }
+                  }}
+                  disabled={!(canEditOwn || canEditOthers)}
                   color="primary"
                   size="small"
                   sx={{
@@ -2166,30 +1906,48 @@ const CurriculumTab = memo(({ mode, educationId, canCreateData = true, canEditOw
                   }}
                 />
               </TableCell>
-              <TableCell sx={{ width: columnWidths.no, fontWeight: 600 }}>NO</TableCell>
-              <TableCell sx={{ width: columnWidths.educationDate, fontWeight: 600 }}>교육일자</TableCell>
-              <TableCell sx={{ width: columnWidths.time, fontWeight: 600 }}>시간</TableCell>
-              <TableCell sx={{ width: columnWidths.instructor, fontWeight: 600 }}>강사</TableCell>
-              <TableCell sx={{ width: columnWidths.title, fontWeight: 600 }}>제목</TableCell>
-              <TableCell sx={{ width: columnWidths.content, fontWeight: 600 }}>교육내용</TableCell>
-              <TableCell sx={{ width: columnWidths.notes, fontWeight: 600 }}>비고</TableCell>
+              <TableCell sx={{ width: columnWidths.no }}>NO</TableCell>
+              <TableCell sx={{ width: columnWidths.educationDate }}>교육일자</TableCell>
+              <TableCell sx={{ width: columnWidths.time }}>시간</TableCell>
+              <TableCell sx={{ width: columnWidths.instructor }}>강사</TableCell>
+              <TableCell sx={{ width: columnWidths.title }}>제목</TableCell>
+              <TableCell sx={{ width: columnWidths.content }}>교육내용</TableCell>
+              <TableCell sx={{ width: columnWidths.notes }}>비고</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {currentItems.map((item, index) => (
-              <TableRow
-                key={`curriculum-${item.id}`}
-                hover
-                sx={{
-                  minHeight: cellHeight,
-                  '&:hover': { backgroundColor: 'action.hover' }
-                }}
-              >
-                <TableCell sx={{ width: columnWidths.checkbox, padding: 0, height: 48 }}>
-                  <Box sx={{ height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {currentItems.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
+                  추가 버튼을 눌러 커리큘럼 항목을 추가해보세요.
+                </TableCell>
+              </TableRow>
+            ) : (
+              currentItems.map((item, index) => (
+                <TableRow
+                  key={`curriculum-${item.id}`}
+                  hover
+                  sx={{ '& .MuiTableCell-root': { py: 1.5 } }}
+                >
+                  <TableCell
+                    padding="checkbox"
+                    sx={{
+                      textAlign: 'center',
+                      verticalAlign: 'middle',
+                      '& .MuiCheckbox-root': {
+                        display: 'block',
+                        margin: '0 auto'
+                      }
+                    }}
+                  >
                     <Checkbox
                       checked={selectedRows.includes(item.id.toString())}
-                      onChange={() => handleSelectRow(item.id.toString())}
+                      onChange={() => {
+                        setSelectedRows((prev) =>
+                          prev.includes(item.id.toString()) ? prev.filter((id) => id !== item.id.toString()) : [...prev, item.id.toString()]
+                        );
+                      }}
+                      disabled={!(canEditOwn || canEditOthers)}
                       color="primary"
                       size="small"
                       sx={{
@@ -2199,51 +1957,33 @@ const CurriculumTab = memo(({ mode, educationId, canCreateData = true, canEditOw
                         }
                       }}
                     />
-                  </Box>
-                </TableCell>
-                <TableCell sx={{ width: columnWidths.no, padding: 0, height: 48 }}>
-                  <Box sx={{ height: 48, display: 'flex', alignItems: 'center', padding: '8px 12px' }}>
-                    {curriculumItems.length - startIndex - index}
-                  </Box>
-                </TableCell>
-                <TableCell
-                  sx={{ width: columnWidths.educationDate, padding: 0, height: 48 }}
-                  onClick={() => handleCellClick(item.id.toString(), 'educationDate')}
-                >
-                  {renderEditableCell(item, 'educationDate', item.created_at?.split('T')[0] || new Date().toISOString().split('T')[0])}
-                </TableCell>
-                <TableCell
-                  sx={{ width: columnWidths.time, padding: 0, height: 48 }}
-                  onClick={() => handleCellClick(item.id.toString(), 'time')}
-                >
-                  {renderEditableCell(item, 'time', item.duration_minutes && item.duration_minutes > 0 ? `${item.duration_minutes}분` : '')}
-                </TableCell>
-                <TableCell
-                  sx={{ width: columnWidths.instructor, padding: 0, height: 48 }}
-                  onClick={() => handleCellClick(item.id.toString(), 'instructor')}
-                >
-                  {renderEditableCell(item, 'instructor', item.instructor || '')}
-                </TableCell>
-                <TableCell
-                  sx={{ width: columnWidths.title, padding: 0, height: 48 }}
-                  onClick={() => handleCellClick(item.id.toString(), 'title')}
-                >
-                  {renderEditableCell(item, 'title', item.session_title || '')}
-                </TableCell>
-                <TableCell
-                  sx={{ width: columnWidths.content, padding: 0, height: 48 }}
-                  onClick={() => handleCellClick(item.id.toString(), 'content')}
-                >
-                  {renderEditableCell(item, 'content', item.session_description || '')}
-                </TableCell>
-                <TableCell
-                  sx={{ width: columnWidths.notes, padding: 0, height: 48 }}
-                  onClick={() => handleCellClick(item.id.toString(), 'notes')}
-                >
-                  {renderEditableCell(item, 'notes', item.objectives || '')}
-                </TableCell>
-              </TableRow>
-            ))}
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.secondary', fontWeight: 500 }}>
+                      {curriculumItems.length - startIndex - index}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    {renderEditableCell(item, 'educationDate', item.created_at?.split('T')[0] || new Date().toISOString().split('T')[0], canEditOwn || canEditOthers)}
+                  </TableCell>
+                  <TableCell>
+                    {renderEditableCell(item, 'time', item.duration_minutes || '', canEditOwn || canEditOthers)}
+                  </TableCell>
+                  <TableCell>
+                    {renderEditableCell(item, 'instructor', item.instructor || '', canEditOwn || canEditOthers)}
+                  </TableCell>
+                  <TableCell>
+                    {renderEditableCell(item, 'title', item.session_title || '', canEditOwn || canEditOthers)}
+                  </TableCell>
+                  <TableCell>
+                    {renderEditableCell(item, 'content', item.session_description || '', canEditOwn || canEditOthers)}
+                  </TableCell>
+                  <TableCell>
+                    {renderEditableCell(item, 'notes', item.objectives || '', canEditOwn || canEditOthers)}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </TableContainer>
@@ -2255,8 +1995,11 @@ const CurriculumTab = memo(({ mode, educationId, canCreateData = true, canEditOw
           justifyContent: 'space-between',
           alignItems: 'center',
           mt: 'auto',
-          pt: 2,
+          pt: 0.5,
+          pb: 0.5,
+          mb: 0,
           px: 4,
+          height: '36px',
           borderTop: '1px solid',
           borderColor: 'divider',
           backgroundColor: 'background.paper',
@@ -2266,7 +2009,7 @@ const CurriculumTab = memo(({ mode, educationId, canCreateData = true, canEditOw
           right: '24px'
         }}
       >
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem', lineHeight: 1 }}>
           {sortedCurriculumItems.length > 0
             ? `${startIndex + 1}-${Math.min(endIndex, sortedCurriculumItems.length)} of ${sortedCurriculumItems.length}`
             : '0-0 of 0'}
@@ -2281,11 +2024,20 @@ const CurriculumTab = memo(({ mode, educationId, canCreateData = true, canEditOw
             showFirstButton
             showLastButton
             sx={{
+              m: 0,
+              p: 0,
+              height: '20px',
+              '& .MuiPagination-ul': {
+                m: 0,
+                p: 0
+              },
               '& .MuiPaginationItem-root': {
-                fontSize: '0.875rem',
-                minWidth: '32px',
-                height: '32px',
-                borderRadius: '4px'
+                fontSize: '0.75rem',
+                minWidth: '28px',
+                height: '28px',
+                borderRadius: '4px',
+                m: 0,
+                p: 0
               },
               '& .MuiPaginationItem-page.Mui-selected': {
                 backgroundColor: 'primary.main',
@@ -3226,9 +2978,35 @@ interface SecurityEducationDialogProps {
   canEditOwn?: boolean;
   canEditOthers?: boolean;
   generateEducationCode?: () => Promise<string>;
+  // 커리큘럼 관련 props (비용관리 금액탭 패턴)
+  curriculumData?: SecurityCurriculumItem[];
+  curriculumLoading?: boolean;
+  fetchCurriculum?: () => Promise<void>;
+  // 참석자 관련 props (커리큘럼탭과 동일한 패턴)
+  attendeeData?: SecurityAttendeeItem[];
+  attendeeLoading?: boolean;
+  fetchAttendee?: () => Promise<void>;
 }
 
-export default function SecurityEducationDialog({ open, onClose, onSave, data, mode, canCreateData = true, canEditOwn = true, canEditOthers = true, generateEducationCode }: SecurityEducationDialogProps) {
+export default function SecurityEducationDialog({
+  open,
+  onClose,
+  onSave,
+  data,
+  mode,
+  canCreateData = true,
+  canEditOwn = true,
+  canEditOthers = true,
+  generateEducationCode,
+  // 커리큘럼 props (비용관리 금액탭 패턴)
+  curriculumData,
+  curriculumLoading,
+  fetchCurriculum,
+  // 참석자 props (커리큘럼탭과 동일한 패턴)
+  attendeeData,
+  attendeeLoading,
+  fetchAttendee
+}: SecurityEducationDialogProps) {
   const [value, setValue] = useState(0);
 
   // 현재 로그인 사용자 정보
@@ -3429,6 +3207,14 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
     feedback: ''
   });
 
+  // 커리큘럼 상태 관리 (비용관리 금액탭 패턴)
+  const [curriculumItems, setCurriculumItems] = useState<SecurityCurriculumItem[]>([]);
+  const [selectedCurriculumRows, setSelectedCurriculumRows] = useState<string[]>([]);
+
+  // 참석자 상태 관리 (커리큘럼탭과 동일한 패턴)
+  const [participantItems, setParticipantItems] = useState<SecurityAttendeeItem[]>([]);
+  const [selectedParticipantRows, setSelectedParticipantRows] = useState<number[]>([]);
+
   // 기록 상태 관리
   const [newComment, setNewComment] = useState('');
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
@@ -3542,12 +3328,30 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
 
   // 다이얼로그 열릴 때 상태 초기화
   useEffect(() => {
-    if (open) {
+    const initializeDialog = async () => {
+      if (!open) return;
+
+      // 다이얼로그 열릴 때 최신 커리큘럼 데이터 가져오기
+      if (fetchCurriculum) {
+        console.log('🔄 [다이얼로그 열림] 커리큘럼 데이터 새로고침 시작');
+        await fetchCurriculum();
+        console.log('✅ [다이얼로그 열림] 커리큘럼 데이터 새로고침 완료');
+      }
+
+      // 다이얼로그 열릴 때 최신 참석자 데이터 가져오기 (커리큘럼탭과 동일한 패턴)
+      if (fetchAttendee) {
+        console.log('🔄 [다이얼로그 열림] 참석자 데이터 새로고침 시작');
+        await fetchAttendee();
+        console.log('✅ [다이얼로그 열림] 참석자 데이터 새로고침 완료');
+      }
+
       if (mode === 'edit' && data) {
         console.log('🔍 [팝업열림] SET_EDUCATION 실행');
         console.log('🔍 data.educationType:', data.educationType, '(타입:', typeof data.educationType, ')');
         console.log('🔍 data.status:', data.status, '(타입:', typeof data.status, ')');
         console.log('🔍 data 전체:', data);
+
+        // DB에 서브코드명이 저장되어 있으므로 변환 없이 그대로 사용
         dispatch({ type: 'SET_EDUCATION', education: data });
         // 편집 모드에서 기존 교육실적보고 데이터 로드
         // 임시 저장된 데이터 확인
@@ -3578,6 +3382,9 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
 
           setEducationReport(loadedReport);
         }
+
+        // 커리큘럼 데이터는 별도 useEffect에서 curriculumData 변경 시 자동 로드됨
+
         setNewComment('');
       } else {
         // 새 교육 추가 시 자동으로 코드 생성
@@ -3636,11 +3443,57 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
           improvements: '',
           feedback: ''
         });
+        setCurriculumItems([]); // add 모드: 빈 배열로 초기화
+        setParticipantItems([]); // add 모드: 빈 배열로 초기화
         setNewComment('');
       }
       setValue(0);
+    };
+
+    initializeDialog();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, mode, data?.id ?? null]); // data.id를 null로 기본값 설정하여 배열 크기 일정하게 유지
+
+  // curriculumData가 업데이트될 때마다 자동으로 필터링 (fetchCurriculum 완료 후)
+  useEffect(() => {
+    if (open && mode === 'edit' && data?.id && curriculumData) {
+      console.log('🔄 [curriculumData 변경 감지] 데이터 필터링 시작');
+      const filteredCurriculum = curriculumData.filter((item) => {
+        const itemEducationId = typeof item.education_id === 'string' ? parseInt(item.education_id) : item.education_id;
+        const targetEducationId = typeof data.id === 'string' ? parseInt(data.id) : data.id;
+        return itemEducationId === targetEducationId;
+      });
+      console.log('✅ [curriculumData 변경 감지] 필터링 완료:', filteredCurriculum.length, '개');
+      setCurriculumItems(filteredCurriculum);
     }
-  }, [open, mode, data]);
+  }, [curriculumData, open, mode, data?.id]);
+
+  // attendeeData가 업데이트될 때마다 자동으로 필터링 (커리큘럼탭과 동일한 패턴)
+  useEffect(() => {
+    console.log('👥 [attendeeData useEffect] 실행됨', {
+      open,
+      mode,
+      dataId: data?.id,
+      attendeeDataLength: attendeeData?.length,
+      attendeeData: attendeeData
+    });
+
+    if (open && mode === 'edit' && data?.id && attendeeData) {
+      console.log('🔄 [attendeeData 변경 감지] 데이터 필터링 시작');
+      console.log('👥 전체 attendeeData:', attendeeData);
+
+      const filteredAttendee = attendeeData.filter((item) => {
+        const itemEducationId = typeof item.education_id === 'string' ? parseInt(item.education_id) : item.education_id;
+        const targetEducationId = typeof data.id === 'string' ? parseInt(data.id) : data.id;
+        console.log('👥 필터링 체크:', { itemEducationId, targetEducationId, match: itemEducationId === targetEducationId });
+        return itemEducationId === targetEducationId;
+      });
+
+      console.log('✅ [attendeeData 변경 감지] 필터링 완료:', filteredAttendee.length, '개');
+      console.log('👥 필터링된 참석자:', filteredAttendee);
+      setParticipantItems(filteredAttendee);
+    }
+  }, [attendeeData, open, mode, data?.id]);
 
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
@@ -3914,17 +3767,9 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
         if (oldValue !== newValue) {
           console.log(`✅ 변경 감지! 필드: ${field}, 이전값: ${oldValue}, 새값: ${newValue}`);
 
-          // 상태와 교육유형은 서브코드명으로 변환해서 로그 저장
+          // 상태와 교육유형은 이미 서브코드명으로 저장되므로 그대로 사용
           let oldValueDisplay = oldValue;
           let newValueDisplay = newValue;
-
-          if (field === 'status') {
-            oldValueDisplay = getStatusName(oldValue) || oldValue;
-            newValueDisplay = getStatusName(newValue) || newValue;
-          } else if (field === 'educationType') {
-            oldValueDisplay = getEducationTypeName(oldValue) || oldValue;
-            newValueDisplay = getEducationTypeName(newValue) || newValue;
-          }
 
           queueChangeLog(action, oldValueDisplay, newValueDisplay, {
             changeType: 'update',
@@ -4419,6 +4264,10 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
       improvements: '',
       feedback: ''
     });
+    setCurriculumItems([]); // 커리큘럼 초기화
+    setSelectedCurriculumRows([]); // 선택된 커리큘럼 초기화
+    setParticipantItems([]); // 참석자 초기화
+    setSelectedParticipantRows([]); // 선택된 참석자 초기화
     setNewComment('');
     setEditingCommentId(null);
     setEditingCommentText('');
@@ -4488,7 +4337,7 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
         </Box>
       </DialogTitle>
 
-      <DialogContent sx={{ p: 0 }}>
+      <DialogContent sx={{ p: 0, overflow: 'hidden' }}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tabs value={value} onChange={handleChange} aria-label="교육관리 탭">
             <Tab label="개요" {...a11yProps(0)} />
@@ -4520,6 +4369,11 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
             canCreateData={canCreateData}
             canEditOwn={canEdit}
             canEditOthers={canEdit}
+            // 비용관리 금액탭 패턴: 부모 state 전달
+            curriculumItems={curriculumItems}
+            setCurriculumItems={setCurriculumItems}
+            selectedRows={selectedCurriculumRows}
+            setSelectedRows={setSelectedCurriculumRows}
           />
         </TabPanel>
 
@@ -4532,6 +4386,11 @@ export default function SecurityEducationDialog({ open, onClose, onSave, data, m
             canCreateData={canCreateData}
             canEditOwn={canEdit}
             canEditOthers={canEdit}
+            // 커리큘럼탭과 동일한 패턴: 부모 state 전달
+            participantItems={participantItems}
+            setParticipantItems={setParticipantItems}
+            selectedRows={selectedParticipantRows}
+            setSelectedRows={setSelectedParticipantRows}
           />
         </TabPanel>
 
