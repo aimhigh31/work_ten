@@ -318,10 +318,11 @@ export default function HardwareTable({
         if (addChangeLog) {
           deletedHardwares.forEach((task) => {
             const assetName = task.assetName || task.workContent || '하드웨어';
+            const hardwareCode = task.code || `HW-${task.id}`;
             addChangeLog(
-              '하드웨어 삭제',
-              task.code || `HW-${task.id}`,
-              `${assetName} 삭제`,
+              '삭제',
+              hardwareCode,
+              `하드웨어관리 ${assetName}(${hardwareCode})의 데이터가 삭제 되었습니다.`,
               task.team || '미분류',
               undefined,
               undefined,
@@ -340,19 +341,10 @@ export default function HardwareTable({
         if (setSnackbar) {
           if (deletedHardwares.length === 1) {
             const assetName = deletedHardwares[0].assetName || deletedHardwares[0].workContent || '하드웨어';
-            const getKoreanParticle = (word: string): string => {
-              const lastChar = word.charAt(word.length - 1);
-              const code = lastChar.charCodeAt(0);
-              if (code >= 0xAC00 && code <= 0xD7A3) {
-                const hasJongseong = (code - 0xAC00) % 28 !== 0;
-                return hasJongseong ? '이' : '가';
-              }
-              return '가';
-            };
-            const josa = getKoreanParticle(assetName);
+            const hardwareCode = deletedHardwares[0].code || `HW-${deletedHardwares[0].id}`;
             setSnackbar({
               open: true,
-              message: `${assetName}${josa} 성공적으로 삭제되었습니다.`,
+              message: `하드웨어관리 ${assetName}(${hardwareCode})의 데이터가 삭제 되었습니다.`,
               severity: 'error'
             });
           } else {
@@ -471,7 +463,7 @@ export default function HardwareTable({
           addChangeLog(
             '수정',
             hardwareCode,
-            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 자산분류가 ${originalHardware.assetCategory || ''} → ${convertedHardware.assetCategory || ''} 로 수정 되었습니다.`,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 개요탭의 자산분류가 ${originalHardware.assetCategory || ''} → ${convertedHardware.assetCategory || ''} 로 수정 되었습니다.`,
             convertedHardware.team || '미분류',
             originalHardware.assetCategory || '',
             convertedHardware.assetCategory || '',
@@ -485,7 +477,7 @@ export default function HardwareTable({
           addChangeLog(
             '수정',
             hardwareCode,
-            `하드웨어관리 ${originalHardware.assetName || ''}(${hardwareCode}) 정보의 개요탭 자산명이 ${originalHardware.assetName || ''} → ${convertedHardware.assetName || ''} 로 수정 되었습니다.`,
+            `하드웨어관리 ${originalHardware.assetName || ''}(${hardwareCode}) 개요탭의 자산명이 ${originalHardware.assetName || ''} → ${convertedHardware.assetName || ''} 로 수정 되었습니다.`,
             convertedHardware.team || '미분류',
             originalHardware.assetName || '',
             convertedHardware.assetName || '',
@@ -499,7 +491,7 @@ export default function HardwareTable({
           addChangeLog(
             '수정',
             hardwareCode,
-            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 모델이 ${originalHardware.model || ''} → ${convertedHardware.model || ''} 로 수정 되었습니다.`,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 개요탭의 모델이 ${originalHardware.model || ''} → ${convertedHardware.model || ''} 로 수정 되었습니다.`,
             convertedHardware.team || '미분류',
             originalHardware.model || '',
             convertedHardware.model || '',
@@ -513,7 +505,7 @@ export default function HardwareTable({
           addChangeLog(
             '수정',
             hardwareCode,
-            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 제조사가 ${originalHardware.manufacturer || ''} → ${convertedHardware.manufacturer || ''} 로 수정 되었습니다.`,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 개요탭의 제조사가 ${originalHardware.manufacturer || ''} → ${convertedHardware.manufacturer || ''} 로 수정 되었습니다.`,
             convertedHardware.team || '미분류',
             originalHardware.manufacturer || '',
             convertedHardware.manufacturer || '',
@@ -527,7 +519,7 @@ export default function HardwareTable({
           addChangeLog(
             '수정',
             hardwareCode,
-            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 공급업체가 ${originalHardware.vendor || ''} → ${convertedHardware.vendor || ''} 로 수정 되었습니다.`,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 개요탭의 공급업체가 ${originalHardware.vendor || ''} → ${convertedHardware.vendor || ''} 로 수정 되었습니다.`,
             convertedHardware.team || '미분류',
             originalHardware.vendor || '',
             convertedHardware.vendor || '',
@@ -541,7 +533,7 @@ export default function HardwareTable({
           addChangeLog(
             '수정',
             hardwareCode,
-            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 상세스펙이 ${originalHardware.detailSpec || ''} → ${convertedHardware.detailSpec || ''} 로 수정 되었습니다.`,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 개요탭의 상세스펙이 ${originalHardware.detailSpec || ''} → ${convertedHardware.detailSpec || ''} 로 수정 되었습니다.`,
             convertedHardware.team || '미분류',
             originalHardware.detailSpec || '',
             convertedHardware.detailSpec || '',
@@ -555,7 +547,7 @@ export default function HardwareTable({
           addChangeLog(
             '수정',
             hardwareCode,
-            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 사용자가 ${originalHardware.currentUser || ''} → ${convertedHardware.currentUser || ''} 로 수정 되었습니다.`,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 개요탭의 사용자가 ${originalHardware.currentUser || ''} → ${convertedHardware.currentUser || ''} 로 수정 되었습니다.`,
             convertedHardware.team || '미분류',
             originalHardware.currentUser || '',
             convertedHardware.currentUser || '',
@@ -569,11 +561,11 @@ export default function HardwareTable({
           addChangeLog(
             '수정',
             hardwareCode,
-            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 위치가 ${originalHardware.location || ''} → ${convertedHardware.location || ''} 로 수정 되었습니다.`,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 개요탭의 자산위치가 ${originalHardware.location || ''} → ${convertedHardware.location || ''} 로 수정 되었습니다.`,
             convertedHardware.team || '미분류',
             originalHardware.location || '',
             convertedHardware.location || '',
-            '위치',
+            '자산위치',
             hardwareName
           );
         }
@@ -583,7 +575,7 @@ export default function HardwareTable({
           addChangeLog(
             '수정',
             hardwareCode,
-            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 담당자가 ${originalHardware.assignee || ''} → ${convertedHardware.assignee || ''} 로 수정 되었습니다.`,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 개요탭의 담당자가 ${originalHardware.assignee || ''} → ${convertedHardware.assignee || ''} 로 수정 되었습니다.`,
             convertedHardware.team || '미분류',
             originalHardware.assignee || '',
             convertedHardware.assignee || '',
@@ -597,7 +589,7 @@ export default function HardwareTable({
           addChangeLog(
             '수정',
             hardwareCode,
-            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 상태가 ${originalHardware.status} → ${convertedHardware.status} 로 수정 되었습니다.`,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 개요탭의 상태가 ${originalHardware.status} → ${convertedHardware.status} 로 수정 되었습니다.`,
             convertedHardware.team || '미분류',
             originalHardware.status,
             convertedHardware.status,
@@ -611,7 +603,7 @@ export default function HardwareTable({
           addChangeLog(
             '수정',
             hardwareCode,
-            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 구매일이 ${originalHardware.purchaseDate || ''} → ${convertedHardware.purchaseDate || ''} 로 수정 되었습니다.`,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 개요탭의 구매일이 ${originalHardware.purchaseDate || ''} → ${convertedHardware.purchaseDate || ''} 로 수정 되었습니다.`,
             convertedHardware.team || '미분류',
             originalHardware.purchaseDate || '',
             convertedHardware.purchaseDate || '',
@@ -625,7 +617,7 @@ export default function HardwareTable({
           addChangeLog(
             '수정',
             hardwareCode,
-            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 보증만료일이 ${originalHardware.warrantyEndDate || ''} → ${convertedHardware.warrantyEndDate || ''} 로 수정 되었습니다.`,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 개요탭의 보증만료일이 ${originalHardware.warrantyEndDate || ''} → ${convertedHardware.warrantyEndDate || ''} 로 수정 되었습니다.`,
             convertedHardware.team || '미분류',
             originalHardware.warrantyEndDate || '',
             convertedHardware.warrantyEndDate || '',
@@ -639,7 +631,7 @@ export default function HardwareTable({
           addChangeLog(
             '수정',
             hardwareCode,
-            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 시리얼번호가 ${originalHardware.serialNumber || ''} → ${convertedHardware.serialNumber || ''} 로 수정 되었습니다.`,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 개요탭의 시리얼번호가 ${originalHardware.serialNumber || ''} → ${convertedHardware.serialNumber || ''} 로 수정 되었습니다.`,
             convertedHardware.team || '미분류',
             originalHardware.serialNumber || '',
             convertedHardware.serialNumber || '',
@@ -653,7 +645,7 @@ export default function HardwareTable({
           addChangeLog(
             '수정',
             hardwareCode,
-            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 팀이 ${originalHardware.team || ''} → ${convertedHardware.team || ''} 로 수정 되었습니다.`,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 개요탭의 팀이 ${originalHardware.team || ''} → ${convertedHardware.team || ''} 로 수정 되었습니다.`,
             convertedHardware.team || '미분류',
             originalHardware.team || '',
             convertedHardware.team || '',
@@ -667,7 +659,7 @@ export default function HardwareTable({
           addChangeLog(
             '수정',
             hardwareCode,
-            `하드웨어관리 ${hardwareName}(${hardwareCode}) 정보의 개요탭 자산설명이 ${originalHardware.assetDescription || ''} → ${convertedHardware.assetDescription || ''} 로 수정 되었습니다.`,
+            `하드웨어관리 ${hardwareName}(${hardwareCode}) 개요탭의 자산설명이 ${originalHardware.assetDescription || ''} → ${convertedHardware.assetDescription || ''} 로 수정 되었습니다.`,
             convertedHardware.team || '미분류',
             originalHardware.assetDescription || '',
             convertedHardware.assetDescription || '',

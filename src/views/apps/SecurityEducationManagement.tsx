@@ -76,6 +76,30 @@ interface ChangeLog {
   user: string;
 }
 
+// 한국어 조사 선택 함수
+function getJosa(word: string, josaType: '이가' | '은는' | '을를'): string {
+  if (!word || word.length === 0) return josaType === '이가' ? '이' : josaType === '은는' ? '은' : '을';
+
+  const lastChar = word.charAt(word.length - 1);
+  const code = lastChar.charCodeAt(0);
+
+  // 한글이 아닌 경우
+  if (code < 0xac00 || code > 0xd7a3) {
+    return josaType === '이가' ? '가' : josaType === '은는' ? '는' : '를';
+  }
+
+  // 받침 유무 확인
+  const hasJongseong = (code - 0xac00) % 28 !== 0;
+
+  if (josaType === '이가') {
+    return hasJongseong ? '이' : '가';
+  } else if (josaType === '은는') {
+    return hasJongseong ? '은' : '는';
+  } else {
+    return hasJongseong ? '을' : '를';
+  }
+}
+
 // Icons
 import { TableDocument, Chart, Calendar, Element, DocumentText } from '@wandersonalwes/iconsax-react';
 
@@ -161,6 +185,12 @@ interface KanbanViewProps {
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
+  curriculumData?: any[];
+  curriculumLoading?: boolean;
+  fetchCurriculum?: () => Promise<void>;
+  attendeeData?: any[];
+  attendeeLoading?: boolean;
+  fetchAttendee?: () => Promise<void>;
 }
 
 function KanbanView({
@@ -185,7 +215,13 @@ function KanbanView({
   users = [],
   canCreateData = true,
   canEditOwn = true,
-  canEditOthers = true
+  canEditOthers = true,
+  curriculumData = [],
+  curriculumLoading = false,
+  fetchCurriculum,
+  attendeeData = [],
+  attendeeLoading = false,
+  fetchAttendee
 }: KanbanViewProps) {
   const theme = useTheme();
   const supabase = createClient(); // Supabase client 생성
@@ -377,10 +413,10 @@ function KanbanView({
       // 변경로그 추가
       const taskCode = currentTask.code || `EDU-${taskId}`;
       const educationName = currentTask.educationName || '교육명 없음';
-      const description = `${educationName} 상태를 "${oldStatusName}"에서 "${newStatusName}"로 변경`;
+      const description = `보안교육관리 ${educationName}(${taskCode}) 개요탭의 상태가 ${oldStatusName} → ${newStatusName}로 수정 되었습니다.`;
 
       addChangeLog(
-        '교육 상태 변경',
+        '수정',
         taskCode,
         description,
         currentTask.educationType || '미분류',
@@ -388,7 +424,7 @@ function KanbanView({
         newStatusName,
         '상태',
         educationName,
-        '칸반탭'
+        '개요탭'
       );
     }
   };
@@ -1443,15 +1479,15 @@ function ChangeLogView({
           <TableHead>
             <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
               <TableCell sx={{ fontWeight: 600, width: 50, fontSize: '12px' }}>NO</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 130, fontSize: '12px' }}>변경시간</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 140, fontSize: '12px' }}>코드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 180, fontSize: '12px' }}>제목</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 110, fontSize: '12px' }}>변경시간</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 150, fontSize: '12px' }}>코드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 150, fontSize: '12px' }}>제목</TableCell>
               <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경분류</TableCell>
               <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경위치</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경필드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경전</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경후</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 300, fontSize: '12px' }}>변경세부내용</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경필드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경전</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경후</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 330, fontSize: '12px' }}>변경 세부내용</TableCell>
               <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>팀</TableCell>
               <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경자</TableCell>
             </TableRow>
@@ -2752,14 +2788,14 @@ export default function SecurityEducationManagement() {
         no: education.no || education.id,
         title: education.education_name,
         educationName: education.education_name || '교육명 없음',
-        educationType: education.education_type || '', // 서브코드 그대로 유지
+        educationType: getEducationTypeName(education.education_type) || education.education_type, // 서브코드를 서브코드명으로 변환
         assignee: education.assignee || '미정',
         createdBy: education.created_by, // DB의 created_by 필드 매핑
         team: education.team || '보안팀', // DB에서 팀 정보 로드
         executionDate: education.execution_date || new Date().toISOString().split('T')[0],
         attendeeCount: education.participant_count || 0,
         participantCount: education.participant_count || 0,
-        status: education.status || '', // 서브코드 그대로 유지
+        status: getStatusName(education.status) || education.status, // 서브코드를 서브코드명으로 변환
         description: education.description || '',
         location: education.location || '',
         code: convertedCode,
@@ -3152,10 +3188,10 @@ export default function SecurityEducationManagement() {
           <Box sx={{ mb: 2, flexShrink: 0 }}>
             <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 2 }}>
               <Typography variant="h2" sx={{ fontWeight: 700 }}>
-                보안교육관리
+                개인교육관리
               </Typography>
               <Typography variant="body1" color="text.secondary" sx={{ pb: 0.5 }}>
-                보안메뉴 &gt; 보안교육관리
+                메인메뉴 &gt; 개인교육관리
               </Typography>
             </Box>
           </Box>

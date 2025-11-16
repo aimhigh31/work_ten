@@ -410,7 +410,7 @@ export default function VOCDataTable({
           addChangeLog(
             '삭제',
             vocCode,
-            `VOC관리 ${vocContent}(${vocCode})이 삭제되었습니다.`,
+            `VOC관리 ${vocContent}(${vocCode})의 데이터가 삭제 되었습니다.`,
             voc.team || '미분류',
             undefined,
             undefined,
@@ -435,11 +435,8 @@ export default function VOCDataTable({
         if (deletedVOCs.length === 1) {
           // 단일 삭제
           const vocTitle = deletedVOCs[0].content || 'VOC';
-          const lastChar = vocTitle.charAt(vocTitle.length - 1);
-          const code = lastChar.charCodeAt(0);
-          const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
-          const josa = hasJongseong ? '이' : '가';
-          message = `${vocTitle}${josa} 삭제되었습니다.`;
+          const vocCode = `IT-VOC-${new Date(deletedVOCs[0].registrationDate).getFullYear().toString().slice(-2)}-${String(deletedVOCs[0].no).padStart(3, '0')}`;
+          message = `VOC관리 ${vocTitle}(${vocCode})의 데이터가 삭제 되었습니다.`;
         } else {
           // 다중 삭제
           message = `${deletedVOCs.length}건의 데이터가 삭제되었습니다.`;

@@ -72,7 +72,8 @@ interface EducationDataTableProps {
     beforeValue?: string,
     afterValue?: string,
     changedField?: string,
-    title?: string
+    title?: string,
+    location?: string
   ) => void;
   setSnackbar?: React.Dispatch<React.SetStateAction<{ open: boolean; message: string; severity: 'success' | 'error' | 'warning' | 'info' }>>;
   // 🔐 권한 관리
@@ -399,12 +400,13 @@ export default function EducationDataTable({
           addChangeLog(
             '삭제',
             educationCode,
-            `개인교육관리 ${educationTitle}(${educationCode})이 삭제되었습니다.`,
+            `개인교육관리 ${educationTitle}(${educationCode})의 데이터가 삭제 되었습니다.`,
             education.team || '미분류',
             undefined,
             undefined,
             undefined,
-            educationTitle
+            educationTitle,
+            '개요탭'
           );
         });
       }
@@ -493,22 +495,26 @@ export default function EducationDataTable({
               originalEducation.title || '',
               updatedEducation.title || '',
               '교육명',
-              updatedEducation.title
+              updatedEducation.title,
+              '개요탭'
             );
           }
 
           // 1. Education유형 변경
           if (originalEducation.educationType !== updatedEducation.educationType) {
             changedFields.push('교육유형');
+            const oldEducationMethodName = getEducationMethodName(originalEducation.educationType);
+            const newEducationMethodName = getEducationMethodName(updatedEducation.educationType);
             addChangeLog(
               '수정',
               educationCode,
-              `개인교육관리 ${educationTitle}(${educationCode}) 정보의 개요탭 Education유형이 ${originalEducation.educationType || ''} → ${updatedEducation.educationType || ''} 로 수정 되었습니다.`,
+              `개인교육관리 ${educationTitle}(${educationCode}) 정보의 개요탭 교육방식이 ${oldEducationMethodName} → ${newEducationMethodName} 로 수정 되었습니다.`,
               updatedEducation.team || '미분류',
-              originalEducation.educationType || '',
-              updatedEducation.educationType || '',
-              'Education유형',
-              educationTitle
+              oldEducationMethodName,
+              newEducationMethodName,
+              '교육방식',
+              educationTitle,
+              '개요탭'
             );
           }
 
@@ -523,7 +529,8 @@ export default function EducationDataTable({
               originalEducation.customerName || '',
               updatedEducation.customerName || '',
               '고객명',
-              educationTitle
+              educationTitle,
+              '개요탭'
             );
           }
 
@@ -538,7 +545,8 @@ export default function EducationDataTable({
               originalEducation.companyName || '',
               updatedEducation.companyName || '',
               '회사명',
-              educationTitle
+              educationTitle,
+              '개요탭'
             );
           }
 
@@ -553,7 +561,8 @@ export default function EducationDataTable({
               originalEducation.content || '',
               updatedEducation.content || '',
               '요청내용',
-              educationTitle
+              educationTitle,
+              '개요탭'
             );
           }
 
@@ -568,7 +577,8 @@ export default function EducationDataTable({
               originalEducation.responseContent || '',
               updatedEducation.responseContent || '',
               '처리내용',
-              educationTitle
+              educationTitle,
+              '개요탭'
             );
           }
 
@@ -583,22 +593,26 @@ export default function EducationDataTable({
               originalEducation.priority || '',
               updatedEducation.priority || '',
               '우선순위',
-              educationTitle
+              educationTitle,
+              '개요탭'
             );
           }
 
           // 7. 상태 변경
           if (originalEducation.status !== updatedEducation.status) {
             changedFields.push('상태');
+            const oldStatusName = getStatusName(originalEducation.status);
+            const newStatusName = getStatusName(updatedEducation.status);
             addChangeLog(
               '수정',
               educationCode,
-              `개인교육관리 ${educationTitle}(${educationCode}) 정보의 개요탭 상태가 ${originalEducation.status || ''} → ${updatedEducation.status || ''} 로 수정 되었습니다.`,
+              `개인교육관리 ${educationTitle}(${educationCode}) 정보의 개요탭 상태가 ${oldStatusName} → ${newStatusName} 로 수정 되었습니다.`,
               updatedEducation.team || '미분류',
-              originalEducation.status || '',
-              updatedEducation.status || '',
+              oldStatusName,
+              newStatusName,
               '상태',
-              educationTitle
+              educationTitle,
+              '개요탭'
             );
           }
 
@@ -613,7 +627,8 @@ export default function EducationDataTable({
               originalEducation.assignee || '',
               updatedEducation.assignee || '',
               '담당자',
-              educationTitle
+              educationTitle,
+              '개요탭'
             );
           }
 
@@ -628,7 +643,8 @@ export default function EducationDataTable({
               originalEducation.team || '',
               updatedEducation.team || '',
               '팀',
-              educationTitle
+              educationTitle,
+              '개요탭'
             );
           }
 
@@ -643,7 +659,8 @@ export default function EducationDataTable({
               originalEducation.receptionDate || '',
               updatedEducation.receptionDate || '',
               '접수일',
-              educationTitle
+              educationTitle,
+              '개요탭'
             );
           }
 
@@ -658,7 +675,8 @@ export default function EducationDataTable({
               originalEducation.resolutionDate || '',
               updatedEducation.resolutionDate || '',
               '완료일',
-              educationTitle
+              educationTitle,
+              '개요탭'
             );
           }
 
@@ -673,7 +691,8 @@ export default function EducationDataTable({
               originalEducation.channel || '',
               updatedEducation.channel || '',
               '채널',
-              educationTitle
+              educationTitle,
+              '개요탭'
             );
           }
         }
@@ -737,12 +756,13 @@ export default function EducationDataTable({
             addChangeLog(
               '추가',
               educationCode,
-              `개인교육관리 ${educationTitle}(${educationCode})이 신규 등록되었습니다.`,
+              `개인교육관리 ${educationTitle}(${educationCode})의 데이터가 추가 되었습니다.`,
               newEducationData.team || '미분류',
               undefined,
               undefined,
               undefined,
-              educationTitle
+              educationTitle,
+              '개요탭'
             );
           }
 
@@ -927,17 +947,17 @@ export default function EducationDataTable({
                       onChange={handleSelectAllClick}
                     />
                   </TableCell>
-                  <TableCell sx={{ width: columnWidths.no, fontWeight: 600 }}>NO</TableCell>
-                  <TableCell sx={{ width: columnWidths.registrationDate, fontWeight: 600 }}>등록일</TableCell>
-                  <TableCell sx={{ width: columnWidths.code, fontWeight: 600 }}>코드</TableCell>
-                  <TableCell sx={{ width: columnWidths.educationType, fontWeight: 600 }}>교육방식</TableCell>
-                  <TableCell sx={{ width: columnWidths.title, fontWeight: 600 }}>제목</TableCell>
-                  <TableCell sx={{ width: columnWidths.team, fontWeight: 600 }}>팀</TableCell>
-                  <TableCell sx={{ width: columnWidths.assignee, fontWeight: 600 }}>담당자</TableCell>
-                  <TableCell sx={{ width: columnWidths.status, fontWeight: 600 }}>상태</TableCell>
-                  <TableCell sx={{ width: columnWidths.startDate, fontWeight: 600 }}>시작일</TableCell>
-                  <TableCell sx={{ width: columnWidths.completionDate, fontWeight: 600 }}>완료일</TableCell>
-                  <TableCell sx={{ width: columnWidths.action, fontWeight: 600 }}>ACTION</TableCell>
+                  <TableCell sx={{ width: columnWidths.no, fontWeight: 600, fontSize: '12px' }}>NO</TableCell>
+                  <TableCell sx={{ width: columnWidths.registrationDate, fontWeight: 600, fontSize: '12px' }}>등록일</TableCell>
+                  <TableCell sx={{ width: columnWidths.code, fontWeight: 600, fontSize: '12px' }}>코드</TableCell>
+                  <TableCell sx={{ width: columnWidths.educationType, fontWeight: 600, fontSize: '12px' }}>교육방식</TableCell>
+                  <TableCell sx={{ width: columnWidths.title, fontWeight: 600, fontSize: '12px' }}>제목</TableCell>
+                  <TableCell sx={{ width: columnWidths.team, fontWeight: 600, fontSize: '12px' }}>팀</TableCell>
+                  <TableCell sx={{ width: columnWidths.assignee, fontWeight: 600, fontSize: '12px' }}>담당자</TableCell>
+                  <TableCell sx={{ width: columnWidths.status, fontWeight: 600, fontSize: '12px' }}>상태</TableCell>
+                  <TableCell sx={{ width: columnWidths.startDate, fontWeight: 600, fontSize: '12px' }}>시작일</TableCell>
+                  <TableCell sx={{ width: columnWidths.completionDate, fontWeight: 600, fontSize: '12px' }}>완료일</TableCell>
+                  <TableCell sx={{ width: columnWidths.action, fontWeight: 600, fontSize: '12px' }}>ACTION</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>

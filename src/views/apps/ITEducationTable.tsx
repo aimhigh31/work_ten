@@ -80,7 +80,12 @@ const convertRecordToTableData = (record: ITEducationRecord): ITEducationTableDa
     team: record.team, // 비용관리 패턴: team은 required field
     assignee: record.assignee,
     department: undefined,
-    attachments: record.attachments
+    attachments: record.attachments,
+    // 교육실적보고 필드들
+    achievements: record.achievements,
+    improvements: record.improvements,
+    education_feedback: record.education_feedback,
+    report_notes: record.report_notes
   };
 };
 
@@ -119,7 +124,8 @@ interface ITEducationTableProps {
     beforeValue?: string,
     afterValue?: string,
     changedField?: string,
-    title?: string
+    title?: string,
+    location?: string
   ) => void;
   onDelete?: (ids: number[]) => Promise<void>;
   users?: any[]; // CommonData에서 전달받은 사용자 목록
@@ -312,7 +318,12 @@ export default function ITEducationTable({
             team: item.team, // 비용관리 패턴: 직접 접근 (필수 필드)
             assignee: item.assignee,
             department: undefined,
-            attachments: []
+            attachments: [],
+            // 교육실적보고 필드들
+            achievements: item.achievements,
+            improvements: item.improvements,
+            education_feedback: item.education_feedback,
+            report_notes: item.report_notes
           }));
           console.log('🔍 변환된 데이터 (첫 번째):', convertedData[0]);
           setData(convertedData);
@@ -425,7 +436,7 @@ export default function ITEducationTable({
         if (addChangeLog) {
           deletedTasks.forEach((task) => {
             addChangeLog(
-              '교육 삭제',
+              '삭제',
               task.code || `IT-EDU-${task.id}`,
               `${task.educationName || '교육'} 삭제`,
               undefined,
@@ -468,7 +479,13 @@ export default function ITEducationTable({
 
   // Task 저장 - Supabase 저장 후 데이터 새로 로드
   const handleEditTaskSave = async (updatedRecord: ITEducationRecord) => {
-    console.log('💾 Task 저장 요청:', updatedRecord);
+    console.log('🟡 [ITEducationTable] handleEditTaskSave 시작 - updatedRecord:', {
+      id: updatedRecord.id,
+      achievements: updatedRecord.achievements,
+      improvements: updatedRecord.improvements,
+      education_feedback: updatedRecord.education_feedback,
+      report_notes: updatedRecord.report_notes
+    });
 
     try {
       // Record를 TableData로 변환
@@ -478,6 +495,14 @@ export default function ITEducationTable({
       if (existingIndex !== -1) {
         // 기존 Task 업데이트 - 즉시 업데이트
         const originalTask = data[existingIndex];
+
+        console.log('🟠 [ITEducationTable] originalTask vs updatedTask:', {
+          originalAchievements: originalTask.achievements,
+          updatedAchievements: updatedTask.achievements,
+          originalImprovements: originalTask.improvements,
+          updatedImprovements: updatedTask.improvements
+        });
+
         const updatedData = [...data];
         updatedData[existingIndex] = updatedTask;
         setData(updatedData);
@@ -489,6 +514,7 @@ export default function ITEducationTable({
 
         // 변경로그 추가 - 필드별 상세 추적
         if (addChangeLog) {
+          console.log('🔴 [ITEducationTable] addChangeLog 시작 - 개요탭 필드 체크');
           const taskCode = updatedTask.code || `IT-EDU-${updatedTask.id}`;
           const educationName = updatedTask.educationName || 'IT교육';
 
@@ -505,12 +531,13 @@ export default function ITEducationTable({
             addChangeLog(
               '수정',
               taskCode,
-              `IT교육관리 ${educationName}(${taskCode}) 정보의 개요탭 교육유형이 ${originalTask.educationType} → ${updatedTask.educationType} 로 수정 되었습니다.`,
+              `IT교육관리 ${educationName}(${taskCode}) 개요탭의 교육유형이 ${originalTask.educationType} → ${updatedTask.educationType}로 수정 되었습니다.`,
               updatedTask.team || '미분류',
               originalTask.educationType,
               updatedTask.educationType,
               '교육유형',
-              educationName
+              educationName,
+              '개요탭'
             );
           }
 
@@ -519,12 +546,13 @@ export default function ITEducationTable({
             addChangeLog(
               '수정',
               taskCode,
-              `IT교육관리 ${originalTask.educationName || ''}(${taskCode}) 정보의 개요탭 교육명이 ${originalTask.educationName || ''} → ${updatedTask.educationName || ''} 로 수정 되었습니다.`,
+              `IT교육관리 ${originalTask.educationName || ''}(${taskCode}) 개요탭의 교육명이 ${originalTask.educationName || ''} → ${updatedTask.educationName || ''}로 수정 되었습니다.`,
               updatedTask.team || '미분류',
               originalTask.educationName || '',
               updatedTask.educationName || '',
               '교육명',
-              updatedTask.educationName
+              updatedTask.educationName,
+              '개요탭'
             );
           }
 
@@ -533,12 +561,13 @@ export default function ITEducationTable({
             addChangeLog(
               '수정',
               taskCode,
-              `IT교육관리 ${educationName}(${taskCode}) 정보의 개요탭 장소가 ${originalTask.location || ''} → ${updatedTask.location || ''} 로 수정 되었습니다.`,
+              `IT교육관리 ${educationName}(${taskCode}) 개요탭의 장소가 ${originalTask.location || ''} → ${updatedTask.location || ''}로 수정 되었습니다.`,
               updatedTask.team || '미분류',
               originalTask.location || '',
               updatedTask.location || '',
               '장소',
-              educationName
+              educationName,
+              '개요탭'
             );
           }
 
@@ -547,12 +576,13 @@ export default function ITEducationTable({
             addChangeLog(
               '수정',
               taskCode,
-              `IT교육관리 ${educationName}(${taskCode}) 정보의 개요탭 참석수가 ${originalTask.attendeeCount} → ${updatedTask.attendeeCount} 로 수정 되었습니다.`,
+              `IT교육관리 ${educationName}(${taskCode}) 개요탭의 참석수가 ${originalTask.attendeeCount} → ${updatedTask.attendeeCount}로 수정 되었습니다.`,
               updatedTask.team || '미분류',
               String(originalTask.attendeeCount),
               String(updatedTask.attendeeCount),
               '참석수',
-              educationName
+              educationName,
+              '개요탭'
             );
           }
 
@@ -561,12 +591,13 @@ export default function ITEducationTable({
             addChangeLog(
               '수정',
               taskCode,
-              `IT교육관리 ${educationName}(${taskCode}) 정보의 개요탭 상태가 ${originalTask.status} → ${updatedTask.status} 로 수정 되었습니다.`,
+              `IT교육관리 ${educationName}(${taskCode}) 개요탭의 상태가 ${originalTask.status} → ${updatedTask.status}로 수정 되었습니다.`,
               updatedTask.team || '미분류',
               originalTask.status,
               updatedTask.status,
               '상태',
-              educationName
+              educationName,
+              '개요탭'
             );
           }
 
@@ -575,12 +606,13 @@ export default function ITEducationTable({
             addChangeLog(
               '수정',
               taskCode,
-              `IT교육관리 ${educationName}(${taskCode}) 정보의 개요탭 담당자가 ${originalTask.assignee || ''} → ${updatedTask.assignee || ''} 로 수정 되었습니다.`,
+              `IT교육관리 ${educationName}(${taskCode}) 개요탭의 담당자가 ${originalTask.assignee || ''} → ${updatedTask.assignee || ''}로 수정 되었습니다.`,
               updatedTask.team || '미분류',
               originalTask.assignee || '',
               updatedTask.assignee || '',
               '담당자',
-              educationName
+              educationName,
+              '개요탭'
             );
           }
 
@@ -589,12 +621,13 @@ export default function ITEducationTable({
             addChangeLog(
               '수정',
               taskCode,
-              `IT교육관리 ${educationName}(${taskCode}) 정보의 개요탭 팀이 ${originalTask.team || ''} → ${updatedTask.team || ''} 로 수정 되었습니다.`,
+              `IT교육관리 ${educationName}(${taskCode}) 개요탭의 팀이 ${originalTask.team || ''} → ${updatedTask.team || ''}로 수정 되었습니다.`,
               updatedTask.team || '미분류',
               originalTask.team || '',
               updatedTask.team || '',
               '팀',
-              educationName
+              educationName,
+              '개요탭'
             );
           }
 
@@ -603,12 +636,13 @@ export default function ITEducationTable({
             addChangeLog(
               '수정',
               taskCode,
-              `IT교육관리 ${educationName}(${taskCode}) 정보의 개요탭 실행일이 ${originalTask.executionDate || ''} → ${updatedTask.executionDate || ''} 로 수정 되었습니다.`,
+              `IT교육관리 ${educationName}(${taskCode}) 개요탭의 실행일이 ${originalTask.executionDate || ''} → ${updatedTask.executionDate || ''}로 수정 되었습니다.`,
               updatedTask.team || '미분류',
               originalTask.executionDate || '',
               updatedTask.executionDate || '',
               '실행일',
-              educationName
+              educationName,
+              '개요탭'
             );
           }
 
@@ -617,14 +651,18 @@ export default function ITEducationTable({
             addChangeLog(
               '수정',
               taskCode,
-              `IT교육관리 ${educationName}(${taskCode}) 정보의 개요탭 교육설명이 ${originalTask.description || ''} → ${updatedTask.description || ''} 로 수정 되었습니다.`,
+              `IT교육관리 ${educationName}(${taskCode}) 개요탭의 교육설명이 ${originalTask.description || ''} → ${updatedTask.description || ''}로 수정 되었습니다.`,
               updatedTask.team || '미분류',
               originalTask.description || '',
               updatedTask.description || '',
               '교육설명',
-              educationName
+              educationName,
+              '개요탭'
             );
           }
+
+          // 교육실적보고 필드 변경로그는 ITEducationEditDialog에서 생성됨 (중복 방지)
+          console.log('🟢 [ITEducationTable] addChangeLog 블록 완료');
         }
 
         // 토스트 알림 (수정)
@@ -713,7 +751,12 @@ export default function ITEducationTable({
             team: item.team, // 비용관리 패턴: 직접 접근 (필수 필드)
             assignee: item.assignee,
             department: undefined,
-            attachments: []
+            attachments: [],
+            // 교육실적보고 필드들
+            achievements: item.achievements,
+            improvements: item.improvements,
+            education_feedback: item.education_feedback,
+            report_notes: item.report_notes
           }));
           console.log('🔍 변환된 데이터 (첫 번째):', convertedData[0]);
           setData(convertedData);
@@ -760,6 +803,7 @@ export default function ITEducationTable({
       }
     }
 
+    console.log('🏁 [ITEducationTable] handleEditTaskSave 완료');
     handleEditDialogClose();
   };
 
@@ -1215,6 +1259,7 @@ export default function ITEducationTable({
           recordId={editingTaskId}
           tasks={data}
           onSave={handleEditTaskSave}
+          addChangeLog={addChangeLog}
           canCreateData={canCreateData}
           canEditOwn={canEditOwn}
           canEditOthers={canEditOthers}

@@ -344,10 +344,11 @@ export default function SolutionTable({
     if (addChangeLog) {
       deletedSolutions.forEach((solution) => {
         const solutionTitle = solution.title || solution.workContent || '업무';
+        const solutionCode = solution.code || `IT-SOL-${new Date().getFullYear().toString().slice(-2)}-${String(solution.id).padStart(3, '0')}`;
         addChangeLog(
-          '업무 삭제',
-          solution.code || `IT-SOL-${new Date().getFullYear().toString().slice(-2)}-${String(solution.id).padStart(3, '0')}`,
-          `${solutionTitle} 삭제`,
+          '삭제',
+          solutionCode,
+          `솔루션관리 ${solutionTitle}(${solutionCode})의 데이터가 삭제 되었습니다.`,
           solution.team || '미분류',
           undefined,
           undefined,
@@ -380,19 +381,10 @@ export default function SolutionTable({
         if (setSnackbar) {
           if (deletedSolutions.length === 1) {
             const solutionTitle = deletedSolutions[0].title || deletedSolutions[0].workContent || '솔루션';
-            const getKoreanParticle = (word: string): string => {
-              const lastChar = word.charAt(word.length - 1);
-              const code = lastChar.charCodeAt(0);
-              if (code >= 0xAC00 && code <= 0xD7A3) {
-                const hasJongseong = (code - 0xAC00) % 28 !== 0;
-                return hasJongseong ? '이' : '가';
-              }
-              return '가';
-            };
-            const josa = getKoreanParticle(solutionTitle);
+            const solutionCode = deletedSolutions[0].code || `IT-SOL-${new Date().getFullYear().toString().slice(-2)}-${String(deletedSolutions[0].id).padStart(3, '0')}`;
             setSnackbar({
               open: true,
-              message: `${solutionTitle}${josa} 성공적으로 삭제되었습니다.`,
+              message: `솔루션관리 ${solutionTitle}(${solutionCode})의 데이터가 삭제 되었습니다.`,
               severity: 'error'
             });
           } else {
@@ -735,15 +727,17 @@ export default function SolutionTable({
 
           // 변경로그 추가
           if (addChangeLog) {
+            const solutionTitle = createdSolution.title || createdSolution.detailContent || '솔루션';
+            const solutionCode = createdSolution.code;
             addChangeLog(
-              '새 업무 생성',
-              createdSolution.code,
-              `새로운 업무가 생성되었습니다: ${createdSolution.title}`,
+              '추가',
+              solutionCode,
+              `솔루션관리 ${solutionTitle}(${solutionCode})의 데이터가 추가 되었습니다.`,
               createdSolution.team,
               undefined,
               undefined,
               undefined,
-              createdSolution.title
+              solutionTitle
             );
           }
 
@@ -752,19 +746,10 @@ export default function SolutionTable({
           // 토스트 알림 (추가)
           if (setSnackbar) {
             const solutionTitle = createdSolution.title || createdSolution.detailContent || '솔루션';
-            const getKoreanParticle = (word: string): string => {
-              const lastChar = word.charAt(word.length - 1);
-              const code = lastChar.charCodeAt(0);
-              if (code >= 0xAC00 && code <= 0xD7A3) {
-                const hasJongseong = (code - 0xAC00) % 28 !== 0;
-                return hasJongseong ? '이' : '가';
-              }
-              return '가';
-            };
-            const josa = getKoreanParticle(solutionTitle);
+            const solutionCode = createdSolution.code;
             setSnackbar({
               open: true,
-              message: `${solutionTitle}${josa} 성공적으로 추가되었습니다.`,
+              message: `솔루션관리 ${solutionTitle}(${solutionCode})의 데이터가 추가 되었습니다.`,
               severity: 'success'
             });
           }

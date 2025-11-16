@@ -1306,14 +1306,15 @@ const ParticipantsTab = memo(
             overflowX: 'auto',
             maxHeight: '500px',
             '& .MuiTable-root': {
-              minWidth: 800
+              minWidth: 800,
+              tableLayout: 'fixed'
             }
           }}
         >
           <Table size="small">
             <TableHead>
               <TableRow sx={{ backgroundColor: 'grey.50' }}>
-                <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox }}>
+                <TableCell padding="checkbox" sx={{ width: columnWidths.checkbox, minWidth: columnWidths.checkbox, maxWidth: columnWidths.checkbox }}>
                   <Checkbox
                     checked={selectedRows.length === participantItems.length && participantItems.length > 0}
                     onChange={handleSelectAll}
@@ -1327,12 +1328,12 @@ const ParticipantsTab = memo(
                     }}
                   />
                 </TableCell>
-                <TableCell sx={{ width: columnWidths.no, fontWeight: 600 }}>NO</TableCell>
-                <TableCell sx={{ width: columnWidths.participant, fontWeight: 600 }}>참석자</TableCell>
-                <TableCell sx={{ width: columnWidths.position, fontWeight: 600 }}>직책</TableCell>
-                <TableCell sx={{ width: columnWidths.department, fontWeight: 600 }}>부서</TableCell>
-                <TableCell sx={{ width: columnWidths.attendanceCheck, fontWeight: 600 }}>출석점검</TableCell>
-                <TableCell sx={{ width: columnWidths.notes, fontWeight: 600 }}>비고</TableCell>
+                <TableCell sx={{ width: columnWidths.no, minWidth: columnWidths.no, maxWidth: columnWidths.no, fontWeight: 600 }}>NO</TableCell>
+                <TableCell sx={{ width: columnWidths.participant, minWidth: columnWidths.participant, maxWidth: columnWidths.participant, fontWeight: 600 }}>참석자</TableCell>
+                <TableCell sx={{ width: columnWidths.position, minWidth: columnWidths.position, maxWidth: columnWidths.position, fontWeight: 600 }}>직책</TableCell>
+                <TableCell sx={{ width: columnWidths.department, minWidth: columnWidths.department, maxWidth: columnWidths.department, fontWeight: 600 }}>부서</TableCell>
+                <TableCell sx={{ width: columnWidths.attendanceCheck, minWidth: columnWidths.attendanceCheck, maxWidth: columnWidths.attendanceCheck, fontWeight: 600 }}>출석점검</TableCell>
+                <TableCell sx={{ width: columnWidths.notes, minWidth: columnWidths.notes, maxWidth: columnWidths.notes, fontWeight: 600 }}>비고</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -1345,7 +1346,7 @@ const ParticipantsTab = memo(
                     '&:hover': { backgroundColor: 'action.hover' }
                   }}
                 >
-                  <TableCell sx={{ width: columnWidths.checkbox, padding: 0, height: 48 }}>
+                  <TableCell sx={{ width: columnWidths.checkbox, minWidth: columnWidths.checkbox, maxWidth: columnWidths.checkbox, padding: 0, height: 48 }}>
                     <Box sx={{ height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <Checkbox
                         checked={selectedRows.includes(item.id)}
@@ -1361,13 +1362,13 @@ const ParticipantsTab = memo(
                       />
                     </Box>
                   </TableCell>
-                  <TableCell sx={{ width: columnWidths.no, padding: 0, height: 48 }}>
+                  <TableCell sx={{ width: columnWidths.no, minWidth: columnWidths.no, maxWidth: columnWidths.no, padding: 0, height: 48 }}>
                     <Box sx={{ height: 48, display: 'flex', alignItems: 'center', padding: '8px 12px' }}>
                       {participantItems.length - startIndex - index}
                     </Box>
                   </TableCell>
                   <TableCell
-                    sx={{ width: columnWidths.participant, padding: 0, height: 48 }}
+                    sx={{ width: columnWidths.participant, minWidth: columnWidths.participant, maxWidth: columnWidths.participant, padding: 0, height: 48, overflow: 'hidden', textOverflow: 'ellipsis' }}
                     onClick={(e) => {
                       e.stopPropagation();
                       handleCellClick(item.id, 'user_name');
@@ -1376,7 +1377,7 @@ const ParticipantsTab = memo(
                     {renderEditableCell(item, 'user_name', item.user_name)}
                   </TableCell>
                   <TableCell
-                    sx={{ width: columnWidths.position, padding: 0, height: 48 }}
+                    sx={{ width: columnWidths.position, minWidth: columnWidths.position, maxWidth: columnWidths.position, padding: 0, height: 48, overflow: 'hidden', textOverflow: 'ellipsis' }}
                     onClick={(e) => {
                       e.stopPropagation();
                       handleCellClick(item.id, 'position');
@@ -1385,7 +1386,7 @@ const ParticipantsTab = memo(
                     {renderEditableCell(item, 'position', item.position || '')}
                   </TableCell>
                   <TableCell
-                    sx={{ width: columnWidths.department, padding: 0, height: 48 }}
+                    sx={{ width: columnWidths.department, minWidth: columnWidths.department, maxWidth: columnWidths.department, padding: 0, height: 48, overflow: 'hidden', textOverflow: 'ellipsis' }}
                     onClick={(e) => {
                       e.stopPropagation();
                       handleCellClick(item.id, 'department');
@@ -1394,7 +1395,7 @@ const ParticipantsTab = memo(
                     {renderEditableCell(item, 'department', item.department || '')}
                   </TableCell>
                   <TableCell
-                    sx={{ width: columnWidths.attendanceCheck, padding: 0, height: 48 }}
+                    sx={{ width: columnWidths.attendanceCheck, minWidth: columnWidths.attendanceCheck, maxWidth: columnWidths.attendanceCheck, padding: 0, height: 48, overflow: 'hidden', textOverflow: 'ellipsis' }}
                     onClick={(e) => {
                       e.stopPropagation();
                       handleCellClick(item.id, 'attendance_status');
@@ -1403,7 +1404,7 @@ const ParticipantsTab = memo(
                     {renderEditableCell(item, 'attendance_status', item.attendance_status || '예정')}
                   </TableCell>
                   <TableCell
-                    sx={{ width: columnWidths.notes, padding: 0, height: 48 }}
+                    sx={{ width: columnWidths.notes, minWidth: columnWidths.notes, maxWidth: columnWidths.notes, padding: 0, height: 48, overflow: 'hidden', textOverflow: 'ellipsis' }}
                     onClick={(e) => {
                       e.stopPropagation();
                       handleCellClick(item.id, 'notes');
@@ -3314,14 +3315,14 @@ export default function SecurityEducationDialog({
     }
   }, [currentUser, educationState.team, data, mode]);
 
-  // 상태 초기값을 "대기" subcode로 설정 (add 모드일 때만)
+  // 상태 초기값을 "대기" 서브코드명으로 설정 (add 모드일 때만)
   React.useEffect(() => {
     if (open && mode === 'add' && statusTypesFromDB.length > 0 && !educationState.status) {
-      // "대기"에 해당하는 subcode 찾기
+      // "대기"에 해당하는 서브코드명 찾기
       const defaultStatus = statusTypesFromDB.find(item => item.subcode_name === '대기');
       if (defaultStatus) {
-        console.log('✅ 상태 초기값 설정:', defaultStatus.subcode, '-', defaultStatus.subcode_name);
-        dispatch({ type: 'SET_FIELD', field: 'status', value: defaultStatus.subcode });
+        console.log('✅ 상태 초기값 설정 (서브코드명):', defaultStatus.subcode_name);
+        dispatch({ type: 'SET_FIELD', field: 'status', value: defaultStatus.subcode_name });
       }
     }
   }, [open, mode, statusTypesFromDB, educationState.status]);

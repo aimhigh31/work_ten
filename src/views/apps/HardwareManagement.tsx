@@ -2334,64 +2334,78 @@ export default function HardwareManagement() {
 
   // Hardware 저장 핸들러
   const handleEditHardwareSave = async (updatedHardware: Partial<HardwareRecord>) => {
-    const originalHardware = tasks.find((t) => t.id === Number(updatedHardware.id));
+    console.log('🔍 HardwareEditDialog에서 받은 데이터:', JSON.stringify(updatedHardware, null, 2));
+    console.log('🔍 현재 tasks 개수:', tasks.length);
 
-    console.log('🔍 HardwareEditDialog에서 받은 데이터:', updatedHardware);
+    // ⚠️ 중요: HardwareEditDialog에서 이미 DB 저장을 완료했으므로
+    // 여기서는 로컬 상태 업데이트, 토스트 알림, 변경로그만 처리
 
     try {
+      const originalHardware = tasks.find((t) => t.id === Number(updatedHardware.id));
+      console.log('🔍 originalHardware 검색:', originalHardware ? '찾음' : '없음 (신규)');
+
+      // HardwareRecord → HardwareTableData 변환
+      const convertedHardware: HardwareTableData = {
+        id: Number(updatedHardware.id) || 0,
+        no: 0, // 프론트엔드에서 계산됨
+        registrationDate: updatedHardware.registrationDate || new Date().toISOString(),
+        code: updatedHardware.code || '',
+        team: updatedHardware.team || '개발팀',
+        department: 'IT',
+        workContent: updatedHardware.assetName || '',
+        status: updatedHardware.status || '예비',
+        assignee: updatedHardware.assignee || '',
+        registrant: updatedHardware.registrant || '',
+        startDate: '',
+        completedDate: '',
+        attachments: [],
+        createdBy: undefined,
+
+        // 하드웨어 특화 필드
+        assetCategory: updatedHardware.assetCategory || '',
+        assetName: updatedHardware.assetName || '',
+        assetDescription: updatedHardware.assetDescription || '',
+        location: updatedHardware.location || '',
+        currentUser: updatedHardware.currentUser || '',
+
+        // 추가된 하드웨어 상세 필드들
+        model: updatedHardware.model || '',
+        manufacturer: updatedHardware.manufacturer || '',
+        vendor: updatedHardware.vendor || '',
+        detailSpec: updatedHardware.detailSpec || '',
+        purchaseDate: updatedHardware.purchaseDate || '',
+        warrantyEndDate: updatedHardware.warrantyEndDate || '',
+        serialNumber: updatedHardware.serialNumber || '',
+
+        // 개별 이미지 URL 필드들
+        image_1_url: updatedHardware.image_1_url || '',
+        image_2_url: updatedHardware.image_2_url || ''
+      };
+
+      console.log('🔄 변환된 HardwareTableData:', JSON.stringify(convertedHardware, null, 2));
+
+      // 한국어 조사 판별 함수
+      const getKoreanParticle = (word: string): string => {
+        const lastChar = word.charAt(word.length - 1);
+        const code = lastChar.charCodeAt(0);
+        if (code >= 0xAC00 && code <= 0xD7A3) {
+          const hasJongseong = (code - 0xAC00) % 28 !== 0;
+          return hasJongseong ? '이' : '가';
+        }
+        return '가';
+      };
+
       if (originalHardware) {
-        // 업데이트 - HardwareRecord를 Supabase 형식으로 변환
-        const hardwareData: any = {
-          code: updatedHardware.code,
-          team: updatedHardware.team || '개발팀', // 팀 필드 매핑
-          department: 'IT', // 기본값
-          work_content: updatedHardware.assetName || '하드웨어',
-          status: updatedHardware.status || '예비',
-          assignee: updatedHardware.registrant || updatedHardware.assignee || '미할당', // registrant를 assignee에 매핑
-          start_date: new Date().toISOString().split('T')[0] // 기본값
-        };
-
-        // HardwareRecord의 필드들을 Supabase 형식으로 매핑
-        if (updatedHardware.assetCategory) hardwareData.asset_category = updatedHardware.assetCategory;
-        if (updatedHardware.assetName) hardwareData.asset_name = updatedHardware.assetName;
-        if (updatedHardware.assetDescription !== undefined) hardwareData.asset_description = updatedHardware.assetDescription;
-        if (updatedHardware.model) hardwareData.model = updatedHardware.model;
-        if (updatedHardware.manufacturer) hardwareData.manufacturer = updatedHardware.manufacturer;
-        if (updatedHardware.vendor) hardwareData.vendor = updatedHardware.vendor;
-        if (updatedHardware.detailSpec) hardwareData.detail_spec = updatedHardware.detailSpec;
-        if (updatedHardware.purchaseDate) hardwareData.purchase_date = updatedHardware.purchaseDate;
-        if (updatedHardware.warrantyEndDate) hardwareData.warranty_end_date = updatedHardware.warrantyEndDate;
-        if (updatedHardware.serialNumber) hardwareData.serial_number = updatedHardware.serialNumber;
-        if (updatedHardware.currentUser) hardwareData.assigned_user = updatedHardware.currentUser;
-        if (updatedHardware.location) hardwareData.location = updatedHardware.location;
-
-        // 이미지 URL 필드 매핑
-        if (updatedHardware.image_1_url !== undefined) hardwareData.image_1_url = updatedHardware.image_1_url;
-        if (updatedHardware.image_2_url !== undefined) hardwareData.image_2_url = updatedHardware.image_2_url;
-
-        console.log('🖼️ 이미지 URL 저장 데이터:', {
-          image_1_url: hardwareData.image_1_url,
-          image_2_url: hardwareData.image_2_url
+        // 업데이트 - 로컬 상태 업데이트 (소프트웨어관리 패턴)
+        console.log('✅ 하드웨어 업데이트 - UI 즉시 반영');
+        setTasks((prevTasks) => {
+          const updated = prevTasks.map((task) => (task.id === Number(updatedHardware.id) ? convertedHardware : task));
+          console.log('🔄 업데이트 후 tasks 개수:', updated.length);
+          return updated;
         });
-
-        console.log('💾 Supabase로 전송할 전체 데이터:', hardwareData);
-
-        await updateHardware(Number(updatedHardware.id), hardwareData);
-
-        // ✅ updateHardware가 내부에서 setHardware 호출 (KPI 패턴)
-        console.log('✅ 하드웨어 업데이트 성공');
 
         // 토스트 알림 (수정)
         const assetName = updatedHardware.assetName || '하드웨어';
-        const getKoreanParticle = (word: string): string => {
-          const lastChar = word.charAt(word.length - 1);
-          const code = lastChar.charCodeAt(0);
-          if (code >= 0xAC00 && code <= 0xD7A3) {
-            const hasJongseong = (code - 0xAC00) % 28 !== 0;
-            return hasJongseong ? '이' : '가';
-          }
-          return '가';
-        };
         const josa = getKoreanParticle(assetName);
         setSnackbar({
           open: true,
@@ -2399,64 +2413,31 @@ export default function HardwareManagement() {
           severity: 'success'
         });
       } else {
-        // 새로 생성 - HardwareRecord를 Supabase 형식으로 변환
-        const hardwareData: any = {
-          code: updatedHardware.code, // 다이얼로그에서 생성된 코드 사용
-          team: updatedHardware.team || '개발팀', // 팀 필드 매핑
-          department: 'IT', // 기본값
-          work_content: updatedHardware.assetName || '신규 하드웨어',
-          status: updatedHardware.status || '예비',
-          assignee: updatedHardware.registrant || updatedHardware.assignee || '미할당', // registrant를 assignee에 매핑
-          start_date: new Date().toISOString().split('T')[0] // 기본값
-        };
+        // 새로 생성 - 로컬 상태 업데이트 (소프트웨어관리 패턴)
+        console.log('✅ 하드웨어 생성 - UI 즉시 반영');
+        console.log('📝 추가할 데이터 ID:', convertedHardware.id);
+        setTasks((prevTasks) => {
+          // 현재 tasks에서 가장 큰 no 값 찾기
+          const maxNo = prevTasks.length > 0 ? Math.max(...prevTasks.map(t => t.no || 0)) : 0;
+          const newNo = maxNo + 1;
 
-        // HardwareRecord의 필드들을 Supabase 형식으로 매핑 (새로 생성)
-        if (updatedHardware.assetCategory) hardwareData.asset_category = updatedHardware.assetCategory;
-        if (updatedHardware.assetName) hardwareData.asset_name = updatedHardware.assetName;
-        if (updatedHardware.assetDescription !== undefined) hardwareData.asset_description = updatedHardware.assetDescription;
-        if (updatedHardware.model) hardwareData.model = updatedHardware.model;
-        if (updatedHardware.manufacturer) hardwareData.manufacturer = updatedHardware.manufacturer;
-        if (updatedHardware.vendor) hardwareData.vendor = updatedHardware.vendor;
-        if (updatedHardware.detailSpec) hardwareData.detail_spec = updatedHardware.detailSpec;
-        if (updatedHardware.purchaseDate) hardwareData.purchase_date = updatedHardware.purchaseDate;
-        if (updatedHardware.warrantyEndDate) hardwareData.warranty_end_date = updatedHardware.warrantyEndDate;
-        if (updatedHardware.serialNumber) hardwareData.serial_number = updatedHardware.serialNumber;
-        if (updatedHardware.currentUser) hardwareData.assigned_user = updatedHardware.currentUser;
-        if (updatedHardware.location) hardwareData.location = updatedHardware.location;
+          // 올바른 NO 값으로 설정
+          const hardwareWithCorrectNo = {
+            ...convertedHardware,
+            no: newNo
+          };
 
-        // 이미지 URL 필드 매핑 (새로 생성)
-        if (updatedHardware.image_1_url !== undefined) hardwareData.image_1_url = updatedHardware.image_1_url;
-        if (updatedHardware.image_2_url !== undefined) hardwareData.image_2_url = updatedHardware.image_2_url;
-
-        console.log('🖼️ 새로 생성 - 이미지 URL:', {
-          image_1_url: hardwareData.image_1_url,
-          image_2_url: hardwareData.image_2_url
+          const newTasks = [...prevTasks, hardwareWithCorrectNo];
+          console.log('🔄 추가 후 tasks 개수:', newTasks.length, '(이전:', prevTasks.length, ')');
+          console.log('🔄 새로 추가된 항목 NO:', newNo);
+          console.log('🔄 새로 추가된 항목:', JSON.stringify(hardwareWithCorrectNo, null, 2));
+          return newTasks;
         });
 
-        console.log('📝 새로 생성할 하드웨어 데이터:', hardwareData);
-        console.log('📝 전체 데이터 키:', Object.keys(hardwareData));
-        console.log('📝 image_1_url 값:', hardwareData.image_1_url);
-        console.log('📝 image_2_url 값:', hardwareData.image_2_url);
-
-        console.log('🚀 createHardware 함수 호출 시작...');
-        const createdHardware = await createHardware(hardwareData);
-        console.log('🚀 createHardware 함수 호출 완료:', createdHardware);
-
-        // ✅ createHardware가 내부에서 setHardware 호출 (KPI 패턴)
-        console.log('✅ 하드웨어 생성 성공');
-        addChangeLog('추가', hardwareData.code, `새로운 하드웨어가 생성되었습니다: ${updatedHardware.assetName}`, '개발팀');
+        addChangeLog('추가', updatedHardware.code || '', `새로운 하드웨어가 생성되었습니다: ${updatedHardware.assetName}`, '개발팀');
 
         // 토스트 알림 (추가)
         const assetName = updatedHardware.assetName || '하드웨어';
-        const getKoreanParticle = (word: string): string => {
-          const lastChar = word.charAt(word.length - 1);
-          const code = lastChar.charCodeAt(0);
-          if (code >= 0xAC00 && code <= 0xD7A3) {
-            const hasJongseong = (code - 0xAC00) % 28 !== 0;
-            return hasJongseong ? '이' : '가';
-          }
-          return '가';
-        };
         const josa = getKoreanParticle(assetName);
         setSnackbar({
           open: true,
@@ -2467,7 +2448,7 @@ export default function HardwareManagement() {
 
       handleEditDialogClose();
     } catch (error: any) {
-      console.error('❌ 하드웨어 저장 실패:', error);
+      console.error('❌ 하드웨어 저장 후처리 실패:', error);
       setSnackbar({
         open: true,
         message: `저장 실패: ${error?.message || '알 수 없는 오류가 발생했습니다.'}`,
@@ -2497,11 +2478,15 @@ export default function HardwareManagement() {
 
     // 상태가 변경된 경우만 업데이트
     const currentHardware = tasks.find((task) => task.id === taskId);
-    if (currentHardware && currentHardware.status !== newStatus) {
-      const oldStatus = currentHardware.status;
+    if (currentHardware && getStatusName(currentHardware.status) !== newStatus) {
+      const oldStatus = getStatusName(currentHardware.status);
 
       // 로컬 상태 업데이트
       setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status: newStatus } : task)));
+
+      // 변경로그용 데이터 준비
+      const taskCode = currentHardware.code || `TASK-${taskId}`;
+      const assetName = currentHardware.assetName || '자산명 없음';
 
       // DB에 상태 변경 저장
       try {
@@ -2512,7 +2497,7 @@ export default function HardwareManagement() {
         // 토스트 알림
         setSnackbar({
           open: true,
-          message: `상태가 "${oldStatus}"에서 "${newStatus}"로 변경되었습니다.`,
+          message: `하드웨어관리 ${assetName}(${taskCode}) 개요탭의 상태가 ${oldStatus} → ${newStatus}로 수정 되었습니다.`,
           severity: 'success'
         });
       } catch (error) {
@@ -2527,11 +2512,9 @@ export default function HardwareManagement() {
       }
 
       // 변경로그 추가
-      const taskCode = currentHardware.code || `TASK-${taskId}`;
-      const workContent = currentHardware.workContent || '업무내용 없음';
-      const description = `${workContent} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
+      const description = `하드웨어관리 ${assetName}(${taskCode}) 개요탭의 상태가 ${oldStatus} → ${newStatus}로 수정 되었습니다.`;
 
-      addChangeLog('수정', taskCode, description, currentHardware.team || '미분류', oldStatus, newStatus, '상태', workContent, '칸반탭');
+      addChangeLog('수정', taskCode, description, currentHardware.team || '미분류', oldStatus, newStatus, '상태', assetName, '칸반탭');
     }
   };
 
@@ -3071,18 +3054,18 @@ export default function HardwareManagement() {
                   <Table size="small">
                     <TableHead>
                       <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
-                        <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 110 }}>변경시간</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 150 }}>제목</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 100 }}>코드</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 80 }}>변경분류</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 80 }}>변경위치</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 100 }}>변경필드</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 120 }}>변경전</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 120 }}>변경후</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 360 }}>변경 세부내용</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 50, fontSize: '12px' }}>NO</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 110, fontSize: '12px' }}>변경시간</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>코드</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 150, fontSize: '12px' }}>제목</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 80, fontSize: '12px' }}>변경분류</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 80, fontSize: '12px' }}>변경위치</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경필드</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 120, fontSize: '12px' }}>변경전</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 120, fontSize: '12px' }}>변경후</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 360, fontSize: '12px' }}>변경 세부내용</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>팀</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경자</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -3091,47 +3074,47 @@ export default function HardwareManagement() {
                         .map((log, index) => (
                           <TableRow key={log.id} hover sx={{ '&:hover': { backgroundColor: 'action.hover' } }}>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
                                 {changeLogs.length - (changeLogPage * changeLogRowsPerPage + index)}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
                                 {log.dateTime}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                                {log.title}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
                                 {log.code}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                                {log.title}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
                                 {log.action}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
                                 {log.location}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
                                 {log.changedField || '-'}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
                                 {log.beforeValue || '-'}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
                                 {log.afterValue || '-'}
                               </Typography>
                             </TableCell>
@@ -3139,7 +3122,7 @@ export default function HardwareManagement() {
                               <Typography
                                 variant="body2"
                                 sx={{
-                                  fontSize: '13px',
+                                  fontSize: '12px',
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
                                   whiteSpace: 'normal',
@@ -3154,12 +3137,12 @@ export default function HardwareManagement() {
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
                                 {log.team}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
                                 {log.user}
                               </Typography>
                             </TableCell>

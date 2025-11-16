@@ -479,12 +479,13 @@ export default function SecurityEducationTable({
             await addChangeLog(
               '삭제',
               codeToUse,
-              `보안교육관리 ${educationTitle}(${codeToUse}) 정보의 데이터탭 데이터가 삭제 되었습니다.`,
+              `보안교육관리 ${educationTitle}(${codeToUse})의 데이터가 삭제 되었습니다.`,
               task.team || '보안팀',
-              `${educationTitle} - ${task.location || '-'}`,
-              '',
-              '데이터탭',
-              educationTitle
+              undefined,
+              undefined,
+              undefined,
+              educationTitle,
+              undefined
             );
           }
         }
@@ -651,7 +652,7 @@ export default function SecurityEducationTable({
             // 변경된 필드가 있으면 각각 로그 기록
             if (changes.length > 0) {
               for (const change of changes) {
-                const description = `보안교육관리 ${updatedTask.educationName}(${codeToUse}) 정보의 개요탭 ${change.fieldKorean}이 ${change.before} → ${change.after} 로 수정 되었습니다.`;
+                const description = `보안교육관리 ${updatedTask.educationName}(${codeToUse}) 개요탭의 ${change.fieldKorean}이 ${change.before} → ${change.after} 로 수정 되었습니다.`;
 
                 await addChangeLog(
                   '수정',
@@ -669,7 +670,7 @@ export default function SecurityEducationTable({
               await addChangeLog(
                 '수정',
                 codeToUse,
-                `보안교육관리 ${updatedTask.educationName}(${codeToUse}) 정보의 개요탭에서 수정되었습니다.`,
+                `보안교육관리 ${updatedTask.educationName}(${codeToUse}) 개요탭의에서 수정되었습니다.`,
                 updatedTask.team || '보안팀',
                 '',
                 '',
@@ -769,12 +770,13 @@ export default function SecurityEducationTable({
             await addChangeLog(
               '추가',
               codeToUse,
-              `보안교육관리 ${updatedRecord.educationName}(${codeToUse}) 정보의 개요탭 데이터가 추가 되었습니다.`,
+              `보안교육관리 ${updatedRecord.educationName}(${codeToUse})의 데이터가 추가 되었습니다.`,
               updatedRecord.team || '보안팀',
-              '',
-              `${updatedRecord.educationName} - ${updatedRecord.location || '-'}`,
-              '개요탭',
-              updatedRecord.educationName
+              undefined,
+              undefined,
+              undefined,
+              updatedRecord.educationName,
+              undefined
             );
           }
 

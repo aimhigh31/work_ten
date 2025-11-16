@@ -127,7 +127,8 @@ interface KanbanViewProps {
     beforeValue?: string,
     afterValue?: string,
     changedField?: string,
-    title?: string
+    title?: string,
+    location?: string
   ) => void;
   generateInspectionCode?: () => Promise<string>;
   assigneeList?: any[];
@@ -280,12 +281,12 @@ function KanbanView({
         addChangeLog(
           '수정',
           inspectionCode,
-          `${updatedInspection.inspectionTitle || '점검'} - ${changes.join(', ')}`,
+          `${updatedInspection.evaluationTitle || '평가'} - ${changes.join(', ')}`,
           updatedInspection.team || '미분류',
           undefined,
           undefined,
           undefined,
-          updatedInspection.inspectionContent || updatedInspection.inspectionTitle
+          updatedInspection.evaluationTitle
         );
       }
     }
@@ -357,21 +358,20 @@ function KanbanView({
       }
 
       // 변경로그 추가
-      const inspectionCode = currentInspection.code || `TASK-${inspectionId}`;
-      const inspectionTitle = currentInspection.inspectionTitle || '점검내용 없음';
-      const inspectionContent = currentInspection.inspectionContent || inspectionTitle;
-      const description = `${inspectionTitle} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
+      const evaluationCode = currentInspection.code || `EVAL-${inspectionId}`;
+      const evaluationTitle = currentInspection.evaluationTitle || '평가제목 없음';
+      const description = `인사평가관리 ${evaluationTitle}(${evaluationCode}) 개요탭의 상태가 ${oldStatus} → ${newStatus} 수정 되었습니다.`;
 
       addChangeLog(
         '수정',
-        inspectionCode,
+        evaluationCode,
         description,
         currentInspection.team || '미분류',
         oldStatus,
         newStatus,
         '상태',
-        inspectionContent,
-        '칸반탭'
+        evaluationTitle,
+        '개요탭'
       );
     }
   };
@@ -2281,14 +2281,21 @@ export default function EvaluationManagement() {
         startDate: item.start_date || '',
         endDate: item.end_date || '',
         details: item.details || '',
-        performance: (item as any).performance || '',
-        improvements: (item as any).improvements || '',
-        thoughts: (item as any).thoughts || '',
-        notes: (item as any).notes || '',
-        checklistGuide: (item as any).checklist_guide || '',
+        performance: item.performance || '',
+        improvements: item.improvements || '',
+        thoughts: item.thoughts || '',
+        notes: item.notes || '',
+        checklistGuide: item.checklist_guide || '',
         attachments: [],
         evaluationDataId: item.id
       };
+
+      // 디버깅: checklistGuide 값 확인
+      if (item.checklist_guide) {
+        console.log('📋 DB에서 불러온 checklist_guide:', item.id, item.checklist_guide);
+      }
+
+      return mapped;
     });
   }, [evaluationDataList, getEvaluationTypeName, getManagementCategoryName, getStatusName]);
 
@@ -2385,7 +2392,7 @@ export default function EvaluationManagement() {
         dateTime: formattedDateTime,
         code: log.record_id, // record_id가 이미 코드임
         target: log.title || inspection?.inspectionContent || log.record_id,
-        location: '개요탭', // 변경위치
+        location: log.change_location || '개요탭', // DB에서 가져온 변경위치 사용
         action: normalizeActionType(log.action_type),
         changedField: log.changed_field || '-', // 변경필드
         description: log.description,
@@ -2517,6 +2524,9 @@ export default function EvaluationManagement() {
       try {
         const userName = currentUser?.user_name || currentUser?.name || user?.name || '시스템';
 
+        // 디버깅: location 파라미터 확인
+        console.log('📍 addChangeLog 호출 - location 파라미터:', location);
+
         const logData = {
           page: 'hr_evaluation',
           record_id: target, // 코드를 record_id로 사용
@@ -2639,13 +2649,7 @@ export default function EvaluationManagement() {
 
           console.log('📋 최종 변경된 필드:', changedFields);
 
-          // 변경로그 추가
-          addChangeLog(
-            '수정',
-            updatedInspection.code || `EVAL-${updatedInspection.id}`,
-            `${updatedInspection.evaluationTitle} - 수정됨`,
-            updatedInspection.team || '미분류'
-          );
+          // 변경로그는 EvaluationTable.tsx에서 각 필드별로 추가됨 (중복 방지)
 
           // 데이터 새로고침
           await fetchEvaluationDataList();
@@ -2669,13 +2673,7 @@ export default function EvaluationManagement() {
         // 새 데이터 추가
         console.log('✅ 새 평가 데이터 추가 (EvaluationEditDialog에서 이미 저장됨)');
 
-        // 변경로그 추가
-        addChangeLog(
-          '추가',
-          updatedInspection.code || `EVAL-${updatedInspection.id}`,
-          `${updatedInspection.evaluationTitle} - 새로 생성됨`,
-          updatedInspection.team || '미분류'
-        );
+        // 변경로그는 EvaluationTable.tsx에서 추가됨 (중복 방지)
 
         // 데이터 새로고침
         await fetchEvaluationDataList();
@@ -2738,7 +2736,7 @@ export default function EvaluationManagement() {
         .filter((evaluation) => successfulIds.includes(evaluation.id))
         .forEach((evaluation) => {
           const evaluationCode = evaluation.code || `EVAL-${evaluation.id}`;
-          const evaluationTitle = evaluation.inspectionContent || '평가';
+          const evaluationTitle = evaluation.evaluationTitle || '평가';
           addChangeLog(
             '삭제',
             evaluationCode,
@@ -3373,11 +3371,11 @@ export default function EvaluationManagement() {
                       <TableHead>
                         <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
                           <TableCell sx={{ fontWeight: 600, width: 50, fontSize: '12px' }}>NO</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 150, fontSize: '12px' }}>변경시간</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 120, fontSize: '12px' }}>변경시간</TableCell>
                           <TableCell sx={{ fontWeight: 600, width: 110, fontSize: '12px' }}>코드</TableCell>
                           <TableCell sx={{ fontWeight: 600, width: 140, fontSize: '12px' }}>제목</TableCell>
                           <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경분류</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경위치</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경위치</TableCell>
                           <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경필드</TableCell>
                           <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경전</TableCell>
                           <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경후</TableCell>

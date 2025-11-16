@@ -1780,7 +1780,14 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
                   <TextField
                     fullWidth
                     label="등록자"
-                    value={formData.registrant || ''}
+                    value={(() => {
+                      // registrant에서 이름만 추출 (서브코드 제거)
+                      if (!formData.registrant) return '';
+                      const registrantUser = users.find((u) => u.user_name === formData.registrant);
+                      if (registrantUser) return registrantUser.user_name;
+                      // users에서 못 찾은 경우, registrant 값에서 서브코드 패턴 제거
+                      return formData.registrant.replace(/\s+GROUP\d+-SUB\d+$/g, '').trim();
+                    })()}
                     InputLabelProps={{ shrink: true }}
                     variant="outlined"
                     InputProps={{
@@ -1795,7 +1802,7 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
                           avatar_url: registrantUser.avatar_url
                         } : '없음');
                         const avatarSrc = registrantUser ? (registrantUser.profile_image_url || registrantUser.avatar_url) : currentUser.profileImage;
-                        const avatarInitial = formData.registrant ? formData.registrant[0] : currentUser.name[0];
+                        const avatarInitial = formData.registrant ? formData.registrant.replace(/\s+GROUP\d+-SUB\d+$/g, '').trim()[0] : currentUser.name[0];
                         return (
                           <Avatar src={avatarSrc} sx={{ width: 24, height: 24, mr: 0 }}>
                             {avatarInitial}

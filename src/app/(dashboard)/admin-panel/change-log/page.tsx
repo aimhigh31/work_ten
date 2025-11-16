@@ -525,18 +525,18 @@ export default function ChangeLogPage() {
               <Table size="small">
                 <TableHead>
                   <TableRow sx={{ backgroundColor: 'grey.50' }}>
-                    <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
-                    <TableCell sx={{ fontWeight: 600, width: 150 }}>변경시간</TableCell>
-                    <TableCell sx={{ fontWeight: 600, width: 120 }}>페이지</TableCell>
-                    <TableCell sx={{ fontWeight: 600, width: 150 }}>제목</TableCell>
-                    <TableCell sx={{ fontWeight: 600, width: 100 }}>코드</TableCell>
-                    <TableCell sx={{ fontWeight: 600, width: 100 }}>변경분류</TableCell>
-                    <TableCell sx={{ fontWeight: 600, width: 70 }}>변경필드</TableCell>
-                    <TableCell sx={{ fontWeight: 600, width: 120 }}>변경전</TableCell>
-                    <TableCell sx={{ fontWeight: 600, width: 120 }}>변경후</TableCell>
-                    <TableCell sx={{ fontWeight: 600, width: 360 }}>변경세부내용</TableCell>
-                    <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-                    <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 50, fontSize: '12px' }}>NO</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 130, fontSize: '12px' }}>변경시간</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 120, fontSize: '12px' }}>페이지</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 150, fontSize: '12px' }}>코드</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 150, fontSize: '12px' }}>제목</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경분류</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경필드</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 120, fontSize: '12px' }}>변경전</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 120, fontSize: '12px' }}>변경후</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 360, fontSize: '12px' }}>변경세부내용</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>팀</TableCell>
+                    <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경자</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -574,12 +574,12 @@ export default function ChangeLogPage() {
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                            {log.title}
+                            {log.code}
                           </Typography>
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2" sx={{ fontSize: '12px' }}>
-                            {log.code}
+                            {log.title}
                           </Typography>
                         </TableCell>
                         <TableCell>

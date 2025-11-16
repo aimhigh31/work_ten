@@ -254,9 +254,10 @@ function KanbanView({
 
           // 토스트 알림 추가
           const investmentTitle = currentInvestment.investmentName || '투자';
+          const investmentCode = currentInvestment.code || `PLAN-INV-25-${String(currentInvestment.id).padStart(3, '0')}`;
           setSnackbar({
             open: true,
-            message: `${investmentTitle}의 상태가 ${oldStatus} → ${newStatus}로 변경되었습니다.`,
+            message: `투자관리 ${investmentTitle}(${investmentCode}) 개요탭의 상태가 ${oldStatus} → ${newStatus}로 수정 되었습니다.`,
             severity: 'success'
           });
         } catch (error) {
@@ -277,7 +278,8 @@ function KanbanView({
 
       // 변경로그 추가 - 칸반에서 상태 변경
       const investmentCode = currentInvestment.code || `PLAN-INV-25-${String(currentInvestment.id).padStart(3, '0')}`;
-      const description = `${currentInvestment.investmentName || '투자'} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
+      const investmentName = currentInvestment.investmentName || '투자';
+      const description = `투자관리 ${investmentName}(${investmentCode}) 개요탭의 상태가 ${oldStatus} → ${newStatus}로 수정 되었습니다.`;
       addChangeLog('수정', investmentCode, description, currentInvestment.team || '미분류', oldStatus, newStatus, '상태', currentInvestment.investmentName, '칸반탭');
     }
   };
@@ -2002,18 +2004,18 @@ function ChangeLogView({
         <Table size="small">
           <TableHead>
             <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
-              <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 110 }}>변경시간</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 150 }}>제목</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 120 }}>코드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경분류</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경위치</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 100 }}>변경필드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 120 }}>변경전</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 120 }}>변경후</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 330 }}>변경 세부내용</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 50, fontSize: '12px' }}>NO</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 110, fontSize: '12px' }}>변경시간</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 120, fontSize: '12px' }}>코드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 150, fontSize: '12px' }}>제목</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경분류</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경위치</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경필드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 120, fontSize: '12px' }}>변경전</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 120, fontSize: '12px' }}>변경후</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 330, fontSize: '12px' }}>변경 세부내용</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>팀</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경자</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -2026,47 +2028,47 @@ function ChangeLogView({
                 }}
               >
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {changeLogs.length - (page * rowsPerPage + index)}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.dateTime}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                    {log.title}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.code}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', fontWeight: 500 }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                    {log.title}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '12px', fontWeight: 500 }}>
                     {log.action}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.location}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.changedField}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.beforeValue}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.afterValue}
                   </Typography>
                 </TableCell>
@@ -2074,7 +2076,7 @@ function ChangeLogView({
                   <Typography
                     variant="body2"
                     sx={{
-                      fontSize: '13px',
+                      fontSize: '12px',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'normal',
@@ -2089,12 +2091,12 @@ function ChangeLogView({
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.team}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.user}
                   </Typography>
                 </TableCell>
@@ -2544,33 +2546,14 @@ export default function InvestmentManagement() {
 
   // 투자 저장 함수 (생성/수정)
   const handleSaveInvestment = async (investmentData: InvestmentData) => {
+    // ⚠️ 중요: InvestmentEditDialog에서 이미 DB 저장을 완료했으므로
+    // 여기서는 로컬 상태 업데이트와 변경로그만 처리
     try {
-      console.log('💾 저장할 투자 데이터 (프론트엔드 형식):', JSON.stringify(investmentData, null, 2));
-
-      // 필수 필드 검증
-      if (!investmentData.investmentName || !investmentData.investmentName.trim()) {
-        alert('투자명을 입력해주세요.');
-        return;
-      }
-      if (!investmentData.investmentType || !investmentData.investmentType.trim()) {
-        alert('투자유형을 선택해주세요.');
-        return;
-      }
-      if (!investmentData.team || !investmentData.team.trim()) {
-        alert('팀을 선택해주세요.');
-        return;
-      }
-      if (!investmentData.assignee || !investmentData.assignee.trim()) {
-        alert('담당자를 선택해주세요.');
-        return;
-      }
-
-      const dbData = convertToDbInvestmentData(investmentData);
-      console.log('💾 변환된 DB 데이터:', JSON.stringify(dbData, null, 2));
+      console.log('💾 InvestmentEditDialog에서 받은 데이터:', JSON.stringify(investmentData, null, 2));
 
       if (currentInvestment) {
-        // 수정
-        console.log('🔄 투자 업데이트 시작, ID:', currentInvestment.id);
+        // 수정 - 변경로그만 기록
+        console.log('🔄 투자 업데이트 변경로그 기록 시작, ID:', currentInvestment.id);
 
         // 원본 데이터 저장
         const originalInvestment = { ...currentInvestment };
@@ -2583,7 +2566,7 @@ export default function InvestmentManagement() {
           await addChangeLog(
             '수정',
             investmentCode,
-            `투자관리 ${investmentName}(${investmentCode}) 정보의 개요탭 투자유형이 ${originalInvestment.investmentType || ''} → ${updatedInvestment.investmentType || ''} 로 수정 되었습니다.`,
+            `투자관리 ${investmentName}(${investmentCode}) 개요탭의 투자유형이 ${originalInvestment.investmentType || ''} → ${updatedInvestment.investmentType || ''} 로 수정 되었습니다.`,
             updatedInvestment.team || '미분류',
             originalInvestment.investmentType || '',
             updatedInvestment.investmentType || '',
@@ -2596,7 +2579,7 @@ export default function InvestmentManagement() {
           await addChangeLog(
             '수정',
             investmentCode,
-            `투자관리 ${investmentName}(${investmentCode}) 정보의 개요탭 투자명이 ${originalInvestment.investmentName || ''} → ${updatedInvestment.investmentName || ''} 로 수정 되었습니다.`,
+            `투자관리 ${investmentName}(${investmentCode}) 개요탭의 투자명이 ${originalInvestment.investmentName || ''} → ${updatedInvestment.investmentName || ''} 로 수정 되었습니다.`,
             updatedInvestment.team || '미분류',
             originalInvestment.investmentName || '',
             updatedInvestment.investmentName || '',
@@ -2609,7 +2592,7 @@ export default function InvestmentManagement() {
           await addChangeLog(
             '수정',
             investmentCode,
-            `투자관리 ${investmentName}(${investmentCode}) 정보의 개요탭 설명이 ${originalInvestment.description || ''} → ${updatedInvestment.description || ''} 로 수정 되었습니다.`,
+            `투자관리 ${investmentName}(${investmentCode}) 개요탭의 설명이 ${originalInvestment.description || ''} → ${updatedInvestment.description || ''} 로 수정 되었습니다.`,
             updatedInvestment.team || '미분류',
             originalInvestment.description || '',
             updatedInvestment.description || '',
@@ -2622,7 +2605,7 @@ export default function InvestmentManagement() {
           await addChangeLog(
             '수정',
             investmentCode,
-            `투자관리 ${investmentName}(${investmentCode}) 정보의 개요탭 투자금액이 ${originalInvestment.amount || ''} → ${updatedInvestment.amount || ''} 로 수정 되었습니다.`,
+            `투자관리 ${investmentName}(${investmentCode}) 개요탭의 투자금액이 ${originalInvestment.amount || ''} → ${updatedInvestment.amount || ''} 로 수정 되었습니다.`,
             updatedInvestment.team || '미분류',
             String(originalInvestment.amount || ''),
             String(updatedInvestment.amount || ''),
@@ -2635,7 +2618,7 @@ export default function InvestmentManagement() {
           await addChangeLog(
             '수정',
             investmentCode,
-            `투자관리 ${investmentName}(${investmentCode}) 정보의 개요탭 팀이 ${originalInvestment.team || ''} → ${updatedInvestment.team || ''} 로 수정 되었습니다.`,
+            `투자관리 ${investmentName}(${investmentCode}) 개요탭의 팀이 ${originalInvestment.team || ''} → ${updatedInvestment.team || ''} 로 수정 되었습니다.`,
             updatedInvestment.team || '미분류',
             originalInvestment.team || '',
             updatedInvestment.team || '',
@@ -2648,7 +2631,7 @@ export default function InvestmentManagement() {
           await addChangeLog(
             '수정',
             investmentCode,
-            `투자관리 ${investmentName}(${investmentCode}) 정보의 개요탭 담당자가 ${originalInvestment.assignee || ''} → ${updatedInvestment.assignee || ''} 로 수정 되었습니다.`,
+            `투자관리 ${investmentName}(${investmentCode}) 개요탭의 담당자가 ${originalInvestment.assignee || ''} → ${updatedInvestment.assignee || ''} 로 수정 되었습니다.`,
             updatedInvestment.team || '미분류',
             originalInvestment.assignee || '',
             updatedInvestment.assignee || '',
@@ -2661,7 +2644,7 @@ export default function InvestmentManagement() {
           await addChangeLog(
             '수정',
             investmentCode,
-            `투자관리 ${investmentName}(${investmentCode}) 정보의 개요탭 상태가 ${originalInvestment.status || ''} → ${updatedInvestment.status || ''} 로 수정 되었습니다.`,
+            `투자관리 ${investmentName}(${investmentCode}) 개요탭의 상태가 ${originalInvestment.status || ''} → ${updatedInvestment.status || ''} 로 수정 되었습니다.`,
             updatedInvestment.team || '미분류',
             originalInvestment.status || '',
             updatedInvestment.status || '',
@@ -2674,7 +2657,7 @@ export default function InvestmentManagement() {
           await addChangeLog(
             '수정',
             investmentCode,
-            `투자관리 ${investmentName}(${investmentCode}) 정보의 개요탭 시작일이 ${originalInvestment.startDate || ''} → ${updatedInvestment.startDate || ''} 로 수정 되었습니다.`,
+            `투자관리 ${investmentName}(${investmentCode}) 개요탭의 시작일이 ${originalInvestment.startDate || ''} → ${updatedInvestment.startDate || ''} 로 수정 되었습니다.`,
             updatedInvestment.team || '미분류',
             originalInvestment.startDate || '',
             updatedInvestment.startDate || '',
@@ -2687,7 +2670,7 @@ export default function InvestmentManagement() {
           await addChangeLog(
             '수정',
             investmentCode,
-            `투자관리 ${investmentName}(${investmentCode}) 정보의 개요탭 완료일이 ${originalInvestment.completedDate || ''} → ${updatedInvestment.completedDate || ''} 로 수정 되었습니다.`,
+            `투자관리 ${investmentName}(${investmentCode}) 개요탭의 완료일이 ${originalInvestment.completedDate || ''} → ${updatedInvestment.completedDate || ''} 로 수정 되었습니다.`,
             updatedInvestment.team || '미분류',
             originalInvestment.completedDate || '',
             updatedInvestment.completedDate || '',
@@ -2700,7 +2683,7 @@ export default function InvestmentManagement() {
           await addChangeLog(
             '수정',
             investmentCode,
-            `투자관리 ${investmentName}(${investmentCode}) 정보의 개요탭 기대수익률이 ${originalInvestment.expectedReturn || ''} → ${updatedInvestment.expectedReturn || ''} 로 수정 되었습니다.`,
+            `투자관리 ${investmentName}(${investmentCode}) 개요탭의 기대수익률이 ${originalInvestment.expectedReturn || ''} → ${updatedInvestment.expectedReturn || ''} 로 수정 되었습니다.`,
             updatedInvestment.team || '미분류',
             String(originalInvestment.expectedReturn || ''),
             String(updatedInvestment.expectedReturn || ''),
@@ -2713,7 +2696,7 @@ export default function InvestmentManagement() {
           await addChangeLog(
             '수정',
             investmentCode,
-            `투자관리 ${investmentName}(${investmentCode}) 정보의 개요탭 실제수익률이 ${originalInvestment.actualReturn || ''} → ${updatedInvestment.actualReturn || ''} 로 수정 되었습니다.`,
+            `투자관리 ${investmentName}(${investmentCode}) 개요탭의 실제수익률이 ${originalInvestment.actualReturn || ''} → ${updatedInvestment.actualReturn || ''} 로 수정 되었습니다.`,
             updatedInvestment.team || '미분류',
             String(originalInvestment.actualReturn || ''),
             String(updatedInvestment.actualReturn || ''),
@@ -2726,7 +2709,7 @@ export default function InvestmentManagement() {
           await addChangeLog(
             '수정',
             investmentCode,
-            `투자관리 ${investmentName}(${investmentCode}) 정보의 개요탭 위험도가 ${originalInvestment.riskLevel || ''} → ${updatedInvestment.riskLevel || ''} 로 수정 되었습니다.`,
+            `투자관리 ${investmentName}(${investmentCode}) 개요탭의 위험도가 ${originalInvestment.riskLevel || ''} → ${updatedInvestment.riskLevel || ''} 로 수정 되었습니다.`,
             updatedInvestment.team || '미분류',
             originalInvestment.riskLevel || '',
             updatedInvestment.riskLevel || '',
@@ -2735,98 +2718,57 @@ export default function InvestmentManagement() {
           );
         }
 
-        const success = await updateInvestment(currentInvestment.id, dbData);
-        console.log('✅ 업데이트 결과:', success);
-        if (success) {
-          // 투자금액 데이터 저장은 InvestmentEditDialog에서 처리
+        // DB 저장은 InvestmentEditDialog에서 이미 완료
+        // 여기서는 로컬 상태만 업데이트
+        console.log('✅ 변경로그 기록 완료, 로컬 상태 업데이트 중...');
 
-          // 데이터 새로고침 및 NO 재할당
-          const dbInvestments = await getInvestments();
-          const convertedInvestments = dbInvestments.map((dbInv) => {
-            const converted = convertToInvestmentData(dbInv);
-            return {
-              ...converted,
-              investmentType: getInvestmentTypeName(converted.investmentType) || converted.investmentType,
-              investmentDetailType: getInvestmentDetailTypeName(converted.investmentDetailType) || converted.investmentDetailType,
-              status: getStatusName(converted.status) || converted.status
-            };
-          });
+        // 데이터 새로고침 및 NO 재할당
+        const dbInvestments = await getInvestments();
+        const convertedInvestments = dbInvestments.map((dbInv) => {
+          const converted = convertToInvestmentData(dbInv);
+          return {
+            ...converted,
+            investmentType: getInvestmentTypeName(converted.investmentType) || converted.investmentType,
+            investmentDetailType: getInvestmentDetailTypeName(converted.investmentDetailType) || converted.investmentDetailType,
+            status: getStatusName(converted.status) || converted.status
+          };
+        });
 
-          setInvestments(assignNoToInvestments(convertedInvestments));
-        }
+        setInvestments(assignNoToInvestments(convertedInvestments));
       } else {
-        // 생성
-        // 코드 자동 생성 (DB에서 직접 조회 - 캐시 무시)
-        const currentYear = new Date().getFullYear().toString().slice(-2);
+        // 신규 생성 - 변경로그만 기록
+        // DB 저장은 InvestmentEditDialog에서 이미 완료
+        console.log('🆕 신규 투자 변경로그 기록 시작, 코드:', investmentData.code);
 
-        // DB에서 직접 최신 코드 조회 (캐시 무시)
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-        const supabase = createClient(supabaseUrl, supabaseKey);
+        // 데이터 새로고침 및 NO 재할당
+        const updatedDbInvestments = await getInvestments();
+        const convertedInvestments = updatedDbInvestments.map((dbInv) => {
+          const converted = convertToInvestmentData(dbInv);
+          return {
+            ...converted,
+            investmentType: getInvestmentTypeName(converted.investmentType) || converted.investmentType,
+            investmentDetailType: getInvestmentDetailTypeName(converted.investmentDetailType) || converted.investmentDetailType,
+            status: getStatusName(converted.status) || converted.status
+          };
+        });
 
-        const { data: latestInvestments } = await supabase
-          .from('plan_investment_data')
-          .select('code')
-          .like('code', `PLAN-INV-${currentYear}-%`)
-          .order('code', { ascending: false })
-          .limit(1);
+        setInvestments(assignNoToInvestments(convertedInvestments));
 
-        let maxNumber = 0;
-        if (latestInvestments && latestInvestments.length > 0) {
-          const match = latestInvestments[0].code?.match(/PLAN-INV-\d{2}-(\d{3})$/);
-          maxNumber = match ? parseInt(match[1], 10) : 0;
-        }
-
-        const newCode = `PLAN-INV-${currentYear}-${String(maxNumber + 1).padStart(3, '0')}`;
-
-        const newInvestmentData = {
-          ...dbData,
-          code: newCode
-        };
-
-        console.log('🆕 신규 투자 생성 시작, 코드:', newCode);
-        const newInvestment = await createInvestment(newInvestmentData);
-        console.log('📊 생성된 투자:', newInvestment);
-
-        if (newInvestment) {
-          // 투자금액 데이터 저장은 InvestmentEditDialog에서 처리
-
-          // 데이터 새로고침 및 NO 재할당
-          const updatedDbInvestments = await getInvestments();
-          const convertedInvestments = updatedDbInvestments.map((dbInv) => {
-            const converted = convertToInvestmentData(dbInv);
-            return {
-              ...converted,
-              investmentType: getInvestmentTypeName(converted.investmentType) || converted.investmentType,
-              investmentDetailType: getInvestmentDetailTypeName(converted.investmentDetailType) || converted.investmentDetailType,
-              status: getStatusName(converted.status) || converted.status
-            };
-          });
-
-          setInvestments(assignNoToInvestments(convertedInvestments));
-
-          // 변경로그 추가
-          const investmentName = investmentData.investmentName || '새 투자';
-          await addChangeLog(
-            '추가',
-            newCode,
-            `투자관리 ${investmentName}(${newCode})이 신규 등록되었습니다.`,
-            investmentData.team || '미분류',
-            undefined,
-            undefined,
-            undefined,
-            investmentName
-          );
-          console.log('✅ 신규 투자 생성 완료');
-        } else {
-          console.error('❌ 투자 생성 실패: createInvestment가 null을 반환했습니다.');
-          setSnackbar({
-            open: true,
-            message: '투자 생성에 실패했습니다. 콘솔 로그를 확인해주세요.',
-            severity: 'error'
-          });
-          return;
-        }
+        // 변경로그 추가
+        const investmentName = investmentData.investmentName || '새 투자';
+        const newCode = investmentData.code;
+        await addChangeLog(
+          '추가',
+          newCode,
+          `투자관리 ${investmentName}(${newCode})의 데이터가 추가 되었습니다.`,
+          investmentData.team || '미분류',
+          undefined,
+          undefined,
+          undefined,
+          investmentName,
+          undefined
+        );
+        console.log('✅ 신규 투자 변경로그 기록 완료');
       }
 
       setEditDialogOpen(false);
@@ -2850,12 +2792,13 @@ export default function InvestmentManagement() {
       await addChangeLog(
         '삭제',
         investment.code,
-        `투자관리 ${investmentName}(${investment.code})이 삭제되었습니다.`,
+        `투자관리 ${investmentName}(${investment.code})의 데이터가 삭제 되었습니다.`,
         investment.team || '미분류',
         undefined,
         undefined,
         undefined,
-        investmentName
+        investmentName,
+        undefined
       );
 
       const success = await deleteInvestment(investment.id);

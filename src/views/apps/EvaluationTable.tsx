@@ -88,7 +88,8 @@ interface EvaluationTableProps {
     beforeValue?: string,
     afterValue?: string,
     changedField?: string,
-    title?: string
+    title?: string,
+    location?: string
   ) => void;
   onSave?: (evaluation: EvaluationTableData) => Promise<void>;
   onDelete?: (ids: number[]) => Promise<void>;
@@ -393,7 +394,7 @@ export default function EvaluationTable({
             addChangeLog(
               '수정',
               evaluationCode,
-              `인사평가관리 ${evaluationTitle}(${evaluationCode}) 정보 개요탭 상태가 ${originalEvaluation.status} → ${updatedEvaluation.status} 수정 되었습니다.`,
+              `인사평가관리 ${evaluationTitle}(${evaluationCode}) 개요탭의 상태가 ${originalEvaluation.status} → ${updatedEvaluation.status} 수정 되었습니다.`,
               updatedEvaluation.team || '미분류',
               originalEvaluation.status,
               updatedEvaluation.status,
@@ -407,7 +408,7 @@ export default function EvaluationTable({
             addChangeLog(
               '수정',
               evaluationCode,
-              `인사평가관리 ${evaluationTitle}(${evaluationCode}) 정보 개요탭 담당자가 ${originalEvaluation.assignee || '미할당'} → ${updatedEvaluation.assignee || '미할당'} 수정 되었습니다.`,
+              `인사평가관리 ${evaluationTitle}(${evaluationCode}) 개요탭의 담당자가 ${originalEvaluation.assignee || '미할당'} → ${updatedEvaluation.assignee || '미할당'} 수정 되었습니다.`,
               updatedEvaluation.team || '미분류',
               originalEvaluation.assignee || '미할당',
               updatedEvaluation.assignee || '미할당',
@@ -421,7 +422,7 @@ export default function EvaluationTable({
             addChangeLog(
               '수정',
               evaluationCode,
-              `인사평가관리 ${evaluationTitle}(${evaluationCode}) 정보 개요탭 평가제목이 ${originalEvaluation.evaluationTitle} → ${updatedEvaluation.evaluationTitle} 수정 되었습니다.`,
+              `인사평가관리 ${updatedEvaluation.evaluationTitle}(${evaluationCode}) 개요탭의 평가제목이 ${originalEvaluation.evaluationTitle} → ${updatedEvaluation.evaluationTitle} 수정 되었습니다.`,
               updatedEvaluation.team || '미분류',
               originalEvaluation.evaluationTitle || '',
               updatedEvaluation.evaluationTitle || '',
@@ -435,7 +436,7 @@ export default function EvaluationTable({
             addChangeLog(
               '수정',
               evaluationCode,
-              `인사평가관리 ${evaluationTitle}(${evaluationCode}) 정보 개요탭 평가유형이 ${originalEvaluation.evaluationType} → ${updatedEvaluation.evaluationType} 수정 되었습니다.`,
+              `인사평가관리 ${evaluationTitle}(${evaluationCode}) 개요탭의 평가유형이 ${originalEvaluation.evaluationType} → ${updatedEvaluation.evaluationType} 수정 되었습니다.`,
               updatedEvaluation.team || '미분류',
               originalEvaluation.evaluationType,
               updatedEvaluation.evaluationType,
@@ -449,7 +450,7 @@ export default function EvaluationTable({
             addChangeLog(
               '수정',
               evaluationCode,
-              `인사평가관리 ${evaluationTitle}(${evaluationCode}) 정보 개요탭 관리분류가 ${originalEvaluation.managementCategory} → ${updatedEvaluation.managementCategory} 수정 되었습니다.`,
+              `인사평가관리 ${evaluationTitle}(${evaluationCode}) 개요탭의 관리분류가 ${originalEvaluation.managementCategory} → ${updatedEvaluation.managementCategory} 수정 되었습니다.`,
               updatedEvaluation.team || '미분류',
               originalEvaluation.managementCategory,
               updatedEvaluation.managementCategory,
@@ -463,11 +464,39 @@ export default function EvaluationTable({
             addChangeLog(
               '수정',
               evaluationCode,
-              `인사평가관리 ${evaluationTitle}(${evaluationCode}) 정보 개요탭 점검일이 ${originalEvaluation.inspectionDate || '미정'} → ${updatedEvaluation.inspectionDate || '미정'} 수정 되었습니다.`,
+              `인사평가관리 ${evaluationTitle}(${evaluationCode}) 개요탭의 점검일이 ${originalEvaluation.inspectionDate || '미정'} → ${updatedEvaluation.inspectionDate || '미정'} 수정 되었습니다.`,
               updatedEvaluation.team || '미분류',
               originalEvaluation.inspectionDate || '미정',
               updatedEvaluation.inspectionDate || '미정',
               '점검일',
+              evaluationTitle
+            );
+          }
+
+          // 시작일 변경
+          if (originalEvaluation.startDate !== updatedEvaluation.startDate) {
+            addChangeLog(
+              '수정',
+              evaluationCode,
+              `인사평가관리 ${evaluationTitle}(${evaluationCode}) 개요탭의 시작일이 ${originalEvaluation.startDate || '미정'} → ${updatedEvaluation.startDate || '미정'} 수정 되었습니다.`,
+              updatedEvaluation.team || '미분류',
+              originalEvaluation.startDate || '미정',
+              updatedEvaluation.startDate || '미정',
+              '시작일',
+              evaluationTitle
+            );
+          }
+
+          // 종료일 변경
+          if (originalEvaluation.endDate !== updatedEvaluation.endDate) {
+            addChangeLog(
+              '수정',
+              evaluationCode,
+              `인사평가관리 ${evaluationTitle}(${evaluationCode}) 개요탭의 종료일이 ${originalEvaluation.endDate || '미정'} → ${updatedEvaluation.endDate || '미정'} 수정 되었습니다.`,
+              updatedEvaluation.team || '미분류',
+              originalEvaluation.endDate || '미정',
+              updatedEvaluation.endDate || '미정',
+              '종료일',
               evaluationTitle
             );
           }
@@ -477,7 +506,7 @@ export default function EvaluationTable({
             addChangeLog(
               '수정',
               evaluationCode,
-              `인사평가관리 ${evaluationTitle}(${evaluationCode}) 정보 개요탭 팀이 ${originalEvaluation.team || '미분류'} → ${updatedEvaluation.team || '미분류'} 수정 되었습니다.`,
+              `인사평가관리 ${evaluationTitle}(${evaluationCode}) 개요탭의 팀이 ${originalEvaluation.team || '미분류'} → ${updatedEvaluation.team || '미분류'} 수정 되었습니다.`,
               updatedEvaluation.team || '미분류',
               originalEvaluation.team || '미분류',
               updatedEvaluation.team || '미분류',
@@ -491,12 +520,32 @@ export default function EvaluationTable({
             addChangeLog(
               '수정',
               evaluationCode,
-              `인사평가관리 ${evaluationTitle}(${evaluationCode}) 정보의 개요탭 세부설명이 ${originalEvaluation.details || ''} → ${updatedEvaluation.details || ''} 로 수정 되었습니다.`,
+              `인사평가관리 ${evaluationTitle}(${evaluationCode}) 개요탭의 세부설명이 ${originalEvaluation.details || ''} → ${updatedEvaluation.details || ''} 로 수정 되었습니다.`,
               updatedEvaluation.team || '미분류',
               originalEvaluation.details || '',
               updatedEvaluation.details || '',
               '세부설명',
               evaluationTitle
+            );
+          }
+
+          // 안내가이드 변경
+          if (originalEvaluation.checklistGuide !== updatedEvaluation.checklistGuide) {
+            console.log('🔔 안내가이드 변경 감지!');
+            console.log('  - Original:', originalEvaluation.checklistGuide);
+            console.log('  - Updated:', updatedEvaluation.checklistGuide);
+            console.log('  - addChangeLog 호출 - 9번째 파라미터(location): 체크리스트탭');
+
+            addChangeLog(
+              '수정',
+              evaluationCode,
+              `인사평가관리 ${evaluationTitle}(${evaluationCode}) 체크리스트탭의 안내가이드가 수정 되었습니다.`,
+              updatedEvaluation.team || '미분류',
+              originalEvaluation.checklistGuide || '',
+              updatedEvaluation.checklistGuide || '',
+              '안내가이드',
+              evaluationTitle,
+              '체크리스트탭'
             );
           }
         }

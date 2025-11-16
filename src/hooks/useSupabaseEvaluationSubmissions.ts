@@ -58,6 +58,11 @@ export interface EvaluationData {
   evaluation_code?: string;
   checklist_id?: number;
   checklist_evaluation_type?: string;
+  performance?: string;
+  improvements?: string;
+  thoughts?: string;
+  notes?: string;
+  checklist_guide?: string;
   created_at?: string;
   updated_at?: string;
   created_by?: string;

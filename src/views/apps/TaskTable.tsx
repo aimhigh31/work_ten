@@ -91,6 +91,7 @@ interface TaskTableProps {
   users?: any[]; // ✅ 사용자 목록 추가 (KPI 패턴)
   onDeleteTasks?: (taskIds: number[]) => Promise<void>; // ✅ KPI 패턴: number[] 타입
   onAddTask?: (taskInput: any) => Promise<boolean>; // ✅ Optimistic Update 패턴
+  getTasks?: (forceRefresh?: boolean) => Promise<any[]>; // ✅ DB 새로고침 함수
   addChangeLog?: (
     action: string,
     target: string,
@@ -119,6 +120,7 @@ export default function TaskTable({
   users = [],
   onDeleteTasks,
   onAddTask,
+  getTasks,
   addChangeLog,
   setSnackbar,
   canCreateData = true,
@@ -453,6 +455,12 @@ export default function TaskTable({
         }
 
         console.log('✅ 기존 Task 업데이트 완료');
+
+        // ✅ DB에서 최신 데이터 강제 새로고침 (팝업 재오픈 시 최신 데이터 보장)
+        if (getTasks) {
+          await getTasks(true);
+          console.log('🔄 [TaskTable] getTasks(true) 호출 완료 - 최신 데이터 로드됨');
+        }
       } else {
         // 새 Task 추가
         const currentYear = new Date().getFullYear();

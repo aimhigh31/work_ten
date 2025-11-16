@@ -23,6 +23,11 @@ export interface ITEducationRecord {
   attachment?: boolean;
   attachmentCount?: number;
   attachments?: string[];
+  // 교육실적보고 필드들
+  achievements?: string; // 성과
+  improvements?: string; // 개선사항
+  education_feedback?: string; // 교육소감
+  report_notes?: string; // 비고
   isNew?: boolean;
   isEditing?: boolean;
   originalData?: ITEducationRecord;
@@ -46,7 +51,7 @@ export type ITEducationTableData = ITEducationRecord;
 export interface CurriculumItem {
   id: string;
   educationDate: string;
-  time: string;
+  duration_minutes: string;
   instructor: string;
   title: string;
   content: string;

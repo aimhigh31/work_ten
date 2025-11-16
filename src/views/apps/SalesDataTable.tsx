@@ -656,12 +656,13 @@ const SalesDataTable: React.FC<SalesDataTableProps> = ({
         await addChangeLog(
           '삭제',
           salesCode,
-          `매출관리 ${salesTitle}(${salesCode}) 정보의 데이터탭 데이터가 삭제 되었습니다.`,
+          `매출관리 ${salesTitle}(${salesCode})의 데이터가 삭제 되었습니다.`,
           record.businessUnit || '미분류',
-          `${record.customerName} - ${record.itemName} (${Number(record.totalAmount).toLocaleString()}원)`,
-          '',
-          '데이터탭',
-          salesTitle
+          undefined,
+          undefined,
+          undefined,
+          salesTitle,
+          undefined
         );
       }
 

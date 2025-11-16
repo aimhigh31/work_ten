@@ -27,7 +27,7 @@ export interface UseSupabaseInvestmentReturn {
   getInvestments: () => Promise<DbInvestmentData[]>;
   getInvestmentById: (id: number) => Promise<DbInvestmentData | null>;
   createInvestment: (investment: Omit<DbInvestmentData, 'id' | 'created_at' | 'updated_at'>) => Promise<DbInvestmentData | null>;
-  updateInvestment: (id: number, investment: Partial<DbInvestmentData>) => Promise<boolean>;
+  updateInvestment: (id: number, investment: Partial<DbInvestmentData>) => Promise<DbInvestmentData | null>;
   deleteInvestment: (id: number) => Promise<boolean>;
   convertToInvestmentData: (dbData: DbInvestmentData) => InvestmentData;
   convertToDbInvestmentData: (frontendData: InvestmentData) => Omit<DbInvestmentData, 'id' | 'created_at' | 'updated_at'>;
@@ -125,6 +125,11 @@ export const useSupabaseInvestment = (): UseSupabaseInvestmentReturn => {
 
         const insertData = {
           ...investment,
+          no: null, // DB에서 자동으로 관리
+          attachments: investment.attachments || [],
+          created_by: investment.created_by || 'system',
+          updated_by: investment.updated_by || 'system',
+          is_active: investment.is_active !== undefined ? investment.is_active : true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
@@ -134,17 +139,23 @@ export const useSupabaseInvestment = (): UseSupabaseInvestmentReturn => {
         const { data, error: supabaseError } = await supabase.from('plan_investment_data').insert([insertData]).select().single();
 
         if (supabaseError) {
-          console.log('❌ Supabase 생성 오류:', supabaseError);
-          console.log('❌ 오류 메시지:', supabaseError.message);
-          console.log('❌ 오류 코드:', supabaseError.code);
-          console.log('❌ 상세 오류:', supabaseError.details);
-          console.log('❌ 힌트:', supabaseError.hint);
-          console.log('❌ 전체 오류 객체:', JSON.stringify(supabaseError, null, 2));
+          console.error('❌ Supabase 생성 오류:', supabaseError);
+          console.error('❌ 오류 메시지:', supabaseError.message);
+          console.error('❌ 오류 코드:', supabaseError.code);
+          console.error('❌ 상세 오류:', supabaseError.details);
+          console.error('❌ 힌트:', supabaseError.hint);
+          console.error('❌ 전체 오류 객체:', JSON.stringify(supabaseError, null, 2));
           setError(`투자 생성 오류: ${supabaseError.message || '알 수 없는 오류'}`);
-          return null;
+          throw new Error(`Supabase 투자 생성 실패: ${supabaseError.message || '알 수 없는 오류'}`);
+        }
+
+        if (!data) {
+          console.error('❌ createInvestment: 데이터가 반환되지 않았습니다');
+          throw new Error('투자 데이터가 생성되었지만 반환되지 않았습니다.');
         }
 
         console.log('✅ createInvestment 성공:', data);
+        console.log('✅ 생성된 투자 ID:', data.id);
 
         // ✅ 로컬 상태 즉시 업데이트 (KPI 패턴)
         setInvestments((prev) => [data, ...prev]);
@@ -154,9 +165,11 @@ export const useSupabaseInvestment = (): UseSupabaseInvestmentReturn => {
 
         return data;
       } catch (error) {
-        console.log('❌ createInvestment 실패:', error);
+        console.error('❌ createInvestment 실패:', error);
+        console.error('❌ 에러 타입:', typeof error);
+        console.error('❌ 에러 상세:', error instanceof Error ? error.message : String(error));
         setError(error instanceof Error ? error.message : '투자 생성 실패');
-        return null;
+        throw error; // 에러를 다시 던져서 호출하는 쪽에서 처리하도록
       } finally {
         setLoading(false);
       }
@@ -165,7 +178,7 @@ export const useSupabaseInvestment = (): UseSupabaseInvestmentReturn => {
   );
 
   // 투자 업데이트
-  const updateInvestment = useCallback(async (id: number, investment: Partial<DbInvestmentData>): Promise<boolean> => {
+  const updateInvestment = useCallback(async (id: number, investment: Partial<DbInvestmentData>): Promise<DbInvestmentData | null> => {
     try {
       console.log('📞 updateInvestment 호출:', id);
       console.log('📦 업데이트할 데이터:', investment);
@@ -184,35 +197,42 @@ export const useSupabaseInvestment = (): UseSupabaseInvestmentReturn => {
         .update(updateData)
         .eq('id', id)
         .eq('is_active', true)
-        .select();
+        .select()
+        .single();
 
       if (supabaseError) {
-        console.log('❌ Supabase 업데이트 오류 상세:');
-        console.log('  message:', supabaseError.message);
-        console.log('  details:', supabaseError.details);
-        console.log('  hint:', supabaseError.hint);
-        console.log('  code:', supabaseError.code);
-        console.log('  전체 오류 객체:', JSON.stringify(supabaseError, null, 2));
+        console.error('❌ Supabase 업데이트 오류 상세:');
+        console.error('  message:', supabaseError.message);
+        console.error('  details:', supabaseError.details);
+        console.error('  hint:', supabaseError.hint);
+        console.error('  code:', supabaseError.code);
+        console.error('  전체 오류 객체:', JSON.stringify(supabaseError, null, 2));
         setError(`투자 업데이트 오류: ${supabaseError.message || '알 수 없는 오류'}`);
-        return false;
+        throw new Error(`Supabase 투자 업데이트 실패: ${supabaseError.message || '알 수 없는 오류'}`);
+      }
+
+      if (!data) {
+        console.error('❌ updateInvestment: 데이터가 반환되지 않았습니다');
+        throw new Error('업데이트된 데이터가 반환되지 않았습니다.');
       }
 
       console.log('✅ 업데이트된 데이터:', data);
+      console.log('✅ 업데이트된 투자 ID:', data.id);
       console.log('✅ updateInvestment 성공');
 
       // ✅ 로컬 상태 즉시 업데이트 (KPI 패턴)
-      if (data && data.length > 0) {
-        setInvestments((prev) => prev.map((inv) => (inv.id === id ? data[0] : inv)));
-      }
+      setInvestments((prev) => prev.map((inv) => (inv.id === id ? data : inv)));
 
       // 캐시 무효화 (최신 데이터 보장)
       sessionStorage.removeItem(CACHE_KEY);
 
-      return true;
+      return data;
     } catch (error) {
-      console.log('❌ updateInvestment 실패:', error);
+      console.error('❌ updateInvestment 실패:', error);
+      console.error('❌ 에러 타입:', typeof error);
+      console.error('❌ 에러 상세:', error instanceof Error ? error.message : String(error));
       setError(error instanceof Error ? error.message : '투자 업데이트 실패');
-      return false;
+      throw error; // 에러를 다시 던져서 호출하는 쪽에서 처리하도록
     } finally {
       setLoading(false);
     }

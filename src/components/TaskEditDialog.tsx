@@ -525,7 +525,7 @@ const OverviewTab = memo(
                 notched
                 renderValue={(selected) => {
                   if (!selected) return '';
-                  const item = statusTypesFromDB.find((t) => t.subcode === selected);
+                  const item = statusTypesFromDB.find((t) => t.subcode_name === selected);
                   const statusName = item ? item.subcode_name : selected;
                   const getStatusColor = (statusName: string) => {
                     switch (statusName) {
@@ -571,7 +571,7 @@ const OverviewTab = memo(
                     }
                   };
                   return (
-                    <MenuItem key={option.subcode} value={option.subcode}>
+                    <MenuItem key={option.subcode} value={option.subcode_name}>
                       <Chip
                         label={option.subcode_name}
                         size="small"

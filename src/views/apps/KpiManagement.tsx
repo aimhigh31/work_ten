@@ -432,7 +432,7 @@ function KanbanView({
           // 변경로그 추가
           const taskCode = currentTask.code || `TASK-${taskId}`;
           const workContent = currentTask.workContent || '업무내용 없음';
-          const description = `${workContent} 상태를 "${oldStatusName}"에서 "${newStatusName}"로 변경`;
+          const description = `KPI관리 ${workContent}(${taskCode}) 개요탭의 상태가 ${oldStatusName} → ${newStatusName}로 수정 되었습니다.`;
 
           addChangeLog('수정', taskCode, description, currentTask.team || '미분류', oldStatusName, newStatusName, '상태', workContent, '칸반탭');
 
@@ -1464,18 +1464,18 @@ function ChangeLogView({
         <Table size="small">
           <TableHead>
             <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
-              <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 130 }}>변경시간</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 180 }}>제목</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 140 }}>코드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경분류</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경위치</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>변경필드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 100 }}>변경전</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 100 }}>변경후</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 300 }}>변경 세부내용</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 50, fontSize: '12px' }}>NO</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 130, fontSize: '12px' }}>변경시간</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 140, fontSize: '12px' }}>코드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 180, fontSize: '12px' }}>제목</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경분류</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경위치</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경필드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경전</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경후</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 300, fontSize: '12px' }}>변경 세부내용</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>팀</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경자</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -1488,37 +1488,37 @@ function ChangeLogView({
                 }}
               >
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {changeLogs.length - (page * rowsPerPage + index)}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {log.dateTime}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                    {log.title}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {log.code}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                    {log.title}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {log.action}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {log.location}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {log.changedField || '-'}
                   </Typography>
                 </TableCell>
@@ -1526,7 +1526,7 @@ function ChangeLogView({
                   <Typography
                     variant="body2"
                     sx={{
-                      fontSize: '13px',
+                      fontSize: '12px',
                       color: 'text.primary',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -1542,7 +1542,7 @@ function ChangeLogView({
                   <Typography
                     variant="body2"
                     sx={{
-                      fontSize: '13px',
+                      fontSize: '12px',
                       color: 'text.primary',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -1558,7 +1558,7 @@ function ChangeLogView({
                   <Typography
                     variant="body2"
                     sx={{
-                      fontSize: '13px',
+                      fontSize: '12px',
                       color: 'text.primary',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -1574,12 +1574,12 @@ function ChangeLogView({
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {log.team}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {log.user}
                   </Typography>
                 </TableCell>
@@ -2754,6 +2754,18 @@ export default function KpiManagement() {
   const changeLogs = React.useMemo(() => {
     if (!dbChangeLogs) return [];
 
+    // action_type 매핑 함수
+    const mapActionType = (actionType: string): string => {
+      if (actionType === '추가' || actionType.includes('추가') || actionType.includes('등록') || actionType.includes('생성')) {
+        return '추가';
+      } else if (actionType === '수정' || actionType.includes('수정') || actionType.includes('변경')) {
+        return '수정';
+      } else if (actionType === '삭제' || actionType.includes('삭제')) {
+        return '삭제';
+      }
+      return '수정'; // 기본값
+    };
+
     return dbChangeLogs.map((log: ChangeLogData) => {
       // record_id로 해당 KPI 찾기 (record_id는 코드로 저장되어 있음)
       const kpi = tasks.find((t) => t.code === log.record_id);
@@ -2771,7 +2783,7 @@ export default function KpiManagement() {
         dateTime: formattedDateTime,
         title: log.title || '',
         code: log.record_id,
-        action: log.action_type,
+        action: mapActionType(log.action_type),
         location: log.change_location || '-',
         changedField: log.changed_field || '-',
         beforeValue: log.before_value || '-',
@@ -2978,7 +2990,8 @@ export default function KpiManagement() {
               String(change.before),
               String(change.after),
               change.fieldKorean,
-              kpiTitle
+              kpiTitle,
+              '개요탭'
             );
           }
         }
@@ -3047,12 +3060,13 @@ export default function KpiManagement() {
         await addChangeLog(
           '추가',
           updatedTask.code,
-          `KPI관리 ${kpiTitle}(${updatedTask.code}) 정보의 개요탭 데이터가 추가 되었습니다.`,
+          `KPI관리 ${kpiTitle}(${updatedTask.code})의 데이터가 추가 되었습니다.`,
           updatedTask.team || '시스템',
-          '',
+          undefined,
+          undefined,
+          undefined,
           kpiTitle,
-          '개요탭',
-          kpiTitle
+          '개요탭'
         );
 
         // 토스트 알림 (추가)

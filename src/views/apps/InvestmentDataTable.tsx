@@ -492,21 +492,8 @@ export default function InvestmentDataTable({
               if (onDeleteInvestments && selectedItems.length > 0) {
                 const selectedInvestments = investments.filter((inv) => selectedItems.includes(inv.id));
                 if (window.confirm(`선택한 ${selectedItems.length}개의 투자를 삭제하시겠습니까?`)) {
+                  // onDeleteInvestments 내부에서 변경로그를 처리하므로 여기서는 호출만
                   selectedInvestments.forEach((investment) => {
-                    // 변경로그 추가 (삭제 전에 호출)
-                    if (addChangeLog) {
-                      const investmentName = investment.investmentName || '투자';
-                      addChangeLog(
-                        '삭제',
-                        investment.code,
-                        `투자관리 ${investmentName}(${investment.code})이 삭제되었습니다.`,
-                        investment.team || '미분류',
-                        undefined,
-                        undefined,
-                        undefined,
-                        investmentName
-                      );
-                    }
                     onDeleteInvestments([investment]);
                   });
 

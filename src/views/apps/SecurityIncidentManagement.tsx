@@ -86,6 +86,30 @@ interface ChangeLog {
   user: string;
 }
 
+// 한국어 조사 선택 함수
+function getJosa(word: string, josaType: '이가' | '은는' | '을를'): string {
+  if (!word || word.length === 0) return josaType === '이가' ? '이' : josaType === '은는' ? '은' : '을';
+
+  const lastChar = word.charAt(word.length - 1);
+  const code = lastChar.charCodeAt(0);
+
+  // 한글이 아닌 경우
+  if (code < 0xac00 || code > 0xd7a3) {
+    return josaType === '이가' ? '가' : josaType === '은는' ? '는' : '를';
+  }
+
+  // 받침 유무 확인
+  const hasJongseong = (code - 0xac00) % 28 !== 0;
+
+  if (josaType === '이가') {
+    return hasJongseong ? '이' : '가';
+  } else if (josaType === '은는') {
+    return hasJongseong ? '은' : '는';
+  } else {
+    return hasJongseong ? '을' : '를';
+  }
+}
+
 // Icons
 import { TableDocument, Chart, Calendar, Element, DocumentText } from '@wandersonalwes/iconsax-react';
 
@@ -2434,29 +2458,30 @@ export default function SecurityIncidentManagement() {
       });
       console.log('📢 snackbar state 업데이트 완료:', { open: true, message, severity: 'success' });
 
-      // 변경로그 추가
-      const changes = [];
-      if (originalTask?.status !== updatedTask.status) {
-        changes.push(`상태: ${originalTask?.status} → ${updatedTask.status}`);
-      }
-      if (originalTask?.assignee !== updatedTask.assignee) {
-        changes.push(`담당자: ${originalTask?.assignee} → ${updatedTask.assignee}`);
-      }
-      if (originalTask?.completedDate !== updatedTask.completedDate) {
-        changes.push(`완료일: ${originalTask?.completedDate} → ${updatedTask.completedDate}`);
-      }
+      // 변경로그 추가 - 각 필드별로 개별 로그 생성
+      if (originalTask) {
+        Object.keys(fieldMap).forEach((key) => {
+          const oldValue = (originalTask as any)[key];
+          const newValue = (updatedTask as any)[key];
 
-      if (changes.length > 0) {
-        addChangeLog(
-          '업무 수정',
-          updatedTask.code,
-          changes.join(', '),
-          updatedTask.team,
-          undefined,
-          undefined,
-          undefined,
-          updatedTask.mainContent
-        );
+          if (oldValue !== newValue) {
+            const fieldName = fieldMap[key];
+            const josa = getJosa(fieldName, '이가');
+            const description = `보안사고관리 ${updatedTask.mainContent}(${updatedTask.code}) 개요탭의 ${fieldName}${josa} ${oldValue || '(없음)'} → ${newValue || '(없음)'}로 수정 되었습니다.`;
+
+            addChangeLog(
+              '수정',
+              updatedTask.code,
+              description,
+              updatedTask.team,
+              oldValue,
+              newValue,
+              fieldName,
+              updatedTask.mainContent,
+              '개요탭'
+            );
+          }
+        });
       }
     } else {
       // 새 데이터 추가
@@ -2532,15 +2557,18 @@ export default function SecurityIncidentManagement() {
 
         // 변경로그 추가
         deletedIncidents.forEach((incident) => {
+          const incidentCode = incident.code || `INC-${incident.id}`;
+          const josa = getJosa('데이터', '이가');
           addChangeLog(
             '삭제',
-            incident.code || `INC-${incident.id}`,
-            `${incident.mainContent} - 삭제됨`,
+            incidentCode,
+            `보안사고관리 ${incident.mainContent}(${incidentCode}) 개요탭의 데이터${josa} 삭제 되었습니다.`,
             incident.team,
-            undefined,
-            undefined,
-            undefined,
-            incident.mainContent
+            incident.mainContent,
+            '',
+            '데이터',
+            incident.mainContent,
+            '개요탭'
           );
         });
       }
@@ -2650,9 +2678,10 @@ export default function SecurityIncidentManagement() {
       // 변경로그 추가
       const taskCode = currentTask.code || `TASK-${taskId}`;
       const mainContent = currentTask.mainContent || '사고내용 없음';
-      const description = `${mainContent} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
+      const josa = getJosa('상태', '이가');
+      const description = `보안사고관리 ${mainContent}(${taskCode}) 개요탭의 상태${josa} ${oldStatus} → ${newStatus}로 수정 되었습니다.`;
 
-      addChangeLog('수정', taskCode, description, currentTask.team || '미분류', oldStatus, newStatus, '상태', mainContent, '칸반탭');
+      addChangeLog('수정', taskCode, description, currentTask.team || '미분류', oldStatus, newStatus, '상태', mainContent, '개요탭');
 
       // 토스트 알림
       setSnackbar({

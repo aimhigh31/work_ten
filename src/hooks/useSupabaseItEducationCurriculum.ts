@@ -32,7 +32,7 @@ export interface ItEducationCurriculumData {
 export interface CurriculumItem {
   id: string;
   educationDate: string;
-  time: string;
+  duration_minutes: string;
   instructor: string;
   title: string;
   content: string;
@@ -238,10 +238,13 @@ export function useSupabaseItEducationCurriculum() {
 
   // 데이터 변환 함수들
   const convertSupabaseToCurriculumItem = useCallback((supabaseData: ItEducationCurriculumData): CurriculumItem => {
+    // materials에 원본 텍스트가 있으면 사용, 없으면 duration_minutes 숫자만 사용
+    const durationDisplay = supabaseData.materials || (supabaseData.duration_minutes?.toString() || '');
+
     return {
       id: supabaseData.id.toString(),
       educationDate: supabaseData.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
-      time: `${supabaseData.duration_minutes || 60}분`,
+      duration_minutes: durationDisplay,
       instructor: supabaseData.instructor || '',
       title: supabaseData.session_title,
       content: supabaseData.session_description || '',
@@ -251,8 +254,9 @@ export function useSupabaseItEducationCurriculum() {
   }, []);
 
   const convertCurriculumItemToSupabase = useCallback((item: CurriculumItem, sessionOrder: number): Partial<ItEducationCurriculumData> => {
-    const durationMatch = item.time.match(/(\d+)/);
-    const durationMinutes = durationMatch ? parseInt(durationMatch[1]) : 60;
+    // duration_minutes를 숫자로 변환 시도, 실패하면 0
+    const durationMatch = item.duration_minutes.match(/(\d+)/);
+    const durationMinutes = durationMatch ? parseInt(durationMatch[1]) : 0;
 
     return {
       session_order: sessionOrder,
@@ -261,7 +265,7 @@ export function useSupabaseItEducationCurriculum() {
       duration_minutes: durationMinutes,
       instructor: item.instructor,
       session_type: '강의',
-      materials: '',
+      materials: item.duration_minutes, // 원본 텍스트를 materials에 저장 (시간 범위나 텍스트 형식 보존)
       objectives: item.notes
     };
   }, []);

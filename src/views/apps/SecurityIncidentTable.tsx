@@ -49,6 +49,30 @@ import { useCommonData } from 'contexts/CommonDataContext';
 // Icons
 import { Edit } from '@wandersonalwes/iconsax-react';
 
+// 한국어 조사 선택 함수
+function getJosa(word: string, josaType: '이가' | '은는' | '을를'): string {
+  if (!word || word.length === 0) return josaType === '이가' ? '이' : josaType === '은는' ? '은' : '을';
+
+  const lastChar = word.charAt(word.length - 1);
+  const code = lastChar.charCodeAt(0);
+
+  // 한글이 아닌 경우
+  if (code < 0xac00 || code > 0xd7a3) {
+    return josaType === '이가' ? '가' : josaType === '은는' ? '는' : '를';
+  }
+
+  // 받침 유무 확인
+  const hasJongseong = (code - 0xac00) % 28 !== 0;
+
+  if (josaType === '이가') {
+    return hasJongseong ? '이' : '가';
+  } else if (josaType === '은는') {
+    return hasJongseong ? '은' : '는';
+  } else {
+    return hasJongseong ? '을' : '를';
+  }
+}
+
 // 임시 데이터 매핑
 const teams = ['보안팀', 'IT팀', '운영팀', '관리팀'];
 const assignees = ['김철수', '이영희', '박민수', '최지연', '정현우', '강민정', '윤성호', '송민정'];
@@ -434,10 +458,11 @@ export default function SecurityIncidentTable({
             if (originalIncident.status !== updatedIncident.status) {
               const originalStatusName = getStatusName(originalIncident.status);
               const updatedStatusName = getStatusName(updatedIncident.status);
+              const josa = getJosa('상태', '이가');
               addChangeLog(
                 '수정',
                 incidentCode,
-                `보안사고관리 ${incidentTitle}(${incidentCode}) 정보 개요탭 상태가 ${originalStatusName} → ${updatedStatusName} 수정 되었습니다.`,
+                `보안사고관리 ${incidentTitle}(${incidentCode}) 개요탭의 상태${josa} ${originalStatusName} → ${updatedStatusName}로 수정 되었습니다.`,
                 updatedIncident.team || '미분류',
                 originalIncident.status,
                 updatedIncident.status,
@@ -448,10 +473,11 @@ export default function SecurityIncidentTable({
 
             // 담당자 변경
             if (originalIncident.assignee !== updatedIncident.assignee) {
+              const josa = getJosa('담당자', '이가');
               addChangeLog(
                 '수정',
                 incidentCode,
-                `보안사고관리 ${incidentTitle}(${incidentCode}) 정보 개요탭 담당자가 ${originalIncident.assignee || '미할당'} → ${updatedIncident.assignee || '미할당'} 수정 되었습니다.`,
+                `보안사고관리 ${incidentTitle}(${incidentCode}) 개요탭의 담당자${josa} ${originalIncident.assignee || '미할당'} → ${updatedIncident.assignee || '미할당'}로 수정 되었습니다.`,
                 updatedIncident.team || '미분류',
                 originalIncident.assignee || '미할당',
                 updatedIncident.assignee || '미할당',
@@ -462,10 +488,11 @@ export default function SecurityIncidentTable({
 
             // 사고내용 변경
             if (originalIncident.mainContent !== updatedIncident.mainContent) {
+              const josa = getJosa('사고내용', '이가');
               addChangeLog(
                 '수정',
                 incidentCode,
-                `보안사고관리 ${incidentTitle}(${incidentCode}) 정보 개요탭 사고내용이 ${originalIncident.mainContent} → ${updatedIncident.mainContent} 수정 되었습니다.`,
+                `보안사고관리 ${incidentTitle}(${incidentCode}) 개요탭의 사고내용${josa} ${originalIncident.mainContent} → ${updatedIncident.mainContent}로 수정 되었습니다.`,
                 updatedIncident.team || '미분류',
                 originalIncident.mainContent || '',
                 updatedIncident.mainContent || '',
@@ -476,10 +503,11 @@ export default function SecurityIncidentTable({
 
             // 완료일 변경
             if (originalIncident.completedDate !== updatedIncident.completedDate) {
+              const josa = getJosa('완료일', '이가');
               addChangeLog(
                 '수정',
                 incidentCode,
-                `보안사고관리 ${incidentTitle}(${incidentCode}) 정보 개요탭 완료일이 ${originalIncident.completedDate || '미정'} → ${updatedIncident.completedDate || '미정'} 수정 되었습니다.`,
+                `보안사고관리 ${incidentTitle}(${incidentCode}) 개요탭의 완료일${josa} ${originalIncident.completedDate || '미정'} → ${updatedIncident.completedDate || '미정'}로 수정 되었습니다.`,
                 updatedIncident.team || '미분류',
                 originalIncident.completedDate || '미정',
                 updatedIncident.completedDate || '미정',
@@ -490,10 +518,11 @@ export default function SecurityIncidentTable({
 
             // 팀 변경
             if (originalIncident.team !== updatedIncident.team) {
+              const josa = getJosa('팀', '이가');
               addChangeLog(
                 '수정',
                 incidentCode,
-                `보안사고관리 ${incidentTitle}(${incidentCode}) 정보 개요탭 팀이 ${originalIncident.team || '미분류'} → ${updatedIncident.team || '미분류'} 수정 되었습니다.`,
+                `보안사고관리 ${incidentTitle}(${incidentCode}) 개요탭의 팀${josa} ${originalIncident.team || '미분류'} → ${updatedIncident.team || '미분류'}로 수정 되었습니다.`,
                 updatedIncident.team || '미분류',
                 originalIncident.team || '미분류',
                 updatedIncident.team || '미분류',
@@ -506,10 +535,11 @@ export default function SecurityIncidentTable({
             if (originalIncident.incidentType !== updatedIncident.incidentType) {
               const originalTypeName = getIncidentTypeName(originalIncident.incidentType);
               const updatedTypeName = getIncidentTypeName(updatedIncident.incidentType);
+              const josa = getJosa('사고유형', '이가');
               addChangeLog(
                 '수정',
                 incidentCode,
-                `보안사고관리 ${incidentTitle}(${incidentCode}) 정보 개요탭 사고유형이 ${originalTypeName} → ${updatedTypeName} 수정 되었습니다.`,
+                `보안사고관리 ${incidentTitle}(${incidentCode}) 개요탭의 사고유형${josa} ${originalTypeName} → ${updatedTypeName}로 수정 되었습니다.`,
                 updatedIncident.team || '미분류',
                 originalIncident.incidentType,
                 updatedIncident.incidentType,
@@ -520,10 +550,11 @@ export default function SecurityIncidentTable({
 
             // 대응조치 변경
             if (originalIncident.responseAction !== updatedIncident.responseAction) {
+              const josa = getJosa('대응조치', '이가');
               addChangeLog(
                 '수정',
                 incidentCode,
-                `보안사고관리 ${incidentTitle}(${incidentCode}) 정보 개요탭 대응조치가 ${originalIncident.responseAction || '-'} → ${updatedIncident.responseAction || '-'} 수정 되었습니다.`,
+                `보안사고관리 ${incidentTitle}(${incidentCode}) 개요탭의 대응조치${josa} ${originalIncident.responseAction || '-'} → ${updatedIncident.responseAction || '-'}로 수정 되었습니다.`,
                 updatedIncident.team || '미분류',
                 originalIncident.responseAction || '',
                 updatedIncident.responseAction || '',
@@ -534,10 +565,11 @@ export default function SecurityIncidentTable({
 
             // 시작일 변경
             if (originalIncident.startDate !== updatedIncident.startDate) {
+              const josa = getJosa('시작일', '이가');
               addChangeLog(
                 '수정',
                 incidentCode,
-                `보안사고관리 ${incidentTitle}(${incidentCode}) 정보 개요탭 시작일이 ${originalIncident.startDate || '미정'} → ${updatedIncident.startDate || '미정'} 수정 되었습니다.`,
+                `보안사고관리 ${incidentTitle}(${incidentCode}) 개요탭의 시작일${josa} ${originalIncident.startDate || '미정'} → ${updatedIncident.startDate || '미정'}로 수정 되었습니다.`,
                 updatedIncident.team || '미분류',
                 originalIncident.startDate || '미정',
                 updatedIncident.startDate || '미정',

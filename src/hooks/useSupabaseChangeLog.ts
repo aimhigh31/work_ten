@@ -48,21 +48,21 @@ export function useSupabaseChangeLog(page: string, recordId?: string | number) {
         테이블명: 'common_log_data'
       });
 
+      // 데이터 조회 쿼리
       let query = supabase
         .from('common_log_data')
         .select(
           'id, page, record_id, action_type, title, description, before_value, after_value, changed_field, change_location, user_name, team, user_department, created_at'
         )
         .eq('page', page)
-        .order('created_at', { ascending: false })
-        .limit(100); // 최근 100개만 가져오기
+        .order('created_at', { ascending: false });
 
       // recordId가 제공된 경우 (특정 레코드의 변경 이력)
       if (normalizedRecordId && normalizedRecordId !== 'undefined') {
         console.log('✅ record_id 필터 적용:', normalizedRecordId);
         query = query.eq('record_id', normalizedRecordId);
       } else {
-        console.log('ℹ️ record_id 필터 미적용: 전체 페이지 변경 이력 조회 (최근 100개)');
+        console.log('ℹ️ record_id 필터 미적용: 전체 페이지 변경 이력 조회');
       }
 
       console.log('🚀 쿼리 실행 중...');

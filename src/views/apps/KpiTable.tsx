@@ -342,12 +342,13 @@ export default function KpiTable({
           await addChangeLog(
             '삭제',
             codeToUse,
-            `KPI관리 ${kpiTitle}(${codeToUse}) 정보의 데이터탭 데이터가 삭제 되었습니다.`,
+            `KPI관리 ${kpiTitle}(${codeToUse})의 데이터가 삭제 되었습니다.`,
             task.team || '시스템',
+            undefined,
+            undefined,
+            undefined,
             kpiTitle,
-            '',
-            '데이터탭',
-            kpiTitle
+            '데이터탭'
           );
         }
       }

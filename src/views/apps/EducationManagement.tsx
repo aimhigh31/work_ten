@@ -126,6 +126,7 @@ interface KanbanViewProps {
   ) => void;
   setSnackbar: React.Dispatch<React.SetStateAction<{ open: boolean; message: string; severity: 'success' | 'error' | 'warning' | 'info' }>>;
   assigneeList?: any[];
+  getStatusName: (subcode: string) => string;
   // 🔐 권한 관리
   canCreateData?: boolean;
   canEditOwn?: boolean;
@@ -142,6 +143,7 @@ function KanbanView({
   addChangeLog,
   setSnackbar,
   assigneeList,
+  getStatusName,
   canCreateData = true,
   canEditOwn = true,
   canEditOthers = true
@@ -344,6 +346,8 @@ function KanbanView({
     const currentEducation = educations.find((education) => education.id === educationId);
     if (currentEducation && currentEducation.status !== newStatus) {
       const oldStatus = currentEducation.status;
+      const oldStatusName = getStatusName(oldStatus);
+      const newStatusName = getStatusName(newStatus);
 
       console.log('🎯 드래그앤드롭 - 상태 변경:', oldStatus, '→', newStatus);
 
@@ -364,15 +368,15 @@ function KanbanView({
         // 변경로그 추가
         const educationCode = `MAIN-EDU-${new Date(currentEducation.registrationDate).getFullYear().toString().slice(-2)}-${String(currentEducation.no).padStart(3, '0')}`;
         const educationTitle = currentEducation.title || '개인교육관리';
-        const description = `${educationTitle} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
+        const description = `개인교육관리 ${educationTitle}(${educationCode}) 개요탭의 상태가 ${oldStatusName} → ${newStatusName}로 수정 되었습니다.`;
 
         addChangeLog(
-          '개인교육관리 상태 변경',
+          '수정',
           educationCode,
           description,
           currentEducation.team || '미분류',
-          oldStatus,
-          newStatus,
+          oldStatusName,
+          newStatusName,
           '상태',
           educationTitle,
           '칸반탭'
@@ -381,7 +385,7 @@ function KanbanView({
         // 토스트 알림
         setSnackbar({
           open: true,
-          message: `${educationTitle}의 상태가 ${oldStatus} → ${newStatus}로 변경되었습니다.`,
+          message: `개인교육관리 ${educationTitle}(${educationCode}) 개요탭의 상태가 ${oldStatusName} → ${newStatusName}로 수정 되었습니다.`,
           severity: 'success'
         });
       } else {
@@ -1318,21 +1322,21 @@ function ChangeLogView({
           }
         }}
       >
-        <Table size="small">
+        <Table size="small" sx={{ tableLayout: 'fixed' }}>
           <TableHead>
             <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
-              <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 110 }}>변경시간</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 200 }}>제목</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 170 }}>코드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 60 }}>변경분류</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 100 }}>변경위치</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 80 }}>변경필드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 120 }}>변경전</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 120 }}>변경후</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 250 }}>변경 세부내용</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 50, fontSize: '12px' }}>NO</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 120, fontSize: '12px' }}>변경시간</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 130, fontSize: '12px' }}>코드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 200, fontSize: '12px' }}>제목</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 80, fontSize: '12px' }}>변경분류</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경위치</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경필드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 60, fontSize: '12px' }}>변경전</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 60, fontSize: '12px' }}>변경후</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 320, fontSize: '12px' }}>변경 세부내용</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>팀</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경자</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -1345,37 +1349,37 @@ function ChangeLogView({
                 }}
               >
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {changeLogs.length - (page * rowsPerPage + index)}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.dateTime}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                    {log.title}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.code}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', fontWeight: 500 }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                    {log.title}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '12px', fontWeight: 500 }}>
                     {log.action}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.location}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.changedField || '-'}
                   </Typography>
                 </TableCell>
@@ -1383,7 +1387,7 @@ function ChangeLogView({
                   <Typography
                     variant="body2"
                     sx={{
-                      fontSize: '13px',
+                      fontSize: '12px',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap'
@@ -1397,7 +1401,7 @@ function ChangeLogView({
                   <Typography
                     variant="body2"
                     sx={{
-                      fontSize: '13px',
+                      fontSize: '12px',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap'
@@ -1411,7 +1415,7 @@ function ChangeLogView({
                   <Typography
                     variant="body2"
                     sx={{
-                      fontSize: '13px',
+                      fontSize: '12px',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'normal',
@@ -1426,12 +1430,12 @@ function ChangeLogView({
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.team}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.user}
                   </Typography>
                 </TableCell>
@@ -2585,27 +2589,41 @@ export default function EducationManagement() {
 
   // 변경로그 데이터 변환 (ChangeLogData -> ChangeLog)
   const changeLogs = React.useMemo(() => {
-    return logs.map((log: ChangeLogData) => ({
-      id: log.id,
-      dateTime: new Date(log.created_at).toLocaleString('ko-KR', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      }),
-      title: log.title || '',
-      code: log.record_id,
-      action: log.action_type,
-      location: '개인교육관리',
-      changedField: log.changed_field || undefined,
-      beforeValue: log.before_value || undefined,
-      afterValue: log.after_value || undefined,
-      description: log.description,
-      team: log.team || '시스템',
-      user: log.user_name
-    }));
+    // action_type 매핑 함수
+    const mapActionType = (actionType: string): string => {
+      if (actionType === '추가' || actionType.includes('추가') || actionType.includes('등록') || actionType.includes('생성')) {
+        return '추가';
+      } else if (actionType === '수정' || actionType.includes('수정') || actionType.includes('변경')) {
+        return '수정';
+      } else if (actionType === '삭제' || actionType.includes('삭제')) {
+        return '삭제';
+      }
+      return '수정'; // 기본값
+    };
+
+    return logs
+      .filter((log: ChangeLogData) => log.record_id.startsWith('MAIN-EDU')) // MAIN-EDU로 시작하는 것만 필터링
+      .map((log: ChangeLogData) => ({
+        id: log.id,
+        dateTime: new Date(log.created_at).toLocaleString('ko-KR', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        }),
+        title: log.title || '',
+        code: log.record_id,
+        action: mapActionType(log.action_type),
+        location: log.change_location || '개요탭',
+        changedField: log.changed_field || undefined,
+        beforeValue: log.before_value || undefined,
+        afterValue: log.after_value || undefined,
+        description: log.description,
+        team: log.team || '시스템',
+        user: log.user_name
+      }));
   }, [logs]);
 
   // 필터 상태
@@ -2907,7 +2925,7 @@ export default function EducationManagement() {
                 개인교육관리
               </Typography>
               <Typography variant="body1" color="text.secondary" sx={{ pb: 0.5 }}>
-                IT메뉴 &gt; 개인교육관리
+                메인메뉴 &gt; 개인교육관리
               </Typography>
             </Box>
           </Box>
@@ -3232,6 +3250,7 @@ export default function EducationManagement() {
                   addChangeLog={addChangeLog}
                   setSnackbar={setSnackbar}
                   assigneeList={users}
+                  getStatusName={getStatusName}
                   canCreateData={canCreateData}
                   canEditOwn={canEditOwn}
                   canEditOthers={canEditOthers}

@@ -2855,6 +2855,10 @@ export default function SolutionManagement() {
       // 로컬 상태 업데이트
       setSolutions((prev) => prev.map((solution) => (solution.id === solutionId ? { ...solution, status: newStatus } : solution)));
 
+      // 변경로그용 데이터 준비
+      const solutionCode = currentSolution.code || `TASK-${solutionId}`;
+      const solutionTitle = currentSolution.title || currentSolution.detailContent || '솔루션';
+
       // DB에 상태 변경 저장
       try {
         // ✅ 서브코드명(subcode_name) 그대로 저장 (CLAUDE.md 규칙)
@@ -2865,7 +2869,7 @@ export default function SolutionManagement() {
         // 토스트 알림
         setSnackbar({
           open: true,
-          message: `상태가 "${oldStatus}"에서 "${newStatus}"로 변경되었습니다.`,
+          message: `솔루션관리 ${solutionTitle}(${solutionCode}) 개요탭의 상태가 ${oldStatus} → ${newStatus}로 수정 되었습니다.`,
           severity: 'success'
         });
       } catch (error) {
@@ -2880,18 +2884,17 @@ export default function SolutionManagement() {
       }
 
       // 변경로그 추가
-      const solutionCode = currentSolution.code || `TASK-${solutionId}`;
-      const workContent = currentSolution.detailContent || currentSolution.title || '솔루션';
+      const description = `솔루션관리 ${solutionTitle}(${solutionCode}) 개요탭의 상태가 ${oldStatus} → ${newStatus}로 수정 되었습니다.`;
 
       addChangeLog(
         '수정',
         solutionCode,
-        `${workContent} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`,
+        description,
         currentSolution.team || '미분류',
         oldStatus,
         newStatus,
         '상태',
-        workContent
+        solutionTitle
       );
     }
   };
@@ -3427,18 +3430,18 @@ export default function SolutionManagement() {
                   <Table size="small">
                     <TableHead>
                       <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
-                        <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 110 }}>변경시간</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 150 }}>제목</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 100 }}>코드</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 80 }}>변경분류</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 80 }}>변경위치</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 100 }}>변경필드</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 120 }}>변경전</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 120 }}>변경후</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 360 }}>변경 세부내용</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 50, fontSize: '12px' }}>NO</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 110, fontSize: '12px' }}>변경시간</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>코드</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 150, fontSize: '12px' }}>제목</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 80, fontSize: '12px' }}>변경분류</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 80, fontSize: '12px' }}>변경위치</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경필드</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 120, fontSize: '12px' }}>변경전</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 120, fontSize: '12px' }}>변경후</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 360, fontSize: '12px' }}>변경 세부내용</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>팀</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경자</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -3447,47 +3450,47 @@ export default function SolutionManagement() {
                         .map((log, index) => (
                           <TableRow key={log.id} hover sx={{ '&:hover': { backgroundColor: 'action.hover' } }}>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
                                 {changeLogs.length - (changeLogPage * changeLogRowsPerPage + index)}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
                                 {log.dateTime}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                                {log.title}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
                                 {log.code}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                                {log.title}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
                                 {log.action}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
                                 {log.location}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
                                 {log.changedField || '-'}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
                                 {log.beforeValue || '-'}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px' }}>
                                 {log.afterValue || '-'}
                               </Typography>
                             </TableCell>
@@ -3495,7 +3498,7 @@ export default function SolutionManagement() {
                               <Typography
                                 variant="body2"
                                 sx={{
-                                  fontSize: '13px',
+                                  fontSize: '12px',
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
                                   whiteSpace: 'normal',

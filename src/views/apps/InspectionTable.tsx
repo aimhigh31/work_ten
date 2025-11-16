@@ -59,6 +59,30 @@ import { useMenuPermission } from 'hooks/usePermissions';
 import { useSession } from 'next-auth/react';
 import useUser from 'hooks/useUser';
 
+// 한국어 조사 선택 함수
+function getJosa(word: string, josaType: '이가' | '은는' | '을를'): string {
+  if (!word || word.length === 0) return josaType === '이가' ? '이' : josaType === '은는' ? '은' : '을';
+
+  const lastChar = word.charAt(word.length - 1);
+  const code = lastChar.charCodeAt(0);
+
+  // 한글이 아닌 경우
+  if (code < 0xac00 || code > 0xd7a3) {
+    return josaType === '이가' ? '가' : josaType === '은는' ? '는' : '를';
+  }
+
+  // 받침 유무 확인
+  const hasJongseong = (code - 0xac00) % 28 !== 0;
+
+  if (josaType === '이가') {
+    return hasJongseong ? '이' : '가';
+  } else if (josaType === '은는') {
+    return hasJongseong ? '은' : '는';
+  } else {
+    return hasJongseong ? '을' : '를';
+  }
+}
+
 // 컬럼 너비 정의 (VOC관리와 유사하게)
 const columnWidths = {
   checkbox: 50,
@@ -92,7 +116,7 @@ interface InspectionTableProps {
     changedField?: string,
     title?: string
   ) => void;
-  onSave?: (inspection: InspectionTableData) => Promise<void>;
+  onSave?: (inspection: InspectionTableData) => Promise<InspectionTableData | null>;
   onDelete?: (ids: number[]) => Promise<void>;
   generateInspectionCode?: () => Promise<string>;
   canReadData?: boolean;
@@ -373,20 +397,28 @@ export default function InspectionTable({
   };
 
   // Inspection 저장
-  const handleEditInspectionSave = async (updatedInspection: InspectionTableData) => {
-    console.log('💾 InspectionTable 저장 요청:', updatedInspection);
+  const handleEditInspectionSave = async (updatedInspection: InspectionTableData): Promise<InspectionTableData | null> => {
+    console.log('💾 [InspectionTable] 저장 요청:', updatedInspection);
 
     // onSave prop이 있으면 Supabase 연동된 저장 함수 사용
     if (onSave) {
-      console.log('🔄 Supabase 연동 저장 함수 호출');
+      console.log('🔄 [InspectionTable] Supabase 연동 저장 함수 호출');
       try {
         // 기존 inspection 찾기 (변경로그 추적용)
         const existingIndex = data.findIndex((inspection) => inspection.id === updatedInspection.id);
         const originalInspection = existingIndex !== -1 ? data[existingIndex] : null;
+        console.log('📊 [InspectionTable] 기존 inspection:', originalInspection ? '있음' : '없음 (신규)');
 
-        // Supabase에 저장
-        await onSave(updatedInspection);
-        console.log('✅ Supabase 저장 완료');
+        // Supabase에 저장하고 결과 받기
+        console.log('🔄 [InspectionTable] onSave 호출 시작');
+        const savedInspection = await onSave(updatedInspection);
+        console.log('✅ [InspectionTable] onSave 호출 완료, 결과:', savedInspection);
+
+        // 저장 실패 시 null 반환
+        if (!savedInspection) {
+          console.error('🔴 [InspectionTable] onSave returned null');
+          return null;
+        }
 
         // 변경로그 추가 - 각 필드별로 개별 로그 생성 (기존 inspection 업데이트인 경우에만)
         if (originalInspection && addChangeLog) {
@@ -395,10 +427,11 @@ export default function InspectionTable({
 
           // 상태 변경
           if (originalInspection.status !== updatedInspection.status) {
+            const josa = getJosa('상태', '이가');
             addChangeLog(
               '수정',
               inspectionCode,
-              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 상태가 ${originalInspection.status} → ${updatedInspection.status} 수정 되었습니다.`,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 개요탭의 상태${josa} ${originalInspection.status} → ${updatedInspection.status}로 수정 되었습니다.`,
               updatedInspection.team || '미분류',
               originalInspection.status,
               updatedInspection.status,
@@ -409,10 +442,11 @@ export default function InspectionTable({
 
           // 담당자 변경
           if (originalInspection.assignee !== updatedInspection.assignee) {
+            const josa = getJosa('담당자', '이가');
             addChangeLog(
               '수정',
               inspectionCode,
-              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 담당자가 ${originalInspection.assignee || '미할당'} → ${updatedInspection.assignee || '미할당'} 수정 되었습니다.`,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 개요탭의 담당자${josa} ${originalInspection.assignee || '미할당'} → ${updatedInspection.assignee || '미할당'}로 수정 되었습니다.`,
               updatedInspection.team || '미분류',
               originalInspection.assignee || '미할당',
               updatedInspection.assignee || '미할당',
@@ -423,10 +457,11 @@ export default function InspectionTable({
 
           // 점검내용 변경
           if (originalInspection.inspectionContent !== updatedInspection.inspectionContent) {
+            const josa = getJosa('점검내용', '이가');
             addChangeLog(
               '수정',
               inspectionCode,
-              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 점검내용이 ${originalInspection.inspectionContent} → ${updatedInspection.inspectionContent} 수정 되었습니다.`,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 개요탭의 점검내용${josa} ${originalInspection.inspectionContent} → ${updatedInspection.inspectionContent}로 수정 되었습니다.`,
               updatedInspection.team || '미분류',
               originalInspection.inspectionContent || '',
               updatedInspection.inspectionContent || '',
@@ -437,10 +472,11 @@ export default function InspectionTable({
 
           // 점검유형 변경
           if (originalInspection.inspectionType !== updatedInspection.inspectionType) {
+            const josa = getJosa('점검유형', '이가');
             addChangeLog(
               '수정',
               inspectionCode,
-              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 점검유형이 ${originalInspection.inspectionType} → ${updatedInspection.inspectionType} 수정 되었습니다.`,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 개요탭의 점검유형${josa} ${originalInspection.inspectionType} → ${updatedInspection.inspectionType}로 수정 되었습니다.`,
               updatedInspection.team || '미분류',
               originalInspection.inspectionType,
               updatedInspection.inspectionType,
@@ -451,10 +487,11 @@ export default function InspectionTable({
 
           // 점검대상 변경
           if (originalInspection.inspectionTarget !== updatedInspection.inspectionTarget) {
+            const josa = getJosa('점검대상', '이가');
             addChangeLog(
               '수정',
               inspectionCode,
-              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 점검대상이 ${originalInspection.inspectionTarget} → ${updatedInspection.inspectionTarget} 수정 되었습니다.`,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 개요탭의 점검대상${josa} ${originalInspection.inspectionTarget} → ${updatedInspection.inspectionTarget}로 수정 되었습니다.`,
               updatedInspection.team || '미분류',
               originalInspection.inspectionTarget,
               updatedInspection.inspectionTarget,
@@ -465,10 +502,11 @@ export default function InspectionTable({
 
           // 점검일 변경
           if (originalInspection.inspectionDate !== updatedInspection.inspectionDate) {
+            const josa = getJosa('점검일', '이가');
             addChangeLog(
               '수정',
               inspectionCode,
-              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 점검일이 ${originalInspection.inspectionDate || '미정'} → ${updatedInspection.inspectionDate || '미정'} 수정 되었습니다.`,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 개요탭의 점검일${josa} ${originalInspection.inspectionDate || '미정'} → ${updatedInspection.inspectionDate || '미정'}로 수정 되었습니다.`,
               updatedInspection.team || '미분류',
               originalInspection.inspectionDate || '미정',
               updatedInspection.inspectionDate || '미정',
@@ -479,10 +517,11 @@ export default function InspectionTable({
 
           // 팀 변경
           if (originalInspection.team !== updatedInspection.team) {
+            const josa = getJosa('팀', '이가');
             addChangeLog(
               '수정',
               inspectionCode,
-              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 팀이 ${originalInspection.team || '미분류'} → ${updatedInspection.team || '미분류'} 수정 되었습니다.`,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 개요탭의 팀${josa} ${originalInspection.team || '미분류'} → ${updatedInspection.team || '미분류'}로 수정 되었습니다.`,
               updatedInspection.team || '미분류',
               originalInspection.team || '미분류',
               updatedInspection.team || '미분류',
@@ -493,10 +532,11 @@ export default function InspectionTable({
 
           // 세부설명 변경
           if (originalInspection.details !== updatedInspection.details) {
+            const josa = getJosa('세부설명', '이가');
             addChangeLog(
               '수정',
               inspectionCode,
-              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보의 개요탭 세부설명이 ${originalInspection.details || ''} → ${updatedInspection.details || ''} 로 수정 되었습니다.`,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 개요탭의 세부설명${josa} ${originalInspection.details || ''} → ${updatedInspection.details || ''}로 수정 되었습니다.`,
               updatedInspection.team || '미분류',
               originalInspection.details || '',
               updatedInspection.details || '',
@@ -511,7 +551,7 @@ export default function InspectionTable({
           const inspectionCode = updatedInspection.code || `SEC-${updatedInspection.id}`;
           const inspectionTitle = updatedInspection.inspectionContent || '새 점검';
           addChangeLog(
-            '생성',
+            '추가',
             inspectionCode,
             `보안점검관리 ${inspectionTitle}(${inspectionCode}) 데이터가 생성 되었습니다.`,
             updatedInspection.team || '미분류',
@@ -582,10 +622,13 @@ export default function InspectionTable({
             });
           }
         }
+
+        // 저장된 inspection 반환
+        return savedInspection;
       } catch (error) {
         console.error('❌ Supabase 저장 실패:', error);
         alert('저장 중 오류가 발생했습니다. 다시 시도해주세요.');
-        return;
+        return null;
       }
     } else {
       // 기존 로컬 저장 로직 (fallback)
@@ -612,10 +655,11 @@ export default function InspectionTable({
 
           // 상태 변경
           if (originalInspection.status !== updatedInspection.status) {
+            const josa = getJosa('상태', '이가');
             addChangeLog(
               '수정',
               inspectionCode,
-              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 상태가 ${originalInspection.status} → ${updatedInspection.status} 수정 되었습니다.`,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 개요탭의 상태${josa} ${originalInspection.status} → ${updatedInspection.status}로 수정 되었습니다.`,
               updatedInspection.team || '미분류',
               originalInspection.status,
               updatedInspection.status,
@@ -626,10 +670,11 @@ export default function InspectionTable({
 
           // 담당자 변경
           if (originalInspection.assignee !== updatedInspection.assignee) {
+            const josa = getJosa('담당자', '이가');
             addChangeLog(
               '수정',
               inspectionCode,
-              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 담당자가 ${originalInspection.assignee || '미할당'} → ${updatedInspection.assignee || '미할당'} 수정 되었습니다.`,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 개요탭의 담당자${josa} ${originalInspection.assignee || '미할당'} → ${updatedInspection.assignee || '미할당'}로 수정 되었습니다.`,
               updatedInspection.team || '미분류',
               originalInspection.assignee || '미할당',
               updatedInspection.assignee || '미할당',
@@ -640,10 +685,11 @@ export default function InspectionTable({
 
           // 점검내용 변경
           if (originalInspection.inspectionContent !== updatedInspection.inspectionContent) {
+            const josa = getJosa('점검내용', '이가');
             addChangeLog(
               '수정',
               inspectionCode,
-              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 점검내용이 ${originalInspection.inspectionContent} → ${updatedInspection.inspectionContent} 수정 되었습니다.`,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 개요탭의 점검내용${josa} ${originalInspection.inspectionContent} → ${updatedInspection.inspectionContent}로 수정 되었습니다.`,
               updatedInspection.team || '미분류',
               originalInspection.inspectionContent || '',
               updatedInspection.inspectionContent || '',
@@ -654,10 +700,11 @@ export default function InspectionTable({
 
           // 점검유형 변경
           if (originalInspection.inspectionType !== updatedInspection.inspectionType) {
+            const josa = getJosa('점검유형', '이가');
             addChangeLog(
               '수정',
               inspectionCode,
-              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 점검유형이 ${originalInspection.inspectionType} → ${updatedInspection.inspectionType} 수정 되었습니다.`,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 개요탭의 점검유형${josa} ${originalInspection.inspectionType} → ${updatedInspection.inspectionType}로 수정 되었습니다.`,
               updatedInspection.team || '미분류',
               originalInspection.inspectionType,
               updatedInspection.inspectionType,
@@ -668,10 +715,11 @@ export default function InspectionTable({
 
           // 점검대상 변경
           if (originalInspection.inspectionTarget !== updatedInspection.inspectionTarget) {
+            const josa = getJosa('점검대상', '이가');
             addChangeLog(
               '수정',
               inspectionCode,
-              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 점검대상이 ${originalInspection.inspectionTarget} → ${updatedInspection.inspectionTarget} 수정 되었습니다.`,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 개요탭의 점검대상${josa} ${originalInspection.inspectionTarget} → ${updatedInspection.inspectionTarget}로 수정 되었습니다.`,
               updatedInspection.team || '미분류',
               originalInspection.inspectionTarget,
               updatedInspection.inspectionTarget,
@@ -682,10 +730,11 @@ export default function InspectionTable({
 
           // 점검일 변경
           if (originalInspection.inspectionDate !== updatedInspection.inspectionDate) {
+            const josa = getJosa('점검일', '이가');
             addChangeLog(
               '수정',
               inspectionCode,
-              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 점검일이 ${originalInspection.inspectionDate || '미정'} → ${updatedInspection.inspectionDate || '미정'} 수정 되었습니다.`,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 개요탭의 점검일${josa} ${originalInspection.inspectionDate || '미정'} → ${updatedInspection.inspectionDate || '미정'}로 수정 되었습니다.`,
               updatedInspection.team || '미분류',
               originalInspection.inspectionDate || '미정',
               updatedInspection.inspectionDate || '미정',
@@ -696,10 +745,11 @@ export default function InspectionTable({
 
           // 팀 변경
           if (originalInspection.team !== updatedInspection.team) {
+            const josa = getJosa('팀', '이가');
             addChangeLog(
               '수정',
               inspectionCode,
-              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보 개요탭 팀이 ${originalInspection.team || '미분류'} → ${updatedInspection.team || '미분류'} 수정 되었습니다.`,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 개요탭의 팀${josa} ${originalInspection.team || '미분류'} → ${updatedInspection.team || '미분류'}로 수정 되었습니다.`,
               updatedInspection.team || '미분류',
               originalInspection.team || '미분류',
               updatedInspection.team || '미분류',
@@ -710,10 +760,11 @@ export default function InspectionTable({
 
           // 세부설명 변경
           if (originalInspection.details !== updatedInspection.details) {
+            const josa = getJosa('세부설명', '이가');
             addChangeLog(
               '수정',
               inspectionCode,
-              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 정보의 개요탭 세부설명이 ${originalInspection.details || ''} → ${updatedInspection.details || ''} 로 수정 되었습니다.`,
+              `보안점검관리 ${inspectionTitle}(${inspectionCode}) 개요탭의 세부설명${josa} ${originalInspection.details || ''} → ${updatedInspection.details || ''}로 수정 되었습니다.`,
               updatedInspection.team || '미분류',
               originalInspection.details || '',
               updatedInspection.details || '',
@@ -723,7 +774,8 @@ export default function InspectionTable({
           }
         }
 
-        console.log('✅ 기존 Inspection 업데이트 완료');
+        console.log('✅ [InspectionTable] 기존 Inspection 업데이트 완료');
+        return updatedInspection;
       } else {
         // 새 Inspection 추가 - 상단에 추가
         const currentYear = new Date().getFullYear();
@@ -751,7 +803,7 @@ export default function InspectionTable({
           const newCode = newInspectionWithNumber.code;
           const inspectionTitle = newInspectionWithNumber.inspectionContent || '새 점검';
           addChangeLog(
-            '생성',
+            '추가',
             newCode,
             `보안점검관리 ${inspectionTitle}(${newCode}) 데이터가 생성 되었습니다.`,
             newInspectionWithNumber.team || '미분류',
@@ -762,11 +814,13 @@ export default function InspectionTable({
           );
         }
 
-        console.log('✅ 새 Inspection 추가 완료:', newInspectionWithNumber);
+        console.log('✅ [InspectionTable] 새 Inspection 추가 완료:', newInspectionWithNumber);
+        return newInspectionWithNumber;
       }
     }
 
-    handleEditDialogClose();
+    // 로컬 저장 로직은 updatedInspection 반환
+    return updatedInspection;
   };
 
   // 새 Inspection 추가

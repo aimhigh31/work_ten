@@ -102,6 +102,7 @@ const convertRecordToTableData = (record: ITEducationRecord): ITEducationTableDa
     code: record.code,
     educationType: record.educationType,
     educationName: record.educationName,
+    description: record.description, // 교육설명 필드 추가
     location: record.location,
     attendeeCount: record.participantCount,
     executionDate: record.executionDate,
@@ -109,7 +110,12 @@ const convertRecordToTableData = (record: ITEducationRecord): ITEducationTableDa
     assignee: record.assignee,
     team: record.team, // 필수 필드 (비용관리 패턴)
     department: (record as any).department || undefined, // 옵셔널
-    attachments: record.attachments
+    attachments: record.attachments,
+    // 교육실적보고 필드들
+    achievements: record.achievements,
+    improvements: record.improvements,
+    education_feedback: record.education_feedback,
+    report_notes: record.report_notes
   };
 };
 
@@ -1890,7 +1896,7 @@ const CurriculumTab = memo(({
     {
       id: '1',
       educationDate: '2024-01-15',
-      time: '09:00-10:00',
+      duration_minutes: '09:00-10:00',
       instructor: '김철수',
       title: 'React 기초',
       content: 'React 컴포넌트 개념 및 State 관리',
@@ -1900,7 +1906,7 @@ const CurriculumTab = memo(({
     {
       id: '2',
       educationDate: '2024-01-16',
-      time: '10:00-12:00',
+      duration_minutes: '10:00-12:00',
       instructor: '이영희',
       title: 'React Hooks',
       content: 'useState, useEffect, useContext 사용법',
@@ -1910,7 +1916,7 @@ const CurriculumTab = memo(({
     {
       id: '3',
       educationDate: '2024-01-17',
-      time: '14:00-16:00',
+      duration_minutes: '14:00-16:00',
       instructor: '박민수',
       title: 'TypeScript 입문',
       content: '타입 정의와 인터페이스 활용',
@@ -1920,7 +1926,7 @@ const CurriculumTab = memo(({
     {
       id: '4',
       educationDate: '2024-01-18',
-      time: '09:00-11:00',
+      duration_minutes: '09:00-11:00',
       instructor: '최은지',
       title: 'Next.js 기초',
       content: '라우팅과 SSR/SSG 개념',
@@ -1930,7 +1936,7 @@ const CurriculumTab = memo(({
     {
       id: '5',
       educationDate: '2024-01-19',
-      time: '13:00-15:00',
+      duration_minutes: '13:00-15:00',
       instructor: '정현우',
       title: 'API 통신',
       content: 'REST API와 axios 활용법',
@@ -1940,7 +1946,7 @@ const CurriculumTab = memo(({
     {
       id: '6',
       educationDate: '2024-01-22',
-      time: '10:00-12:00',
+      duration_minutes: '10:00-12:00',
       instructor: '강예린',
       title: '상태 관리',
       content: 'Redux와 Context API 비교',
@@ -1950,7 +1956,7 @@ const CurriculumTab = memo(({
     {
       id: '7',
       educationDate: '2024-01-23',
-      time: '14:00-17:00',
+      duration_minutes: '14:00-17:00',
       instructor: '송지훈',
       title: '테스팅',
       content: 'Jest와 React Testing Library',
@@ -1960,7 +1966,7 @@ const CurriculumTab = memo(({
     {
       id: '8',
       educationDate: '2024-01-24',
-      time: '09:00-11:00',
+      duration_minutes: '09:00-11:00',
       instructor: '김소영',
       title: 'UI/UX 디자인',
       content: 'Material-UI 컴포넌트 활용',
@@ -1970,7 +1976,7 @@ const CurriculumTab = memo(({
     {
       id: '9',
       educationDate: '2024-01-25',
-      time: '15:00-17:00',
+      duration_minutes: '15:00-17:00',
       instructor: '이동현',
       title: '배포 및 운영',
       content: 'Vercel 배포 및 환경변수 관리',
@@ -2011,7 +2017,7 @@ const CurriculumTab = memo(({
     const newItem: CurriculumItem = {
       id: Date.now().toString(),
       educationDate: new Date().toISOString().split('T')[0],
-      time: '',
+      duration_minutes: '',
       instructor: '',
       title: '',
       content: '',
@@ -2051,7 +2057,7 @@ const CurriculumTab = memo(({
     checkbox: 50,
     no: 60,
     educationDate: 100,
-    time: 100,
+    duration_minutes: 100,
     instructor: 120,
     title: 150,
     content: 200,
@@ -2113,10 +2119,11 @@ const CurriculumTab = memo(({
         <Box sx={{ width: '100%', height: '48px', position: 'relative' }}>
           <TextField
             type="text"
-            value={value || ''}
+            value={field === 'duration_minutes' && value ? String(value).replace(/분$/, '').trim() : (value || '')}
             onChange={(e) => handleEditItem(item.id, field as keyof CurriculumItem, e.target.value)}
             onBlur={handleCellBlur}
             size="small"
+            placeholder={field === 'duration_minutes' ? '예: 60, 09:00-10:00, 1시간' : ''}
             multiline={field === 'content' || field === 'notes'}
             rows={field === 'content' || field === 'notes' ? 2 : 1}
             sx={{
@@ -2175,7 +2182,7 @@ const CurriculumTab = memo(({
             WebkitBoxOrient: field === 'content' || field === 'notes' ? 'vertical' : undefined
           }}
         >
-          {value || '-'}
+          {field === 'duration_minutes' ? (value ? String(value).replace(/분$/, '').trim() : '-') : (value || '-')}
         </Typography>
       </Box>
     );
@@ -2251,7 +2258,7 @@ const CurriculumTab = memo(({
               </TableCell>
               <TableCell sx={{ width: columnWidths.no, fontWeight: 600 }}>NO</TableCell>
               <TableCell sx={{ width: columnWidths.educationDate, fontWeight: 600 }}>교육일자</TableCell>
-              <TableCell sx={{ width: columnWidths.time, fontWeight: 600 }}>시간</TableCell>
+              <TableCell sx={{ width: columnWidths.duration_minutes, fontWeight: 600 }}>시간</TableCell>
               <TableCell sx={{ width: columnWidths.instructor, fontWeight: 600 }}>강사</TableCell>
               <TableCell sx={{ width: columnWidths.title, fontWeight: 600 }}>제목</TableCell>
               <TableCell sx={{ width: columnWidths.content, fontWeight: 600 }}>교육내용</TableCell>
@@ -2295,8 +2302,8 @@ const CurriculumTab = memo(({
                 >
                   {renderEditableCell(item, 'educationDate', item.educationDate)}
                 </TableCell>
-                <TableCell sx={{ width: columnWidths.time, padding: 0, height: 48 }} onClick={() => handleCellClick(item.id, 'time')}>
-                  {renderEditableCell(item, 'time', item.time)}
+                <TableCell sx={{ width: columnWidths.duration_minutes, padding: 0, height: 48 }} onClick={() => handleCellClick(item.id, 'duration_minutes')}>
+                  {renderEditableCell(item, 'duration_minutes', item.duration_minutes)}
                 </TableCell>
                 <TableCell
                   sx={{ width: columnWidths.instructor, padding: 0, height: 48 }}
@@ -2963,6 +2970,18 @@ interface ITEducationDialogProps {
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
+  // 변경로그 추가 함수
+  addChangeLog?: (
+    action: string,
+    target: string,
+    description: string,
+    team?: string,
+    beforeValue?: string,
+    afterValue?: string,
+    changedField?: string,
+    title?: string,
+    location?: string
+  ) => void;
 }
 
 export default function ITEducationDialog({
@@ -2973,7 +2992,8 @@ export default function ITEducationDialog({
   tasks = [],
   canCreateData = true,
   canEditOwn = true,
-  canEditOthers = true
+  canEditOthers = true,
+  addChangeLog
 }: ITEducationDialogProps) {
   // recordId 유무로 모드 판단
   const mode = recordId ? 'edit' : 'add';
@@ -3110,6 +3130,14 @@ export default function ITEducationDialog({
     notes: ''
   });
 
+  // 교육실적보고 초기값 저장 (변경로그 비교용)
+  const [initialEducationReport, setInitialEducationReport] = useState<EducationReport>({
+    achievements: '',
+    improvements: '',
+    feedback: '',
+    notes: ''
+  });
+
   // 커리큘럼 상태 관리 (체크리스트탭과 동일한 패턴)
   const [curriculumItems, setCurriculumItems] = useState<CurriculumItem[]>([]);
   const [selectedCurriculumRows, setSelectedCurriculumRows] = useState<string[]>([]);
@@ -3227,16 +3255,20 @@ export default function ITEducationDialog({
               const tempKey = `it_education_report_temp_${recordId}`;
               const tempData = sessionStorage.getItem(tempKey);
 
+              const reportData = {
+                achievements: supabaseData.achievements || '',
+                improvements: supabaseData.improvements || '',
+                feedback: supabaseData.education_feedback || '',
+                notes: supabaseData.report_notes || ''
+              };
+
+              // 초기값 저장 (변경로그 비교용)
+              setInitialEducationReport(reportData);
+
               if (tempData) {
                 const parsedTempData = JSON.parse(tempData);
                 setEducationReport(parsedTempData);
               } else {
-                const reportData = {
-                  achievements: supabaseData.achievements || '',
-                  improvements: supabaseData.improvements || '',
-                  feedback: supabaseData.education_feedback || '',
-                  notes: supabaseData.report_notes || ''
-                };
                 setEducationReport(reportData);
               }
 
@@ -3399,6 +3431,7 @@ export default function ITEducationDialog({
   }, []);
 
   const handleSave = useCallback(async () => {
+    console.log('🟢 [ITEducationEditDialog] handleSave 시작');
     try {
       // 필수 입력 검증
       if (!educationState.educationName || !educationState.educationName.trim()) {
@@ -3581,6 +3614,73 @@ export default function ITEducationDialog({
           console.log('✅ 기록 탭 변경사항 저장 완료');
         }
 
+        // 🔄 교육실적보고 변경로그 추가 (편집 모드일 때만)
+        if (recordId && addChangeLog) {
+          const taskCode = result.code || `IT-EDU-${result.id}`;
+          const educationName = result.education_name || 'IT교육';
+
+          // 성과 변경
+          if (initialEducationReport.achievements !== finalEducationReport.achievements) {
+            console.log('🔍 [ITEducationEditDialog] 성과 변경로그 생성 - location: 교육실적보고탭');
+            addChangeLog(
+              '수정',
+              taskCode,
+              `IT교육관리 ${educationName}(${taskCode}) 교육실적보고의 성과가 ${initialEducationReport.achievements || '(없음)'} → ${finalEducationReport.achievements || '(없음)'}로 수정 되었습니다.`,
+              result.team || '미분류',
+              initialEducationReport.achievements || '',
+              finalEducationReport.achievements || '',
+              '성과',
+              educationName,
+              '교육실적보고탭'
+            );
+          }
+
+          // 개선사항 변경
+          if (initialEducationReport.improvements !== finalEducationReport.improvements) {
+            addChangeLog(
+              '수정',
+              taskCode,
+              `IT교육관리 ${educationName}(${taskCode}) 교육실적보고의 개선사항이 ${initialEducationReport.improvements || '(없음)'} → ${finalEducationReport.improvements || '(없음)'}로 수정 되었습니다.`,
+              result.team || '미분류',
+              initialEducationReport.improvements || '',
+              finalEducationReport.improvements || '',
+              '개선사항',
+              educationName,
+              '교육실적보고탭'
+            );
+          }
+
+          // 교육소감 변경
+          if (initialEducationReport.feedback !== finalEducationReport.feedback) {
+            addChangeLog(
+              '수정',
+              taskCode,
+              `IT교육관리 ${educationName}(${taskCode}) 교육실적보고의 교육소감이 ${initialEducationReport.feedback || '(없음)'} → ${finalEducationReport.feedback || '(없음)'}로 수정 되었습니다.`,
+              result.team || '미분류',
+              initialEducationReport.feedback || '',
+              finalEducationReport.feedback || '',
+              '교육소감',
+              educationName,
+              '교육실적보고탭'
+            );
+          }
+
+          // 비고 변경
+          if (initialEducationReport.notes !== finalEducationReport.notes) {
+            addChangeLog(
+              '수정',
+              taskCode,
+              `IT교육관리 ${educationName}(${taskCode}) 교육실적보고의 비고가 ${initialEducationReport.notes || '(없음)'} → ${finalEducationReport.notes || '(없음)'}로 수정 되었습니다.`,
+              result.team || '미분류',
+              initialEducationReport.notes || '',
+              finalEducationReport.notes || '',
+              '비고',
+              educationName,
+              '교육실적보고탭'
+            );
+          }
+        }
+
         // 기존 UI 업데이트를 위한 데이터 구조로 변환
         const educationData: ITEducationRecord = {
           id: result.id,
@@ -3598,10 +3698,25 @@ export default function ITEducationDialog({
           attachment: false,
           attachmentCount: 0,
           attachments: [],
+          // 교육실적보고 필드들
+          achievements: result.achievements,
+          improvements: result.improvements,
+          education_feedback: result.education_feedback,
+          report_notes: result.report_notes,
           isNew: mode === 'add'
         };
 
+        console.log('🔵 [ITEducationEditDialog] onSave 호출 직전 - educationData:', {
+          id: educationData.id,
+          achievements: educationData.achievements,
+          improvements: educationData.improvements,
+          education_feedback: educationData.education_feedback,
+          report_notes: educationData.report_notes
+        });
+
         onSave(educationData);
+
+        console.log('🟣 [ITEducationEditDialog] onSave 호출 완료');
 
         // 저장 성공 시 임시 저장소 정리
         const tempKey = `${mode}_${result.id || 'new'}`;
@@ -3649,7 +3764,11 @@ export default function ITEducationDialog({
     participantItems,
     convertParticipantItemToSupabase,
     getAttendeesByEducationId,
-    convertSupabaseToParticipantItem
+    convertSupabaseToParticipantItem,
+    educationReport,
+    initialEducationReport,
+    addChangeLog,
+    recordId
   ]);
 
   const handleClose = useCallback(() => {
@@ -3657,6 +3776,12 @@ export default function ITEducationDialog({
     onClose();
     dispatch({ type: 'RESET' });
     setEducationReport({
+      achievements: '',
+      improvements: '',
+      feedback: '',
+      notes: ''
+    });
+    setInitialEducationReport({
       achievements: '',
       improvements: '',
       feedback: '',
@@ -3678,6 +3803,7 @@ export default function ITEducationDialog({
 
   return (
     <Dialog
+      key={open ? (recordId || 'new') : 'closed'}
       open={open}
       onClose={handleClose}
       maxWidth="lg"

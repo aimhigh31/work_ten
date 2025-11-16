@@ -298,13 +298,13 @@ function CostKanbanView({
         // 변경로그 추가
         const costCode = currentCost.code || `COST-${costId}`;
         const content = currentCost.content || '비용내용 없음';
-        const description = `비용관리 ${content}(${costCode}) 정보의 칸반탭 상태가 ${oldStatus} → ${newStatus} 로 수정 되었습니다.`;
+        const description = `비용관리 ${content}(${costCode}) 개요탭의 상태가 ${oldStatus} → ${newStatus}로 수정 되었습니다.`;
         await addChangeLog('수정', costCode, description, currentCost.team || '미분류', oldStatus, newStatus, '상태', content, '칸반탭');
 
         // 칸반용 토스트 알림 (updateCostRecord의 토스트를 덮어씀)
         setSnackbar({
           open: true,
-          message: `${costCode}의 상태가 ${oldStatus} → ${newStatus}로 변경되었습니다.`,
+          message: `비용관리 ${content}(${costCode}) 개요탭의 상태가 ${oldStatus} → ${newStatus}로 수정 되었습니다.`,
           severity: 'success'
         });
       } catch (error) {
@@ -772,7 +772,9 @@ function CostKanbanView({
           selectedAssignee={selectedAssignee}
           costs={costs}
           setCosts={() => {}}
+          updateCostRecord={updateCostRecord}
           checkCodeExists={checkCodeExists}
+          addChangeLog={addChangeLog}
           canCreateData={canCreateData}
           canEditOwn={canEditOwn}
           canEditOthers={canEditOthers}
@@ -1807,22 +1809,23 @@ function CostDashboardView({ selectedYear, selectedTeam, selectedStatus, selecte
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 0.5,
-                      minWidth: 180,
-                      maxWidth: 180
+                      minWidth: 220,
+                      maxWidth: 220
                     }}
                   >
                     {typeLabels.map((label, index) => (
-                      <Box key={`cost-type-${index}`} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box key={`cost-type-${index}`} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                         <Box
                           sx={{
                             width: 12,
                             height: 12,
                             borderRadius: '50%',
-                            backgroundColor: pieChartOptions.colors?.[index % pieChartOptions.colors.length]
+                            backgroundColor: pieChartOptions.colors?.[index % pieChartOptions.colors.length],
+                            flexShrink: 0
                           }}
                         />
-                        <Typography sx={{ flex: 1, fontSize: '13px' }}>{label}</Typography>
-                        <Typography sx={{ fontSize: '13px', fontWeight: 600 }}>{formatAmount(typeValues[index])}원</Typography>
+                        <Typography sx={{ fontSize: '13px', whiteSpace: 'nowrap' }}>{label}</Typography>
+                        <Typography sx={{ fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap', marginLeft: 'auto' }}>{formatAmount(typeValues[index])}원</Typography>
                       </Box>
                     ))}
                   </Box>
@@ -2138,18 +2141,18 @@ function CostChangeLogView({
         <Table size="small">
           <TableHead>
             <TableRow sx={{ backgroundColor: 'grey.50' }}>
-              <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 110 }}>변경시간</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 150 }}>제목</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 150 }}>코드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경분류</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경위치</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경필드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 120 }}>변경전</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 120 }}>변경후</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 330 }}>변경 세부내용</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 50, fontSize: '12px' }}>NO</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 110, fontSize: '12px' }}>변경시간</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 150, fontSize: '12px' }}>코드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 150, fontSize: '12px' }}>제목</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경분류</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경위치</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경필드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경전</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경후</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 330, fontSize: '12px' }}>변경 세부내용</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>팀</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경자</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -2162,47 +2165,47 @@ function CostChangeLogView({
                 }}
               >
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {changeLogs.length - (page * rowsPerPage + index)}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.dateTime}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                    {log.title}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.code}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                    {log.title}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.action}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.location}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.changedField}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.beforeValue}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.afterValue}
                   </Typography>
                 </TableCell>
@@ -2210,7 +2213,7 @@ function CostChangeLogView({
                   <Typography
                     variant="body2"
                     sx={{
-                      fontSize: '13px',
+                      fontSize: '12px',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'normal',
@@ -2225,12 +2228,12 @@ function CostChangeLogView({
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.team}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.user}
                   </Typography>
                 </TableCell>
@@ -2591,36 +2594,8 @@ export default function CostManagement() {
       const allData = await getCosts();
       setCostRecords(allData);
 
-      // 변경된 필드 추적
-      const fieldNameMap: { [key: string]: string } = {
-        'registration_date': '등록일자',
-        'start_date': '시작일자',
-        'team': '팀',
-        'assignee': '담당자',
-        'costType': '비용유형',
-        'content': '내용',
-        'quantity': '수량',
-        'unitPrice': '단가',
-        'amount': '금액',
-        'status': '상태',
-        'completion_date': '완료일자'
-      };
-
-      const changedFields = Object.keys(updates)
-        .filter(key => key !== 'id' && key !== 'updated_at' && key !== 'created_at')
-        .map(key => fieldNameMap[key] || key);
-
-      // 토스트 알림 추가 (status만 변경된 경우는 칸반에서 처리하므로 제외)
-      const isOnlyStatusChange = Object.keys(updates).length === 1 && updates.status !== undefined;
-      if (changedFields.length > 0 && !isOnlyStatusChange) {
-        const costCode = updated.code || `COST-${updated.id}`;
-        const fieldsText = changedFields.join(', ');
-        setSnackbar({
-          open: true,
-          message: `${costCode}의 ${fieldsText}이 수정되었습니다.`,
-          severity: 'success'
-        });
-      }
+      // 토스트 알림은 CostDataTable의 handleSaveRecord에서 처리하므로 여기서는 제거
+      // (중복 알림 방지)
 
       return updated;
     }

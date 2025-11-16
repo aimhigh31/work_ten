@@ -47,6 +47,7 @@ import Grid from '@mui/material/Grid';
 import { HardwareRecord, assetCategoryOptions, assigneeOptions, currentUserOptions } from 'types/hardware';
 import { useSupabaseHardwareHistory, HardwareHistory } from '../hooks/useSupabaseHardwareHistory';
 import { useSupabaseHardwareUser, HardwareUserHistory } from '../hooks/useSupabaseHardwareUser';
+import { useSupabaseHardware } from '../hooks/useSupabaseHardware';
 import { useCommonData } from '../contexts/CommonDataContext';
 import { useSupabaseImageUpload } from '../hooks/useSupabaseImageUpload';
 import { useSupabaseFeedback } from '../hooks/useSupabaseFeedback';
@@ -387,13 +388,12 @@ const OverviewTab = memo(
                 notched
                 renderValue={(selected) => {
                   if (!selected) return '선택';
-                  const item = assetCategoriesFromDB.find(c => c.subcode === selected);
-                  return item ? item.subcode_name : selected;
+                  return selected;
                 }}
               >
                 <MenuItem value="">선택</MenuItem>
                 {assetCategoriesFromDB.map((option) => (
-                  <MenuItem key={option.subcode} value={option.subcode}>
+                  <MenuItem key={option.subcode} value={option.subcode_name}>
                     {option.subcode_name}
                   </MenuItem>
                 ))}
@@ -415,8 +415,8 @@ const OverviewTab = memo(
                 label="상태"
                 notched
                 renderValue={(selected) => {
-                  const item = statusTypesFromDB.find(s => s.subcode === selected);
-                  return item ? item.subcode_name : selected;
+                  if (!selected) return '';
+                  return selected;
                 }}
               >
                 {statusTypesFromDB.map((option) => {
@@ -436,7 +436,7 @@ const OverviewTab = memo(
                     }
                   };
                   return (
-                    <MenuItem key={option.subcode} value={option.subcode}>
+                    <MenuItem key={option.subcode} value={option.subcode_name}>
                       <Chip
                         label={option.subcode_name}
                         size="small"
@@ -3105,6 +3105,9 @@ export default function HardwareDialog({
     return filtered;
   }, [users]);
 
+  // Supabase 훅 (소프트웨어관리 패턴)
+  const { createHardware, updateHardware } = useSupabaseHardware();
+
   // DB 훅들 (커리큘럼탭 패턴: 데이터 로드와 저장 모두 부모에서 처리)
   const { getUserHistories, convertToUserHistory, saveUserHistories } = useSupabaseHardwareUser();
   const { getMaintenanceHistories, convertToMaintenanceHistory, saveMaintenanceHistories } = useSupabaseHardwareHistory();
@@ -3409,7 +3412,7 @@ export default function HardwareDialog({
     setPendingFeedbacks((prev) => prev.filter((fb) => fb.id !== commentId));
   }, []);
 
-  // 저장 핸들러
+  // 저장 핸들러 (소프트웨어관리 패턴)
   const handleSave = async () => {
     // 필수 입력 검증
     if (!hardwareState.assetName || !hardwareState.assetName.trim()) {
@@ -3436,82 +3439,145 @@ export default function HardwareDialog({
     setValidationError('');
 
     try {
-      // 하드웨어 기본 정보 저장
-      onSave(hardwareState);
+      console.log('💾 하드웨어 데이터 저장 시작...');
 
-      // 사용자이력 DB 저장 (커리큘럼탭 패턴)
-      if (data?.id) {
-        const hardwareId = parseInt(data.id);
+      // Supabase에 저장할 데이터 준비
+      const hardwareData: any = {
+        code: hardwareState.code?.trim() || '',
+        team: hardwareState.team || '개발팀',
+        department: 'IT',
+        work_content: hardwareState.assetName || '하드웨어',
+        status: hardwareState.status || '예비',
+        assignee: hardwareState.registrant || hardwareState.assignee || '미할당',
+        start_date: new Date().toISOString().split('T')[0]
+      };
 
-        try {
-          console.log('💾 사용자이력 데이터 저장 중...', { hardwareId, count: userHistories.length });
+      // HardwareRecord 필드들을 Supabase 형식으로 매핑
+      if (hardwareState.assetCategory) hardwareData.asset_category = hardwareState.assetCategory;
+      if (hardwareState.assetName) hardwareData.asset_name = hardwareState.assetName;
+      if (hardwareState.assetDescription !== undefined) hardwareData.asset_description = hardwareState.assetDescription;
+      if (hardwareState.model) hardwareData.model = hardwareState.model;
+      if (hardwareState.manufacturer) hardwareData.manufacturer = hardwareState.manufacturer;
+      if (hardwareState.vendor) hardwareData.vendor = hardwareState.vendor;
+      if (hardwareState.detailSpec) hardwareData.detail_spec = hardwareState.detailSpec;
+      if (hardwareState.purchaseDate) hardwareData.purchase_date = hardwareState.purchaseDate;
+      if (hardwareState.warrantyEndDate) hardwareData.warranty_end_date = hardwareState.warrantyEndDate;
+      if (hardwareState.serialNumber) hardwareData.serial_number = hardwareState.serialNumber;
+      if (hardwareState.currentUser) hardwareData.assigned_user = hardwareState.currentUser;
+      if (hardwareState.location) hardwareData.location = hardwareState.location;
+      if (hardwareState.image_1_url !== undefined) hardwareData.image_1_url = hardwareState.image_1_url;
+      if (hardwareState.image_2_url !== undefined) hardwareData.image_2_url = hardwareState.image_2_url;
 
-          // UserHistory를 HardwareUserHistory 형식으로 변환
-          const convertedHistories: HardwareUserHistory[] = userHistories.map((history) => ({
-            id: parseInt(history.id) || 0,
-            hardware_id: hardwareId,
-            user_name: history.userName?.trim() || '',
-            department: history.department?.trim() || '',
-            start_date: history.startDate?.trim() || new Date().toISOString().split('T')[0],
-            end_date: history.endDate?.trim() && history.endDate.trim() !== '' ? history.endDate.trim() : null,
-            reason: history.reason?.trim() || '',
-            status: history.status as 'active' | 'inactive',
-            registration_date: history.registrationDate?.trim() || new Date().toISOString().split('T')[0],
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            created_by: 'system',
-            updated_by: 'system',
-            is_active: true
-          }));
+      let savedData;
 
-          console.log('🔄 사용자이력 변환:', { original: userHistories, converted: convertedHistories });
-
-          const success = await saveUserHistories(hardwareId, convertedHistories);
-          if (success) {
-            console.log('✅ 사용자이력 DB 저장 완료');
-
-            // 최신 데이터 다시 로드 (커리큘럼탭과 동일한 패턴)
-            const freshUserData = await getUserHistories(hardwareId);
-            const freshUserHistories = freshUserData.map(convertToUserHistory);
-            setUserHistories(freshUserHistories);
-            console.log('🔄 최신 사용자이력 데이터 로드 완료:', { count: freshUserHistories.length });
-          } else {
-            console.warn('⚠️ 사용자이력 DB 저장 실패');
-          }
-        } catch (error) {
-          console.error('❌ 사용자이력 저장 중 오류:', error);
-        }
+      if (!data || !data.id) {
+        // 새 하드웨어 생성
+        console.log('🆕 새 하드웨어 생성:', hardwareData);
+        savedData = await createHardware(hardwareData);
+      } else {
+        // 기존 하드웨어 수정
+        console.log('🔄 하드웨어 수정:', { id: data.id, data: hardwareData });
+        savedData = await updateHardware(Number(data.id), hardwareData);
       }
 
-      // 구매/수리이력 DB 저장 (커리큘럼탭 패턴)
-      if (data?.id) {
-        const hardwareId = parseInt(data.id);
+      console.log('✅ Supabase 저장 성공:', savedData);
 
-        try {
-          console.log('💾 구매/수리이력 데이터 저장 중...', { hardwareId, count: maintenanceHistories.length });
+      // 사용자이력 저장
+      console.log('🔍 사용자이력 저장 체크:');
+      console.log('  - userHistories.length:', userHistories.length);
+      console.log('  - savedData:', savedData);
+      console.log('  - savedData?.id:', savedData?.id);
 
-          const success = await saveMaintenanceHistories(hardwareId, maintenanceHistories);
-          if (success) {
-            console.log('✅ 구매/수리이력 DB 저장 완료');
+      if (userHistories.length > 0) {
+        if (!savedData?.id) {
+          console.error('❌ 하드웨어 ID가 없어서 사용자이력을 저장할 수 없습니다.');
+        } else {
+          console.log('💾 사용자이력 저장 시작...', {
+            hardwareId: savedData.id,
+            userCount: userHistories.length,
+            users: userHistories
+          });
 
-            // 최신 데이터 다시 로드 (커리큘럼탭과 동일한 패턴)
-            const freshHistoryData = await getMaintenanceHistories(hardwareId);
-            const freshMaintenanceHistories = freshHistoryData.map(convertToMaintenanceHistory);
-            setMaintenanceHistories(freshMaintenanceHistories);
-            console.log('🔄 최신 구매/수리이력 데이터 로드 완료:', { count: freshMaintenanceHistories.length });
-          } else {
-            console.warn('⚠️ 구매/수리이력 DB 저장 실패');
+          try {
+            // UserHistory를 HardwareUserHistory 형식으로 변환
+            const convertedHistories: HardwareUserHistory[] = userHistories.map((history) => ({
+              id: parseInt(history.id) || 0,
+              hardware_id: savedData.id,
+              user_name: history.userName?.trim() || '',
+              department: history.department?.trim() || '',
+              start_date: history.startDate?.trim() || new Date().toISOString().split('T')[0],
+              end_date: history.endDate?.trim() && history.endDate.trim() !== '' ? history.endDate.trim() : null,
+              reason: history.reason?.trim() || '',
+              status: history.status as 'active' | 'inactive',
+              registration_date: history.registrationDate?.trim() || new Date().toISOString().split('T')[0],
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              created_by: 'system',
+              updated_by: 'system',
+              is_active: true
+            }));
+
+            const success = await saveUserHistories(savedData.id, convertedHistories);
+            if (success) {
+              console.log('✅ 사용자이력 저장 성공');
+
+              // 최신 데이터 다시 로드
+              const freshUserData = await getUserHistories(savedData.id);
+              const freshUserHistories = freshUserData.map(convertToUserHistory);
+              setUserHistories(freshUserHistories);
+              console.log('🔄 최신 사용자이력 데이터 로드 완료:', { count: freshUserHistories.length });
+            } else {
+              console.warn('⚠️ 사용자이력 저장 실패 - 하드웨어 데이터는 저장됨');
+            }
+          } catch (saveError) {
+            console.error('❌ 사용자이력 저장 중 예외 발생:', saveError);
           }
-        } catch (error) {
-          console.error('❌ 구매/수리이력 저장 중 오류:', error);
         }
+      } else {
+        console.log('ℹ️ 저장할 사용자이력이 없습니다.');
+      }
+
+      // 구매/수리이력 저장
+      console.log('🔍 구매/수리이력 저장 체크:');
+      console.log('  - maintenanceHistories.length:', maintenanceHistories.length);
+      console.log('  - savedData?.id:', savedData?.id);
+
+      if (maintenanceHistories.length > 0) {
+        if (!savedData?.id) {
+          console.error('❌ 하드웨어 ID가 없어서 구매/수리이력을 저장할 수 없습니다.');
+        } else {
+          console.log('💾 구매/수리이력 저장 시작...', {
+            hardwareId: savedData.id,
+            historyCount: maintenanceHistories.length,
+            histories: maintenanceHistories
+          });
+
+          try {
+            const success = await saveMaintenanceHistories(savedData.id, maintenanceHistories);
+            if (success) {
+              console.log('✅ 구매/수리이력 저장 성공');
+
+              // 최신 데이터 다시 로드
+              const freshHistoryData = await getMaintenanceHistories(savedData.id);
+              const freshMaintenanceHistories = freshHistoryData.map(convertToMaintenanceHistory);
+              setMaintenanceHistories(freshMaintenanceHistories);
+              console.log('🔄 최신 구매/수리이력 데이터 로드 완료:', { count: freshMaintenanceHistories.length });
+            } else {
+              console.warn('⚠️ 구매/수리이력 저장 실패 - 하드웨어 데이터는 저장됨');
+            }
+          } catch (saveError) {
+            console.error('❌ 구매/수리이력 저장 중 예외 발생:', saveError);
+          }
+        }
+      } else {
+        console.log('ℹ️ 저장할 구매/수리이력이 없습니다.');
       }
 
       // 🔄 기록 탭 변경사항 DB 저장
       console.log('💾 기록 탭 변경사항 저장 시작');
       console.time('⏱️ 기록 저장 Total');
 
-      if (data?.id) {
+      if (savedData?.id) {
         // 추가된 기록 (temp- ID)
         const addedFeedbacks = pendingFeedbacks.filter(
           (fb) => fb.id.toString().startsWith('temp-') && !initialFeedbacks.find((initial) => initial.id === fb.id)
@@ -3575,10 +3641,17 @@ export default function HardwareDialog({
         }
       }
 
+      // HardwareRecord 형식으로 변환하여 부모 컴포넌트에 전달
+      const resultHardware: Partial<HardwareRecord> = {
+        ...hardwareState,
+        id: savedData?.id ? String(savedData.id) : hardwareState.id
+      };
+
+      onSave(resultHardware);
       handleClose(); // 저장 후 팝업창 닫기
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ 저장 중 오류 발생:', error);
-      setValidationError('저장 중 오류가 발생했습니다.');
+      setValidationError(error.message || '저장 중 오류가 발생했습니다.');
     }
   };
 

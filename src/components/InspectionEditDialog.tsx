@@ -58,7 +58,7 @@ import { useSession } from 'next-auth/react';
 interface InspectionEditDialogProps {
   open: boolean;
   onClose: () => void;
-  onSave: (inspection: InspectionTableData) => void;
+  onSave: (inspection: InspectionTableData) => Promise<InspectionTableData | null>;
   inspection?: InspectionTableData | null;
   generateInspectionCode?: () => Promise<string>;
   inspectionTypes?: string[];
@@ -1648,22 +1648,41 @@ export default function InspectionEditDialog({
 
     console.log('💾 저장할 데이터:', updatedInspection);
 
-    onSave(updatedInspection);
+    // 개요탭 데이터를 먼저 저장하고, 생성된 inspection ID를 받아옴
+    console.log('🔄 onSave 호출 시작');
+    let savedInspection;
+    try {
+      savedInspection = await onSave(updatedInspection);
+      console.log('🔄 onSave 호출 완료, 결과:', savedInspection);
+    } catch (error) {
+      console.error('🔴 onSave 호출 중 에러:', error);
+      console.error('🔴 에러 상세:', JSON.stringify(error, null, 2));
+      return;
+    }
+
+    // 저장 실패 시 중단
+    if (!savedInspection) {
+      console.error('🔴 개요탭 저장 실패 - savedInspection is null or undefined');
+      console.error('🔴 savedInspection 값:', savedInspection);
+      return;
+    }
+
+    console.log('✅ 개요탭 저장 완료, ID:', savedInspection.id);
 
     // 🔄 점검 탭 체크리스트 변경사항 DB 저장 (커리큘럼탭과 동일한 패턴)
-    if (inspection?.id && selectedChecklistId && checklistItems.length > 0) {
+    if (savedInspection?.id && selectedChecklistId && checklistItems.length > 0) {
       console.log('💾 체크리스트 변경사항 저장 시작');
       console.time('⏱️ 체크리스트 저장 Total');
 
       try {
         // 1단계: 기존 체크시트 데이터 전체 삭제 (커리큘럼탭과 동일한 패턴)
         console.log('🗑️ 기존 체크시트 데이터 삭제 시작');
-        await deleteAllChecksheetItems(inspection.id);
+        await deleteAllChecksheetItems(savedInspection.id);
         console.log('✅ 기존 체크시트 데이터 삭제 완료');
 
         // 2단계: 현재 checklistItems를 DB에 저장 (커리큘럼탭과 동일한 패턴)
         console.log('📝 새 체크시트 데이터 저장 시작');
-        await createChecksheetItems(inspection.id, checklistItems, Number(selectedChecklistId));
+        await createChecksheetItems(savedInspection.id, checklistItems, Number(selectedChecklistId));
         console.log('✅ 새 체크시트 데이터 저장 완료');
 
         console.timeEnd('⏱️ 체크리스트 저장 Total');
@@ -1676,14 +1695,14 @@ export default function InspectionEditDialog({
     }
 
     // 🔄 OPL 탭 변경사항 DB 저장 (커리큘럼탭과 동일한 패턴)
-    if (inspection?.id && oplItems.length > 0) {
+    if (savedInspection?.id && oplItems.length > 0) {
       console.log('💾 OPL 변경사항 저장 시작');
       console.time('⏱️ OPL 저장 Total');
 
       try {
         // 1단계: 기존 OPL 데이터 전체 삭제 (커리큘럼탭과 동일한 패턴)
         console.log('🗑️ 기존 OPL 데이터 삭제 시작');
-        const allOplIds = (await getOplItemsByInspectionId(inspection.id)).map(item => item.id);
+        const allOplIds = (await getOplItemsByInspectionId(savedInspection.id)).map(item => item.id);
         if (allOplIds.length > 0) {
           await deleteOplItems(allOplIds);
           console.log('✅ 기존 OPL 데이터 삭제 완료');
@@ -1696,7 +1715,7 @@ export default function InspectionEditDialog({
           const { id, created_at, updated_at, ...itemData } = item;
           await addOplItem({
             ...itemData,
-            inspection_id: inspection.id
+            inspection_id: savedInspection.id
           });
         }
         console.log('✅ 새 OPL 데이터 저장 완료');
@@ -1714,7 +1733,7 @@ export default function InspectionEditDialog({
     console.log('💾 기록 탭 변경사항 저장 시작');
     console.time('⏱️ 기록 저장 Total');
 
-    if (inspection?.id) {
+    if (savedInspection?.id) {
       // 추가된 기록 (temp- ID)
       const addedFeedbacks = pendingFeedbacks.filter(
         (fb) => fb.id.toString().startsWith('temp-') && !initialFeedbacks.find((initial) => initial.id === fb.id)

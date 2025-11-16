@@ -346,10 +346,11 @@ export default function SoftwareTable({
       if (addChangeLog) {
         deletedSoftwares.forEach((task) => {
           const softwareName = task.softwareName || task.workContent || '소프트웨어';
+          const taskCode = task.code || `SW-${task.id}`;
           addChangeLog(
-            '소프트웨어 삭제',
-            task.code || `SW-${task.id}`,
-            `${task.workContent || '소프트웨어'} 삭제`,
+            '삭제',
+            taskCode,
+            `소프트웨어관리 ${softwareName}(${taskCode})의 데이터가 삭제 되었습니다.`,
             task.team || '미분류',
             undefined,
             undefined,
@@ -378,19 +379,10 @@ export default function SoftwareTable({
         if (setSnackbar) {
           if (deletedSoftwares.length === 1) {
             const softwareName = deletedSoftwares[0].softwareName || deletedSoftwares[0].workContent || '소프트웨어';
-            const getKoreanParticle = (word: string): string => {
-              const lastChar = word.charAt(word.length - 1);
-              const code = lastChar.charCodeAt(0);
-              if (code >= 0xAC00 && code <= 0xD7A3) {
-                const hasJongseong = (code - 0xAC00) % 28 !== 0;
-                return hasJongseong ? '이' : '가';
-              }
-              return '가';
-            };
-            const josa = getKoreanParticle(softwareName);
+            const taskCode = deletedSoftwares[0].code || `SW-${deletedSoftwares[0].id}`;
             setSnackbar({
               open: true,
-              message: `${softwareName}${josa} 성공적으로 삭제되었습니다.`,
+              message: `소프트웨어관리 ${softwareName}(${taskCode})의 데이터가 삭제 되었습니다.`,
               severity: 'error'
             });
           } else {
@@ -701,7 +693,7 @@ export default function SoftwareTable({
       if (addChangeLog) {
         const softwareName = newTaskWithNumber.softwareName || newTaskWithNumber.workContent || '새 업무';
         addChangeLog(
-          '새 업무 생성',
+          '추가',
           newTaskWithNumber.code,
           `${newTaskWithNumber.workContent || '새 업무'} 생성`,
           newTaskWithNumber.team || '미분류',

@@ -323,10 +323,11 @@ function KanbanView({
           console.log('✅ 칸반 드래그: 상태 변경 DB 저장 성공');
 
           // 토스트 알림 - 상태 변경 성공
-          const vocTitle = currentVOC.workContent || currentVOC.requestContent || 'VOC';
+          const vocTitle = currentVOC.requestContent || currentVOC.workContent || 'VOC';
+          const vocCode = currentVOC.code || `VOC-${vocId}`;
           setSnackbar({
             open: true,
-            message: `${vocTitle}의 상태가 ${oldStatus} → ${newStatus}로 변경되었습니다.`,
+            message: `VOC관리 ${vocTitle}(${vocCode}) 개요탭의 상태가 ${oldStatus} → ${newStatus}로 수정 되었습니다.`,
             severity: 'success'
           });
         } catch (error) {
@@ -346,10 +347,10 @@ function KanbanView({
 
       // 변경로그 추가
       const vocCode = currentVOC.code || `VOC-${vocId}`;
-      const requestContent = currentVOC.requestContent || 'VOC내용 없음';
-      const description = `${requestContent} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
+      const vocTitle = currentVOC.requestContent || currentVOC.workContent || 'VOC';
+      const description = `VOC관리 ${vocTitle}(${vocCode}) 개요탭의 상태가 ${oldStatus} → ${newStatus}로 수정 되었습니다.`;
 
-      addChangeLog('수정', vocCode, description, currentVOC.team || '미분류', oldStatus, newStatus, '상태', requestContent, '칸반탭');
+      addChangeLog('수정', vocCode, description, currentVOC.team || '미분류', oldStatus, newStatus, '상태', vocTitle, '칸반탭');
     }
   };
 
@@ -1301,18 +1302,18 @@ function ChangeLogView({
         <Table size="small">
           <TableHead>
             <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
-              <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 130 }}>변경시간</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 200 }}>제목</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 100 }}>코드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 80 }}>변경분류</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 100 }}>변경위치</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 100 }}>변경필드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 120 }}>변경전</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 120 }}>변경후</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 250 }}>변경 세부내용</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 50, fontSize: '12px' }}>NO</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 130, fontSize: '12px' }}>변경시간</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>코드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 200, fontSize: '12px' }}>제목</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 80, fontSize: '12px' }}>변경분류</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경위치</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경필드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 120, fontSize: '12px' }}>변경전</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 120, fontSize: '12px' }}>변경후</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 250, fontSize: '12px' }}>변경 세부내용</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>팀</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경자</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -1325,37 +1326,37 @@ function ChangeLogView({
                 }}
               >
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {changeLogs.length - (page * rowsPerPage + index)}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.dateTime}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                    {log.title}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.code}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', fontWeight: 500 }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                    {log.title}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '12px', fontWeight: 500 }}>
                     {log.action}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.location}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.changedField || '-'}
                   </Typography>
                 </TableCell>
@@ -1363,7 +1364,7 @@ function ChangeLogView({
                   <Typography
                     variant="body2"
                     sx={{
-                      fontSize: '13px',
+                      fontSize: '12px',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap'
@@ -1377,7 +1378,7 @@ function ChangeLogView({
                   <Typography
                     variant="body2"
                     sx={{
-                      fontSize: '13px',
+                      fontSize: '12px',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap'
@@ -1391,7 +1392,7 @@ function ChangeLogView({
                   <Typography
                     variant="body2"
                     sx={{
-                      fontSize: '13px',
+                      fontSize: '12px',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'normal',
@@ -1406,12 +1407,12 @@ function ChangeLogView({
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.team}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.user}
                   </Typography>
                 </TableCell>
@@ -2774,23 +2775,26 @@ export default function VOCManagement() {
       }
 
       if (changes.length > 0) {
-        addChangeLog('수정', updatedVOC.code, changes.join(', '), updatedVOC.team);
+        const vocTitle = updatedVOC.requestContent || updatedVOC.workContent || 'VOC';
+        const vocCode = updatedVOC.code;
+        const description = `VOC관리 ${vocTitle}(${vocCode}) 개요탭의 ${changes.join(', ')}가 수정 되었습니다.`;
+        addChangeLog('수정', vocCode, description, updatedVOC.team);
       }
     } else {
       // 새로 생성
       setVOCs((prevVOCs) => [...prevVOCs, updatedVOC]);
 
-      // 성공 알림 with Korean particle detection
-      const josa = getKoreanParticle(updatedVOC.workContent || 'VOC');
-      const addMessage = `${updatedVOC.workContent || 'VOC'}${josa} 성공적으로 추가되었습니다.`;
+      // 성공 알림
+      const vocTitle = updatedVOC.requestContent || updatedVOC.workContent || 'VOC';
+      const vocCode = updatedVOC.code;
 
       setSnackbar({
         open: true,
-        message: addMessage,
+        message: `VOC관리 ${vocTitle}(${vocCode})의 데이터가 추가 되었습니다.`,
         severity: 'success'
       });
 
-      addChangeLog('추가', updatedVOC.code, `새로운 VOC가 생성되었습니다: ${updatedVOC.workContent}`, updatedVOC.team);
+      addChangeLog('추가', vocCode, `VOC관리 ${vocTitle}(${vocCode})의 데이터가 추가 되었습니다.`, updatedVOC.team);
     }
 
     handleEditDialogClose();

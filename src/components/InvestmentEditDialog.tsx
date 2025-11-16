@@ -37,6 +37,7 @@ import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from
 import { useCommonData } from '../contexts/CommonDataContext';
 import { useSupabaseDepartments } from '../hooks/useSupabaseDepartments';
 import { useSupabaseUsers } from '../hooks/useSupabaseUsers';
+import { useSupabaseInvestment } from '../hooks/useSupabaseInvestment';
 import { useSupabaseInvestmentFinance } from '../hooks/useSupabaseInvestmentFinance';
 import { useSupabaseFeedback } from '../hooks/useSupabaseFeedback';
 import { PAGE_IDENTIFIERS, FeedbackData } from '../types/feedback';
@@ -377,15 +378,11 @@ const InvestmentOverviewTab = memo(
                 onChange={handleFieldChange('investmentType')}
                 displayEmpty
                 notched
-                renderValue={(selected) => {
-                  if (!selected) return '선택';
-                  const item = investmentTypesFromDB.find(t => t.subcode === selected);
-                  return item ? item.subcode_name : selected;
-                }}
+                renderValue={(selected) => selected || '선택'}
               >
                 <MenuItem value="">선택</MenuItem>
                 {investmentTypesFromDB.map((option) => (
-                  <MenuItem key={option.subcode} value={option.subcode}>
+                  <MenuItem key={option.subcode} value={option.subcode_name}>
                     {option.subcode_name}
                   </MenuItem>
                 ))}
@@ -413,8 +410,7 @@ const InvestmentOverviewTab = memo(
                 onChange={handleFieldChange('status')}
                 notched
                 renderValue={(selected) => {
-                  const item = statusTypesFromDB.find(s => s.subcode === selected);
-                  const displayName = item ? item.subcode_name : selected;
+                  if (!selected) return '선택';
 
                   const getStatusColor = (statusName: string) => {
                     switch (statusName) {
@@ -435,11 +431,11 @@ const InvestmentOverviewTab = memo(
 
                   return (
                     <Chip
-                      label={displayName}
+                      label={selected}
                       size="small"
                       sx={{
-                        backgroundColor: getStatusColor(displayName).bgcolor,
-                        color: getStatusColor(displayName).color,
+                        backgroundColor: getStatusColor(selected).bgcolor,
+                        color: getStatusColor(selected).color,
                         fontSize: '13px',
                         fontWeight: 400
                       }}
@@ -466,7 +462,7 @@ const InvestmentOverviewTab = memo(
                   };
 
                   return (
-                    <MenuItem key={option.subcode} value={option.subcode}>
+                    <MenuItem key={option.subcode} value={option.subcode_name}>
                       <Chip
                         label={option.subcode_name}
                         size="small"
@@ -2206,6 +2202,9 @@ function InvestmentEditDialog({
     deleteFeedback
   } = useSupabaseFeedback(PAGE_IDENTIFIERS.INVESTMENT, investment?.id);
 
+  // Supabase 훅 (소프트웨어/하드웨어관리 패턴)
+  const { createInvestment, updateInvestment } = useSupabaseInvestment();
+
   // 투자금액 훅 사용 (하드웨어 관리 패턴)
   const { getFinanceItems, saveFinanceItems, deleteFinanceItem } = useSupabaseInvestmentFinance();
 
@@ -2513,92 +2512,145 @@ function InvestmentEditDialog({
     // 에러 초기화
     setValidationError('');
 
-    // progress는 DB에 저장하지 않으므로 제외
-    const { progress, ...stateWithoutProgress } = investmentState;
+    try {
+      console.log('💾 투자 데이터 저장 시작...');
 
-    const savedData = {
-      ...investment,
-      ...stateWithoutProgress,
-      investmentName: currentValues.investmentName, // 현재 입력 값 반영
-      description: currentValues.description, // 현재 입력 값 반영
-      id: investment?.id || Date.now(),
-      no: investment?.no || 0,
-      code: investment?.code || '',
-      registrationDate: stateWithoutProgress.registrationDate || new Date().toISOString().split('T')[0],
-      amount: totalInvestmentAmount // 투자금액탭의 총합을 amount로 설정
-    };
+      // progress는 DB에 저장하지 않으므로 제외
+      const { progress, ...stateWithoutProgress } = investmentState;
 
-    console.log('💾 InvestmentEditDialog에서 저장할 데이터:', savedData);
+      // 신규 생성 시 코드 자동 생성
+      let investmentCode = investment?.code || '';
+      if (!investment || !investment.id) {
+        // 코드 자동 생성 (DB에서 직접 조회 - 캐시 무시)
+        const currentYear = new Date().getFullYear().toString().slice(-2);
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 기본 투자 정보 저장
-    onSave(savedData);
+        const { data: latestInvestments } = await supabase
+          .from('plan_investment_data')
+          .select('code')
+          .like('code', `PLAN-INV-${currentYear}-%`)
+          .order('code', { ascending: false })
+          .limit(1);
 
-    // 투자금액 데이터 저장 (하드웨어 관리 패턴)
-    if (savedData.id) {
-      try {
+        let maxNumber = 0;
+        if (latestInvestments && latestInvestments.length > 0) {
+          const match = latestInvestments[0].code?.match(/PLAN-INV-\d{2}-(\d{3})$/);
+          maxNumber = match ? parseInt(match[1], 10) : 0;
+        }
+
+        investmentCode = `PLAN-INV-${currentYear}-${String(maxNumber + 1).padStart(3, '0')}`;
+        console.log('🆕 신규 투자 코드 생성:', investmentCode);
+      }
+
+      // Supabase DB 형식으로 변환
+      const investmentData: any = {
+        no: null, // DB에서 자동 관리
+        registration_date: stateWithoutProgress.registrationDate || new Date().toISOString().split('T')[0],
+        code: investmentCode,
+        investment_type: stateWithoutProgress.investmentType || '',
+        investment_name: currentValues.investmentName.trim(),
+        amount: totalInvestmentAmount, // 투자금액탭의 총합
+        team: stateWithoutProgress.team || '투자팀',
+        assignee: stateWithoutProgress.assignee || null,
+        status: stateWithoutProgress.status || '대기',
+        start_date: stateWithoutProgress.startDate || null,
+        completed_date: stateWithoutProgress.completedDate || null,
+        expected_return: stateWithoutProgress.expectedReturn || 0,
+        actual_return: stateWithoutProgress.actualReturn || null,
+        risk_level: stateWithoutProgress.riskLevel || '보통',
+        attachments: {
+          description: currentValues.description?.trim() || '',
+          files: stateWithoutProgress.attachments || []
+        },
+        created_by: 'system',
+        updated_by: 'system',
+        is_active: true
+      };
+
+      let savedData;
+
+      // 1. DB에 투자 데이터 먼저 저장하고 ID 받기
+      if (!investment || !investment.id) {
+        // 신규 생성
+        savedData = await createInvestment(investmentData);
+        console.log('✅ 투자 생성 성공:', savedData);
+      } else {
+        // 기존 데이터 업데이트
+        savedData = await updateInvestment(Number(investment.id), investmentData);
+        console.log('✅ 투자 업데이트 성공:', savedData);
+      }
+
+      if (!savedData || !savedData.id) {
+        throw new Error('투자 데이터 저장 실패: ID를 받지 못했습니다.');
+      }
+
+      // 2. 투자금액 데이터 저장 (savedData.id 사용)
+      if (amountItems && amountItems.length > 0) {
         console.log('💾 투자금액 데이터 저장 중...', { investmentId: savedData.id, count: amountItems.length });
 
-        if (amountItems && amountItems.length > 0) {
-          const financeItems = amountItems.map((item: any, index: number) => {
-            // subcode를 subcode_name으로 변환 (UI: "GROUP026-SUB001" → DB: "서버")
-            const categoryName = investmentDetailTypesFromDB.find(
-              t => t.subcode === item.investmentCategory
-            )?.subcode_name || item.investmentCategory;
+        const financeItems = amountItems.map((item: any, index: number) => {
+          // subcode를 subcode_name으로 변환 (UI: "GROUP026-SUB001" → DB: "서버")
+          const categoryName = investmentDetailTypesFromDB.find(
+            t => t.subcode === item.investmentCategory
+          )?.subcode_name || item.investmentCategory;
 
-            return {
-              investment_id: savedData.id,
-              item_order: index + 1,
-              investment_category: categoryName,
-              item_name: item.itemName || '',
-              budget_amount: parseFloat(item.budgetAmount) || 0,
-              execution_amount: parseFloat(item.executionAmount) || 0,
-              remarks: item.remarks || ''
-            };
-          });
+          return {
+            investment_id: savedData.id,
+            item_order: index + 1,
+            investment_category: categoryName,
+            item_name: item.itemName || '',
+            budget_amount: parseFloat(item.budgetAmount) || 0,
+            execution_amount: parseFloat(item.executionAmount) || 0,
+            remarks: item.remarks || ''
+          };
+        });
 
-          await saveFinanceItems(savedData.id, financeItems);
-          console.log('✅ 투자금액 데이터 저장 완료');
-
-          // 캐시 무효화 (최신 데이터 보장)
-          sessionStorage.removeItem('cache_investment_data');
-        }
-      } catch (error) {
-        console.error('❌ 투자금액 저장 중 오류:', error);
+        await saveFinanceItems(savedData.id, financeItems);
+        console.log('✅ 투자금액 데이터 저장 완료');
       }
-    }
 
-    // 토스트 알림 추가
-    if (setSnackbar) {
-      const isNewInvestment = !investment;
-      const investmentName = currentValues.investmentName || '투자';
+      // 3. 부모 컴포넌트에 알림 (UI 업데이트용)
+      const resultInvestment = {
+        ...investment,
+        ...stateWithoutProgress,
+        investmentName: currentValues.investmentName,
+        description: currentValues.description,
+        id: savedData.id,
+        no: savedData.no || investment?.no || 0,
+        code: savedData.code || investment?.code || '',
+        registrationDate: savedData.registration_date || stateWithoutProgress.registrationDate,
+        amount: totalInvestmentAmount
+      };
 
-      if (isNewInvestment) {
-        // 신규 등록
+      onSave(resultInvestment);
+
+      // 토스트 알림
+      if (setSnackbar) {
+        const isNewInvestment = !investment;
+        const investmentName = currentValues.investmentName || '투자';
         const lastChar = investmentName.charAt(investmentName.length - 1);
         const code = lastChar.charCodeAt(0);
         const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
         const josa = hasJongseong ? '이' : '가';
+
         setSnackbar({
           open: true,
-          message: `${investmentName}${josa} 등록되었습니다.`,
-          severity: 'success'
-        });
-      } else {
-        // 수정
-        const lastChar = investmentName.charAt(investmentName.length - 1);
-        const code = lastChar.charCodeAt(0);
-        const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
-        const josa = hasJongseong ? '이' : '가';
-        setSnackbar({
-          open: true,
-          message: `${investmentName}${josa} 수정되었습니다.`,
+          message: isNewInvestment
+            ? `${investmentName}${josa} 등록되었습니다.`
+            : `${investmentName}${josa} 수정되었습니다.`,
           severity: 'success'
         });
       }
-    }
 
-    handleClose();
-  }, [investment, investmentState, totalInvestmentAmount, amountItems, investmentDetailTypesFromDB, saveFinanceItems, onSave, handleClose, setSnackbar]);
+      handleClose();
+    } catch (error: any) {
+      console.error('❌ 투자 저장 중 오류:', error);
+      setValidationError(error.message || '저장 중 오류가 발생했습니다.');
+    }
+  }, [investment, investmentState, totalInvestmentAmount, amountItems, investmentDetailTypesFromDB, createInvestment, updateInvestment, saveFinanceItems, onSave, handleClose, setSnackbar]);
 
   return (
     <Dialog

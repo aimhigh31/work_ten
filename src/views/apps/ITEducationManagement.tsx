@@ -75,6 +75,30 @@ interface ChangeLog {
   user: string;
 }
 
+// 한국어 조사 선택 함수
+function getJosa(word: string, josaType: '이가' | '은는' | '을를'): string {
+  if (!word || word.length === 0) return josaType === '이가' ? '이' : josaType === '은는' ? '은' : '을';
+
+  const lastChar = word.charAt(word.length - 1);
+  const code = lastChar.charCodeAt(0);
+
+  // 한글이 아닌 경우
+  if (code < 0xac00 || code > 0xd7a3) {
+    return josaType === '이가' ? '가' : josaType === '은는' ? '는' : '를';
+  }
+
+  // 받침 유무 확인
+  const hasJongseong = (code - 0xac00) % 28 !== 0;
+
+  if (josaType === '이가') {
+    return hasJongseong ? '이' : '가';
+  } else if (josaType === '은는') {
+    return hasJongseong ? '은' : '는';
+  } else {
+    return hasJongseong ? '을' : '를';
+  }
+}
+
 // Icons
 import { TableDocument, Chart, Calendar, Element, DocumentText } from '@wandersonalwes/iconsax-react';
 
@@ -236,77 +260,6 @@ function KanbanView({
       setOriginalTask(JSON.parse(JSON.stringify(task))); // Deep copy - 원본 데이터 저장
     }
     setEditDialog(true);
-  };
-
-  // 편집 다이얼로그 닫기
-  const handleEditDialogClose = () => {
-    setEditDialog(false);
-    setEditingTask(null);
-    if (setOriginalTask) {
-      setOriginalTask(null);
-    }
-  };
-
-  // Task 저장 핸들러
-  const handleEditTaskSave = (updatedTask: ITEducationTableData) => {
-    const taskFromList = tasks.find((t) => t.id === updatedTask.id);
-
-    if (taskFromList) {
-      // 업데이트
-      setTasks((prev) => prev.map((task) => (task.id === updatedTask.id ? updatedTask : task)));
-
-      // 변경된 필드 찾기 - originalTask state 사용
-      const changedFields: string[] = [];
-      const fieldMap: { [key: string]: string } = {
-        educationName: '교육명',
-        educationType: '교육유형',
-        status: '상태',
-        assignee: '담당자',
-        executionDate: '실시일',
-        completedDate: '완료일',
-        location: '장소',
-        attendeeCount: '참석수',
-        team: '팀'
-      };
-
-      if (originalTask) {
-        Object.keys(fieldMap).forEach((key) => {
-          const oldValue = (originalTask as any)[key];
-          const newValue = (updatedTask as any)[key];
-          if (oldValue !== newValue && !changedFields.includes(fieldMap[key])) {
-            changedFields.push(fieldMap[key]);
-          }
-        });
-      }
-
-      // 토스트 알림 with Korean particle detection
-      if (setSnackbar) {
-        let message = '';
-        if (changedFields.length > 0) {
-          const fieldsText = changedFields.join(', ');
-          const lastField = changedFields[changedFields.length - 1];
-          const lastChar = lastField.charAt(lastField.length - 1);
-          const code = lastChar.charCodeAt(0);
-          const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
-          const josa = hasJongseong ? '이' : '가';
-          message = `${updatedTask.educationName}의 ${fieldsText}${josa} 성공적으로 수정되었습니다.`;
-        } else {
-          const lastChar = updatedTask.educationName.charAt(updatedTask.educationName.length - 1);
-          const code = lastChar.charCodeAt(0);
-          const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
-          const josa = hasJongseong ? '이' : '가';
-          message = `${updatedTask.educationName}${josa} 성공적으로 수정되었습니다.`;
-        }
-
-        setSnackbar({
-          open: true,
-          message: message,
-          severity: 'success'
-        });
-      }
-    }
-
-    handleEditDialogClose();
   };
 
   // 상태별 컬럼 정의
@@ -730,20 +683,6 @@ function KanbanView({
 
         <DragOverlay>{activeTask ? <DraggableCard task={activeTask} canEditOwn={canEditOwn} canEditOthers={canEditOthers} /> : null}</DragOverlay>
       </DndContext>
-
-      {/* Task 편집 다이얼로그 */}
-      {editDialog && (
-        <ITEducationEditDialog
-          open={editDialog}
-          onClose={handleEditDialogClose}
-          recordId={editingTask?.id}
-          tasks={tasks}
-          onSave={handleEditTaskSave}
-          canCreateData={canCreateData}
-          canEditOwn={canEditOwn}
-          canEditOthers={canEditOthers}
-        />
-      )}
     </Box>
   );
 }
@@ -2161,7 +2100,7 @@ export default function ITEducationManagement() {
         dateTime: formattedDateTime,
         code: log.record_id, // record_id가 이미 코드임
         target: education?.educationName || log.record_id,
-        location: '개요탭', // 변경위치
+        location: log.change_location || '개요탭', // DB의 변경위치 값 사용
         action: log.action_type,
         changedField: log.changed_field || '-', // 변경필드
         description: log.description,
@@ -2199,6 +2138,7 @@ export default function ITEducationManagement() {
           code: item.code || '',
           educationType: (item.education_type as any) || '온라인',
           educationName: item.education_name || '',
+          description: item.description,
           location: item.location || '',
           attendeeCount: item.participant_count || 0,
           executionDate: item.execution_date || '',
@@ -2207,7 +2147,12 @@ export default function ITEducationManagement() {
           team: item.team || '',
           department: undefined,
           createdBy: item.created_by,
-          attachments: []
+          attachments: [],
+          // 교육실적보고 필드들
+          achievements: item.achievements,
+          improvements: item.improvements,
+          education_feedback: item.education_feedback,
+          report_notes: item.report_notes
         }));
         setTasks(convertedTasks);
       } catch (error) {
@@ -2263,6 +2208,15 @@ export default function ITEducationManagement() {
     ) => {
       try {
         const userName = currentUser?.user_name || currentUser?.name || user?.name || '시스템';
+        const finalLocation = location || '개요탭';
+
+        console.log('🔍 [addChangeLog] 호출됨:', {
+          changedField,
+          location파라미터: location,
+          finalLocation,
+          action,
+          target
+        });
 
         const logData = {
           page: 'it_education',
@@ -2273,7 +2227,7 @@ export default function ITEducationManagement() {
           before_value: beforeValue || null,
           after_value: afterValue || null,
           changed_field: changedField || null,
-          change_location: location || '개요탭',
+          change_location: finalLocation,
           user_name: userName,
           team: currentUser?.department || '시스템', // 로그인한 사용자의 부서
           user_department: currentUser?.department,
@@ -2282,16 +2236,24 @@ export default function ITEducationManagement() {
           created_at: new Date().toISOString()
         };
 
-        console.log('📝 변경로그 저장 시도:', logData);
+        console.log('📝 [addChangeLog] DB 저장 직전 - logData:', {
+          changed_field: logData.changed_field,
+          change_location: logData.change_location,
+          description: logData.description.substring(0, 50)
+        });
 
         // common_log_data에 직접 저장
         const supabase = createClient();
-        const { data, error } = await supabase.from('common_log_data').insert(logData).select();
+        const { data: insertedData, error } = await supabase.from('common_log_data').insert(logData).select();
 
         if (error) {
           console.error('❌ 변경로그 저장 실패:', error);
         } else {
-          console.log('✅ 변경로그 저장 성공:', description, data);
+          console.log('✅ [addChangeLog] DB 저장 성공 - insertedData:', {
+            id: insertedData?.[0]?.id,
+            change_location: insertedData?.[0]?.change_location,
+            changed_field: insertedData?.[0]?.changed_field
+          });
         }
       } catch (err) {
         console.error('❌ 변경로그 저장 중 오류:', err);
@@ -2410,21 +2372,7 @@ export default function ITEducationManagement() {
       // Supabase 데이터 새로고침
       refreshData();
 
-      // 변경로그 추가
-      const changes = [];
-      if (originalTask?.status !== updatedTask.status) {
-        changes.push(`상태: ${originalTask?.status} → ${updatedTask.status}`);
-      }
-      if (originalTask?.assignee !== updatedTask.assignee) {
-        changes.push(`담당자: ${originalTask?.assignee} → ${updatedTask.assignee}`);
-      }
-      if (originalTask?.completedDate !== updatedTask.completedDate) {
-        changes.push(`완료일: ${originalTask?.completedDate} → ${updatedTask.completedDate}`);
-      }
-
-      if (changes.length > 0) {
-        addChangeLog('수정', updatedTask.code, changes.join(', '));
-      }
+      // 변경로그는 ITEducationTable.tsx에서 추가됨 (중복 방지)
     } else {
       // 새 데이터 추가 - DB 저장 없이 토스트만
       console.log('✅ 새 교육 데이터 추가 (ITEducationEditDialog에서 이미 저장됨)');
@@ -2517,10 +2465,11 @@ export default function ITEducationManagement() {
       // 변경로그 추가
       const taskCode = currentTask.code || `ITEDU-${taskId}`;
       const educationName = currentTask.educationName || '교육명 없음';
-      const description = `${educationName} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
+      const josa = getJosa('상태', '이가');
+      const description = `IT교육관리 ${educationName}(${taskCode}) 개요탭의 상태${josa} ${oldStatus} → ${newStatus}로 수정 되었습니다.`;
 
       addChangeLog(
-        'IT교육 상태 변경',
+        '수정',
         taskCode,
         description,
         currentTask.educationType || '미분류',
@@ -2528,7 +2477,7 @@ export default function ITEducationManagement() {
         newStatus,
         '상태',
         educationName,
-        '칸반탭'
+        '개요탭'
       );
     }
   };
@@ -2547,10 +2496,24 @@ export default function ITEducationManagement() {
       for (const id of ids) {
         try {
           const supabase = createClient();
-          const { error } = await supabase.from('it_education').update({ is_deleted: true }).eq('id', id);
+          const { error } = await supabase.from('it_education_data').update({ is_active: false }).eq('id', id);
 
           if (error) {
-            console.error(`🔴 교육 ID ${id} 삭제 실패:`, error);
+            // 에러 정보를 한 번에 모아서 출력
+            const errorInfo = {
+              교육ID: id,
+              에러타입: typeof error,
+              에러생성자: error?.constructor?.name || 'unknown',
+              에러키목록: Object.keys(error || {}),
+              message: error.message || '없음',
+              details: error.details || '없음',
+              hint: error.hint || '없음',
+              code: error.code || '없음',
+              전체에러: error
+            };
+
+            console.log(`🔴🔴🔴 교육 삭제 실패 상세 정보:`, JSON.stringify(errorInfo, null, 2));
+            console.log(`원본 에러 객체:`, error);
             failCount++;
           } else {
             console.log(`✅ 교육 ID ${id} 삭제 성공`);
@@ -2569,15 +2532,19 @@ export default function ITEducationManagement() {
 
         // 변경로그 추가
         deletedEducations.forEach((education) => {
+          const educationCode = education.code || `IT-EDU-${education.id}`;
+          const educationName = education.educationName || 'IT교육';
+          const josa = getJosa('데이터', '이가');
+
           addChangeLog(
             '삭제',
-            education.code || `IT-EDU-${education.id}`,
-            `${education.educationName} - 삭제됨`,
+            educationCode,
+            `IT교육관리 ${educationName}(${educationCode})의 데이터${josa} 삭제 되었습니다.`,
             education.team,
             undefined,
             undefined,
             undefined,
-            education.educationName
+            educationName
           );
         });
       }
@@ -3213,18 +3180,18 @@ export default function ITEducationManagement() {
                     <Table size="small">
                       <TableHead>
                         <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
-                          <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 110 }}>변경시간</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 180 }}>제목</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 140 }}>코드</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 70 }}>변경분류</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 70 }}>변경위치</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 90 }}>변경필드</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 100 }}>변경전</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 100 }}>변경후</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 400 }}>변경 세부내용</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-                          <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 50, fontSize: '12px' }}>NO</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 110, fontSize: '12px' }}>변경시간</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 150, fontSize: '12px' }}>코드</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 150, fontSize: '12px' }}>제목</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경분류</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경위치</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경필드</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경전</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경후</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 330, fontSize: '12px' }}>변경 세부내용</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>팀</TableCell>
+                          <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경자</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -3237,37 +3204,37 @@ export default function ITEducationManagement() {
                             }}
                           >
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                                 {changeLogs.length - (changeLogPage * changeLogRowsPerPage + index)}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                                 {log.dateTime}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                                {log.target}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                                 {log.code}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                                {log.target}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                                 {log.action}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                                 {log.location}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                                 {log.changedField || '-'}
                               </Typography>
                             </TableCell>
@@ -3275,7 +3242,7 @@ export default function ITEducationManagement() {
                               <Typography
                                 variant="body2"
                                 sx={{
-                                  fontSize: '13px',
+                                  fontSize: '12px',
                                   color: 'text.primary',
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
@@ -3291,7 +3258,7 @@ export default function ITEducationManagement() {
                               <Typography
                                 variant="body2"
                                 sx={{
-                                  fontSize: '13px',
+                                  fontSize: '12px',
                                   color: 'text.primary',
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
@@ -3307,7 +3274,7 @@ export default function ITEducationManagement() {
                               <Typography
                                 variant="body2"
                                 sx={{
-                                  fontSize: '13px',
+                                  fontSize: '12px',
                                   color: 'text.primary',
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
@@ -3323,19 +3290,12 @@ export default function ITEducationManagement() {
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Chip
-                                label={log.team}
-                                size="small"
-                                sx={{
-                                  height: 22,
-                                  fontSize: '13px',
-                                  backgroundColor: getTeamColor(log.team),
-                                  color: '#333333'
-                                }}
-                              />
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                                {log.team}
+                              </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                                 {log.user}
                               </Typography>
                             </TableCell>
@@ -3501,6 +3461,7 @@ export default function ITEducationManagement() {
           canCreateData={canCreateData}
           canEditOwn={canEditOwn}
           canEditOthers={canEditOthers}
+          addChangeLog={addChangeLog}
         />
       )}
 

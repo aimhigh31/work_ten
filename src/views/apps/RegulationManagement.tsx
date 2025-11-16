@@ -79,6 +79,7 @@ import { PAGE_IDENTIFIERS, FeedbackData } from 'types/feedback';
 import { useMenuPermission } from '../../hooks/usePermissions';
 import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
 import { ChangeLogData } from 'types/changelog';
+import { createClient } from '@/lib/supabase/client';
 
 // 변경로그 타입 정의
 interface ChangeLog {
@@ -89,6 +90,31 @@ interface ChangeLog {
   action: string;
   target: string;
   description: string;
+}
+
+// 한국어 조사 자동 선택 헬퍼 함수
+function getJosa(word: string, josaType: '이가' | '은는' | '을를'): string {
+  if (!word || word.length === 0) return josaType === '이가' ? '이' : josaType === '은는' ? '은' : '을';
+
+  const lastChar = word.charAt(word.length - 1);
+  const code = lastChar.charCodeAt(0);
+
+  // 한글이 아닌 경우
+  if (code < 0xac00 || code > 0xd7a3) {
+    // 영어나 숫자인 경우 받침 없는 것으로 처리
+    return josaType === '이가' ? '가' : josaType === '은는' ? '는' : '를';
+  }
+
+  // 받침 유무 확인
+  const hasJongseong = (code - 0xac00) % 28 !== 0;
+
+  if (josaType === '이가') {
+    return hasJongseong ? '이' : '가';
+  } else if (josaType === '은는') {
+    return hasJongseong ? '은' : '는';
+  } else {
+    return hasJongseong ? '을' : '를';
+  }
 }
 
 // 폴더 타입 정의
@@ -471,7 +497,9 @@ const OverviewTab = React.memo(
         setTitle(newTitle);
         // setTimeout을 사용하여 렌더링 사이클 이후에 업데이트
         setTimeout(() => {
-          onUpdateItem?.({ ...selectedItem, name: newTitle });
+          if (selectedItem) {
+            onUpdateItem?.({ ...selectedItem, name: newTitle });
+          }
         }, 0);
       },
       [selectedItem, onUpdateItem]
@@ -482,7 +510,9 @@ const OverviewTab = React.memo(
         const newDescription = event.target.value;
         setDescription(newDescription);
         setTimeout(() => {
-          onUpdateItem?.({ ...selectedItem, description: newDescription });
+          if (selectedItem) {
+            onUpdateItem?.({ ...selectedItem, description: newDescription });
+          }
         }, 0);
       },
       [selectedItem, onUpdateItem]
@@ -493,7 +523,9 @@ const OverviewTab = React.memo(
         const newStatus = event.target.value;
         setStatus(newStatus);
         setTimeout(() => {
-          onUpdateItem?.({ ...selectedItem, status: newStatus });
+          if (selectedItem) {
+            onUpdateItem?.({ ...selectedItem, status: newStatus });
+          }
         }, 0);
       },
       [selectedItem, onUpdateItem]
@@ -510,7 +542,9 @@ const OverviewTab = React.memo(
 
         // selectedFile 업데이트 (저장 버튼 검증용)
         setTimeout(() => {
-          onUpdateItem?.({ ...selectedItem, documentType: newDocumentType });
+          if (selectedItem) {
+            onUpdateItem?.({ ...selectedItem, documentType: newDocumentType });
+          }
         }, 0);
       },
       [selectedItem, onUpdateItem, setValidationError]
@@ -1611,6 +1645,17 @@ interface OverviewPanelProps {
   selectedItem: FolderItem | null;
   onUpdateItem?: (updatedItem: Partial<FolderItem>) => void;
   updateItem?: (id: number, updateData: Partial<any>) => Promise<boolean>;
+  addChangeLog?: (
+    action: string,
+    target: string,
+    description: string,
+    team?: string,
+    beforeValue?: string,
+    afterValue?: string,
+    changedField?: string,
+    title?: string,
+    location?: string
+  ) => Promise<void>;
   documentTypes?: Array<{
     subcode_name: string;
     subcode: string;
@@ -1652,6 +1697,13 @@ interface OverviewPanelProps {
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
+  setSnackbar?: React.Dispatch<
+    React.SetStateAction<{
+      open: boolean;
+      message: string;
+      severity: 'success' | 'error' | 'warning' | 'info';
+    }>
+  >;
 }
 
 const OverviewPanel = React.memo(
@@ -1659,6 +1711,7 @@ const OverviewPanel = React.memo(
     selectedItem,
     onUpdateItem,
     updateItem,
+    addChangeLog,
     documentTypes,
     statusTypes,
     assigneeList,
@@ -1666,7 +1719,8 @@ const OverviewPanel = React.memo(
     setAttachedFiles: externalSetAttachedFiles,
     canCreateData = true,
     canEditOwn = true,
-    canEditOthers = true
+    canEditOthers = true,
+    setSnackbar
   }: OverviewPanelProps) => {
     const [detailTab, setDetailTab] = React.useState(0);
     const { revisions, fetchRevisions } = useSupabaseSecurityRevision();
@@ -1724,6 +1778,33 @@ const OverviewPanel = React.memo(
         setDetailTab(0);
       }
     }, [selectedItem?.id, selectedItem?.type]);
+
+    // 원본 selectedItem 저장 (변경 전 데이터 비교용)
+    const originalItemRef = React.useRef<any>(null);
+
+    // selectedItem이 변경될 때마다 원본 데이터 저장 (currentData와 같은 형식으로 저장)
+    React.useEffect(() => {
+      if (selectedItem) {
+        originalItemRef.current = {
+          name: selectedItem.name,
+          description: selectedItem.description,
+          status: selectedItem.status,
+          document_type: selectedItem.documentType,
+          team: selectedItem.team,
+          assignee: selectedItem.assignee
+        };
+      }
+    }, [selectedItem?.id]);
+
+    // 현재 편집 중인 selectedItem 상태 (로컬 state)
+    const [editingItem, setEditingItem] = React.useState<any>(selectedItem);
+
+    // selectedItem이 변경될 때 editingItem도 업데이트
+    React.useEffect(() => {
+      if (selectedItem) {
+        setEditingItem({ ...selectedItem });
+      }
+    }, [selectedItem?.id]);
 
     // 현재 편집된 데이터 상태
     const [currentData, setCurrentData] = React.useState<any>(null);
@@ -1942,8 +2023,27 @@ const OverviewPanel = React.memo(
               variant="outlined"
               size="small"
               onClick={() => {
-                console.log('폴더뷰 개요창 취소 버튼 클릭');
-                // 취소 로직 구현 예정
+                console.log('📌 폴더뷰 개요창 취소 버튼 클릭 - 원본 데이터로 복원');
+
+                // 원본 데이터로 복원 (snake_case를 camelCase로 변환)
+                if (originalItemRef.current && selectedItem) {
+                  const restoredItem = {
+                    ...selectedItem,
+                    name: originalItemRef.current.name,
+                    description: originalItemRef.current.description,
+                    status: originalItemRef.current.status,
+                    documentType: originalItemRef.current.document_type,
+                    team: originalItemRef.current.team,
+                    assignee: originalItemRef.current.assignee
+                  };
+
+                  setEditingItem(restoredItem);
+
+                  // onUpdateItem을 호출하여 상위 컴포넌트도 업데이트
+                  if (onUpdateItem) {
+                    onUpdateItem(restoredItem);
+                  }
+                }
               }}
               disabled={!(canEditOwn || canEditOthers)}
               sx={{
@@ -1969,14 +2069,89 @@ const OverviewPanel = React.memo(
               variant="contained"
               size="small"
               onClick={async () => {
-                if (!selectedItem || !updateItem || !currentData) {
+                if (!editingItem || !updateItem || !currentData) {
                   console.log('저장할 데이터가 없습니다.');
                   return;
                 }
 
+                const originalItem = originalItemRef.current;
+                if (!originalItem) {
+                  console.log('원본 데이터가 없습니다.');
+                  return;
+                }
+
                 try {
-                  console.log('저장 중...', currentData);
-                  const success = await updateItem(Number(selectedItem.id), {
+                  console.log('📋 폴더뷰 개요창 저장 시작:', {
+                    originalItem,
+                    currentData
+                  });
+
+                  // 변경된 필드 찾기 및 변경로그 추가
+                  const fieldMap: { [key: string]: string } = {
+                    name: '제목',
+                    description: '설명',
+                    status: '상태',
+                    document_type: '보안문서유형',
+                    team: '팀',
+                    assignee: '담당자'
+                  };
+
+                  const changedFields: string[] = [];
+
+                  Object.keys(fieldMap).forEach((key) => {
+                    // originalItem과 currentData 모두 snake_case 사용
+                    const oldValue = (originalItem as any)[key];
+                    const newValue = (currentData as any)[key];
+
+                    console.log(`🔍 필드 비교 [${key}]:`, {
+                      oldValue,
+                      newValue,
+                      isDifferent: oldValue !== newValue
+                    });
+
+                    // 실제로 값이 변경된 경우만 추가 (빈 문자열과 undefined는 같은 것으로 처리)
+                    const isChanged = oldValue !== newValue &&
+                                     !(oldValue === '' && newValue === undefined) &&
+                                     !(oldValue === undefined && newValue === '') &&
+                                     !(oldValue === '' && newValue === '');
+
+                    if (isChanged) {
+                      changedFields.push(fieldMap[key]);
+
+                      const regulationCode = editingItem.code || editingItem.id;
+                      const regulationTitle = currentData.name || editingItem.name || '규정제목 없음';
+                      const fieldName = fieldMap[key];
+                      const josa = getJosa(fieldName, '이가');
+                      const description = `보안규정관리 ${regulationTitle}(${regulationCode}) 폴더탭의 ${fieldName}${josa} ${oldValue || '(없음)'} → ${newValue || '(없음)'}로 수정 되었습니다.`;
+
+                      console.log('📝 폴더뷰 개요창 변경로그 추가:', {
+                        field: fieldName,
+                        oldValue,
+                        newValue,
+                        code: regulationCode,
+                        title: regulationTitle
+                      });
+
+                      // 변경로그 추가
+                      if (addChangeLog) {
+                        addChangeLog(
+                          '수정',
+                          regulationCode,
+                          description,
+                          editingItem.team || '미분류',
+                          String(oldValue || ''),
+                          String(newValue || ''),
+                          fieldName,
+                          regulationTitle,
+                          '폴더탭'
+                        );
+                      }
+                    }
+                  });
+
+                  // DB 저장
+                  console.log('💾 DB 저장 중...', currentData);
+                  const success = await updateItem(Number(editingItem.id), {
                     name: currentData.name,
                     description: currentData.description,
                     status: currentData.status,
@@ -1986,12 +2161,72 @@ const OverviewPanel = React.memo(
                   });
 
                   if (success) {
-                    console.log('저장 완료!');
+                    console.log('✅ 저장 완료!');
+
+                    // onUpdateItem을 호출하여 상위 컴포넌트 업데이트
+                    if (onUpdateItem) {
+                      onUpdateItem({
+                        ...editingItem,
+                        name: currentData.name,
+                        description: currentData.description,
+                        status: currentData.status,
+                        documentType: currentData.document_type,
+                        team: currentData.team,
+                        assignee: currentData.assignee
+                      });
+                    }
+
+                    // 원본 데이터 업데이트 (currentData와 같은 형식으로 저장)
+                    originalItemRef.current = {
+                      name: currentData.name,
+                      description: currentData.description,
+                      status: currentData.status,
+                      document_type: currentData.document_type,
+                      team: currentData.team,
+                      assignee: currentData.assignee
+                    };
+
+                    // 성공 토스트 알림
+                    if (setSnackbar) {
+                      let message = '';
+                      if (changedFields.length > 0) {
+                        const fieldsText = changedFields.join(', ');
+                        const lastField = changedFields[changedFields.length - 1];
+                        const josa = getJosa(lastField, '이가');
+                        message = `${currentData.name}의 ${fieldsText}${josa} 성공적으로 수정되었습니다.`;
+                      } else {
+                        const josa = getJosa(currentData.name, '이가');
+                        message = `${currentData.name}${josa} 성공적으로 저장되었습니다.`;
+                      }
+                      setSnackbar({
+                        open: true,
+                        message: message,
+                        severity: 'success'
+                      });
+                    }
                   } else {
-                    console.error('저장 실패');
+                    console.error('❌ 저장 실패');
+
+                    // 실패 토스트 알림
+                    if (setSnackbar) {
+                      setSnackbar({
+                        open: true,
+                        message: '저장 중 오류가 발생했습니다.',
+                        severity: 'error'
+                      });
+                    }
                   }
                 } catch (error) {
-                  console.error('저장 중 오류:', error);
+                  console.error('❌ 저장 중 오류:', error);
+
+                  // 에러 토스트 알림
+                  if (setSnackbar) {
+                    setSnackbar({
+                      open: true,
+                      message: '저장 중 오류가 발생했습니다.',
+                      severity: 'error'
+                    });
+                  }
                 }
               }}
               disabled={!(canEditOwn || canEditOthers)}
@@ -2041,10 +2276,20 @@ const OverviewPanel = React.memo(
           ) : (
             /* 파일 선택 시 탭 컨텐츠 */
             <>
-              {detailTab === 0 && (
+              {detailTab === 0 && editingItem && (
                 <OverviewTab
-                  selectedItem={selectedItem}
-                  onUpdateItem={onUpdateItem}
+                  selectedItem={editingItem}
+                  onUpdateItem={(updates) => {
+                    // 폴더뷰 개요창에서는 로컬 state만 업데이트 (DB 저장 안 함)
+                    // 저장 버튼 클릭 시에만 DB에 저장하고 변경로그 추가
+                    console.log('📝 OverviewTab onUpdateItem 호출 (로컬 state만 업데이트):', updates);
+                    setEditingItem((prev: any) => {
+                      if (prev && prev.id === editingItem.id) {
+                        return { ...prev, ...updates };
+                      }
+                      return prev;
+                    });
+                  }}
                   latestRevision={getLatestRevision()}
                   latestRevisionDate={getLatestRevisionDate()}
                   onDataChange={setCurrentData}
@@ -2053,7 +2298,7 @@ const OverviewPanel = React.memo(
                   assigneeList={assigneeList}
                 />
               )}
-              {detailTab === 1 && (
+              {detailTab === 1 && selectedItem && (
                 <MaterialTab
                   selectedItem={selectedItem}
                   attachedFiles={attachedFiles}
@@ -2069,7 +2314,7 @@ const OverviewPanel = React.memo(
                   canEditOthers={canEditOthers}
                 />
               )}
-              {detailTab === 2 && (
+              {detailTab === 2 && selectedItem && (
                 <RecordTab
                   comments={comments}
                   newComment={newComment}
@@ -2113,6 +2358,17 @@ interface FolderViewProps {
   createItem?: (itemData: any) => Promise<boolean>;
   deleteItem?: (id: number) => Promise<boolean>;
   fetchTree?: () => Promise<void>;
+  addChangeLog?: (
+    action: string,
+    target: string,
+    description: string,
+    team?: string,
+    beforeValue?: string,
+    afterValue?: string,
+    changedField?: string,
+    title?: string,
+    location?: string
+  ) => Promise<void>;
   documentTypes?: Array<{
     subcode_name: string;
     subcode: string;
@@ -2174,6 +2430,7 @@ function FolderView({
   createItem,
   deleteItem: deleteItemDB,
   fetchTree,
+  addChangeLog,
   documentTypes,
   statusTypes,
   assigneeList,
@@ -2300,6 +2557,25 @@ function FolderView({
         try {
           const success = await deleteItemDB(Number(itemToDelete.id));
           if (success) {
+            // 변경로그 추가
+            const regulationCode = itemToDelete.code || `REG-${itemToDelete.id}`;
+            const regulationTitle = itemToDelete.name || '규정제목 없음';
+            const itemType = itemToDelete.type === 'folder' ? '폴더' : '파일';
+            const josa = getJosa(regulationTitle, '이가');
+            const description = `보안규정관리 ${regulationTitle}(${regulationCode}) 폴더탭의 ${itemType}${josa} 삭제되었습니다.`;
+
+            addChangeLog(
+              '삭제',
+              regulationCode,
+              description,
+              itemToDelete.team || '미분류',
+              itemToDelete.name,
+              '',
+              itemType,
+              regulationTitle,
+              '폴더탭'
+            );
+
             // DB에서 전체 트리 다시 로드
             if (fetchTree) {
               await fetchTree();
@@ -2311,11 +2587,7 @@ function FolderView({
             // 성공 알림
             if (setSnackbar) {
               const itemName = `${itemToDelete.name}${itemToDelete.type === 'folder' ? '(폴더)' : ''}`;
-              // 마지막 글자의 받침 유무에 따라 조사 결정
-              const lastChar = itemName.charAt(itemName.length - 1);
-              const code = lastChar.charCodeAt(0);
-              const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
-              const josa = hasJongseong ? '이' : '가';
+              const josa = getJosa(itemName, '이가');
               setSnackbar({
                 open: true,
                 message: `${itemName}${josa} 성공적으로 삭제되었습니다.`,
@@ -2407,7 +2679,7 @@ function FolderView({
           // 변경된 필드 찾기 - 원본 데이터와 비교
           const changedFields: string[] = [];
           const fieldMap: { [key: string]: string } = {
-            name: '파일명',
+            name: '제목',
             description: '설명',
             status: '상태',
             documentType: '보안문서유형',
@@ -2432,19 +2704,11 @@ function FolderView({
           let message = '';
           if (changedFields.length > 0) {
             const fieldsText = changedFields.join(', ');
-            // 마지막 필드명의 받침 유무에 따라 조사 결정
             const lastField = changedFields[changedFields.length - 1];
-            const lastChar = lastField.charAt(lastField.length - 1);
-            const code = lastChar.charCodeAt(0);
-            const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
-            const josa = hasJongseong ? '이' : '가';
+            const josa = getJosa(lastField, '이가');
             message = `${selectedItem.name}의 ${fieldsText}${josa} 성공적으로 수정되었습니다.`;
           } else {
-            // 파일명의 받침 유무에 따라 조사 결정
-            const lastChar = selectedItem.name.charAt(selectedItem.name.length - 1);
-            const code = lastChar.charCodeAt(0);
-            const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
-            const josa = hasJongseong ? '이' : '가';
+            const josa = getJosa(selectedItem.name, '이가');
             message = `${selectedItem.name}${josa} 성공적으로 수정되었습니다.`;
           }
           if (setSnackbar) {
@@ -2555,8 +2819,31 @@ function FolderView({
         <Box sx={{ width: '60%' }}>
           <OverviewPanel
             selectedItem={selectedItem}
-            onUpdateItem={handleUpdateItem}
+            onUpdateItem={(updatedItem: Partial<FolderItem>) => {
+              // 폴더뷰 OverviewPanel에서는 로컬 state만 업데이트 (DB 저장은 OverviewPanel 내부 저장 버튼에서 처리)
+              if (!selectedItem) return;
+
+              setFolderData((prev) => {
+                const updateItemInArray = (items: FolderItem[]): FolderItem[] => {
+                  return items.map((item) => {
+                    if (item.id === selectedItem.id) {
+                      const newItem = { ...item, ...updatedItem };
+                      setTimeout(() => {
+                        setSelectedItem(newItem);
+                      }, 0);
+                      return newItem;
+                    }
+                    if (item.children) {
+                      return { ...item, children: updateItemInArray(item.children) };
+                    }
+                    return item;
+                  });
+                };
+                return updateItemInArray(prev);
+              });
+            }}
             updateItem={updateItem}
+            addChangeLog={addChangeLog}
             documentTypes={documentTypes}
             statusTypes={statusTypes}
             assigneeList={assigneeList}
@@ -2565,6 +2852,7 @@ function FolderView({
             canCreateData={canCreateData}
             canEditOwn={canEditOwn}
             canEditOthers={canEditOthers}
+            setSnackbar={setSnackbar}
           />
         </Box>
       </Box>
@@ -2888,6 +3176,23 @@ function KanbanView({
             if (success) {
               console.log('✅ 칸반 드래그: 상태 변경 DB 저장 성공');
 
+              // 변경로그 기록
+              const regulationCode = currentTask.code || `REG-${taskId}`;
+              const regulationTitle = currentTask.workContent || '규정제목 없음';
+              const description = `보안규정관리 ${regulationTitle}(${regulationCode}) 폴더탭의 상태가 ${oldStatus} → ${newStatus} 수정 되었습니다.`;
+
+              addChangeLog(
+                '수정',
+                regulationCode,
+                description,
+                currentTask.team || '미분류',
+                oldStatus,
+                newStatus,
+                '상태',
+                regulationTitle,
+                '폴더탭'
+              );
+
               // 성공 알림
               if (setSnackbar) {
                 setSnackbar({
@@ -2959,12 +3264,7 @@ function KanbanView({
         }
       }
 
-      // 변경로그 추가
-      const taskCode = currentTask.code || `REG-${taskId}`;
-      const workContent = currentTask.workContent || '문서내용 없음';
-      const description = `${workContent} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
-
-      addChangeLog('수정', taskCode, description, currentTask.team || '미분류', '칸반탭');
+      // 변경로그는 handleDragEnd에서 처리하므로 여기서는 추가하지 않음 (중복 방지)
     }
   };
 
@@ -3975,8 +4275,8 @@ function ChangeLogView({
           <TableHead>
             <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
               <TableCell sx={{ fontWeight: 600, width: 50, fontSize: '12px' }}>NO</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 150, fontSize: '12px' }}>변경시간</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 110, fontSize: '12px' }}>코드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 120, fontSize: '12px' }}>변경시간</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 140, fontSize: '12px' }}>코드</TableCell>
               <TableCell sx={{ fontWeight: 600, width: 140, fontSize: '12px' }}>제목</TableCell>
               <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경분류</TableCell>
               <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경위치</TableCell>
@@ -5509,20 +5809,31 @@ export default function RegulationManagement() {
 
   // DB 변경로그를 UI 변경로그 형식으로 변환
   const changeLogs: ChangeLog[] = useMemo(() => {
-    return dbChangeLogs.map((log: ChangeLogData) => ({
-      id: log.id,
-      dateTime: log.change_datetime || '',
-      code: log.regulation_code || '',
-      target: log.regulation_title || '',
-      location: log.change_location || '',
-      action: normalizeActionType(log.change_type || ''),
-      changedField: log.field_name || '',
-      description: log.change_description || '',
-      beforeValue: log.before_value || '',
-      afterValue: log.after_value || '',
-      team: log.team || '',
-      user: log.user_name || ''
-    }));
+    return dbChangeLogs.map((log: ChangeLogData) => {
+      // created_at을 포맷팅
+      const date = new Date(log.created_at);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hour = String(date.getHours()).padStart(2, '0');
+      const minute = String(date.getMinutes()).padStart(2, '0');
+      const formattedDateTime = `${year}.${month}.${day} ${hour}:${minute}`;
+
+      return {
+        id: log.id,
+        dateTime: formattedDateTime,
+        code: log.record_id || '',
+        target: log.title || log.record_id || '',
+        location: log.change_location || '개요탭',
+        action: normalizeActionType(log.action_type || ''),
+        changedField: log.changed_field || '-',
+        description: log.description || '',
+        beforeValue: log.before_value || '',
+        afterValue: log.after_value || '',
+        team: log.team || log.user_department || '-',
+        user: log.user_name || ''
+      };
+    });
   }, [dbChangeLogs, normalizeActionType]);
 
   // 필터 상태
@@ -5539,15 +5850,134 @@ export default function RegulationManagement() {
     yearOptions.push(i.toString());
   }
 
-  // 변경로그 추가 함수 (현재는 빈 함수로 처리, 향후 Supabase 연동 예정)
-  const addChangeLog = (action: string, target: string, description: string, team: string = '시스템', location?: string) => {
-    // TODO: Supabase에 변경로그 저장 기능 구현 필요
-    console.log('📝 변경로그:', { action, target, description, team, location: location || '개요탭' });
-  };
+  // 중복 방지를 위한 마지막 변경로그 정보 저장
+  const lastChangeLogRef = React.useRef<{
+    record_id: string;
+    action_type: string;
+    before_value: string;
+    after_value: string;
+    timestamp: number;
+  } | null>(null);
+
+  // 변경로그 추가 함수
+  const addChangeLog = React.useCallback(
+    async (
+      action: string,
+      target: string,
+      description: string,
+      team: string = '시스템',
+      beforeValue?: string,
+      afterValue?: string,
+      changedField?: string,
+      title?: string,
+      location?: string
+    ) => {
+      try {
+        const userName = currentUser?.user_name || currentUser?.name || user?.name || '시스템';
+        const now = Date.now();
+
+        // 중복 체크: 최근 2초 이내에 동일한 변경로그가 있으면 스킵
+        if (lastChangeLogRef.current) {
+          const timeDiff = now - lastChangeLogRef.current.timestamp;
+          const isSameLog =
+            lastChangeLogRef.current.record_id === target &&
+            lastChangeLogRef.current.action_type === action &&
+            lastChangeLogRef.current.before_value === (beforeValue || '') &&
+            lastChangeLogRef.current.after_value === (afterValue || '');
+
+          if (isSameLog && timeDiff < 2000) {
+            console.log('⚠️ 중복 변경로그 감지 - 저장 스킵');
+            return;
+          }
+        }
+
+        // 마지막 변경로그 정보 업데이트
+        lastChangeLogRef.current = {
+          record_id: target,
+          action_type: action,
+          before_value: beforeValue || '',
+          after_value: afterValue || '',
+          timestamp: now
+        };
+
+        const logData = {
+          page: 'security_regulation',
+          record_id: target, // 코드를 record_id로 사용
+          action_type: action,
+          title: title || null,
+          description: description,
+          before_value: beforeValue || null,
+          after_value: afterValue || null,
+          changed_field: changedField || null,
+          change_location: location || '개요탭',
+          user_name: userName,
+          team: currentUser?.department || '시스템',
+          user_department: currentUser?.department,
+          user_position: currentUser?.position,
+          user_profile_image: currentUser?.profile_image_url,
+          created_at: new Date().toISOString()
+        };
+
+        console.log('📝 보안규정관리 변경로그 저장 시도:', logData);
+
+        // common_log_data에 직접 저장
+        const supabase = createClient();
+        const { data, error } = await supabase.from('common_log_data').insert(logData).select();
+
+        if (error) {
+          console.error('❌ 변경로그 저장 실패:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code,
+            error: error
+          });
+        } else {
+          console.log('✅ 변경로그 저장 성공:', data);
+          // 변경로그 데이터 새로고침
+          if (fetchChangeLogs) {
+            fetchChangeLogs();
+          }
+        }
+      } catch (error) {
+        console.error('❌ 변경로그 저장 중 예외 발생:', error);
+      }
+    },
+    [currentUser, user, fetchChangeLogs]
+  );
+
+  // folderData의 이전 값을 저장하는 ref
+  const prevFolderDataRef = React.useRef<FolderItem[]>(folderData);
+
+  // folderData가 변경될 때마다 이전 값 저장
+  React.useEffect(() => {
+    prevFolderDataRef.current = folderData;
+  }, [folderData]);
 
   // 파일 업데이트 핸들러 (칸반 드래그 앤 드롭용)
   const handleUpdateItem = React.useCallback(
     async (itemId: string, updates: Partial<FolderItem>) => {
+      // 이전 folderData에서 원본 아이템 찾기
+      const findItem = (items: FolderItem[], id: string): FolderItem | null => {
+        for (const item of items) {
+          if (item.id === id) return item;
+          if (item.children) {
+            const found = findItem(item.children, id);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+
+      const originalItem = findItem(prevFolderDataRef.current, itemId);
+
+      console.log('🔄 handleUpdateItem 호출:', {
+        itemId,
+        updates,
+        originalItem,
+        prevFolderData: prevFolderDataRef.current
+      });
+
       // 로컬 상태 업데이트
       setFolderData((prevData) => {
         const updateItemInArray = (items: FolderItem[]): FolderItem[] => {
@@ -5575,6 +6005,62 @@ export default function RegulationManagement() {
         return prev;
       });
 
+      // 변경로그 추가 (각 변경된 필드마다)
+      if (originalItem) {
+        const fieldMap: { [key: string]: string } = {
+          name: '제목',
+          description: '설명',
+          status: '상태',
+          documentType: '보안문서유형',
+          team: '팀',
+          assignee: '담당자',
+          revision: '리비전'
+        };
+
+        Object.keys(updates).forEach((key) => {
+          const oldValue = (originalItem as any)[key];
+          const newValue = (updates as any)[key];
+
+          console.log(`🔍 필드 비교 [${key}]:`, {
+            oldValue,
+            newValue,
+            isDifferent: oldValue !== newValue,
+            hasMapping: !!fieldMap[key]
+          });
+
+          // 실제로 값이 변경된 경우만 변경로그 추가
+          if (oldValue !== newValue && fieldMap[key]) {
+            const regulationCode = originalItem.code || originalItem.id;
+            const regulationTitle = originalItem.name || '규정제목 없음';
+            const fieldName = fieldMap[key];
+            const josa = getJosa(fieldName, '이가');
+            const description = `보안규정관리 ${regulationTitle}(${regulationCode}) 폴더탭의 ${fieldName}${josa} ${oldValue || '(없음)'} → ${newValue || '(없음)'}로 수정 되었습니다.`;
+
+            console.log('📝 폴더탭 변경로그 추가:', {
+              field: fieldName,
+              oldValue,
+              newValue,
+              code: regulationCode,
+              title: regulationTitle
+            });
+
+            addChangeLog(
+              '수정',
+              regulationCode,
+              description,
+              originalItem.team || '미분류',
+              String(oldValue || ''),
+              String(newValue || ''),
+              fieldName,
+              regulationTitle,
+              '폴더탭'
+            );
+          }
+        });
+      } else {
+        console.error('❌ 원본 아이템을 찾을 수 없습니다:', itemId);
+      }
+
       // DB에 저장 (필드명 매핑)
       const dbUpdateData: any = {};
 
@@ -5599,7 +6085,7 @@ export default function RegulationManagement() {
         console.error('DB 업데이트 오류:', error);
       }
     },
-    [updateItem]
+    [updateItem, addChangeLog]
   );
 
   // 카드 클릭 핸들러
@@ -5694,13 +6180,12 @@ export default function RegulationManagement() {
     // 에러 초기화
     setValidationError('');
 
-    // OverviewPanel에서 편집된 내용이 자동으로 handleUpdateItem을 통해 저장되므로
-    // 여기서는 변경 감지 및 토스트 메시지 표시만 수행합니다
+    // 저장 버튼 클릭 시 DB 저장 + 변경로그 추가
 
-    // 변경된 필드 찾기
+    // 변경된 필드 찾기 및 변경로그 추가
     const changedFields: string[] = [];
     const fieldMap: { [key: string]: string } = {
-      name: '파일명',
+      name: '제목',
       description: '설명',
       status: '상태',
       documentType: '보안문서유형',
@@ -5710,6 +6195,11 @@ export default function RegulationManagement() {
     };
 
     if (originalFile) {
+      console.log('📋 폴더탭 저장 - 변경 감지 시작:', {
+        originalFile,
+        selectedFile
+      });
+
       Object.keys(fieldMap).forEach((key) => {
         const oldValue = (originalFile as any)[key];
         const newValue = (selectedFile as any)[key];
@@ -5717,32 +6207,99 @@ export default function RegulationManagement() {
         // 실제로 값이 변경된 경우만 추가
         if (oldValue !== newValue && !changedFields.includes(fieldMap[key])) {
           changedFields.push(fieldMap[key]);
+
+          // 각 필드별 변경로그 추가
+          const regulationCode = selectedFile.code || selectedFile.id;
+          const regulationTitle = selectedFile.name || '규정제목 없음';
+          const fieldName = fieldMap[key];
+          const josa = getJosa(fieldName, '이가');
+          const description = `보안규정관리 ${regulationTitle}(${regulationCode}) 폴더탭의 ${fieldName}${josa} ${oldValue || '(없음)'} → ${newValue || '(없음)'}로 수정 되었습니다.`;
+
+          console.log('📝 폴더탭 변경로그 추가:', {
+            field: fieldName,
+            oldValue,
+            newValue,
+            code: regulationCode,
+            title: regulationTitle
+          });
+
+          addChangeLog(
+            '수정',
+            regulationCode,
+            description,
+            selectedFile.team || '미분류',
+            String(oldValue || ''),
+            String(newValue || ''),
+            fieldName,
+            regulationTitle,
+            '폴더탭'
+          );
         }
       });
     }
 
-    // 변경로그 추가
-    if (changedFields.length > 0) {
-      addChangeLog('수정', selectedFile.code || selectedFile.id, `파일 "${selectedFile.name}" - ${changedFields.join(', ')} 변경`, '시스템');
+    // DB에 저장 (필드명 매핑)
+    const dbUpdateData: any = {};
+    if (selectedFile.name !== undefined) dbUpdateData.name = selectedFile.name;
+    if (selectedFile.description !== undefined) dbUpdateData.description = selectedFile.description;
+    if (selectedFile.status !== undefined) dbUpdateData.status = selectedFile.status;
+    if (selectedFile.documentType !== undefined && selectedFile.documentType !== '선택' && selectedFile.documentType.trim()) {
+      dbUpdateData.document_type = selectedFile.documentType;
     }
+    if (selectedFile.team !== undefined) dbUpdateData.team = selectedFile.team;
+    if (selectedFile.assignee !== undefined) dbUpdateData.assignee = selectedFile.assignee;
+    if (selectedFile.code !== undefined) dbUpdateData.code = selectedFile.code;
+
+    // DB 업데이트 실행
+    (async () => {
+      try {
+        const success = await updateItem(Number(selectedFile.id), dbUpdateData);
+        if (!success) {
+          console.error('❌ DB 업데이트 실패');
+          setSnackbar({
+            open: true,
+            message: '저장 중 오류가 발생했습니다.',
+            severity: 'error'
+          });
+          return;
+        }
+        console.log('✅ DB 업데이트 성공');
+      } catch (error) {
+        console.error('❌ DB 업데이트 오류:', error);
+        setSnackbar({
+          open: true,
+          message: '저장 중 오류가 발생했습니다.',
+          severity: 'error'
+        });
+        return;
+      }
+    })();
+
+    // folderData state도 업데이트
+    setFolderData((prevData) => {
+      const updateItemInArray = (items: FolderItem[]): FolderItem[] => {
+        return items.map((item) => {
+          if (item.id === selectedFile.id) {
+            return { ...item, ...selectedFile };
+          }
+          if (item.children) {
+            return { ...item, children: updateItemInArray(item.children) };
+          }
+          return item;
+        });
+      };
+      return updateItemInArray(prevData);
+    });
 
     // 성공 알림
     let message = '';
     if (changedFields.length > 0) {
       const fieldsText = changedFields.join(', ');
-      // 마지막 필드명의 받침 유무에 따라 조사 결정
       const lastField = changedFields[changedFields.length - 1];
-      const lastChar = lastField.charAt(lastField.length - 1);
-      const code = lastChar.charCodeAt(0);
-      const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
-      const josa = hasJongseong ? '이' : '가';
+      const josa = getJosa(lastField, '이가');
       message = `${selectedFile.name}의 ${fieldsText}${josa} 성공적으로 수정되었습니다.`;
     } else {
-      // 파일명의 받침 유무에 따라 조사 결정
-      const lastChar = selectedFile.name.charAt(selectedFile.name.length - 1);
-      const code = lastChar.charCodeAt(0);
-      const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
-      const josa = hasJongseong ? '이' : '가';
+      const josa = getJosa(selectedFile.name, '이가');
       message = `${selectedFile.name}${josa} 성공적으로 수정되었습니다.`;
     }
 
@@ -5874,19 +6431,11 @@ export default function RegulationManagement() {
       let message = '';
       if (changedFields.length > 0) {
         const fieldsText = changedFields.join(', ');
-        // 마지막 필드명의 받침 유무에 따라 조사 결정
         const lastField = changedFields[changedFields.length - 1];
-        const lastChar = lastField.charAt(lastField.length - 1);
-        const code = lastChar.charCodeAt(0);
-        const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
-        const josa = hasJongseong ? '이' : '가';
+        const josa = getJosa(lastField, '이가');
         message = `${updatedTask.workContent}의 ${fieldsText}${josa} 성공적으로 수정되었습니다.`;
       } else {
-        // 업무내용의 받침 유무에 따라 조사 결정
-        const lastChar = updatedTask.workContent.charAt(updatedTask.workContent.length - 1);
-        const code = lastChar.charCodeAt(0);
-        const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
-        const josa = hasJongseong ? '이' : '가';
+        const josa = getJosa(updatedTask.workContent, '이가');
         message = `${updatedTask.workContent}${josa} 성공적으로 수정되었습니다.`;
       }
       setSnackbar({
@@ -5900,10 +6449,7 @@ export default function RegulationManagement() {
       addChangeLog('추가', updatedTask.code, `새로운 업무가 생성되었습니다: ${updatedTask.workContent}`, updatedTask.team);
 
       // 성공 알림
-      const lastChar = updatedTask.workContent.charAt(updatedTask.workContent.length - 1);
-      const code = lastChar.charCodeAt(0);
-      const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
-      const josa = hasJongseong ? '이' : '가';
+      const josa = getJosa(updatedTask.workContent, '이가');
       setSnackbar({
         open: true,
         message: `${updatedTask.workContent}${josa} 성공적으로 추가되었습니다.`,
@@ -6276,6 +6822,7 @@ export default function RegulationManagement() {
                     createItem={createItem}
                     deleteItem={deleteItem}
                     fetchTree={fetchTree}
+                    addChangeLog={addChangeLog}
                     documentTypes={documentTypes}
                     statusTypes={statusTypes}
                     assigneeList={assigneeList}
@@ -6617,7 +7164,16 @@ export default function RegulationManagement() {
               {selectedTab === 0 && (
                 <OverviewTab
                   selectedItem={selectedFile}
-                  onUpdateItem={(updates) => handleUpdateItem(selectedFile.id, updates)}
+                  onUpdateItem={(updates) => {
+                    // 폴더탭 다이얼로그에서는 로컬 state만 업데이트 (DB 저장 안 함)
+                    // 저장 버튼 클릭 시에만 DB에 저장하고 변경로그 추가
+                    setSelectedFile((prev) => {
+                      if (prev && prev.id === selectedFile.id) {
+                        return { ...prev, ...updates };
+                      }
+                      return prev;
+                    });
+                  }}
                   latestRevision={getLatestRevisionInfo().latestRevision}
                   latestRevisionDate={getLatestRevisionInfo().latestRevisionDate}
                   documentTypes={documentTypes}

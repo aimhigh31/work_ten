@@ -1255,12 +1255,13 @@ export default function CostDataTable({
             await addChangeLog(
               '추가',
               savedCost.code,
-              `비용관리 ${savedCost.content}(${savedCost.code}) 정보의 개요탭 데이터가 추가 되었습니다.`,
+              `비용관리 ${savedCost.content}(${savedCost.code})의 데이터가 추가 되었습니다.`,
               savedCost.team || '미분류',
-              '',
-              `${savedCost.content} - ${Number(savedCost.amount).toLocaleString()}원`,
-              '개요탭',
-              savedCost.content
+              undefined,
+              undefined,
+              undefined,
+              savedCost.content,
+              undefined
             );
           }
 
@@ -1381,7 +1382,7 @@ export default function CostDataTable({
               await addChangeLog(
                 '수정',
                 costCode,
-                `비용관리 ${costTitle}(${costCode}) 정보의 개요탭 제목이 ${originalCost.title || ''} → ${overviewData.title || ''} 로 수정 되었습니다.`,
+                `비용관리 ${costTitle}(${costCode}) 개요탭의 제목이 ${originalCost.title || ''} → ${overviewData.title || ''} 로 수정 되었습니다.`,
                 overviewData.team || '미분류',
                 originalCost.title || '',
                 overviewData.title || '',
@@ -1395,7 +1396,7 @@ export default function CostDataTable({
               await addChangeLog(
                 '수정',
                 costCode,
-                `비용관리 ${costTitle}(${costCode}) 정보의 개요탭 비용내용이 ${originalCost.content || ''} → ${overviewData.content || ''} 로 수정 되었습니다.`,
+                `비용관리 ${costTitle}(${costCode}) 개요탭의 비용내용이 ${originalCost.content || ''} → ${overviewData.content || ''} 로 수정 되었습니다.`,
                 overviewData.team || '미분류',
                 originalCost.content || '',
                 overviewData.content || '',
@@ -1409,7 +1410,7 @@ export default function CostDataTable({
               await addChangeLog(
                 '수정',
                 costCode,
-                `비용관리 ${costTitle}(${costCode}) 정보의 개요탭 비용유형이 ${originalCost.costType || ''} → ${overviewData.costType || ''} 로 수정 되었습니다.`,
+                `비용관리 ${costTitle}(${costCode}) 개요탭의 비용유형이 ${originalCost.costType || ''} → ${overviewData.costType || ''} 로 수정 되었습니다.`,
                 overviewData.team || '미분류',
                 originalCost.costType || '',
                 overviewData.costType || '',
@@ -1423,7 +1424,7 @@ export default function CostDataTable({
               await addChangeLog(
                 '수정',
                 costCode,
-                `비용관리 ${costTitle}(${costCode}) 정보의 개요탭 팀이 ${originalCost.team || ''} → ${overviewData.team || ''} 로 수정 되었습니다.`,
+                `비용관리 ${costTitle}(${costCode}) 개요탭의 팀이 ${originalCost.team || ''} → ${overviewData.team || ''} 로 수정 되었습니다.`,
                 overviewData.team || '미분류',
                 originalCost.team || '',
                 overviewData.team || '',
@@ -1437,7 +1438,7 @@ export default function CostDataTable({
               await addChangeLog(
                 '수정',
                 costCode,
-                `비용관리 ${costTitle}(${costCode}) 정보의 개요탭 담당자가 ${originalCost.assignee || ''} → ${overviewData.assignee || ''} 로 수정 되었습니다.`,
+                `비용관리 ${costTitle}(${costCode}) 개요탭의 담당자가 ${originalCost.assignee || ''} → ${overviewData.assignee || ''} 로 수정 되었습니다.`,
                 overviewData.team || '미분류',
                 originalCost.assignee || '',
                 overviewData.assignee || '',
@@ -1451,7 +1452,7 @@ export default function CostDataTable({
               await addChangeLog(
                 '수정',
                 costCode,
-                `비용관리 ${costTitle}(${costCode}) 정보의 개요탭 상태가 ${originalCost.status || ''} → ${overviewData.status || ''} 로 수정 되었습니다.`,
+                `비용관리 ${costTitle}(${costCode}) 개요탭의 상태가 ${originalCost.status || ''} → ${overviewData.status || ''} 로 수정 되었습니다.`,
                 overviewData.team || '미분류',
                 originalCost.status || '',
                 overviewData.status || '',
@@ -1465,7 +1466,7 @@ export default function CostDataTable({
               await addChangeLog(
                 '수정',
                 costCode,
-                `비용관리 ${costTitle}(${costCode}) 정보의 개요탭 시작일이 ${originalCost.startDate || ''} → ${overviewData.startDate || ''} 로 수정 되었습니다.`,
+                `비용관리 ${costTitle}(${costCode}) 개요탭의 시작일이 ${originalCost.startDate || ''} → ${overviewData.startDate || ''} 로 수정 되었습니다.`,
                 overviewData.team || '미분류',
                 originalCost.startDate || '',
                 overviewData.startDate || '',
@@ -1479,7 +1480,7 @@ export default function CostDataTable({
               await addChangeLog(
                 '수정',
                 costCode,
-                `비용관리 ${costTitle}(${costCode}) 정보의 개요탭 완료일이 ${originalCost.completionDate || ''} → ${overviewData.completionDate || ''} 로 수정 되었습니다.`,
+                `비용관리 ${costTitle}(${costCode}) 개요탭의 완료일이 ${originalCost.completionDate || ''} → ${overviewData.completionDate || ''} 로 수정 되었습니다.`,
                 overviewData.team || '미분류',
                 originalCost.completionDate || '',
                 overviewData.completionDate || '',
@@ -1493,7 +1494,7 @@ export default function CostDataTable({
               await addChangeLog(
                 '수정',
                 costCode,
-                `비용관리 ${costTitle}(${costCode}) 정보의 개요탭 금액이 ${originalCost.amount || ''} → ${totalAmount || ''} 로 수정 되었습니다.`,
+                `비용관리 ${costTitle}(${costCode}) 개요탭의 금액이 ${originalCost.amount || ''} → ${totalAmount || ''} 로 수정 되었습니다.`,
                 overviewData.team || '미분류',
                 String(originalCost.amount || ''),
                 String(totalAmount || ''),
@@ -1668,12 +1669,13 @@ export default function CostDataTable({
           await addChangeLog(
             '삭제',
             costCode,
-            `비용관리 ${costTitle}(${costCode}) 정보의 데이터탭 데이터가 삭제 되었습니다.`,
+            `비용관리 ${costTitle}(${costCode})의 데이터가 삭제 되었습니다.`,
             record.team || '미분류',
-            `${costTitle} - ${Number(record.amount).toLocaleString()}원`,
-            '',
-            '데이터탭',
-            costTitle
+            undefined,
+            undefined,
+            undefined,
+            costTitle,
+            undefined
           );
         }
       }

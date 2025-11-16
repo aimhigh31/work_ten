@@ -262,10 +262,17 @@ function KanbanView({
 
   // 카드 클릭 핸들러
   const handleCardClick = (task: TaskTableData) => {
-    console.log('🔵 TaskManagement - 다이얼로그 열기 시 tasks:', tasks);
-    console.log('🔵 TaskManagement - 다이얼로그 열기 시 tasks 개수:', tasks?.length);
-    setEditingTask(task);
-    setEditDialog(true);
+    console.log('🔵 KanbanView - 다이얼로그 열기 시 tasks:', tasks);
+    console.log('🔵 KanbanView - 다이얼로그 열기 시 tasks 개수:', tasks?.length);
+
+    // ✅ 최신 tasks 배열에서 id로 찾아서 사용 (클로저 문제 해결)
+    const latestTask = tasks.find((t) => t.id === task.id);
+    if (latestTask) {
+      setEditingTask(latestTask);
+      setEditDialog(true);
+    } else {
+      console.error('❌ Task를 찾을 수 없습니다:', task.id);
+    }
   };
 
   // 편집 다이얼로그 닫기
@@ -377,7 +384,7 @@ function KanbanView({
         // 변경로그 추가
         const taskCode = currentTask.code || `TASK-${taskId}`;
         const workContent = currentTask.workContent || '업무내용 없음';
-        const description = `업무관리 ${workContent}(${taskCode}) 정보의 칸반탭 상태가 ${oldStatus} → ${newStatus} 로 수정 되었습니다.`;
+        const description = `업무관리 ${workContent}(${taskCode}) 개요탭의 상태가 ${oldStatus} → ${newStatus}로 수정 되었습니다.`;
 
         await addChangeLog('수정', taskCode, description, currentTask.team || '시스템', oldStatus, newStatus, '상태', workContent, '칸반탭');
 
@@ -1407,18 +1414,18 @@ function ChangeLogView({
         <Table size="small">
           <TableHead>
             <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
-              <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 130 }}>변경시간</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 180 }}>제목</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 140 }}>코드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경분류</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경위치</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>변경필드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 100 }}>변경전</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 100 }}>변경후</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 300 }}>변경 세부내용</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 50, fontSize: '12px' }}>NO</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 130, fontSize: '12px' }}>변경시간</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 140, fontSize: '12px' }}>코드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 180, fontSize: '12px' }}>제목</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경분류</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경위치</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경필드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경전</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경후</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 300, fontSize: '12px' }}>변경 세부내용</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>팀</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경자</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -1431,37 +1438,37 @@ function ChangeLogView({
                 }}
               >
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {changeLogs.length - (page * rowsPerPage + index)}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {log.dateTime}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
-                    {log.title}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {log.code}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                    {log.title}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {log.action}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {log.location}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {log.changedField || '-'}
                   </Typography>
                 </TableCell>
@@ -1469,7 +1476,7 @@ function ChangeLogView({
                   <Typography
                     variant="body2"
                     sx={{
-                      fontSize: '13px',
+                      fontSize: '12px',
                       color: 'text.primary',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -1485,7 +1492,7 @@ function ChangeLogView({
                   <Typography
                     variant="body2"
                     sx={{
-                      fontSize: '13px',
+                      fontSize: '12px',
                       color: 'text.primary',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -1501,7 +1508,7 @@ function ChangeLogView({
                   <Typography
                     variant="body2"
                     sx={{
-                      fontSize: '13px',
+                      fontSize: '12px',
                       color: 'text.primary',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -1517,12 +1524,12 @@ function ChangeLogView({
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {log.team}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.primary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
                     {log.user}
                   </Typography>
                 </TableCell>
@@ -2800,6 +2807,18 @@ export default function TaskManagement() {
   const changeLogs = React.useMemo(() => {
     if (!dbChangeLogs) return [];
 
+    // action_type 매핑 함수
+    const mapActionType = (actionType: string): string => {
+      if (actionType === '추가' || actionType.includes('추가') || actionType.includes('등록') || actionType.includes('생성')) {
+        return '추가';
+      } else if (actionType === '수정' || actionType.includes('수정') || actionType.includes('변경')) {
+        return '수정';
+      } else if (actionType === '삭제' || actionType.includes('삭제')) {
+        return '삭제';
+      }
+      return '수정'; // 기본값
+    };
+
     return dbChangeLogs.map((log: ChangeLogData) => {
       // record_id로 해당 업무 찾기 (record_id는 코드로 저장되어 있음)
       const taskItem = tasks.find((t) => t.code === log.record_id);
@@ -2817,7 +2836,7 @@ export default function TaskManagement() {
         dateTime: formattedDateTime,
         title: log.title || '',
         code: log.record_id,
-        action: log.action_type,
+        action: mapActionType(log.action_type),
         location: log.change_location || '-',
         changedField: log.changed_field || '-',
         beforeValue: log.before_value || '-',
@@ -2931,8 +2950,15 @@ export default function TaskManagement() {
   const handleCardClick = (task: TaskTableData) => {
     console.log('🔵 TaskManagement - 다이얼로그 열기 시 tasks:', tasks);
     console.log('🔵 TaskManagement - 다이얼로그 열기 시 tasks 개수:', tasks?.length);
-    setEditingTask(task);
-    setEditDialog(true);
+
+    // ✅ 최신 tasks 배열에서 id로 찾아서 사용 (클로저 문제 해결)
+    const latestTask = tasks.find((t) => t.id === task.id);
+    if (latestTask) {
+      setEditingTask(latestTask);
+      setEditDialog(true);
+    } else {
+      console.error('❌ Task를 찾을 수 없습니다:', task.id);
+    }
   };
 
   // 편집 다이얼로그 닫기
@@ -3034,6 +3060,9 @@ export default function TaskManagement() {
         // ✅ updateTask가 내부에서 setTasks 호출 (KPI 패턴)
         console.log('✅ 로컬 상태에서 업무 정보 즉시 갱신 완료');
 
+        // ✅ DB에서 최신 데이터 강제 새로고침 (팝업 재오픈 시 최신 데이터 보장)
+        await getTasks(true);
+
         // 성공 알림
         if (changes.length > 0) {
           const firstField = changes[0].fieldKorean;
@@ -3096,12 +3125,13 @@ export default function TaskManagement() {
         await addChangeLog(
           '추가',
           updatedTask.code,
-          `업무관리 ${taskTitle}(${updatedTask.code}) 정보의 개요탭 데이터가 추가 되었습니다.`,
+          `업무관리 ${taskTitle}(${updatedTask.code})의 데이터가 추가 되었습니다.`,
           updatedTask.team || '시스템',
-          '',
+          undefined,
+          undefined,
+          undefined,
           taskTitle,
-          '개요탭',
-          taskTitle
+          '개요탭'
         );
 
         // ✅ addTaskToDb가 내부에서 setTasks 호출 (KPI 패턴)
@@ -3164,12 +3194,13 @@ export default function TaskManagement() {
             await addChangeLog(
               '삭제',
               taskCode,
-              `업무관리 ${taskTitle}(${taskCode}) 정보의 데이터탭 데이터가 삭제 되었습니다.`,
+              `업무관리 ${taskTitle}(${taskCode})의 데이터가 삭제 되었습니다.`,
               task.team || '시스템',
+              undefined,
+              undefined,
+              undefined,
               taskTitle,
-              '',
-              '데이터탭',
-              taskTitle
+              '데이터탭'
             );
           }
 
@@ -3230,12 +3261,13 @@ export default function TaskManagement() {
           await addChangeLog(
             '추가',
             taskCode,
-            `업무관리 ${taskTitle}(${taskCode}) 정보의 데이터탭 데이터가 추가 되었습니다.`,
+            `업무관리 ${taskTitle}(${taskCode})의 데이터가 추가 되었습니다.`,
             taskInput.team || '시스템',
-            '',
+            undefined,
+            undefined,
+            undefined,
             taskTitle,
-            '데이터탭',
-            taskTitle
+            '데이터탭'
           );
 
           console.log('✅ 업무 추가 완료:', taskCode);
@@ -3628,6 +3660,7 @@ export default function TaskManagement() {
                   users={users}
                   onDeleteTasks={handleDeleteTasks}
                   onAddTask={handleAddTask}
+                  getTasks={getTasks}
                   addChangeLog={addChangeLog}
                   setSnackbar={setSnackbar}
                   canCreateData={canCreateData}

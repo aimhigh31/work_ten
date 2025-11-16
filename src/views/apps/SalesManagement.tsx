@@ -174,18 +174,18 @@ function ChangeLogView({
         <Table size="small">
           <TableHead>
             <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
-              <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 110 }}>변경시간</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 150 }}>제목</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 120 }}>코드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경분류</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 70 }}>변경위치</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 100 }}>변경필드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 120 }}>변경전</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 120 }}>변경후</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 330 }}>변경 세부내용</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 50, fontSize: '12px' }}>NO</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 110, fontSize: '12px' }}>변경시간</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 160, fontSize: '12px' }}>코드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 150, fontSize: '12px' }}>제목</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경분류</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경위치</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경필드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경전</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경후</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 330, fontSize: '12px' }}>변경 세부내용</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>팀</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90, fontSize: '12px' }}>변경자</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -198,47 +198,47 @@ function ChangeLogView({
                 }}
               >
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {changeLogs.length - (page * rowsPerPage + index)}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.dateTime}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                    {log.title}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.code}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', fontWeight: 500 }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                    {log.title}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '12px', fontWeight: 500 }}>
                     {log.action}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.location}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.changedField}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.beforeValue}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.afterValue}
                   </Typography>
                 </TableCell>
@@ -246,7 +246,7 @@ function ChangeLogView({
                   <Typography
                     variant="body2"
                     sx={{
-                      fontSize: '13px',
+                      fontSize: '12px',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'normal',
@@ -261,12 +261,12 @@ function ChangeLogView({
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.team}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.user}
                   </Typography>
                 </TableCell>
@@ -518,7 +518,9 @@ function SalesDashboardView({
   // 담당자별 통계 (원형차트용)
   const assigneeStats = filteredData.reduce(
     (acc, item) => {
-      const assignee = item.registrant || '미할당';
+      // registrant에서 서브코드 제거 (예: "송씨 GROUP004-SUB003" → "송씨")
+      const rawAssignee = item.registrant || '미할당';
+      const assignee = rawAssignee.replace(/\s+GROUP\d+-SUB\d+$/g, '').trim() || '미할당';
       acc[assignee] = (acc[assignee] || 0) + 1;
       return acc;
     },
@@ -2658,7 +2660,7 @@ export default function SalesManagement() {
                   await addChangeLog(
                     '수정',
                     salesCode,
-                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 고객명이 ${originalSales.customerName || ''} → ${updateInput.customerName || ''} 로 수정 되었습니다.`,
+                    `매출관리 ${salesTitle}(${salesCode}) 개요탭의 고객명이 ${originalSales.customerName || ''} → ${updateInput.customerName || ''} 로 수정 되었습니다.`,
                     updateInput.businessUnit || '미분류',
                     originalSales.customerName || '',
                     updateInput.customerName || '',
@@ -2672,7 +2674,7 @@ export default function SalesManagement() {
                   await addChangeLog(
                     '수정',
                     salesCode,
-                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 판매유형이 ${originalSales.salesType || ''} → ${updateInput.salesType || ''} 로 수정 되었습니다.`,
+                    `매출관리 ${salesTitle}(${salesCode}) 개요탭의 판매유형이 ${originalSales.salesType || ''} → ${updateInput.salesType || ''} 로 수정 되었습니다.`,
                     updateInput.businessUnit || '미분류',
                     originalSales.salesType || '',
                     updateInput.salesType || '',
@@ -2686,7 +2688,7 @@ export default function SalesManagement() {
                   await addChangeLog(
                     '수정',
                     salesCode,
-                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 사업부가 ${originalSales.businessUnit || ''} → ${updateInput.businessUnit || ''} 로 수정 되었습니다.`,
+                    `매출관리 ${salesTitle}(${salesCode}) 개요탭의 사업부가 ${originalSales.businessUnit || ''} → ${updateInput.businessUnit || ''} 로 수정 되었습니다.`,
                     updateInput.businessUnit || '미분류',
                     originalSales.businessUnit || '',
                     updateInput.businessUnit || '',
@@ -2700,7 +2702,7 @@ export default function SalesManagement() {
                   await addChangeLog(
                     '수정',
                     salesCode,
-                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 품목명이 ${originalSales.itemName || ''} → ${updateInput.itemName || ''} 로 수정 되었습니다.`,
+                    `매출관리 ${salesTitle}(${salesCode}) 개요탭의 품목명이 ${originalSales.itemName || ''} → ${updateInput.itemName || ''} 로 수정 되었습니다.`,
                     updateInput.businessUnit || '미분류',
                     originalSales.itemName || '',
                     updateInput.itemName || '',
@@ -2714,7 +2716,7 @@ export default function SalesManagement() {
                   await addChangeLog(
                     '수정',
                     salesCode,
-                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 상태가 ${originalSales.status || ''} → ${updateInput.status || ''} 로 수정 되었습니다.`,
+                    `매출관리 ${salesTitle}(${salesCode}) 개요탭의 상태가 ${originalSales.status || ''} → ${updateInput.status || ''} 로 수정 되었습니다.`,
                     updateInput.businessUnit || '미분류',
                     originalSales.status || '',
                     updateInput.status || '',
@@ -2728,7 +2730,7 @@ export default function SalesManagement() {
                   await addChangeLog(
                     '수정',
                     salesCode,
-                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 팀이 ${originalSales.team || ''} → ${updateInput.team || ''} 로 수정 되었습니다.`,
+                    `매출관리 ${salesTitle}(${salesCode}) 개요탭의 팀이 ${originalSales.team || ''} → ${updateInput.team || ''} 로 수정 되었습니다.`,
                     updateInput.businessUnit || '미분류',
                     originalSales.team || '',
                     updateInput.team || '',
@@ -2742,7 +2744,7 @@ export default function SalesManagement() {
                   await addChangeLog(
                     '수정',
                     salesCode,
-                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 등록자가 ${originalSales.registrant || ''} → ${updateInput.registrant || ''} 로 수정 되었습니다.`,
+                    `매출관리 ${salesTitle}(${salesCode}) 개요탭의 등록자가 ${originalSales.registrant || ''} → ${updateInput.registrant || ''} 로 수정 되었습니다.`,
                     updateInput.businessUnit || '미분류',
                     originalSales.registrant || '',
                     updateInput.registrant || '',
@@ -2756,7 +2758,7 @@ export default function SalesManagement() {
                   await addChangeLog(
                     '수정',
                     salesCode,
-                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 모델코드가 ${originalSales.modelCode || ''} → ${updatedRecord.modelCode || ''} 로 수정 되었습니다.`,
+                    `매출관리 ${salesTitle}(${salesCode}) 개요탭의 모델코드가 ${originalSales.modelCode || ''} → ${updatedRecord.modelCode || ''} 로 수정 되었습니다.`,
                     updatedRecord.businessUnit || '미분류',
                     originalSales.modelCode || '',
                     updatedRecord.modelCode || '',
@@ -2770,7 +2772,7 @@ export default function SalesManagement() {
                   await addChangeLog(
                     '수정',
                     salesCode,
-                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 품목코드가 ${originalSales.itemCode || ''} → ${updatedRecord.itemCode || ''} 로 수정 되었습니다.`,
+                    `매출관리 ${salesTitle}(${salesCode}) 개요탭의 품목코드가 ${originalSales.itemCode || ''} → ${updatedRecord.itemCode || ''} 로 수정 되었습니다.`,
                     updatedRecord.businessUnit || '미분류',
                     originalSales.itemCode || '',
                     updatedRecord.itemCode || '',
@@ -2784,7 +2786,7 @@ export default function SalesManagement() {
                   await addChangeLog(
                     '수정',
                     salesCode,
-                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 수량이 ${originalSales.quantity || ''} → ${updatedRecord.quantity || ''} 로 수정 되었습니다.`,
+                    `매출관리 ${salesTitle}(${salesCode}) 개요탭의 수량이 ${originalSales.quantity || ''} → ${updatedRecord.quantity || ''} 로 수정 되었습니다.`,
                     updatedRecord.businessUnit || '미분류',
                     String(originalSales.quantity || ''),
                     String(updatedRecord.quantity || ''),
@@ -2798,7 +2800,7 @@ export default function SalesManagement() {
                   await addChangeLog(
                     '수정',
                     salesCode,
-                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 단가가 ${originalSales.unitPrice || ''} → ${updatedRecord.unitPrice || ''} 로 수정 되었습니다.`,
+                    `매출관리 ${salesTitle}(${salesCode}) 개요탭의 단가가 ${originalSales.unitPrice || ''} → ${updatedRecord.unitPrice || ''} 로 수정 되었습니다.`,
                     updatedRecord.businessUnit || '미분류',
                     String(originalSales.unitPrice || ''),
                     String(updatedRecord.unitPrice || ''),
@@ -2812,7 +2814,7 @@ export default function SalesManagement() {
                   await addChangeLog(
                     '수정',
                     salesCode,
-                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 총액이 ${originalSales.totalAmount || ''} → ${updatedRecord.totalAmount || ''} 로 수정 되었습니다.`,
+                    `매출관리 ${salesTitle}(${salesCode}) 개요탭의 총액이 ${originalSales.totalAmount || ''} → ${updatedRecord.totalAmount || ''} 로 수정 되었습니다.`,
                     updatedRecord.businessUnit || '미분류',
                     String(originalSales.totalAmount || ''),
                     String(updatedRecord.totalAmount || ''),
@@ -2826,7 +2828,7 @@ export default function SalesManagement() {
                   await addChangeLog(
                     '수정',
                     salesCode,
-                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 납품일이 ${originalSales.deliveryDate || ''} → ${updatedRecord.deliveryDate || ''} 로 수정 되었습니다.`,
+                    `매출관리 ${salesTitle}(${salesCode}) 개요탭의 납품일이 ${originalSales.deliveryDate || ''} → ${updatedRecord.deliveryDate || ''} 로 수정 되었습니다.`,
                     updatedRecord.businessUnit || '미분류',
                     originalSales.deliveryDate || '',
                     updatedRecord.deliveryDate || '',
@@ -2840,7 +2842,7 @@ export default function SalesManagement() {
                   await addChangeLog(
                     '수정',
                     salesCode,
-                    `매출관리 ${salesTitle}(${salesCode}) 정보의 개요탭 비고가 ${originalSales.notes || ''} → ${updatedRecord.notes || ''} 로 수정 되었습니다.`,
+                    `매출관리 ${salesTitle}(${salesCode}) 개요탭의 비고가 ${originalSales.notes || ''} → ${updatedRecord.notes || ''} 로 수정 되었습니다.`,
                     updatedRecord.businessUnit || '미분류',
                     originalSales.notes || '',
                     updatedRecord.notes || '',
@@ -2916,12 +2918,13 @@ export default function SalesManagement() {
                 await addChangeLog(
                   '추가',
                   newSales.code,
-                  `매출관리 ${newSales.customerName}(${newSales.code}) 정보의 개요탭 데이터가 추가 되었습니다.`,
+                  `매출관리 ${newSales.customerName}(${newSales.code})의 데이터가 추가 되었습니다.`,
                   newSales.businessUnit || '미분류',
-                  '',
-                  `${newSales.customerName} - ${newSales.itemName} (${Number(newSales.totalAmount).toLocaleString()}원)`,
-                  '개요탭',
-                  newSales.itemName
+                  undefined,
+                  undefined,
+                  undefined,
+                  newSales.itemName,
+                  undefined
                 );
 
                 // 토스트 알림 추가
@@ -3308,7 +3311,7 @@ function SalesKanbanView({
             const salesCode = currentSales.code || `SALES-${salesId}`;
             const customerName = getCodeName('GROUP039', currentSales.customerName) || '매출정보 없음';
             const businessUnitName = getCodeName('GROUP035', currentSales.businessUnit) || '미분류';
-            const description = `${customerName} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
+            const description = `매출관리 ${customerName}(${salesCode}) 개요탭의 상태가 ${oldStatus} → ${newStatus}로 수정 되었습니다.`;
 
             addChangeLog('수정', salesCode, description, businessUnitName, oldStatus, newStatus, '상태', customerName, '칸반탭').catch((logError) => {
               console.error('변경로그 추가 중 비동기 오류:', logError);
@@ -3319,9 +3322,10 @@ function SalesKanbanView({
 
           // 토스트 알림 추가
           const salesCode = currentSales.code || `SALES-${salesId}`;
+          const customerName = getCodeName('GROUP039', currentSales.customerName) || '매출정보 없음';
           setSnackbar({
             open: true,
-            message: `${salesCode}의 상태가 ${oldStatus} → ${newStatus}로 변경되었습니다.`,
+            message: `매출관리 ${customerName}(${salesCode}) 개요탭의 상태가 ${oldStatus} → ${newStatus}로 수정 되었습니다.`,
             severity: 'success'
           });
         } catch (error) {

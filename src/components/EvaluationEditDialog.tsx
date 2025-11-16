@@ -2024,11 +2024,15 @@ export default function EvaluationEditDialog({
               registrationDate: evaluation.registrationDate || new Date().toISOString().split('T')[0],
               team: dbData.team || evaluation.team || '개발팀',
               details: dbData.details || evaluation.details || '',
-              performance: evaluation.performance || '',
-              improvements: evaluation.improvements || '',
-              thoughts: evaluation.thoughts || '',
-              notes: evaluation.notes || ''
+              performance: dbData.performance || evaluation.performance || '',
+              improvements: dbData.improvements || evaluation.improvements || '',
+              thoughts: dbData.thoughts || evaluation.thoughts || '',
+              notes: dbData.notes || evaluation.notes || '',
+              checklistGuide: dbData.checklist_guide || evaluation.checklistGuide || ''
             });
+
+            // 디버깅: checklistGuide 값 확인
+            console.log('📋 Dialog에서 불러온 checklistGuide:', dbData.checklist_guide);
           }
         } catch (error) {
           console.error('❌ DB 데이터 로드 실패:', error);
@@ -2049,7 +2053,8 @@ export default function EvaluationEditDialog({
             performance: evaluation.performance || '',
             improvements: evaluation.improvements || '',
             thoughts: evaluation.thoughts || '',
-            notes: evaluation.notes || ''
+            notes: evaluation.notes || '',
+            checklistGuide: evaluation.checklistGuide || ''
           });
         }
       } else {
@@ -2070,7 +2075,8 @@ export default function EvaluationEditDialog({
           performance: evaluation.performance || '',
           improvements: evaluation.improvements || '',
           thoughts: evaluation.thoughts || '',
-          notes: evaluation.notes || ''
+          notes: evaluation.notes || '',
+          checklistGuide: evaluation.checklistGuide || ''
         });
       }
     };

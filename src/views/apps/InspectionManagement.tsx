@@ -75,6 +75,30 @@ interface ChangeLog {
   user: string;
 }
 
+// 한국어 조사 선택 함수
+function getJosa(word: string, josaType: '이가' | '은는' | '을를'): string {
+  if (!word || word.length === 0) return josaType === '이가' ? '이' : josaType === '은는' ? '은' : '을';
+
+  const lastChar = word.charAt(word.length - 1);
+  const code = lastChar.charCodeAt(0);
+
+  // 한글이 아닌 경우
+  if (code < 0xac00 || code > 0xd7a3) {
+    return josaType === '이가' ? '가' : josaType === '은는' ? '는' : '를';
+  }
+
+  // 받침 유무 확인
+  const hasJongseong = (code - 0xac00) % 28 !== 0;
+
+  if (josaType === '이가') {
+    return hasJongseong ? '이' : '가';
+  } else if (josaType === '은는') {
+    return hasJongseong ? '은' : '는';
+  } else {
+    return hasJongseong ? '을' : '를';
+  }
+}
+
 // Icons
 import { TableDocument, Chart, Calendar, Element, DocumentText } from '@wandersonalwes/iconsax-react';
 
@@ -128,6 +152,7 @@ interface KanbanViewProps {
     changedField?: string,
     title?: string
   ) => void;
+  onSave?: (inspection: InspectionTableData) => Promise<InspectionTableData | null>;
   generateInspectionCode?: () => Promise<string>;
   assigneeList?: any[];
   users?: any[];
@@ -154,6 +179,7 @@ function KanbanView({
   inspections,
   setInspections,
   addChangeLog,
+  onSave,
   generateInspectionCode,
   assigneeList,
   users = [],
@@ -239,98 +265,7 @@ function KanbanView({
     setEditingInspection(null);
   };
 
-  // Inspection 저장 핸들러
-  const handleEditInspectionSave = (updatedInspection: InspectionTableData) => {
-    const originalInspection = inspections.find((t) => t.id === updatedInspection.id);
-
-    if (originalInspection) {
-      // 업데이트
-      setInspections((prev) => prev.map((inspection) => (inspection.id === updatedInspection.id ? updatedInspection : inspection)));
-
-      // 변경된 필드 감지 (토스트용)
-      const changedFields: string[] = [];
-      const fieldMap: { [key: string]: string } = {
-        inspectionTitle: '점검제목',
-        inspectionType: '점검유형',
-        inspectionTarget: '점검대상',
-        inspectionContent: '점검내용',
-        status: '상태',
-        assignee: '담당자',
-        inspectionDate: '점검일',
-        completedDate: '완료일',
-        team: '팀',
-        progress: '진행율'
-      };
-
-      Object.keys(fieldMap).forEach((key) => {
-        const oldValue = (originalInspection as any)[key];
-        const newValue = (updatedInspection as any)[key];
-        if (oldValue !== newValue && !changedFields.includes(fieldMap[key])) {
-          changedFields.push(fieldMap[key]);
-        }
-      });
-
-      // 변경로그 추가 - 변경된 필드 확인
-      const changes: string[] = [];
-      const inspectionCode = updatedInspection.code || `TASK-${updatedInspection.id}`;
-
-      if (originalInspection.status !== updatedInspection.status) {
-        changes.push(`상태: "${originalInspection.status}" → "${updatedInspection.status}"`);
-      }
-      if (originalInspection.assignee !== updatedInspection.assignee) {
-        changes.push(`담당자: "${originalInspection.assignee || '미할당'}" → "${updatedInspection.assignee || '미할당'}"`);
-      }
-      if (originalInspection.inspectionTitle !== updatedInspection.inspectionTitle) {
-        changes.push(`점검내용 수정`);
-      }
-      if (originalInspection.progress !== updatedInspection.progress) {
-        changes.push(`진행율: ${originalInspection.progress || 0}% → ${updatedInspection.progress || 0}%`);
-      }
-      if (originalInspection.completedDate !== updatedInspection.completedDate) {
-        changes.push(`완료일: "${originalInspection.completedDate || '미정'}" → "${updatedInspection.completedDate || '미정'}"`);
-      }
-
-      if (changes.length > 0) {
-        addChangeLog(
-          '점검 정보 수정',
-          inspectionCode,
-          `${updatedInspection.inspectionTitle || '점검'} - ${changes.join(', ')}`,
-          updatedInspection.team || '미분류',
-          undefined,
-          undefined,
-          undefined,
-          updatedInspection.inspectionContent || updatedInspection.inspectionTitle
-        );
-      }
-
-      // 토스트 알림
-      if (setSnackbar) {
-        let message = '';
-        if (changedFields.length > 0) {
-          const fieldsText = changedFields.join(', ');
-          const lastField = changedFields[changedFields.length - 1];
-          const lastChar = lastField.charAt(lastField.length - 1);
-          const code = lastChar.charCodeAt(0);
-          const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
-          const josa = hasJongseong ? '이' : '가';
-          message = `${updatedInspection.inspectionTitle}의 ${fieldsText}${josa} 성공적으로 수정되었습니다.`;
-        } else {
-          const lastChar = updatedInspection.inspectionTitle.charAt(updatedInspection.inspectionTitle.length - 1);
-          const code = lastChar.charCodeAt(0);
-          const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
-          const josa = hasJongseong ? '이' : '가';
-          message = `${updatedInspection.inspectionTitle}${josa} 성공적으로 수정되었습니다.`;
-        }
-        setSnackbar({
-          open: true,
-          message: message,
-          severity: 'success'
-        });
-      }
-    }
-
-    handleEditDialogClose();
-  };
+  // ⚠️ handleEditInspectionSave 함수는 아래 2339번째 줄에 async useCallback으로 정의되어 있음
 
   // 상태별 컬럼 정의
   const statusColumns = [
@@ -768,12 +703,12 @@ function KanbanView({
       </DndContext>
 
       {/* Inspection 편집 다이얼로그 */}
-      {editDialog && (
+      {editDialog && onSave && (
         <InspectionEditDialog
           open={editDialog}
           onClose={handleEditDialogClose}
           inspection={editingInspection}
-          onSave={handleEditInspectionSave}
+          onSave={onSave}
           generateInspectionCode={generateInspectionCode}
           canCreateData={canCreateData}
           canEditOwn={canEditOwn}
@@ -2336,12 +2271,12 @@ export default function InspectionManagement() {
   };
 
   // Inspection 저장 핸들러
-  const handleEditInspectionSave = async (updatedInspection: InspectionTableData) => {
-    console.log('🔄 handleEditInspectionSave 시작');
-    console.log('📊 받은 데이터:', updatedInspection);
+  const handleEditInspectionSave = useCallback(async (updatedInspection: InspectionTableData): Promise<InspectionTableData | null> => {
+    console.log('🔄 [InspectionManagement] handleEditInspectionSave 시작');
+    console.log('📊 [InspectionManagement] 받은 데이터:', updatedInspection);
 
     const originalInspection = inspections.find((t) => t.id === updatedInspection.id);
-    console.log('📊 기존 데이터:', originalInspection ? '있음' : '없음');
+    console.log('📊 [InspectionManagement] 기존 데이터:', originalInspection ? '있음' : '없음 (신규)');
 
     try {
       if (originalInspection) {
@@ -2368,22 +2303,32 @@ export default function InspectionManagement() {
 
         console.log('🔄 Supabase로 전송할 데이터:', supabaseData);
 
+        console.log('🔄 [InspectionManagement] updateInspection 호출 시작');
         const result = await updateInspection(updatedInspection.id, supabaseData);
+        console.log('🔄 [InspectionManagement] updateInspection 호출 완료, result:', result);
 
         if (result) {
-          console.log('✅ 보안점검 데이터 업데이트 성공, 데이터 새로고침 중...');
+          console.log('✅ [InspectionManagement] 보안점검 데이터 업데이트 성공');
 
           // 변경로그는 InspectionTable.tsx에서 자동으로 추가됨 (중복 방지)
 
-          // 전체 데이터 다시 로드 (데이터 형식 불일치 방지)
+          // 데이터 새로고침
+          console.log('🔄 [InspectionManagement] loadInspectionsFromSupabase 호출 시작');
           await loadInspectionsFromSupabase();
+          console.log('✅ [InspectionManagement] loadInspectionsFromSupabase 호출 완료');
 
-          console.log('✅ 보안점검 데이터 새로고침 완료');
+          // 토스트 알림
+          setSnackbar({
+            open: true,
+            message: `${updatedInspection.inspectionContent || '보안점검'}이(가) 성공적으로 수정되었습니다.`,
+            severity: 'success'
+          });
 
-          // 성공 시 다이얼로그 닫기
-          handleEditDialogClose();
+          // 업데이트된 데이터 반환 (점검탭/OPL탭 저장을 위해)
+          console.log('✅ [InspectionManagement] updatedInspection 반환:', updatedInspection);
+          return updatedInspection;
         } else {
-          console.error('🔴 보안점검 데이터 업데이트 실패 - updateInspection returned null');
+          console.error('🔴 [InspectionManagement] 보안점검 데이터 업데이트 실패 - updateInspection returned null');
           throw new Error('보안점검 데이터 업데이트에 실패했습니다. 다시 시도해주세요.');
         }
       } else {
@@ -2407,24 +2352,39 @@ export default function InspectionManagement() {
           attachments: updatedInspection.attachments || []
         };
 
-        console.log('🔄 새 데이터 - Supabase로 전송할 데이터:', supabaseData);
+        console.log('🔄 [InspectionManagement] 새 데이터 - Supabase로 전송할 데이터:', supabaseData);
 
+        console.log('🔄 [InspectionManagement] createInspection 호출 시작');
         const result = await createInspection(supabaseData);
+        console.log('🔄 [InspectionManagement] createInspection 호출 완료, result:', result);
 
         if (result) {
-          console.log('✅ 새 보안점검 데이터 생성 성공, 데이터 새로고침 중...');
+          console.log('✅ [InspectionManagement] 새 보안점검 데이터 생성 성공, ID:', result.id);
 
           // 변경로그는 InspectionTable.tsx에서 자동으로 추가됨 (중복 방지)
 
-          // 전체 데이터 다시 로드 (데이터 형식 불일치 방지)
+          // 데이터 새로고침
+          console.log('🔄 [InspectionManagement] loadInspectionsFromSupabase 호출 시작');
           await loadInspectionsFromSupabase();
+          console.log('✅ [InspectionManagement] loadInspectionsFromSupabase 호출 완료');
 
-          console.log('✅ 보안점검 데이터 새로고침 완료');
+          // 토스트 알림
+          setSnackbar({
+            open: true,
+            message: `${updatedInspection.inspectionContent || '보안점검'}이(가) 성공적으로 추가되었습니다.`,
+            severity: 'success'
+          });
 
-          // 성공 시 다이얼로그 닫기
-          handleEditDialogClose();
+          // 생성된 inspection 데이터를 InspectionTableData 형식으로 변환하여 반환
+          const savedInspection: InspectionTableData = {
+            ...updatedInspection,
+            id: result.id
+          };
+
+          console.log('✅ [InspectionManagement] 생성된 데이터 반환:', savedInspection);
+          return savedInspection;
         } else {
-          console.error('🔴 새 보안점검 데이터 생성 실패 - createInspection returned null');
+          console.error('🔴 [InspectionManagement] 새 보안점검 데이터 생성 실패 - createInspection returned null');
           throw new Error('보안점검 데이터 생성에 실패했습니다. 다시 시도해주세요.');
         }
       }
@@ -2434,8 +2394,9 @@ export default function InspectionManagement() {
       console.error('🔴 보안점검 데이터 저장 중 오류 - Message:', error?.message);
       console.error('🔴 보안점검 데이터 저장 중 오류 - Stack:', error?.stack);
       alert(`저장 실패: ${error?.message || '알 수 없는 오류가 발생했습니다.'}`);
+      return null;
     }
-  };
+  }, [inspections, updateInspection, createInspection, loadInspectionsFromSupabase]);
 
   // Inspection 삭제 핸들러 (소프트 삭제)
   const handleDeleteInspections = async (ids: number[]) => {
@@ -2463,19 +2424,7 @@ export default function InspectionManagement() {
         setInspections((prevInspections) => prevInspections.filter((inspection) => !ids.includes(inspection.id)));
       }
 
-      // 변경로그 추가
-      deletedInspections.forEach((inspection) => {
-        addChangeLog(
-          '점검 삭제',
-          inspection.code,
-          `${inspection.inspectionContent} 삭제`,
-          inspection.team,
-          undefined,
-          undefined,
-          undefined,
-          inspection.inspectionContent
-        );
-      });
+      // 변경로그는 InspectionTable.tsx에서 추가됨 (중복 방지)
 
       console.log('✅ 보안점검 데이터 삭제 완료');
 
@@ -2595,10 +2544,11 @@ export default function InspectionManagement() {
       const inspectionCode = currentInspection.code || `TASK-${inspectionId}`;
       const inspectionTitle = currentInspection.inspectionTitle || '점검내용 없음';
       const inspectionContent = currentInspection.inspectionContent || inspectionTitle;
-      const description = `${inspectionTitle} 상태를 "${oldStatus}"에서 "${newStatus}"로 변경`;
+      const josa = getJosa('상태', '이가');
+      const description = `보안점검관리 ${inspectionContent}(${inspectionCode}) 개요탭의 상태${josa} ${oldStatus} → ${newStatus}로 수정 되었습니다.`;
 
       addChangeLog(
-        '점검 상태 변경',
+        '수정',
         inspectionCode,
         description,
         currentInspection.team || '미분류',
@@ -2606,7 +2556,7 @@ export default function InspectionManagement() {
         newStatus,
         '상태',
         inspectionContent,
-        '칸반탭'
+        '개요탭'
       );
     }
   };
@@ -3019,6 +2969,7 @@ export default function InspectionManagement() {
                   inspections={inspections}
                   setInspections={setInspections}
                   addChangeLog={addChangeLog}
+                  onSave={handleEditInspectionSave}
                   generateInspectionCode={generateInspectionCode}
                   assigneeList={users.filter((user) => user.status === 'active')}
                   users={users}
@@ -3302,16 +3253,9 @@ export default function InspectionManagement() {
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Chip
-                                label={log.team}
-                                size="small"
-                                sx={{
-                                  height: 22,
-                                  fontSize: '12px',
-                                  backgroundColor: getTeamColor(log.team),
-                                  color: '#333333'
-                                }}
-                              />
+                              <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>
+                                {log.team}
+                              </Typography>
                             </TableCell>
                             <TableCell>
                               <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.primary' }}>

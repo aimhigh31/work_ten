@@ -262,35 +262,8 @@ export default function TaskTable({
       }
 
       // 변경로그 추가 - 변경된 필드 확인
-      if (addChangeLog) {
-        const changes: string[] = [];
-        const taskCode = updatedTask.code || `TASK-${updatedTask.id}`;
-
-        if (originalTask.status !== updatedTask.status) {
-          changes.push(`상태: "${originalTask.status}" → "${updatedTask.status}"`);
-        }
-        if (originalTask.assignee !== updatedTask.assignee) {
-          changes.push(`담당자: "${originalTask.assignee || '미할당'}" → "${updatedTask.assignee || '미할당'}"`);
-        }
-        if (originalTask.workContent !== updatedTask.workContent) {
-          changes.push(`업무내용 수정`);
-        }
-        if (originalTask.progress !== updatedTask.progress) {
-          changes.push(`진행율: ${originalTask.progress || 0}% → ${updatedTask.progress || 0}%`);
-        }
-        if (originalTask.completedDate !== updatedTask.completedDate) {
-          changes.push(`완료일: "${originalTask.completedDate || '미정'}" → "${updatedTask.completedDate || '미정'}"`);
-        }
-
-        if (changes.length > 0) {
-          addChangeLog(
-            '업무 정보 수정',
-            taskCode,
-            `${updatedTask.workContent || '업무'} - ${changes.join(', ')}`,
-            updatedTask.team || '미분류'
-          );
-        }
-      }
+      // 변경로그는 RegulationManagement에서 처리하므로 여기서는 호출하지 않음
+      // (칸반 드래그 시 중복 로그 방지)
 
       console.log('✅ 기존 Task 업데이트 완료');
     } else {
