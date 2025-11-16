@@ -231,9 +231,9 @@ const RecordTab = memo(
                       <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '13px' }}>
                         {comment.author}
                       </Typography>
-                      {comment.role && (
+                      {comment.position && (
                         <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '11px' }}>
-                          {comment.role}
+                          {comment.position}
                         </Typography>
                       )}
                       {comment.department && (
@@ -713,6 +713,25 @@ export default function CostDataTable({
     return value;
   }, [masterCodes]);
 
+  // GROUP004 직급 서브코드 옵션 (서브코드명 변환용)
+  const positionOptions = useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP004' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order)
+      .map((item) => ({
+        code: item.subcode,
+        name: item.subcode_name
+      }));
+  }, [masterCodes]);
+
+  // 서브코드를 서브코드명으로 변환하는 함수
+  const convertSubcodeName = useCallback((subcode: string | undefined, options: Array<{ code: string; name: string }>) => {
+    if (!subcode) return '';
+    if (!subcode.includes('GROUP')) return subcode;
+    const found = options.find((opt) => opt.code === subcode);
+    return found ? found.name : subcode;
+  }, []);
+
   // 부서명 목록
   const teamList = useMemo(() => {
     return departments.filter((dept) => dept.is_active).map((dept) => dept.department_name);
@@ -817,9 +836,9 @@ export default function CostDataTable({
       name: currentUser?.user_name || sessionUser?.name || '사용자',
       department: currentUser?.department || sessionUser?.department || '부서',
       profileImage: currentUser?.avatar || sessionUser?.avatar || '/assets/images/users/avatar-1.png',
-      role: currentUser?.role || sessionUser?.role || ''
+      role: convertSubcodeName(currentUser?.role || sessionUser?.role || '', positionOptions)
     };
-  }, [currentUser, sessionUser]);
+  }, [currentUser, sessionUser, positionOptions, convertSubcodeName]);
 
   // Supabase feedbacks를 RecordTab 형식으로 변환하고 pendingComments와 합치기
   const comments = useMemo(() => {
@@ -841,8 +860,8 @@ export default function CostDataTable({
           timestamp: new Date(feedback.created_at).toLocaleString('ko-KR'),
           avatar: feedback.user_profile_image || feedbackUser?.profile_image_url || undefined,
           department: feedback.user_department || feedback.team || feedbackUser?.department || '',
-          position: feedback.user_position || feedbackUser?.position || '',
-          role: feedback.metadata?.role || feedbackUser?.role || '',
+          position: convertSubcodeName(feedbackUser?.role || '', positionOptions),
+          role: '',
           isNew: false
         };
       });
@@ -855,7 +874,7 @@ export default function CostDataTable({
 
     // 합쳐서 반환 (최신 순으로 정렬 - 새 기록이 위로)
     return [...newComments, ...existingComments];
-  }, [feedbacks, users, pendingComments, modifiedComments, deletedCommentIds]);
+  }, [feedbacks, users, pendingComments, modifiedComments, deletedCommentIds, positionOptions, convertSubcodeName]);
 
   // 페이지네이션 상태
   const [page, setPage] = useState(0);
@@ -1816,9 +1835,9 @@ export default function CostDataTable({
     const feedbackUser = users.find((u) => u.user_name === sessionUser?.name);
     const currentUserName = feedbackUser?.user_name || sessionUser?.name || '현재 사용자';
     const currentTeam = feedbackUser?.department || sessionUser?.department || '';
-    const currentPosition = feedbackUser?.position || '';
+    const currentPosition = convertSubcodeName(feedbackUser?.role || '', positionOptions);
     const currentProfileImage = feedbackUser?.profile_image_url || '';
-    const currentRole = feedbackUser?.role || '';
+    const currentRole = '';
 
     // DB에 바로 저장하지 않고 임시 저장 (저장 버튼 클릭 시 DB 저장)
     const tempComment = {
@@ -1835,7 +1854,7 @@ export default function CostDataTable({
 
     setPendingComments((prev) => [tempComment, ...prev]);
     setNewComment('');
-  }, [newComment, users, sessionUser]);
+  }, [newComment, users, sessionUser, positionOptions, convertSubcodeName]);
 
   const handleEditComment = useCallback((commentId: string, content: string) => {
     setEditingCommentId(commentId);

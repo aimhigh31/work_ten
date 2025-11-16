@@ -215,14 +215,14 @@ const RecordTab = memo(
                       <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '13px' }}>
                         {comment.author}
                       </Typography>
-                      {comment.role && (
+                      {comment.position && (
                         <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '11px' }}>
-                          {comment.role}
+                          {comment.position}
                         </Typography>
                       )}
                       {comment.department && (
                         <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '11px' }}>
-                          • {comment.department}
+                          {comment.department}
                         </Typography>
                       )}
                       <Typography variant="caption" color="text.secondary" sx={{ fontSize: '11px', ml: 'auto' }}>
@@ -857,8 +857,8 @@ const SecurityIncidentEditDialog = memo(
     // 로그인한 사용자 정보 가져오기 (InspectionEditDialog 패턴)
     const { data: session } = useSession();
 
-    // ✅ 공용 창고에서 사용자 데이터 가져오기
-    const { users } = useCommonData();
+    // ✅ 공용 창고에서 사용자 데이터와 마스터코드 가져오기
+    const { users, masterCodes } = useCommonData();
 
     // 세션 email로 DB에서 사용자 찾기 (InspectionEditDialog 패턴)
     const currentUser = React.useMemo(() => {
@@ -998,6 +998,25 @@ const SecurityIncidentEditDialog = memo(
 
     // SWR의 revalidateOnMount: true가 자동으로 데이터를 fetch합니다
 
+    // 직급 옵션 (GROUP004)
+    const positionOptions = React.useMemo(() => {
+      return masterCodes
+        .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP004' && item.is_active)
+        .sort((a, b) => a.subcode_order - b.subcode_order)
+        .map((item) => ({
+          code: item.subcode,
+          name: item.subcode_name
+        }));
+    }, [masterCodes]);
+
+    // 서브코드를 서브코드명으로 변환하는 함수
+    const convertSubcodeName = React.useCallback((subcode: string | undefined, options: Array<{ code: string; name: string }>) => {
+      if (!subcode) return '';
+      if (!subcode.includes('GROUP')) return subcode;
+      const found = options.find((opt) => opt.code === subcode);
+      return found ? found.name : subcode;
+    }, []);
+
     // Supabase feedbacks를 RecordTab 형식으로 변환 (pendingFeedbacks 사용)
     const comments = useMemo(() => {
       return pendingFeedbacks.map((feedback) => {
@@ -1011,11 +1030,11 @@ const SecurityIncidentEditDialog = memo(
           timestamp: new Date(feedback.created_at).toLocaleString('ko-KR'),
           avatar: feedback.user_profile_image || feedbackUser?.profile_image_url || undefined,
           department: feedback.user_department || feedback.team || feedbackUser?.department || '',
-          position: feedback.user_position || feedbackUser?.position || '',
-          role: feedback.metadata?.role || feedbackUser?.role || ''
+          position: convertSubcodeName(feedbackUser?.role || '', positionOptions),
+          role: ''
         };
       });
-    }, [pendingFeedbacks, users]);
+    }, [pendingFeedbacks, users, positionOptions, convertSubcodeName]);
 
     const [postMeasures, setPostMeasures] = useState({
       rootCauseAnalysis: '',
@@ -2022,9 +2041,8 @@ const SecurityIncidentEditDialog = memo(
 
       const currentUserName = currentUser?.user_name || user?.name || '현재 사용자';
       const currentTeam = currentUser?.department || user?.department || '';
-      const currentPosition = currentUser?.position || '';
+      const currentPosition = convertSubcodeName(currentUser?.role || '', positionOptions);
       const currentProfileImage = currentUser?.profile_image_url || '';
-      const currentRole = currentUser?.role || '';
 
       // 로컬 임시 ID 생성
       const tempId = `temp-${Date.now()}-${Math.random()}`;
@@ -2038,7 +2056,7 @@ const SecurityIncidentEditDialog = memo(
         user_name: currentUserName,
         team: currentTeam,
         created_at: new Date().toISOString(),
-        metadata: { role: currentRole },
+        metadata: {},
         user_department: currentTeam,
         user_position: currentPosition,
         user_profile_image: currentProfileImage
@@ -2047,7 +2065,7 @@ const SecurityIncidentEditDialog = memo(
       // 로컬 state에만 추가 (즉시 반응)
       setPendingFeedbacks((prev) => [newFeedback, ...prev]);
       setNewComment('');
-    }, [newComment, task, currentUser, user]);
+    }, [newComment, task, currentUser, user, positionOptions, convertSubcodeName]);
 
     const handleEditComment = useCallback((commentId: string, content: string) => {
       setEditingCommentId(commentId);
@@ -2202,7 +2220,7 @@ const SecurityIncidentEditDialog = memo(
               onEditCommentTextChange={setEditingCommentText}
               currentUserName={currentUser?.user_name || user?.name || '현재 사용자'}
               currentUserAvatar={currentUser?.profile_image_url || ''}
-              currentUserRole={currentUser?.role || ''}
+              currentUserRole={convertSubcodeName(currentUser?.role || '', positionOptions)}
               currentUserDepartment={currentUser?.department || user?.department || ''}
             />
           )}

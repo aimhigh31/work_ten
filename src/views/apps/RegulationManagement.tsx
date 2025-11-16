@@ -81,6 +81,16 @@ import { useSupabaseChangeLog } from 'hooks/useSupabaseChangeLog';
 import { ChangeLogData } from 'types/changelog';
 import { createClient } from '@/lib/supabase/client';
 
+// 서브코드를 서브코드명으로 변환하는 유틸리티 함수
+const convertSubcodeName = (subcode: string | undefined, options: Array<{ code: string; name: string }>) => {
+  if (!subcode) return '';
+  // 이미 서브코드명이면 그대로 반환
+  if (!subcode.includes('GROUP')) return subcode;
+  // 서브코드를 서브코드명으로 변환
+  const found = options.find((opt) => opt.code === subcode);
+  return found ? found.name : subcode;
+};
+
 // 변경로그 타입 정의
 interface ChangeLog {
   id: number;
@@ -1082,14 +1092,14 @@ const RecordTab = memo(
                       <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '13px' }}>
                         {comment.author}
                       </Typography>
-                      {comment.role && (
+                      {comment.position && (
                         <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '11px' }}>
-                          {comment.role}
+                          {comment.position}
                         </Typography>
                       )}
                       {comment.department && (
                         <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '11px' }}>
-                          • {comment.department}
+                          {comment.department}
                         </Typography>
                       )}
                       <Typography variant="caption" color="text.secondary" sx={{ fontSize: '11px', ml: 'auto' }}>
@@ -1704,6 +1714,10 @@ interface OverviewPanelProps {
       severity: 'success' | 'error' | 'warning' | 'info';
     }>
   >;
+  positionOptions?: Array<{
+    code: string;
+    name: string;
+  }>;
 }
 
 const OverviewPanel = React.memo(
@@ -1720,7 +1734,8 @@ const OverviewPanel = React.memo(
     canCreateData = true,
     canEditOwn = true,
     canEditOthers = true,
-    setSnackbar
+    setSnackbar,
+    positionOptions = []
   }: OverviewPanelProps) => {
     const [detailTab, setDetailTab] = React.useState(0);
     const { revisions, fetchRevisions } = useSupabaseSecurityRevision();
@@ -1759,6 +1774,9 @@ const OverviewPanel = React.memo(
       return feedbacks.map((feedback) => {
         const feedbackUser = users.find((u) => u.user_name === feedback.user_name);
 
+        // ⚠️ DB에 position과 role이 바뀌어 저장되어 있음
+        // feedbackUser.role에 직급 서브코드(GROUP004-SUB003)가 들어있어서 이걸 변환하면 "팀장"이 나옴
+        // feedbackUser.position에는 직책명("사원")이 들어있는데, 이건 표시하지 않음
         return {
           id: feedback.id,
           author: feedback.user_name,
@@ -1766,11 +1784,11 @@ const OverviewPanel = React.memo(
           timestamp: new Date(feedback.created_at).toLocaleString('ko-KR'),
           avatar: feedback.user_profile_image || feedbackUser?.profile_image_url || undefined,
           department: feedback.user_department || feedback.team || feedbackUser?.department || '',
-          position: feedback.user_position || feedbackUser?.position || '',
-          role: feedback.metadata?.role || feedbackUser?.role || ''
+          position: convertSubcodeName(feedbackUser?.role || '', positionOptions),
+          role: '' // DB에 position/role이 바뀌어 있어서 role은 표시하지 않음
         };
       });
-    }, [feedbacks, users]);
+    }, [feedbacks, users, positionOptions]);
 
     // 파일이 선택될 때마다 개요탭으로 이동
     React.useEffect(() => {
@@ -2329,7 +2347,7 @@ const OverviewPanel = React.memo(
                   onEditCommentTextChange={setEditingCommentText}
                   currentUserName={currentUser?.user_name || user?.name || '현재 사용자'}
                   currentUserAvatar={currentUser?.profile_image_url || ''}
-                  currentUserRole={currentUser?.role || ''}
+                  currentUserRole={convertSubcodeName(currentUser?.role || '', positionOptions)}
                   currentUserDepartment={currentUser?.department || user?.department || ''}
                   isAdding={isAdding}
                   isUpdating={isUpdating}
@@ -2417,6 +2435,10 @@ interface FolderViewProps {
     message: string;
     severity: 'success' | 'error' | 'warning' | 'info';
   }>>;
+  positionOptions?: Array<{
+    code: string;
+    name: string;
+  }>;
 }
 
 function FolderView({
@@ -2439,7 +2461,8 @@ function FolderView({
   canCreateData = true,
   canEditOwn = true,
   canEditOthers = true,
-  setSnackbar
+  setSnackbar,
+  positionOptions = []
 }: FolderViewProps) {
   const theme = useTheme();
   const user = useUser(); // 로그인한 사용자 정보
@@ -2853,6 +2876,7 @@ function FolderView({
             canEditOwn={canEditOwn}
             canEditOthers={canEditOthers}
             setSnackbar={setSnackbar}
+            positionOptions={positionOptions}
           />
         </Box>
       </Box>
@@ -5558,6 +5582,17 @@ export default function RegulationManagement() {
     return users.find((u) => u.email === session.user.email);
   }, [session, users]);
 
+  // GROUP004 서브코드 목록 (직급용) - masterCodes에서 필터링
+  const positionOptions = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP004' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order)
+      .map((item) => ({
+        code: item.subcode,
+        name: item.subcode_name
+      }));
+  }, [masterCodes]);
+
   // GROUP007 서브코드 목록 (문서유형용) - masterCodes에서 필터링
   const documentTypes = React.useMemo(() => {
     return masterCodes
@@ -5669,6 +5704,10 @@ export default function RegulationManagement() {
   const dialogComments = useMemo(() => {
     return dialogFeedbacks.map((feedback) => {
       const feedbackUser = users.find((u) => u.user_name === feedback.user_name);
+
+      // ⚠️ DB에 position과 role이 바뀌어 저장되어 있음
+      // feedbackUser.role에 직급 서브코드(GROUP004-SUB003)가 들어있어서 이걸 변환하면 "팀장"이 나옴
+      // feedbackUser.position에는 직책명("사원")이 들어있는데, 이건 표시하지 않음
       return {
         id: feedback.id,
         author: feedback.user_name,
@@ -5676,11 +5715,11 @@ export default function RegulationManagement() {
         timestamp: new Date(feedback.created_at).toLocaleString('ko-KR'),
         avatar: feedback.user_profile_image || feedbackUser?.profile_image_url || undefined,
         department: feedback.user_department || feedback.team || feedbackUser?.department || '',
-        position: feedback.user_position || feedbackUser?.position || '',
-        role: feedback.metadata?.role || feedbackUser?.role || ''
+        position: convertSubcodeName(feedbackUser?.role || '', positionOptions),
+        role: '' // DB에 position/role이 바뀌어 있어서 role은 표시하지 않음
       };
     });
-  }, [dialogFeedbacks, users]);
+  }, [dialogFeedbacks, users, positionOptions]);
 
   // 공유할 첨부파일 상태 (폴더탭과 칸반 팝업창 공통)
   const [sharedAttachedFiles, setSharedAttachedFiles] = useState<
@@ -6832,6 +6871,7 @@ export default function RegulationManagement() {
                     canEditOwn={canEditOwn}
                     canEditOthers={canEditOthers}
                     setSnackbar={setSnackbar}
+                    positionOptions={positionOptions}
                   />
                 )}
               </Box>
@@ -7213,7 +7253,7 @@ export default function RegulationManagement() {
                   onEditCommentTextChange={setDialogEditingCommentText}
                   currentUserName={currentUser?.user_name || user?.name || '현재 사용자'}
                   currentUserAvatar={currentUser?.profile_image_url || ''}
-                  currentUserRole={currentUser?.role || ''}
+                  currentUserRole={convertSubcodeName(currentUser?.role || '', positionOptions)}
                   currentUserDepartment={currentUser?.department || user?.department || ''}
                   isAdding={isDialogAdding}
                   isUpdating={isDialogUpdating}

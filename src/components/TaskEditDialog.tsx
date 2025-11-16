@@ -858,16 +858,21 @@ const RecordTab = memo(
             <Avatar src={currentUserAvatar} sx={{ width: 35, height: 35 }}>
               {currentUserName?.charAt(0) || 'U'}
             </Avatar>
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
-              <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '11px', textAlign: 'center' }}>
-                {currentUserName || '사용자'} {currentUserRole}
+            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+              <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '11px' }}>
+                {currentUserName || '사용자'}
               </Typography>
-              {currentUserDepartment && (
-                <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '10px', textAlign: 'center' }}>
-                  {currentUserDepartment}
+              {currentUserRole && (
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '10px' }}>
+                  {currentUserRole}
                 </Typography>
               )}
             </Box>
+            {currentUserDepartment && (
+              <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '10px' }}>
+                {currentUserDepartment}
+              </Typography>
+            )}
           </Box>
           <TextField
             multiline
@@ -946,9 +951,9 @@ const RecordTab = memo(
                       <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '13px' }}>
                         {comment.author}
                       </Typography>
-                      {comment.role && (
+                      {comment.position && (
                         <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '11px' }}>
-                          {comment.role}
+                          {comment.position}
                         </Typography>
                       )}
                       {comment.department && (
@@ -2936,7 +2941,7 @@ const TaskEditDialog = memo(
 
     // 현재 로그인한 사용자 정보
     const user = useUser();
-    const { users } = useCommonData();
+    const { users, masterCodes } = useCommonData();
     const { data: session } = useSession();
 
     const currentUser = useMemo(() => {
@@ -2952,6 +2957,25 @@ const TaskEditDialog = memo(
       return task.createdBy === currentUser.user_name ||
              task.assignee === currentUser.user_name;
     }, [currentUser, task]);
+
+    // GROUP004 직급 서브코드 옵션 (서브코드명 변환용)
+    const positionOptions = useMemo(() => {
+      return masterCodes
+        .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP004' && item.is_active)
+        .sort((a, b) => a.subcode_order - b.subcode_order)
+        .map((item) => ({
+          code: item.subcode,
+          name: item.subcode_name
+        }));
+    }, [masterCodes]);
+
+    // 서브코드를 서브코드명으로 변환하는 함수
+    const convertSubcodeName = useCallback((subcode: string | undefined, options: Array<{ code: string; name: string }>) => {
+      if (!subcode) return '';
+      if (!subcode.includes('GROUP')) return subcode;
+      const found = options.find((opt) => opt.code === subcode);
+      return found ? found.name : subcode;
+    }, []);
 
     // 편집 가능 여부
     const canEdit = canEditOthers || (canEditOwn && isOwner);
@@ -2979,6 +3003,8 @@ const TaskEditDialog = memo(
     const [departmentOptions, setDepartmentOptions] = useState<Array<{ code: string; name: string }>>([]);
     // 상태 마스터코드 (GROUP002)
     const [statusOptionsFromDB, setStatusOptionsFromDB] = useState<Array<{ code: string; name: string }>>([]);
+    // 직책 마스터코드 (GROUP005)
+    const [roleOptions, setRoleOptions] = useState<Array<{ code: string; name: string }>>([]);
     // 팀(부서) 데이터
     const [teamOptions, setTeamOptions] = useState<Array<{ code: string; name: string }>>([]);
     // 사용자 데이터
@@ -3063,6 +3089,27 @@ const TaskEditDialog = memo(
                 name: item.subcode_name
               }));
             setStatusOptionsFromDB(statusOpts);
+          }
+
+          // GROUP004 (직급) 조회
+          // GROUP005 (직책) 조회
+          const { data: roles, error: roleError } = await supabase
+            .from('admin_mastercode_data')
+            .select('subcode, subcode_name')
+            .eq('group_code', 'GROUP005')
+            .eq('is_active', true)
+            .order('subcode_order');
+
+          if (roleError) {
+            console.error('직책 조회 실패:', roleError);
+          } else {
+            const roleOpts = roles
+              .filter((item) => item.subcode && item.subcode_name)
+              .map((item) => ({
+                code: item.subcode,
+                name: item.subcode_name
+              }));
+            setRoleOptions(roleOpts);
           }
 
           // 부서(팀) 조회
@@ -3229,21 +3276,36 @@ const TaskEditDialog = memo(
     const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
     const [editingCommentText, setEditingCommentText] = useState('');
 
+    // 서브코드를 서브코드명으로 변환하는 헬퍼 함수
+    const getSubcodeName = useCallback((subcode: string | undefined, options: Array<{ code: string; name: string }>) => {
+      if (!subcode) return '';
+      // 이미 서브코드명이면 그대로 반환
+      if (!subcode.includes('GROUP')) return subcode;
+      // 서브코드를 서브코드명으로 변환
+      const found = options.find((opt) => opt.code === subcode);
+      return found ? found.name : subcode;
+    }, []);
+
     // DB 피드백과 임시 댓글을 병합하여 표시
     const comments = useMemo(() => {
       // DB에서 가져온 피드백 데이터를 댓글 형식으로 변환
       const dbComments = feedbacks
         .filter((fb) => !deletedCommentIds.includes(String(fb.id)))
-        .map((fb) => ({
-          id: String(fb.id),
-          author: fb.user_name,
-          content: modifiedComments[String(fb.id)] !== undefined ? modifiedComments[String(fb.id)] : fb.description,
-          timestamp: new Date(fb.created_at).toLocaleString('ko-KR'),
-          avatar: fb.user_profile_image,
-          department: fb.user_department,
-          position: fb.user_position,
-          role: fb.metadata?.role
-        }));
+        .map((fb) => {
+          // user_name으로 사용자 찾기
+          const feedbackUser = users.find((u) => u.user_name === fb.user_name);
+
+          return {
+            id: String(fb.id),
+            author: fb.user_name,
+            content: modifiedComments[String(fb.id)] !== undefined ? modifiedComments[String(fb.id)] : fb.description,
+            timestamp: new Date(fb.created_at).toLocaleString('ko-KR'),
+            avatar: fb.user_profile_image,
+            department: fb.user_department,
+            position: convertSubcodeName(feedbackUser?.role || '', positionOptions),
+            role: ''
+          };
+        });
 
       // 임시로 추가된 댓글들 (temp_ prefix가 있는 것들)
       const tempComments = pendingComments.map((pc) => ({
@@ -3254,13 +3316,13 @@ const TaskEditDialog = memo(
         avatar: pc.avatar,
         department: pc.department,
         position: pc.position,
-        role: pc.role,
+        role: '',
         isNew: true
       }));
 
       // 임시 댓글을 먼저, DB 댓글을 나중에 (최신순)
       return [...tempComments, ...dbComments];
-    }, [feedbacks, pendingComments, modifiedComments, deletedCommentIds]);
+    }, [feedbacks, pendingComments, modifiedComments, deletedCommentIds, users, positionOptions, convertSubcodeName]);
 
     // KPI 다이얼로그 상태
     const [kpiDialogOpen, setKpiDialogOpen] = useState(false);
@@ -3940,9 +4002,9 @@ const TaskEditDialog = memo(
       const feedbackUser = users.find((u) => u.user_name === user?.name);
       const currentUserName = feedbackUser?.user_name || user?.name || '현재 사용자';
       const currentTeam = feedbackUser?.department || user?.department || '';
-      const currentPosition = feedbackUser?.position || '';
+      const currentPosition = convertSubcodeName(feedbackUser?.role || '', positionOptions);
       const currentProfileImage = feedbackUser?.profile_image_url || '';
-      const currentRole = feedbackUser?.role || '';
+      const currentRole = '';
 
       // 임시 ID로 새 댓글 추가 (temp_ prefix)
       const tempComment = {
@@ -3959,7 +4021,7 @@ const TaskEditDialog = memo(
 
       setPendingComments((prev) => [tempComment, ...prev]);
       setNewComment('');
-    }, [newComment, users, user]);
+    }, [newComment, users, user, positionOptions, convertSubcodeName]);
 
     const handleEditComment = useCallback((commentId: string, content: string) => {
       setEditingCommentId(commentId);
@@ -4100,7 +4162,7 @@ const TaskEditDialog = memo(
       const feedbackUser = users.find((u) => u.user_name === user?.name);
       const currentUserName = feedbackUser?.user_name || user?.name || '현재 사용자';
       const currentUserAvatar = feedbackUser?.profile_image_url || user?.avatar || '';
-      const currentUserRole = feedbackUser?.role || user?.role || '';
+      const currentUserRole = convertSubcodeName(feedbackUser?.role || user?.role || '', positionOptions);
       const currentUserDepartment = feedbackUser?.department || user?.department || '';
 
       return {
@@ -4131,7 +4193,9 @@ const TaskEditDialog = memo(
       handleCancelEditComment,
       handleDeleteComment,
       user,
-      users
+      users,
+      positionOptions,
+      convertSubcodeName
     ]);
 
     return (

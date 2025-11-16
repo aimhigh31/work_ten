@@ -237,9 +237,9 @@ const RecordTab = memo(
                       <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '13px' }}>
                         {comment.author}
                       </Typography>
-                      {comment.role && (
+                      {comment.position && (
                         <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '11px' }}>
-                          {comment.role}
+                          {comment.position}
                         </Typography>
                       )}
                       {comment.department && (
@@ -836,6 +836,25 @@ export default function InspectionEditDialog({
     return subCodes;
   }, [masterCodes]);
 
+  // GROUP004 직급 서브코드 옵션 (서브코드명 변환용)
+  const positionOptions = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP004' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order)
+      .map((item) => ({
+        code: item.subcode,
+        name: item.subcode_name
+      }));
+  }, [masterCodes]);
+
+  // 서브코드를 서브코드명으로 변환하는 함수
+  const convertSubcodeName = React.useCallback((subcode: string | undefined, options: Array<{ code: string; name: string }>) => {
+    if (!subcode) return '';
+    if (!subcode.includes('GROUP')) return subcode;
+    const found = options.find((opt) => opt.code === subcode);
+    return found ? found.name : subcode;
+  }, []);
+
   const [statusOptions, setStatusOptions] = useState<Array<{ code: string; name: string }>>([]);
 
   // 부서명 훅 (fallback용)
@@ -915,8 +934,8 @@ export default function InspectionEditDialog({
         timestamp: new Date(feedback.created_at).toLocaleString('ko-KR'),
         avatar: feedback.user_profile_image || feedbackUser?.profile_image_url || undefined,
         department: feedback.user_department || feedback.team || feedbackUser?.department || '',
-        position: feedback.user_position || feedbackUser?.position || '',
-        role: feedback.metadata?.role || feedbackUser?.role || ''
+        position: convertSubcodeName(feedbackUser?.role || '', positionOptions),
+        role: ''
       };
     });
   }, [pendingFeedbacks, users]);
@@ -1348,7 +1367,7 @@ export default function InspectionEditDialog({
 
     const currentUserName = currentUser?.user_name || '현재 사용자';
     const currentTeam = currentUser?.department || '';
-    const currentPosition = currentUser?.position || '';
+    const currentPosition = convertSubcodeName(currentUser?.role || '', positionOptions);
     const currentProfileImage = currentUser?.profile_image_url || '';
     const currentRole = currentUser?.role || '';
 
@@ -3049,7 +3068,7 @@ export default function InspectionEditDialog({
             onEditCommentTextChange={setEditingCommentText}
             currentUserName={currentUser?.user_name}
             currentUserAvatar={currentUser?.profile_image_url}
-            currentUserRole={currentUser?.role}
+            currentUserRole={convertSubcodeName(currentUser?.role || '', positionOptions)}
             currentUserDepartment={currentUser?.department}
           />
         );

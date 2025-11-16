@@ -846,9 +846,9 @@ const InvestmentRecordTab = memo(
                       <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '13px' }}>
                         {comment.author}
                       </Typography>
-                      {comment.role && (
+                      {comment.position && (
                         <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '11px' }}>
-                          {comment.role}
+                          {comment.position}
                         </Typography>
                       )}
                       {comment.department && (
@@ -2164,7 +2164,7 @@ function InvestmentEditDialog({
   const { data: session } = useSession();
 
   // ✅ 공용 창고에서 사용자 데이터 가져오기 (fallback)
-  const { users: contextUsers } = useCommonData();
+  const { users: contextUsers, masterCodes } = useCommonData();
   const users = propsUsers.length > 0 ? propsUsers : contextUsers;
 
   console.log('🔍 [InvestmentEditDialog] users:', users?.length);
@@ -2193,6 +2193,25 @@ function InvestmentEditDialog({
     return canEditOthers || (canEditOwn && isDataOwner);
   }, [investment, canCreateData, canEditOwn, canEditOthers, isDataOwner]);
 
+  // GROUP004 직급 서브코드 옵션 (서브코드명 변환용)
+  const positionOptions = useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP004' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order)
+      .map((item) => ({
+        code: item.subcode,
+        name: item.subcode_name
+      }));
+  }, [masterCodes]);
+
+  // 서브코드를 서브코드명으로 변환하는 함수
+  const convertSubcodeName = useCallback((subcode: string | undefined, options: Array<{ code: string; name: string }>) => {
+    if (!subcode) return '';
+    if (!subcode.includes('GROUP')) return subcode;
+    const found = options.find((opt) => opt.code === subcode);
+    return found ? found.name : subcode;
+  }, []);
+
   // 피드백 훅 사용 (DB 연동)
   const {
     feedbacks,
@@ -2212,17 +2231,22 @@ function InvestmentEditDialog({
 
   // feedbacks를 comments 형식으로 변환
   const comments = useMemo(() => {
-    return feedbacks.map((feedback) => ({
-      id: feedback.id,
-      author: feedback.user_name,
-      content: feedback.description,
-      timestamp: new Date(feedback.created_at).toLocaleString('ko-KR'),
-      avatar: feedback.user_profile_image,
-      department: feedback.user_department,
-      position: feedback.user_position,
-      role: feedback.metadata?.role || ''
-    }));
-  }, [feedbacks]);
+    return feedbacks.map((feedback) => {
+      // user_name으로 사용자 찾기
+      const feedbackUser = users.find((u) => u.user_name === feedback.user_name);
+
+      return {
+        id: feedback.id,
+        author: feedback.user_name,
+        content: feedback.description,
+        timestamp: new Date(feedback.created_at).toLocaleString('ko-KR'),
+        avatar: feedback.user_profile_image || feedbackUser?.profile_image_url || undefined,
+        department: feedback.user_department || feedbackUser?.department || '',
+        position: convertSubcodeName(feedbackUser?.role || '', positionOptions),
+        role: ''
+      };
+    });
+  }, [feedbacks, users, positionOptions, convertSubcodeName]);
 
   const [newComment, setNewComment] = useState('');
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
@@ -2440,17 +2464,17 @@ function InvestmentEditDialog({
       user_name: currentUser.user_name,
       team: currentUser.department || '',
       user_department: currentUser.department,
-      user_position: currentUser.position,
+      user_position: convertSubcodeName(currentUser.role || '', positionOptions),
       user_profile_image: currentUser.profile_image_url || currentUser.avatar_url,
       metadata: {
-        role: currentUser.role
+        role: ''
       }
     });
 
     if (result.success) {
       setNewComment('');
     }
-  }, [newComment, investment, currentUser, addFeedback]);
+  }, [newComment, investment, currentUser, addFeedback, positionOptions, convertSubcodeName]);
 
   const handleEditComment = useCallback((commentId: string, content: string) => {
     setEditingCommentId(commentId);
@@ -2761,7 +2785,7 @@ function InvestmentEditDialog({
               onEditCommentTextChange={setEditingCommentText}
               currentUserName={currentUser?.user_name || '현재 사용자'}
               currentUserAvatar={currentUser?.profile_image_url || currentUser?.avatar_url || ''}
-              currentUserRole={currentUser?.role || ''}
+              currentUserRole={convertSubcodeName(currentUser?.role || '', positionOptions)}
               currentUserDepartment={currentUser?.department || ''}
             />
           )}

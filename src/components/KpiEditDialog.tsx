@@ -1142,9 +1142,9 @@ const RecordTab = memo(
                       <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '13px' }}>
                         {comment.author}
                       </Typography>
-                      {comment.role && (
+                      {comment.position && (
                         <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '11px' }}>
-                          {comment.role}
+                          {comment.position}
                         </Typography>
                       )}
                       {comment.department && (
@@ -3924,6 +3924,25 @@ const TaskEditDialog = memo(
       return subCodes;
     }, [masterCodes]);
 
+    // GROUP004 직급 서브코드 옵션 (서브코드명 변환용)
+    const positionOptions = useMemo(() => {
+      return masterCodes
+        .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP004' && item.is_active)
+        .sort((a, b) => a.subcode_order - b.subcode_order)
+        .map((item) => ({
+          code: item.subcode,
+          name: item.subcode_name
+        }));
+    }, [masterCodes]);
+
+    // 서브코드를 서브코드명으로 변환하는 함수
+    const convertSubcodeName = useCallback((subcode: string | undefined, options: Array<{ code: string; name: string }>) => {
+      if (!subcode) return '';
+      if (!subcode.includes('GROUP')) return subcode;
+      const found = options.find((opt) => opt.code === subcode);
+      return found ? found.name : subcode;
+    }, []);
+
     // KPI Task 데이터 관리
     const {
       tasks: dbTasks,
@@ -4202,8 +4221,8 @@ const TaskEditDialog = memo(
             timestamp: new Date(feedback.created_at).toLocaleString('ko-KR'),
             avatar: feedback.user_profile_image || feedbackUser?.profile_image_url || undefined,
             department: feedback.user_department || feedback.team || feedbackUser?.department || '',
-            position: feedback.user_position || feedbackUser?.position || '',
-            role: feedback.metadata?.role || feedbackUser?.role || '',
+            position: convertSubcodeName(feedbackUser?.role || '', positionOptions),
+            role: '',
             isNew: false
           };
         });
@@ -4214,7 +4233,7 @@ const TaskEditDialog = memo(
       }));
 
       return [...newComments, ...existingComments];
-    }, [feedbacks, users, pendingComments, modifiedComments, deletedCommentIds]);
+    }, [feedbacks, users, pendingComments, modifiedComments, deletedCommentIds, positionOptions, convertSubcodeName]);
 
     // 진척률 편집 상태
     const [editingField, setEditingField] = useState<string | null>(null);
@@ -4889,9 +4908,9 @@ const TaskEditDialog = memo(
       const feedbackUser = users.find((u) => u.user_name === currentUser?.user_name);
       const currentUserName = feedbackUser?.user_name || currentUser?.user_name || '현재 사용자';
       const currentTeam = feedbackUser?.department || currentUser?.department || '';
-      const currentPosition = feedbackUser?.position || '';
+      const currentPosition = convertSubcodeName(feedbackUser?.role || '', positionOptions);
       const currentProfileImage = feedbackUser?.profile_image_url || '';
-      const currentRole = feedbackUser?.role || '';
+      const currentRole = '';
 
       // DB에 바로 저장하지 않고 임시 저장 (저장 버튼 클릭 시 DB 저장)
       const tempComment = {
@@ -4908,7 +4927,7 @@ const TaskEditDialog = memo(
 
       setPendingComments((prev) => [tempComment, ...prev]);
       setNewComment('');
-    }, [newComment, users, currentUser]);
+    }, [newComment, users, currentUser, positionOptions, convertSubcodeName]);
 
     const handleEditComment = useCallback((commentId: string, content: string) => {
       setEditingCommentId(commentId);
@@ -5112,7 +5131,7 @@ const TaskEditDialog = memo(
       const feedbackUser = users.find((u) => u.user_name === currentUser?.user_name);
       const currentUserName = feedbackUser?.user_name || currentUser?.user_name || '현재 사용자';
       const currentUserAvatar = feedbackUser?.profile_image_url || currentUser?.profile_image_url || '';
-      const currentUserRole = feedbackUser?.role || currentUser?.role || '';
+      const currentUserRole = convertSubcodeName(feedbackUser?.role || currentUser?.role || '', positionOptions);
       const currentUserDepartment = feedbackUser?.department || currentUser?.department || '';
 
       return {
@@ -5143,7 +5162,9 @@ const TaskEditDialog = memo(
       handleCancelEditComment,
       handleDeleteComment,
       users,
-      currentUser
+      currentUser,
+      positionOptions,
+      convertSubcodeName
     ]);
 
     const performanceTabProps = useMemo(

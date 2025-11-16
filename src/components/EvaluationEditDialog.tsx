@@ -247,6 +247,11 @@ const RecordTab = memo(
                       <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '13px' }}>
                         {comment.author}
                       </Typography>
+                      {comment.position && (
+                        <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '11px' }}>
+                          {comment.position}
+                        </Typography>
+                      )}
                       {comment.role && (
                         <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '11px' }}>
                           {comment.role}
@@ -1686,6 +1691,8 @@ export default function EvaluationEditDialog({
   console.log('🔍 [EvaluationEditDialog] users:', users?.length, '명');
 
   const [statusOptions, setStatusOptions] = useState<Array<{ code: string; name: string }>>([]);
+  const [positionOptions, setPositionOptions] = useState<Array<{ code: string; name: string }>>([]);
+  const [roleOptions, setRoleOptions] = useState<Array<{ code: string; name: string }>>([]);
 
   // 부서명 훅 (fallback용)
   const { departmentOptions } = useDepartmentNames();
@@ -1809,6 +1816,46 @@ export default function EvaluationEditDialog({
           }));
           setStatusOptions(options);
         }
+
+        // GROUP004 직급 조회
+        const { data: group004Data, error: group004Error } = await supabase
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP004')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+
+        if (group004Error) {
+          console.error('❌ GROUP004 조회 오류:', group004Error);
+        } else {
+          console.log('✅ GROUP004 직급:', group004Data);
+          const options = (group004Data || []).map((item) => ({
+            code: item.subcode,
+            name: item.subcode_name
+          }));
+          setPositionOptions(options);
+        }
+
+        // GROUP005 직책 조회
+        const { data: group005Data, error: group005Error } = await supabase
+          .from('admin_mastercode_data')
+          .select('subcode, subcode_name, subcode_order')
+          .eq('codetype', 'subcode')
+          .eq('group_code', 'GROUP005')
+          .eq('is_active', true)
+          .order('subcode_order', { ascending: true });
+
+        if (group005Error) {
+          console.error('❌ GROUP005 조회 오류:', group005Error);
+        } else {
+          console.log('✅ GROUP005 직책:', group005Data);
+          const options = (group005Data || []).map((item) => ({
+            code: item.subcode,
+            name: item.subcode_name
+          }));
+          setRoleOptions(options);
+        }
       } catch (error) {
         console.error('❌ 마스터코드 조회 중 오류:', error);
       }
@@ -1837,12 +1884,24 @@ export default function EvaluationEditDialog({
     }
   }, [open, evaluation?.id, feedbacks]);
 
+  // 직급/직책 서브코드를 서브코드명으로 변환하는 헬퍼 함수
+  const convertSubcodeName = React.useCallback((subcode: string | undefined, options: Array<{ code: string; name: string }>) => {
+    if (!subcode) return '';
+    // 이미 서브코드명이면 그대로 반환
+    if (!subcode.includes('GROUP')) return subcode;
+    // 서브코드를 서브코드명으로 변환
+    const found = options.find((opt) => opt.code === subcode);
+    return found ? found.name : subcode;
+  }, []);
+
   // Supabase feedbacks를 RecordTab 형식으로 변환 (pendingFeedbacks 사용)
   const comments = React.useMemo(() => {
     return pendingFeedbacks.map((feedback) => {
-      // user_name으로 사용자 찾기
       const feedbackUser = users.find((u) => u.user_name === feedback.user_name);
 
+      // ⚠️ DB에 position과 role이 바뀌어 저장되어 있음
+      // feedbackUser.role에 직급 서브코드(GROUP004-SUB003)가 들어있어서 이걸 변환하면 "팀장"이 나옴
+      // feedbackUser.position에는 직책명("사원")이 들어있는데, 이건 표시하지 않음
       return {
         id: feedback.id,
         author: feedback.user_name,
@@ -1850,11 +1909,11 @@ export default function EvaluationEditDialog({
         timestamp: new Date(feedback.created_at).toLocaleString('ko-KR'),
         avatar: feedback.user_profile_image || feedbackUser?.profile_image_url || undefined,
         department: feedback.user_department || feedback.team || feedbackUser?.department || '',
-        position: feedback.user_position || feedbackUser?.position || '',
-        role: feedback.metadata?.role || feedbackUser?.role || ''
+        position: convertSubcodeName(feedbackUser?.role || '', positionOptions),
+        role: '' // DB에 position/role이 바뀌어 있어서 role은 표시하지 않음
       };
     });
-  }, [pendingFeedbacks, users]);
+  }, [pendingFeedbacks, users, convertSubcodeName, positionOptions, roleOptions]);
 
   // 체크리스트관리 훅
   const { checklists, loading: checklistsLoading } = useSupabaseChecklistManagement();
@@ -3598,6 +3657,8 @@ export default function EvaluationEditDialog({
         );
 
       case 4: // 기록 탭
+        // ⚠️ DB에 position과 role이 바뀌어 저장되어 있음
+        // currentUser.role에 직급 서브코드(GROUP004-SUB003)가 들어있어서 이걸 변환하면 "팀장"이 나옴
         return (
           <RecordTab
             comments={comments}
@@ -3613,7 +3674,7 @@ export default function EvaluationEditDialog({
             onEditCommentTextChange={setEditingCommentText}
             currentUserName={currentUser?.user_name}
             currentUserAvatar={currentUser?.profile_image_url}
-            currentUserRole={currentUser?.role}
+            currentUserRole={convertSubcodeName(currentUser?.role || '', positionOptions)}
             currentUserDepartment={currentUser?.department}
           />
         );

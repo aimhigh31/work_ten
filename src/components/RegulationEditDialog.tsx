@@ -32,6 +32,9 @@ import { useOptimizedInput } from '../hooks/useDebounce';
 import { useSupabaseUserManagement } from '../hooks/useSupabaseUserManagement';
 import { useSupabaseSecurityRevision } from '../hooks/useSupabaseSecurityRevision';
 import { useSupabaseSecurityRegulation } from '../hooks/useSupabaseSecurityRegulation';
+import { useSupabaseFeedback } from '../hooks/useSupabaseFeedback';
+import { PAGE_IDENTIFIERS, FeedbackData } from '../types/feedback';
+import { createClient } from '@supabase/supabase-js';
 // import { usePerformanceMonitor } from '../utils/performance';
 
 // Icons
@@ -1291,8 +1294,37 @@ const RecordTab = memo(
     onSaveEditComment,
     onCancelEditComment,
     onDeleteComment,
-    onEditCommentTextChange
-  }: any) => {
+    onEditCommentTextChange,
+    currentUserName,
+    currentUserAvatar,
+    currentUserRole,
+    currentUserDepartment
+  }: {
+    comments: Array<{
+      id: string;
+      author: string;
+      content: string;
+      timestamp: string;
+      avatar?: string;
+      department?: string;
+      position?: string;
+      role?: string;
+    }>;
+    newComment: string;
+    onNewCommentChange: (value: string) => void;
+    onAddComment: () => void;
+    editingCommentId: string | null;
+    editingCommentText: string;
+    onEditComment: (id: string, content: string) => void;
+    onSaveEditComment: () => void;
+    onCancelEditComment: () => void;
+    onDeleteComment: (id: string) => void;
+    onEditCommentTextChange: (value: string) => void;
+    currentUserName?: string;
+    currentUserAvatar?: string;
+    currentUserRole?: string;
+    currentUserDepartment?: string;
+  }) => {
     const handleCommentKeyPress = useCallback(
       (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -1304,38 +1336,59 @@ const RecordTab = memo(
     );
 
     return (
-      <Box sx={{ height: '650px', px: '5%' }}>
-        {/* 새 기록 등록 - 좌우 배치 */}
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', mb: 3, pt: 2 }}>
-          <Avatar sx={{ width: 32, height: 32, mt: 0.5 }}>U</Avatar>
-          <TextField
-            fullWidth
-            multiline
-            rows={3}
-            placeholder="새 기록을 입력하세요..."
-            value={newComment}
-            onChange={(e) => onNewCommentChange(e.target.value)}
-            onKeyPress={handleCommentKeyPress}
-            variant="outlined"
-            size="small"
-            InputLabelProps={{ shrink: true }}
-          />
-          <Button
-            variant="contained"
-            onClick={onAddComment}
-            disabled={!newComment.trim()}
-            sx={{ minWidth: '80px', height: '40px', mt: 0.5 }}
-          >
-            등록
-          </Button>
+      <Box sx={{ height: '650px', display: 'flex', flexDirection: 'column' }}>
+        {/* 새 기록 등록 */}
+        <Box sx={{ p: 3, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <Stack direction="row" spacing={2} alignItems="flex-start">
+            <Avatar src={currentUserAvatar} sx={{ width: 32, height: 32, mt: 0.5 }}>
+              {currentUserName?.charAt(0) || 'U'}
+            </Avatar>
+            <Box sx={{ flex: 1 }}>
+              <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', mb: 1 }}>
+                <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '11px' }}>
+                  {currentUserName || '사용자'}
+                </Typography>
+                {currentUserRole && (
+                  <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '10px' }}>
+                    {currentUserRole}
+                  </Typography>
+                )}
+                {currentUserDepartment && (
+                  <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '10px' }}>
+                    {currentUserDepartment}
+                  </Typography>
+                )}
+              </Box>
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                placeholder="새 기록을 입력하세요..."
+                value={newComment}
+                onChange={(e) => onNewCommentChange(e.target.value)}
+                onKeyPress={handleCommentKeyPress}
+                variant="outlined"
+                size="small"
+                InputLabelProps={{ shrink: true }}
+              />
+            </Box>
+            <Button
+              variant="contained"
+              onClick={onAddComment}
+              disabled={!newComment.trim()}
+              sx={{ minWidth: '80px', height: '40px', mt: 3 }}
+            >
+              등록
+            </Button>
+          </Stack>
         </Box>
 
         {/* 기록 항목들 */}
-        <Box sx={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-          <Stack spacing={2}>
-            {comments.map((comment: any) => (
+        <Box sx={{ flex: 1, overflowY: 'auto', minHeight: 0, pb: 0, px: 3 }}>
+          <Stack spacing={2} sx={{ pt: 2 }}>
+            {comments.map((comment) => (
               <Paper
-                key={comment.id}
+                key={`comment-${comment.id}`}
                 variant="outlined"
                 sx={{
                   p: 2,
@@ -1351,17 +1404,31 @@ const RecordTab = memo(
                 }}
               >
                 <Stack direction="row" spacing={2} alignItems="flex-start">
-                  {/* 사용자 아바타 */}
-                  <Avatar sx={{ width: 32, height: 32 }}>{comment.author.charAt(0)}</Avatar>
+                  <Avatar src={comment.avatar} sx={{ width: 30, height: 30 }}>
+                    {comment.author.charAt(0)}
+                  </Avatar>
 
-                  {/* 기록 내용 영역 */}
                   <Box sx={{ flexGrow: 1 }}>
-                    {/* 사용자 정보 및 시간 */}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '13px' }}>
                         {comment.author}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">
+                      {comment.position && (
+                        <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '11px' }}>
+                          {comment.position}
+                        </Typography>
+                      )}
+                      {comment.role && (
+                        <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '11px' }}>
+                          {comment.role}
+                        </Typography>
+                      )}
+                      {comment.department && (
+                        <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '11px' }}>
+                          • {comment.department}
+                        </Typography>
+                      )}
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '11px', ml: 'auto' }}>
                         {comment.timestamp}
                       </Typography>
                     </Box>
@@ -1883,6 +1950,83 @@ const RegulationEditDialog = memo(
       return users.find((u) => u.email === session.user.email);
     }, [session, users]);
 
+    // Supabase 클라이언트 초기화
+    const supabase = useMemo(() => {
+      return createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+    }, []);
+
+    // GROUP004 (직급), GROUP005 (직책) 마스터코드 로딩
+    const [positionOptions, setPositionOptions] = useState<Array<{ code: string; name: string }>>([]);
+    const [roleOptions, setRoleOptions] = useState<Array<{ code: string; name: string }>>([]);
+
+    useEffect(() => {
+      const loadMasterCodes = async () => {
+        try {
+          // GROUP004 (직급) 조회
+          const { data: group004Data, error: group004Error } = await supabase
+            .from('admin_mastercode_data')
+            .select('subcode, subcode_name, subcode_order')
+            .eq('codetype', 'subcode')
+            .eq('group_code', 'GROUP004')
+            .eq('is_active', true)
+            .order('subcode_order', { ascending: true });
+
+          if (group004Error) {
+            console.error('❌ GROUP004 조회 오류:', group004Error);
+          } else {
+            console.log('✅ GROUP004 직급:', group004Data);
+            const options = (group004Data || []).map((item) => ({
+              code: item.subcode,
+              name: item.subcode_name
+            }));
+            setPositionOptions(options);
+          }
+
+          // GROUP005 (직책) 조회
+          const { data: group005Data, error: group005Error } = await supabase
+            .from('admin_mastercode_data')
+            .select('subcode, subcode_name, subcode_order')
+            .eq('codetype', 'subcode')
+            .eq('group_code', 'GROUP005')
+            .eq('is_active', true)
+            .order('subcode_order', { ascending: true });
+
+          if (group005Error) {
+            console.error('❌ GROUP005 조회 오류:', group005Error);
+          } else {
+            console.log('✅ GROUP005 직책:', group005Data);
+            const options = (group005Data || []).map((item) => ({
+              code: item.subcode,
+              name: item.subcode_name
+            }));
+            setRoleOptions(options);
+          }
+        } catch (error) {
+          console.error('❌ 마스터코드 로딩 오류:', error);
+        }
+      };
+
+      if (open) {
+        loadMasterCodes();
+      }
+    }, [open, supabase]);
+
+    // 서브코드를 서브코드명으로 변환하는 함수
+    const convertSubcodeName = React.useCallback((subcode: string | undefined, options: Array<{ code: string; name: string }>) => {
+      console.log('🔄 convertSubcodeName 호출:', { subcode, optionsLength: options.length, options });
+      if (!subcode) return '';
+      // 이미 서브코드명이면 그대로 반환
+      if (!subcode.includes('GROUP')) return subcode;
+      // 서브코드를 서브코드명으로 변환
+      const found = options.find((opt) => opt.code === subcode);
+      const result = found ? found.name : subcode;
+      console.log('✅ convertSubcodeName 결과:', { subcode, found, result });
+      return result;
+    }, []);
+
     // task.code로 regulation_id 찾기
     const regulationId = useMemo(() => {
       if (!task || !task.code || !regulationItems || regulationItems.length === 0) {
@@ -1911,6 +2055,14 @@ const RegulationEditDialog = memo(
       }
       return result;
     }, [task, regulationItems]);
+
+    // 피드백 데이터 훅
+    const {
+      feedbacks,
+      addFeedback,
+      updateFeedback,
+      deleteFeedback
+    } = useSupabaseFeedback(PAGE_IDENTIFIERS.SECURITY_REGULATION, regulationId?.toString() || undefined);
 
     // regulation_id가 있을 때 리비전 데이터 가져오기
     React.useEffect(() => {
@@ -2074,11 +2226,20 @@ const RegulationEditDialog = memo(
     const [editingChecklistText, setEditingChecklistText] = useState('');
 
     // 코멘트 상태
-    const [comments, setComments] = useState<Array<{ id: number; author: string; content: string; timestamp: string; avatar?: string }>>(
+    const [comments, setComments] = useState<Array<{
+      id: string;
+      author: string;
+      content: string;
+      timestamp: string;
+      avatar?: string;
+      department?: string;
+      position?: string;
+      role?: string;
+    }>>(
       []
     );
     const [newComment, setNewComment] = useState('');
-    const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
+    const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
     const [editingCommentText, setEditingCommentText] = useState('');
 
     // 자료 상태
@@ -2097,6 +2258,32 @@ const RegulationEditDialog = memo(
 
     // 에러 상태
     const [validationError, setValidationError] = useState<string>('');
+
+    // feedbacks를 comments로 변환
+    useEffect(() => {
+      if (feedbacks.length > 0) {
+        const convertedComments = feedbacks.map((feedback) => {
+          // user_name으로 사용자 찾기
+          const feedbackUser = users.find((u) => u.user_name === feedback.user_name);
+
+          return {
+            id: feedback.id,
+            author: feedback.user_name,
+            content: feedback.description,
+            timestamp: new Date(feedback.created_at).toLocaleString('ko-KR'),
+            avatar: feedback.user_profile_image || feedbackUser?.profile_image_url || undefined,
+            department: feedback.user_department || feedback.team || feedbackUser?.department || '',
+            position: convertSubcodeName(feedbackUser?.role || '', positionOptions),
+            role: ''
+          };
+        });
+        setComments(convertedComments);
+        console.log('✅ 규정관리 기록 변환:', convertedComments.length, '개');
+      } else if (open && regulationId) {
+        // feedbacks가 비어있고 다이얼로그가 열려있으면 초기화
+        setComments([]);
+      }
+    }, [feedbacks, users, positionOptions, convertSubcodeName, open, regulationId]);
 
     // Task 변경 시 상태 업데이트
     React.useEffect(() => {
@@ -2362,19 +2549,24 @@ const RegulationEditDialog = memo(
     const handleAddComment = useCallback(() => {
       if (!newComment.trim()) return;
 
+      // ⚠️ DB에 position과 role이 바뀌어 저장되어 있음
+      // currentUser.role에 직급 서브코드(GROUP004-SUB003)가 들어있어서 이걸 변환하면 "팀장"이 나옴
       const comment = {
-        id: Date.now(),
-        author: '현재 사용자',
+        id: `temp-${Date.now()}`,
+        author: currentUser?.user_name || '현재 사용자',
         content: newComment,
         timestamp: new Date().toLocaleString('ko-KR'),
-        avatar: undefined
+        avatar: currentUser?.profile_image_url,
+        department: currentUser?.department,
+        position: convertSubcodeName(currentUser?.role || '', positionOptions),
+        role: '' // DB에 position/role이 바뀌어 있어서 role은 표시하지 않음
       };
 
       setComments((prev) => [...prev, comment]);
       setNewComment('');
-    }, [newComment]);
+    }, [newComment, currentUser, positionOptions, convertSubcodeName]);
 
-    const handleEditComment = useCallback((commentId: number, content: string) => {
+    const handleEditComment = useCallback((commentId: string, content: string) => {
       setEditingCommentId(commentId);
       setEditingCommentText(content);
     }, []);
@@ -2399,7 +2591,7 @@ const RegulationEditDialog = memo(
       setEditingCommentText('');
     }, []);
 
-    const handleDeleteComment = useCallback((commentId: number) => {
+    const handleDeleteComment = useCallback((commentId: string) => {
       setComments((prev) => prev.filter((comment) => comment.id !== commentId));
     }, []);
 
@@ -2512,8 +2704,17 @@ const RegulationEditDialog = memo(
       ]
     );
 
-    const recordTabProps = useMemo(
-      () => ({
+    const recordTabProps = useMemo(() => {
+      const userRole = convertSubcodeName(currentUser?.role || '', positionOptions);
+      console.log('🔍 RecordTab Props:', {
+        currentUserRole: currentUser?.role,
+        positionOptions: positionOptions,
+        convertedRole: userRole,
+        currentUserName: currentUser?.user_name,
+        currentUserDepartment: currentUser?.department
+      });
+
+      return {
         comments,
         newComment,
         onNewCommentChange: setNewComment,
@@ -2524,20 +2725,26 @@ const RegulationEditDialog = memo(
         onSaveEditComment: handleSaveEditComment,
         onCancelEditComment: handleCancelEditComment,
         onDeleteComment: handleDeleteComment,
-        onEditCommentTextChange: setEditingCommentText
-      }),
-      [
-        comments,
-        newComment,
-        editingCommentId,
-        editingCommentText,
-        handleAddComment,
-        handleEditComment,
-        handleSaveEditComment,
-        handleCancelEditComment,
-        handleDeleteComment
-      ]
-    );
+        onEditCommentTextChange: setEditingCommentText,
+        currentUserName: currentUser?.user_name,
+        currentUserAvatar: currentUser?.profile_image_url,
+        currentUserRole: userRole,
+        currentUserDepartment: currentUser?.department
+      };
+    }, [
+      comments,
+      newComment,
+      editingCommentId,
+      editingCommentText,
+      handleAddComment,
+      currentUser,
+      positionOptions,
+      convertSubcodeName,
+      handleEditComment,
+      handleSaveEditComment,
+      handleCancelEditComment,
+      handleDeleteComment
+    ]);
 
     const materialTabProps = useMemo(
       () => ({

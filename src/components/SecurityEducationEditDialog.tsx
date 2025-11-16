@@ -2400,14 +2400,14 @@ const RecordTab = memo(
                       <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '13px' }}>
                         {comment.author}
                       </Typography>
-                      {comment.role && (
+                      {comment.position && (
                         <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '11px' }}>
-                          {comment.role}
+                          {comment.position}
                         </Typography>
                       )}
                       {comment.department && (
                         <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '11px' }}>
-                          • {comment.department}
+                          {comment.department}
                         </Typography>
                       )}
                       <Typography variant="caption" color="text.secondary" sx={{ fontSize: '11px', ml: 'auto' }}>
@@ -3056,6 +3056,27 @@ export default function SecurityEducationDialog({
     return found;
   }, [session, users]);
 
+  // GROUP004 서브코드 목록 (직급용) - masterCodes에서 필터링
+  const positionOptions = React.useMemo(() => {
+    return masterCodes
+      .filter((item) => item.codetype === 'subcode' && item.group_code === 'GROUP004' && item.is_active)
+      .sort((a, b) => a.subcode_order - b.subcode_order)
+      .map((item) => ({
+        code: item.subcode,
+        name: item.subcode_name
+      }));
+  }, [masterCodes]);
+
+  // 서브코드를 서브코드명으로 변환하는 함수
+  const convertSubcodeName = React.useCallback((subcode: string | undefined, options: Array<{ code: string; name: string }>) => {
+    if (!subcode) return '';
+    // 이미 서브코드명이면 그대로 반환
+    if (!subcode.includes('GROUP')) return subcode;
+    // 서브코드를 서브코드명으로 변환
+    const found = options.find((opt) => opt.code === subcode);
+    return found ? found.name : subcode;
+  }, []);
+
   // 데이터 소유자 확인 로직
   const isOwner = React.useMemo(() => {
     if (!data) return true; // 신규 생성인 경우 true
@@ -3281,8 +3302,8 @@ export default function SecurityEducationDialog({
           timestamp: new Date(feedback.created_at).toLocaleString('ko-KR'),
           avatar: feedback.user_profile_image || feedbackUser?.profile_image_url || undefined,
           department: feedback.user_department || feedback.team || feedbackUser?.department || '',
-          position: feedback.user_position || feedbackUser?.position || '',
-          role: feedback.metadata?.role || feedbackUser?.role || '',
+          position: convertSubcodeName(feedbackUser?.role || '', positionOptions),
+          role: '',
           isNew: false
         };
       });
@@ -3295,7 +3316,7 @@ export default function SecurityEducationDialog({
 
     // 합쳐서 반환 (최신 순으로 정렬 - 새 기록이 위로)
     return [...newComments, ...existingComments];
-  }, [feedbacks, users, pendingComments, modifiedComments, deletedCommentIds]);
+  }, [feedbacks, users, pendingComments, modifiedComments, deletedCommentIds, positionOptions]);
 
   // 옵션들은 이미 import된 상태
   const statusColors = useMemo(
@@ -3588,9 +3609,8 @@ export default function SecurityEducationDialog({
 
     const currentUserName = currentUser?.user_name || user?.name || '현재 사용자';
     const currentTeam = currentUser?.department || user?.department || '';
-    const currentPosition = currentUser?.position || '';
+    const currentPosition = convertSubcodeName(currentUser?.role || '', positionOptions);
     const currentProfileImage = currentUser?.profile_image_url || '';
-    const currentRole = currentUser?.role || '';
 
     // DB에 바로 저장하지 않고 임시 저장 (저장 버튼 클릭 시 DB 저장)
     const tempComment = {
@@ -3601,7 +3621,7 @@ export default function SecurityEducationDialog({
       avatar: currentProfileImage || undefined,
       department: currentTeam,
       position: currentPosition,
-      role: currentRole,
+      role: '',
       isNew: true
     };
 
@@ -3610,7 +3630,7 @@ export default function SecurityEducationDialog({
 
     // 변경로그 추가
     queueChangeLog(CHANGE_LOG_ACTIONS.COMMENT_ADD, null, newComment, { changeType: 'create' });
-  }, [newComment, currentUser, user, queueChangeLog]);
+  }, [newComment, currentUser, user, queueChangeLog, positionOptions]);
 
   const handleEditComment = useCallback((commentId: string, content: string) => {
     setEditingCommentId(commentId);
@@ -4414,7 +4434,7 @@ export default function SecurityEducationDialog({
             onEditCommentTextChange={setEditingCommentText}
             currentUserName={currentUser?.user_name || user?.name || '현재 사용자'}
             currentUserAvatar={currentUser?.profile_image_url || ''}
-            currentUserRole={currentUser?.role || ''}
+            currentUserRole={convertSubcodeName(currentUser?.role || '', positionOptions)}
             currentUserDepartment={currentUser?.department || user?.department || ''}
           />
         </TabPanel>
