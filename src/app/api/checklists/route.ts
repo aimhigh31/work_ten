@@ -51,6 +51,51 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// 코드 생성 헬퍼 함수
+async function generateChecklistCode(): Promise<string> {
+  const currentYear = new Date().getFullYear();
+  const currentYearStr = currentYear.toString().slice(-2);
+
+  console.log('🔵 [API] 체크리스트 코드 생성 시작');
+
+  // DB에서 현재 연도의 모든 코드 조회 (활성/비활성 모두)
+  // 이렇게 하면 삭제된 번호를 건너뛰고 항상 증가하는 번호를 생성
+  const { data: allChecklists, error: fetchError } = await supabase
+    .from('admin_checklist_data')
+    .select('code')
+    .like('code', `ADMIN-CHECK-${currentYearStr}-%`)
+    .order('code', { ascending: false })
+    .limit(1);
+
+  if (fetchError) {
+    console.error('❌ [API] 코드 조회 실패:', fetchError);
+    // 오류 시 기본값 사용
+    return `ADMIN-CHECK-${currentYearStr}-001`;
+  }
+
+  let nextSequence = 1;
+
+  if (allChecklists && allChecklists.length > 0) {
+    const lastCode = allChecklists[0].code;
+    const validCodePattern = new RegExp(`^ADMIN-CHECK-${currentYearStr}-(\\d{3})$`);
+    const match = lastCode?.match(validCodePattern);
+
+    if (match) {
+      const lastSequence = parseInt(match[1], 10);
+      nextSequence = lastSequence + 1;
+      console.log('📊 [API] 마지막 일련번호:', lastSequence);
+    }
+  }
+
+  const formattedSequence = nextSequence.toString().padStart(3, '0');
+  const code = `ADMIN-CHECK-${currentYearStr}-${formattedSequence}`;
+
+  console.log('✅ [API] 자동 생성된 코드:', code);
+  console.log('📊 [API] 다음 일련번호:', nextSequence);
+
+  return code;
+}
+
 // POST: 체크리스트 생성
 export async function POST(request: NextRequest) {
   try {
@@ -71,62 +116,76 @@ export async function POST(request: NextRequest) {
     // 코드가 제공되지 않았거나 비어있으면 서버에서 생성
     let code = body.code;
     if (!code || code.trim() === '') {
-      const currentYear = new Date().getFullYear().toString().slice(-2);
+      code = await generateChecklistCode();
+    }
 
-      // DB에서 현재 연도의 최대 코드 번호 조회
-      const { data: existingCodes } = await supabase
-        .from('admin_checklist_data')
-        .select('code')
-        .like('code', `ADMIN-CHECK-${currentYear}-%`)
-        .order('code', { ascending: false })
-        .limit(1);
+    // 재시도 로직 (최대 10회)
+    const maxRetries = 10;
+    let lastError: any = null;
 
-      let nextNumber = 1;
-      if (existingCodes && existingCodes.length > 0) {
-        const lastCode = existingCodes[0].code;
-        const match = lastCode.match(/ADMIN-CHECK-\d{2}-(\d{3})/);
-        if (match) {
-          nextNumber = parseInt(match[1], 10) + 1;
-        }
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      if (attempt > 0) {
+        // 재시도 전 대기 (50-200ms 랜덤, attempt가 증가할수록 더 길게)
+        const waitTime = 50 + Math.random() * 150 + (attempt * 20);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+
+        console.log(`🔄 [API] 재시도 ${attempt}회 - 코드 재생성`);
+        code = await generateChecklistCode();
       }
 
-      code = `ADMIN-CHECK-${currentYear}-${nextNumber.toString().padStart(3, '0')}`;
-      console.log('🔢 서버에서 생성된 코드:', code);
+      // 데이터 삽입
+      const { data, error: insertError } = await supabase
+        .from('admin_checklist_data')
+        .insert([
+          {
+            ...body,
+            code,
+            no: body.no || nextNo,
+            registration_date: body.registration_date || new Date().toISOString().split('T')[0],
+            progress: body.progress || 0,
+            created_by: body.created_by || body.assignee || 'unknown',
+            updated_by: body.updated_by || body.created_by || body.assignee || 'unknown',
+            is_active: true
+          }
+        ])
+        .select()
+        .single();
+
+      if (!insertError) {
+        // 성공
+        console.log(`✅ [API] 체크리스트 생성 성공 (${attempt > 0 ? `${attempt}회 재시도 후` : '1회 시도'}):`, code);
+        return NextResponse.json({
+          success: true,
+          data
+        });
+      }
+
+      // 중복 키 오류가 아니면 즉시 실패
+      if (!insertError.message?.includes('duplicate key') && !insertError.message?.includes('admin_checklist_data_code_key')) {
+        console.error('❌ [API] 체크리스트 생성 오류 (중복 외 오류):', insertError);
+        return NextResponse.json(
+          {
+            success: false,
+            error: insertError.message
+          },
+          { status: 500 }
+        );
+      }
+
+      // 중복 키 오류 - 재시도 준비
+      lastError = insertError;
+      console.warn(`⚠️ [API] 코드 중복 감지 (${code}), 재시도 예정... (${attempt + 1}/${maxRetries})`);
     }
 
-    // 데이터 삽입
-    const { data, error: insertError } = await supabase
-      .from('admin_checklist_data')
-      .insert([
-        {
-          ...body,
-          code,
-          no: body.no || nextNo,
-          registration_date: body.registration_date || new Date().toISOString().split('T')[0],
-          progress: body.progress || 0,
-          created_by: body.created_by || body.assignee || 'unknown',
-          updated_by: body.updated_by || body.created_by || body.assignee || 'unknown',
-          is_active: true
-        }
-      ])
-      .select()
-      .single();
-
-    if (insertError) {
-      console.error('체크리스트 생성 오류:', insertError);
-      return NextResponse.json(
-        {
-          success: false,
-          error: insertError.message
-        },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      data
-    });
+    // 최대 재시도 횟수 초과
+    console.error('❌ [API] 최대 재시도 횟수 초과:', lastError);
+    return NextResponse.json(
+      {
+        success: false,
+        error: `체크리스트 생성에 실패했습니다. 잠시 후 다시 시도해주세요.`
+      },
+      { status: 500 }
+    );
   } catch (error) {
     console.error('체크리스트 생성 오류:', error);
     return NextResponse.json(

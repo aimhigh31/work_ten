@@ -36,6 +36,7 @@ import { useSupabaseFeedback } from '../hooks/useSupabaseFeedback';
 import { PAGE_IDENTIFIERS, FeedbackData } from '../types/feedback';
 import { useSupabaseFiles } from '../hooks/useSupabaseFiles';
 import { FileData } from '../types/files';
+import { useSupabaseEducation } from '../hooks/useSupabaseEducation';
 // import { usePerformanceMonitor } from '../utils/performance';
 
 // Icons
@@ -369,13 +370,13 @@ const OverviewTab = memo(
                 notched
                 renderValue={(selected) => {
                   if (!selected) return '선택';
-                  const item = educationFieldsFromDB.find(f => f.subcode === selected);
+                  const item = educationFieldsFromDB.find(f => f.subcode_name === selected);
                   return item ? item.subcode_name : selected;
                 }}
               >
                 <MenuItem value="">선택</MenuItem>
                 {educationFieldsFromDB.map((option) => (
-                  <MenuItem key={option.subcode} value={option.subcode}>
+                  <MenuItem key={option.subcode} value={option.subcode_name}>
                     {option.subcode_name}
                   </MenuItem>
                 ))}
@@ -396,13 +397,13 @@ const OverviewTab = memo(
                 notched
                 renderValue={(selected) => {
                   if (!selected) return '선택';
-                  const item = educationTypesFromDB.find(t => t.subcode === selected);
+                  const item = educationTypesFromDB.find(t => t.subcode_name === selected);
                   return item ? item.subcode_name : selected;
                 }}
               >
                 <MenuItem value="">선택</MenuItem>
                 {educationTypesFromDB.map((option) => (
-                  <MenuItem key={option.subcode} value={option.subcode}>
+                  <MenuItem key={option.subcode} value={option.subcode_name}>
                     {option.subcode_name}
                   </MenuItem>
                 ))}
@@ -418,7 +419,7 @@ const OverviewTab = memo(
                 notched
                 renderValue={(selected) => {
                   if (!selected) return '';
-                  const item = statusTypesFromDB.find(s => s.subcode === selected);
+                  const item = statusTypesFromDB.find(s => s.subcode_name === selected);
                   const displayName = item ? item.subcode_name : selected;
 
                   let chipColors = { bgcolor: '#F5F5F5', color: '#757575' };
@@ -459,7 +460,7 @@ const OverviewTab = memo(
                   }
 
                   return (
-                    <MenuItem key={option.subcode} value={option.subcode}>
+                    <MenuItem key={option.subcode} value={option.subcode_name}>
                       <Chip
                         label={option.subcode_name}
                         size="small"
@@ -1410,6 +1411,9 @@ const EducationEditDialog = memo(
     // CommonData 훅 사용 (캐싱된 데이터)
     const { users, masterCodes } = useCommonData();
 
+    // Education 훅 사용 (DB 저장용)
+    const { createEducation, updateEducation, convertToDbEducationData } = useSupabaseEducation();
+
     // 현재 로그인한 사용자 정보
     const currentUser = useMemo(() => {
       if (!session?.user?.email || users.length === 0) return null;
@@ -1771,59 +1775,105 @@ const EducationEditDialog = memo(
         console.log('✅ 기록 탭 변경사항 저장 완료');
       }
 
-      // 약간의 지연을 두고 저장 (상태 업데이트 완료 대기)
-      setTimeout(async () => {
-        if (!education) {
-          // 새 Education 생성
-          const newEducation: EducationData = {
-            id: Date.now(),
-            no: 0, // DB에서 자동 생성됨
-            code: educationState.code, // 다이얼로그에서 자동 생성된 코드 사용
-            registrationDate: educationState.registrationDate || new Date().toISOString().split('T')[0],
-            receptionDate: new Date().toISOString().split('T')[0],
-            customerName: educationState.customerName,
-            companyName: '',
-            educationType: educationState.educationType,
-            channel: '전화',
-            title: educationState.title,
-            content: currentValues.content,
-            team: currentUser?.department || '',
-            assignee: currentUser?.user_name || '',
-            status: educationState.status,
-            priority: educationState.priority,
-            responseContent: currentValues.responseContent,
-            resolutionDate: educationState.resolutionDate,
-            satisfactionScore: null,
-            attachments: [],
-            createdBy: currentUser?.user_name || '',
-            updatedBy: currentUser?.user_name || ''
-          };
+      // 🔄 Education 데이터 DB 저장 (하드웨어관리/VOC관리 패턴)
+      try {
+        // EducationData 객체 생성 (프론트엔드 형식)
+        const educationData: EducationData = !education ? {
+          id: 0, // DB에서 자동 생성
+          no: 0, // DB에서 자동 생성
+          code: educationState.code,
+          registrationDate: educationState.registrationDate || new Date().toISOString().split('T')[0],
+          receptionDate: educationState.receptionDate || new Date().toISOString().split('T')[0],
+          customerName: educationState.customerName,
+          companyName: educationState.companyName || '',
+          educationType: educationState.educationType,
+          channel: educationState.channel || '전화',
+          title: educationState.title,
+          content: currentValues.content,
+          team: educationState.team || currentUser?.department || '',
+          assignee: educationState.assignee || currentUser?.user_name || '',
+          status: educationState.status,
+          priority: educationState.priority,
+          responseContent: currentValues.responseContent,
+          resolutionDate: educationState.resolutionDate,
+          satisfactionScore: null,
+          attachments: [],
+          createdBy: currentUser?.user_name || 'system',
+          updatedBy: currentUser?.user_name || 'system'
+        } : {
+          ...education,
+          customerName: educationState.customerName,
+          companyName: educationState.companyName || '',
+          educationType: educationState.educationType,
+          channel: educationState.channel || '전화',
+          title: educationState.title,
+          content: currentValues.content,
+          team: educationState.team,
+          assignee: educationState.assignee,
+          status: educationState.status,
+          priority: educationState.priority,
+          responseContent: currentValues.responseContent,
+          resolutionDate: educationState.resolutionDate,
+          updatedBy: currentUser?.user_name || 'system'
+        };
 
-          console.log('🚀 새 Education 생성 중:', newEducation);
-          console.log('👤 현재 사용자 정보:', { department: currentUser?.department, name: currentUser?.user_name });
-          console.log('🔖 자동 생성된 코드:', educationState.code);
-          onSave(newEducation);
+        // DB 형식으로 변환
+        const dbEducationData = convertToDbEducationData(educationData);
+
+        let savedData;
+        if (!education || !education.id) {
+          // 새 Education 생성
+          console.log('🚀 새 Education 생성 중:', dbEducationData);
+          savedData = await createEducation(dbEducationData);
+          if (!savedData) {
+            setValidationError('교육 생성에 실패했습니다.');
+            return;
+          }
+          console.log('✅ 새 Education 생성 성공:', savedData);
         } else {
           // 기존 Education 수정
-          const updatedEducation: EducationData = {
-            ...education,
-            customerName: educationState.customerName,
-            educationType: educationState.educationType,
-            title: educationState.title,
-            content: currentValues.content,
-            assignee: educationState.assignee,
-            status: educationState.status,
-            priority: educationState.priority,
-            responseContent: currentValues.responseContent,
-            resolutionDate: educationState.resolutionDate,
-            updatedBy: currentUser?.user_name || ''
-          };
-
-          console.log('📝 기존 Education 수정 중:', updatedEducation);
-          onSave(updatedEducation);
+          console.log('📝 기존 Education 수정 중:', { id: education.id, data: dbEducationData });
+          const success = await updateEducation(education.id, dbEducationData);
+          if (!success) {
+            setValidationError('교육 수정에 실패했습니다.');
+            return;
+          }
+          console.log('✅ Education 수정 성공');
+          savedData = { ...dbEducationData, id: education.id };
         }
+
+        // 저장된 데이터를 EducationData 형식으로 변환하여 부모에 전달
+        const savedEducationData: EducationData = {
+          id: savedData.id || education?.id || 0,
+          no: savedData.no || education?.no || 0,
+          code: savedData.code || educationState.code,
+          registrationDate: savedData.registration_date || educationState.registrationDate,
+          receptionDate: savedData.reception_date || educationState.receptionDate,
+          customerName: savedData.customer_name || educationState.customerName,
+          companyName: savedData.company_name || educationState.companyName || '',
+          educationType: savedData.education_type || educationState.educationType,
+          channel: savedData.channel || educationState.channel || '전화',
+          title: savedData.title || educationState.title,
+          content: savedData.content || currentValues.content,
+          team: savedData.team || educationState.team,
+          assignee: savedData.assignee || educationState.assignee,
+          status: savedData.status || educationState.status,
+          priority: savedData.priority || educationState.priority,
+          responseContent: savedData.response_content || currentValues.responseContent,
+          resolutionDate: savedData.resolution_date || educationState.resolutionDate,
+          satisfactionScore: savedData.satisfaction_score || null,
+          attachments: savedData.attachments || [],
+          createdBy: savedData.created_by || currentUser?.user_name || 'system',
+          updatedBy: savedData.updated_by || currentUser?.user_name || 'system'
+        };
+
+        console.log('📤 부모 컴포넌트로 전달:', savedEducationData);
+        onSave(savedEducationData);
         onClose();
-      }, 50); // 50ms 지연
+      } catch (error) {
+        console.error('❌ Education 저장 실패:', error);
+        setValidationError('교육 저장 중 오류가 발생했습니다.');
+      }
     }, [
       education,
       educationState,
@@ -1836,7 +1886,10 @@ const EducationEditDialog = memo(
       addFeedback,
       updateFeedback,
       deleteFeedback,
-      currentUser
+      currentUser,
+      createEducation,
+      updateEducation,
+      convertToDbEducationData
     ]);
 
     const handleClose = useCallback(() => {

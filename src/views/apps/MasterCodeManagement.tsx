@@ -6,8 +6,6 @@ import { usePathname, useRouter } from 'next/navigation';
 // Material-UI
 import {
   Box,
-  Tab,
-  Tabs,
   Typography,
   Grid,
   Card,
@@ -39,13 +37,12 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem,
-  Pagination
+  MenuItem
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 
 // Icons
-import { Code, Add, Edit, Trash, Eye, Setting2, TableDocument, DocumentText } from '@wandersonalwes/iconsax-react';
+import { Code, Add, Edit, Trash, Eye, Setting2 } from '@wandersonalwes/iconsax-react';
 
 // Supabase 타입 import - 마스터코드3 플랫 구조 사용
 import { useSupabaseMasterCode3, GroupInfo, SubCodeInfo, MasterCodeFlat } from '../../hooks/useSupabaseMasterCode3';
@@ -56,16 +53,6 @@ import { useMenuPermission } from '../../hooks/usePermissions';
 type MasterCodeData2 = GroupInfo;
 type SubCodeData2 = SubCodeInfo;
 
-// 변경로그 타입 정의
-interface ChangeLog {
-  id: number;
-  dateTime: string;
-  team: string;
-  user: string;
-  action: string;
-  target: string;
-  description: string;
-}
 
 // 다이얼로그 상태 타입
 interface MasterCodeDialogState {
@@ -82,365 +69,6 @@ interface SubCodeDialogState {
 }
 
 // ==============================|| 마스터코드관리3 메인 페이지 ||============================== //
-
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`mastercode-tabpanel-${index}`}
-      aria-labelledby={`mastercode-tab-${index}`}
-      {...other}
-      style={{ height: '100%', overflow: 'hidden' }}
-    >
-      {value === index && <Box sx={{ pt: 3, height: '100%', overflow: 'hidden' }}>{children}</Box>}
-    </div>
-  );
-}
-
-function a11yProps(index: number) {
-  return {
-    id: `mastercode-tab-${index}`,
-    'aria-controls': `mastercode-tabpanel-${index}`
-  };
-}
-
-// 변경로그 뷰 컴포넌트
-interface ChangeLogViewProps {
-  changeLogs: ChangeLog[];
-  masterCodes: MasterCodeData2[];
-  page: number;
-  rowsPerPage: number;
-  goToPage: string;
-  onPageChange: (newPage: number) => void;
-  onRowsPerPageChange: (newRowsPerPage: number) => void;
-  onGoToPageChange: (page: string) => void;
-}
-
-function ChangeLogView({
-  changeLogs,
-  masterCodes,
-  page,
-  rowsPerPage,
-  goToPage,
-  onPageChange,
-  onRowsPerPageChange,
-  onGoToPageChange
-}: ChangeLogViewProps) {
-  const theme = useTheme();
-
-  // 페이지네이션 적용된 데이터
-  const paginatedLogs = React.useMemo(() => {
-    const startIndex = page * rowsPerPage;
-    return changeLogs.slice(startIndex, startIndex + rowsPerPage);
-  }, [changeLogs, page, rowsPerPage]);
-
-  // 총 페이지 수 계산
-  const totalPages = Math.ceil(changeLogs.length / rowsPerPage);
-
-  // 페이지 변경 핸들러
-  const handleChangePage = (event: React.ChangeEvent<unknown>, newPage: number) => {
-    onPageChange(newPage - 1);
-  };
-
-  // Go to 페이지 핸들러
-  const handleGoToPage = () => {
-    const pageNumber = parseInt(goToPage, 10);
-    if (pageNumber >= 1 && pageNumber <= totalPages) {
-      onPageChange(pageNumber - 1);
-    }
-    onGoToPageChange('');
-  };
-
-  return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* 상단 정보 */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, mt: 4.5, flexShrink: 0 }}>
-        <Typography variant="body2" color="text.secondary">
-          총 {changeLogs.length}건
-        </Typography>
-      </Box>
-
-      {/* 변경로그 테이블 */}
-      <TableContainer
-        sx={{
-          flex: 1,
-          border: 'none',
-          borderRadius: 0,
-          overflowX: 'auto',
-          overflowY: 'auto',
-          boxShadow: 'none',
-          minHeight: 0,
-          '& .MuiTable-root': {},
-          // 스크롤바 스타일
-          '&::-webkit-scrollbar': {
-            width: '10px',
-            height: '10px'
-          },
-          '&::-webkit-scrollbar-track': {
-            backgroundColor: '#f8f9fa',
-            borderRadius: '4px'
-          },
-          '&::-webkit-scrollbar-thumb': {
-            backgroundColor: '#e9ecef',
-            borderRadius: '4px',
-            border: '2px solid #f8f9fa'
-          },
-          '&::-webkit-scrollbar-thumb:hover': {
-            backgroundColor: '#dee2e6'
-          },
-          '&::-webkit-scrollbar-corner': {
-            backgroundColor: '#f8f9fa'
-          }
-        }}
-      >
-        <Table size="small">
-          <TableHead>
-            <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
-              <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 130 }}>변경시간</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 100 }}>코드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 180 }}>코드명</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 120 }}>변경분류</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 280 }}>변경 세부내용</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>담당자</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {paginatedLogs.map((log, index) => (
-              <TableRow
-                key={log.id}
-                hover
-                sx={{
-                  '&:hover': { backgroundColor: 'action.hover' }
-                }}
-              >
-                <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                    {changeLogs.length - (page * rowsPerPage + index)}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.secondary' }}>
-                    {log.dateTime}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                    {log.target}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                    {(() => {
-                      const masterCode = masterCodes.find((mc) => mc.code_group === log.target);
-                      return masterCode?.code_group_name || log.description.split(' - ')[0] || '코드명 없음';
-                    })()}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontSize: '13px',
-                      fontWeight: 500
-                    }}
-                  >
-                    {log.action}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontSize: '13px',
-                      color: 'text.secondary',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'normal',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      lineHeight: 1.4
-                    }}
-                    title={log.description}
-                  >
-                    {log.description}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <Chip
-                    label={log.team}
-                    variant="outlined"
-                    sx={{
-                      height: 22,
-                      fontSize: '13px',
-                      color: '#333333',
-                      fontWeight: 500
-                    }}
-                  />
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                    {log.user}
-                  </Typography>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      {/* 페이지네이션 */}
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          mt: 0.5,
-          px: 1,
-          py: 0.5,
-          borderTop: '1px solid',
-          borderColor: 'divider',
-          flexShrink: 0
-        }}
-      >
-        {/* 왼쪽: Row per page */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            Row per page
-          </Typography>
-          <FormControl size="small" sx={{ minWidth: 60 }}>
-            <Select
-              value={rowsPerPage}
-              onChange={(e) => {
-                onRowsPerPageChange(Number(e.target.value));
-                onPageChange(0);
-              }}
-              sx={{
-                '& .MuiSelect-select': {
-                  py: 0.5,
-                  px: 1,
-                  fontSize: '0.875rem'
-                },
-                '& .MuiOutlinedInput-notchedOutline': {
-                  border: '1px solid #e0e0e0'
-                }
-              }}
-            >
-              <MenuItem key={5} value={5}>
-                5
-              </MenuItem>
-              <MenuItem key={10} value={10}>
-                10
-              </MenuItem>
-              <MenuItem key={25} value={25}>
-                25
-              </MenuItem>
-              <MenuItem key={50} value={50}>
-                50
-              </MenuItem>
-            </Select>
-          </FormControl>
-
-          {/* Go to */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Go to
-            </Typography>
-            <TextField
-              value={goToPage}
-              onChange={(e) => onGoToPageChange(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  handleGoToPage();
-                }
-              }}
-              placeholder="1"
-              sx={{
-                width: 60,
-                '& .MuiOutlinedInput-root': {
-                  '& input': {
-                    py: 0.5,
-                    px: 1,
-                    textAlign: 'center',
-                    fontSize: '0.875rem'
-                  },
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    border: '1px solid #e0e0e0'
-                  }
-                }
-              }}
-            />
-            <Button
-              onClick={handleGoToPage}
-              sx={{
-                minWidth: 'auto',
-                px: 1.5,
-                py: 0.5,
-                fontSize: '0.875rem'
-              }}
-            >
-              Go
-            </Button>
-          </Box>
-        </Box>
-
-        {/* 오른쪽: 페이지 네비게이션 */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            {changeLogs.length > 0
-              ? `${page * rowsPerPage + 1}-${Math.min((page + 1) * rowsPerPage, changeLogs.length)} of ${changeLogs.length}`
-              : '0-0 of 0'}
-          </Typography>
-          {totalPages > 0 && (
-            <Pagination
-              count={totalPages}
-              page={page + 1}
-              onChange={handleChangePage}
-              color="primary"
-              showFirstButton
-              showLastButton
-              sx={{
-                '& .MuiPaginationItem-root': {
-                  fontSize: '0.875rem',
-                  minWidth: '32px',
-                  height: '32px',
-                  borderRadius: '4px'
-                },
-                '& .MuiPaginationItem-page.Mui-selected': {
-                  backgroundColor: 'primary.main',
-                  color: 'white !important',
-                  borderRadius: '4px',
-                  fontWeight: 500,
-                  '&:hover': {
-                    backgroundColor: 'primary.dark',
-                    color: 'white !important'
-                  }
-                },
-                '& .MuiPaginationItem-page': {
-                  borderRadius: '4px',
-                  '&:hover': {
-                    backgroundColor: 'grey.100'
-                  }
-                }
-              }}
-            />
-          )}
-        </Box>
-      </Box>
-    </Box>
-  );
-}
 
 // ==============================|| 마스터코드 다이얼로그 ||============================== //
 interface MasterCodeDialogProps {
@@ -783,9 +411,6 @@ export default function MasterCodeManagement() {
   // ✅ 권한 체크
   const { canViewCategory, canReadData, canCreateData, canEditOwn, canEditOthers, loading: permissionLoading } = useMenuPermission('/admin-panel/master-code');
 
-  // 메인 탭 상태 (데이터, 변경로그)
-  const [mainTabValue, setMainTabValue] = useState(0);
-
   // 선택된 마스터코드
   const [selectedMasterCode, setSelectedMasterCode] = useState<number | null>(null);
 
@@ -825,11 +450,6 @@ export default function MasterCodeManagement() {
     message: '',
     severity: 'success' as 'success' | 'error' | 'warning' | 'info'
   });
-
-  // 변경로그 페이지네이션 상태
-  const [changeLogPage, setChangeLogPage] = useState(0);
-  const [changeLogRowsPerPage, setChangeLogRowsPerPage] = useState(10);
-  const [changeLogGoToPage, setChangeLogGoToPage] = useState('');
 
   // Supabase 플랫 구조 훅 사용
   const {
@@ -885,46 +505,6 @@ export default function MasterCodeManagement() {
     error
   });
 
-  // 변경로그 상태 - 초기 데이터는 샘플 데이터 사용
-  const [changeLogs, setChangeLogs] = useState<ChangeLog[]>([
-    {
-      id: 1,
-      dateTime: '2024-01-15 14:30',
-      team: 'IT팀',
-      user: '김개발',
-      action: '마스터코드 생성',
-      target: 'TASK_STATUS',
-      description: '업무 상태 코드 그룹 생성 - 계획, 진행중, 완료, 취소 서브코드 포함'
-    },
-    {
-      id: 2,
-      dateTime: '2024-01-15 15:45',
-      team: 'IT팀',
-      user: '이관리',
-      action: '서브코드 수정',
-      target: 'TASK_STATUS',
-      description: '진행중 서브코드 설명 변경 - "작업 진행 중" → "업무 진행 중"'
-    },
-    {
-      id: 3,
-      dateTime: '2024-01-16 09:20',
-      team: 'IT팀',
-      user: '박시스템',
-      action: '마스터코드 수정',
-      target: 'USER_ROLE',
-      description: '사용자 역할 코드 그룹 설명 업데이트'
-    },
-    {
-      id: 4,
-      dateTime: '2024-01-16 11:15',
-      team: '기획팀',
-      user: '최기획',
-      action: '서브코드 생성',
-      target: 'PRIORITY_LEVEL',
-      description: '우선순위 레벨에 "긴급" 서브코드 추가'
-    }
-  ]);
-
   // 선택된 마스터코드에 따른 서브코드 필터링 및 정렬순서로 정렬
   const filteredSubCodes = selectedMasterCode
     ? (() => {
@@ -960,26 +540,6 @@ export default function MasterCodeManagement() {
       })()
     : [];
 
-  // 변경로그 추가 함수
-  const addChangeLog = (action: string, target: string, description: string) => {
-    const newLog: ChangeLog = {
-      id: changeLogs.length + 1,
-      dateTime: new Date().toLocaleString('ko-KR', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      }),
-      team: 'IT팀',
-      user: '사용자',
-      action,
-      target,
-      description
-    };
-    setChangeLogs((prev) => [newLog, ...prev]);
-  };
-
   // 마스터코드 선택 핸들러 (디바운싱 적용)
   const handleMasterCodeSelect = useCallback(
     (masterCodeId: number) => {
@@ -1002,10 +562,6 @@ export default function MasterCodeManagement() {
   // ========================================
   // 이벤트 핸들러
   // ========================================
-
-  const handleMainTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    setMainTabValue(newValue);
-  };
 
   // 마스터코드 관리
   const handleCreateMasterCode = () => {
@@ -1040,11 +596,6 @@ export default function MasterCodeManagement() {
           message: '마스터코드 그룹이 삭제되었습니다.',
           severity: 'success'
         });
-
-        // 변경로그 추가
-        if (deletedGroup) {
-          addChangeLog('삭제', deletedGroup.group_code, `삭제: ${deletedGroup.group_code_name}`);
-        }
       }
     } catch (error) {
       setSnackbar({
@@ -1086,9 +637,6 @@ export default function MasterCodeManagement() {
           message: '마스터코드 그룹이 수정되었습니다.',
           severity: 'success'
         });
-
-        // 변경로그 추가
-        addChangeLog('수정', data.code_group, `수정: ${data.code_group_name}`);
       } else {
         // 새 그룹 생성 (그룹만 생성)
         await createGroup({
@@ -1107,7 +655,6 @@ export default function MasterCodeManagement() {
           message: '마스터코드 그룹이 생성되었습니다.',
           severity: 'success'
         });
-        addChangeLog('추가', data.code_group, `생성: ${data.code_group_name} - ${data.code_group_description || '설명 없음'}`);
       }
       setMasterCodeDialog({ open: false, mode: 'create', data: null });
     } catch (error) {
@@ -1172,11 +719,6 @@ export default function MasterCodeManagement() {
         message: '서브코드가 삭제되었습니다.',
         severity: 'success'
       });
-
-      // 변경로그 추가
-      if (subCodeToDelete) {
-        addChangeLog('삭제', subCodeToDelete.group_code, `삭제: ${subCodeToDelete.subcode} (${subCodeToDelete.subcode_name})`);
-      }
     } catch (error) {
       setSnackbar({
         open: true,
@@ -1232,14 +774,6 @@ export default function MasterCodeManagement() {
           });
         }
       }
-
-      // 변경로그 추가
-      const masterCode = masterCodes.find((mc) => mc.id === data.mastercode_id);
-      addChangeLog(
-        data.id ? '수정' : '추가',
-        masterCode?.code_group || 'UNKNOWN',
-        `${data.id ? '수정' : '생성'}: ${data.sub_code} (${data.sub_code_name}) - ${data.sub_code_description || '설명 없음'}`
-      );
 
       setSubCodeDialog({ open: false, mode: 'create', mastercode_id: null, data: null });
     } catch (error) {
@@ -1304,13 +838,6 @@ export default function MasterCodeManagement() {
         severity: 'success'
       });
 
-      // 변경로그 추가
-      addChangeLog(
-        '추가',
-        selectedGroup.group_code,
-        `생성: 자동생성 (${subCodeNameValue}) - ${editValues[`${newRowData.id}_sub_code_description`] || '설명 없음'}`
-      );
-
       // 상태 초기화
       setNewRowData(null);
       setEditingCell(null);
@@ -1340,10 +867,6 @@ export default function MasterCodeManagement() {
         message: '서브코드가 수정되었습니다.',
         severity: 'success'
       });
-
-      // 변경로그 추가
-      const subCode = filteredSubCodes.find((sc) => sc.id === updateData.id);
-      addChangeLog('수정', subCode?.group_code || 'UNKNOWN', `수정: ${subCode?.subcode} (${subCode?.subcode_name})`);
     } catch (error) {
       setSnackbar({
         open: true,
@@ -1443,68 +966,7 @@ export default function MasterCodeManagement() {
             </Box>
           ) : (
             <>
-              {/* 탭 네비게이션 및 필터 */}
-              <Box
-                sx={{
-                  borderBottom: 1,
-                  borderColor: 'divider',
-                  flexShrink: 0,
-                  mt: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between'
-                }}
-              >
-                <Tabs
-              value={mainTabValue}
-              onChange={handleMainTabChange}
-              aria-label="마스터코드관리3 탭"
-              sx={{
-                '& .MuiTab-root': {
-                  minHeight: 48,
-                  textTransform: 'none',
-                  fontSize: '0.91rem',
-                  fontWeight: 500
-                }
-              }}
-            >
-              <Tab
-                icon={<TableDocument size={19} />}
-                iconPosition="start"
-                label="데이터"
-                {...a11yProps(0)}
-                sx={{
-                  gap: 0.8,
-                  '& .MuiTab-iconWrapper': {
-                    margin: 0
-                  }
-                }}
-              />
-              <Tab
-                icon={<DocumentText size={19} />}
-                iconPosition="start"
-                label="변경로그"
-                {...a11yProps(1)}
-                sx={{
-                  gap: 0.8,
-                  '& .MuiTab-iconWrapper': {
-                    margin: 0
-                  }
-                }}
-              />
-            </Tabs>
-          </Box>
-
-          {/* 탭 내용 */}
-          <Box
-            sx={{
-              flex: 1,
-              overflow: 'hidden',
-              minHeight: 0
-            }}
-          >
-            <TabPanel value={mainTabValue} index={0}>
-              {/* 데이터 탭 - 테이블 */}
+              {/* 데이터 - 테이블 */}
               <Box
                 sx={{
                   p: 0.5,
@@ -2128,32 +1590,7 @@ export default function MasterCodeManagement() {
                   </Box>
                 </Box>
               </Box>
-            </TabPanel>
-
-            <TabPanel value={mainTabValue} index={1}>
-              {/* 변경로그 탭 */}
-              <Box
-                sx={{
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  p: 0.5
-                }}
-              >
-                <ChangeLogView
-                  changeLogs={changeLogs}
-                  masterCodes={masterCodes}
-                  page={changeLogPage}
-                  rowsPerPage={changeLogRowsPerPage}
-                  goToPage={changeLogGoToPage}
-                  onPageChange={setChangeLogPage}
-                  onRowsPerPageChange={setChangeLogRowsPerPage}
-                  onGoToPageChange={setChangeLogGoToPage}
-                />
-              </Box>
-            </TabPanel>
-          </Box>
-          </>
+            </>
           )}
         </CardContent>
       </Card>

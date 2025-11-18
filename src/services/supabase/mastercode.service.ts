@@ -553,6 +553,82 @@ class MasterCodeService {
       throw error;
     }
   }
+
+  /**
+   * 그룹코드와 서브코드로 서브코드명 조회
+   */
+  async getSubCodeNameByCode(groupCode: string, subCode: string): Promise<string> {
+    try {
+      const { data, error } = await supabase
+        .from('admin_mastercode_data')
+        .select('sub_name')
+        .eq('group_code', groupCode)
+        .eq('sub_code', subCode)
+        .single();
+
+      if (error || !data) {
+        return subCode; // 찾지 못하면 원래 코드 반환
+      }
+
+      return data.sub_name;
+    } catch (error) {
+      console.error('❌ Subcode name fetch error:', error);
+      return subCode; // 오류 발생 시 원래 코드 반환
+    }
+  }
+
+  /**
+   * 플랫 구조로 모든 마스터코드 데이터 조회
+   */
+  async getAllFlatCodes(groupCode?: string): Promise<any[]> {
+    try {
+      let query = supabase.from('admin_mastercode_data').select('*').neq('sub_code', 'MASTER').order('group_code').order('display_order');
+
+      if (groupCode) {
+        query = query.eq('group_code', groupCode);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        throw new Error('Failed to fetch flat codes');
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('❌ Flat codes fetch error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 그룹코드로 서브코드 선택 옵션 조회
+   */
+  async getSubCodeSelectOptionsByGroupCode(groupCode: string): Promise<SubCodeSelectOption[]> {
+    try {
+      const { data, error } = await supabase
+        .from('admin_mastercode_data')
+        .select('*')
+        .eq('group_code', groupCode)
+        .neq('sub_code', 'MASTER')
+        .eq('sub_status', 'active')
+        .order('display_order');
+
+      if (error) {
+        throw new Error('Failed to fetch subcode options');
+      }
+
+      return (data || []).map((item) => ({
+        value: item.sub_code,
+        label: item.sub_name,
+        description: item.sub_description,
+        color: item.code_value1
+      }));
+    } catch (error) {
+      console.error('❌ Subcode options fetch error:', error);
+      throw error;
+    }
+  }
 }
 
 export const masterCodeService = new MasterCodeService();

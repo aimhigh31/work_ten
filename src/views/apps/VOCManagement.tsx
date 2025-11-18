@@ -2527,6 +2527,7 @@ export default function VOCManagement() {
   const {
     vocs: vocsFromHook,
     getVocs,
+    getVocById,
     createVoc,
     updateVoc,
     deleteVoc,
@@ -2542,6 +2543,7 @@ export default function VOCManagement() {
   // 편집 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);
   const [editingVOC, setEditingVOC] = useState<VOCTableData | null>(null);
+  const [originalVOC, setOriginalVOC] = useState<VOCTableData | null>(null);
 
   // 변경로그 페이지네이션 상태
   const [changeLogPage, setChangeLogPage] = useState(0);
@@ -2683,9 +2685,44 @@ export default function VOCManagement() {
     [currentUser, user, userName, fetchChangeLogs]
   );
 
-  // 카드 클릭 핸들러
-  const handleCardClick = (voc: VOCTableData) => {
+  // 카드 클릭 핸들러 (하드웨어관리와 동일한 패턴)
+  const handleCardClick = async (voc: VOCTableData) => {
     setEditingVOC(voc);
+
+    // 🔍 DB에서 최신 데이터를 가져와서 원본으로 저장 (메모리 데이터는 구버전일 수 있음)
+    try {
+      const latestData = await getVocById(voc.id);
+      if (latestData) {
+        // DB 데이터를 VOCTableData 형식으로 변환
+        const originalData: VOCTableData = {
+          ...voc,
+          customerName: latestData.customer_name || voc.customerName,
+          companyName: latestData.company_name || voc.companyName,
+          vocType: latestData.voc_type || voc.vocType,
+          channel: latestData.channel || voc.channel,
+          requestContent: latestData.content || voc.requestContent,
+          workContent: latestData.content || voc.workContent,
+          responseContent: latestData.response_content || voc.responseContent,
+          actionContent: latestData.response_content || voc.actionContent,
+          team: latestData.team || voc.team,
+          assignee: latestData.assignee || voc.assignee,
+          status: latestData.status || voc.status,
+          priority: latestData.priority || voc.priority,
+          resolutionDate: latestData.resolution_date || voc.resolutionDate,
+          completedDate: latestData.resolution_date || voc.completedDate,
+          registrationDate: latestData.registration_date || voc.registrationDate,
+          receptionDate: latestData.reception_date || voc.receptionDate
+        };
+        setOriginalVOC(originalData);
+        console.log('🔍 [handleCardClick] DB에서 가져온 최신 원본 데이터:', originalData);
+      } else {
+        setOriginalVOC(JSON.parse(JSON.stringify(voc)));
+      }
+    } catch (error) {
+      console.error('❌ [handleCardClick] DB 조회 실패, 메모리 데이터 사용:', error);
+      setOriginalVOC(JSON.parse(JSON.stringify(voc)));
+    }
+
     setEditDialog(true);
   };
 
@@ -2693,6 +2730,7 @@ export default function VOCManagement() {
   const handleEditDialogClose = () => {
     setEditDialog(false);
     setEditingVOC(null);
+    setOriginalVOC(null);
   };
 
   // 받침 감지 함수
@@ -2711,7 +2749,8 @@ export default function VOCManagement() {
 
   // VOC 저장 핸들러
   const handleEditVOCSave = (updatedVOC: VOCTableData) => {
-    const originalVOC = vocs.find((t) => t.id === updatedVOC.id);
+    // VOCEditDialog에서 이미 DB 저장을 완료했으므로
+    // 여기서는 로컬 상태 업데이트, 토스트 알림, 변경로그만 처리
 
     if (originalVOC) {
       // 업데이트
@@ -2729,7 +2768,10 @@ export default function VOCManagement() {
         completedDate: '완료일',
         status: '상태',
         assignee: '담당자',
-        team: '팀'
+        team: '팀',
+        customerName: 'VOC요청자',
+        priority: '우선순위',
+        responseContent: '처리내용'
       };
 
       const changedFields: string[] = [];
@@ -2749,11 +2791,11 @@ export default function VOCManagement() {
         // 마지막 필드명의 받침 유무에 따라 조사 결정
         const lastField = changedFields[changedFields.length - 1];
         const josa = getKoreanParticle(lastField);
-        message = `${updatedVOC.workContent || 'VOC'}의 ${fieldsText}${josa} 성공적으로 수정되었습니다.`;
+        message = `${updatedVOC.workContent || updatedVOC.requestContent || 'VOC'}의 ${fieldsText}${josa} 성공적으로 수정되었습니다.`;
       } else {
         // 필드 변경이 없는 경우
-        const josa = getKoreanParticle(updatedVOC.workContent || 'VOC');
-        message = `${updatedVOC.workContent || 'VOC'}${josa} 성공적으로 수정되었습니다.`;
+        const josa = getKoreanParticle(updatedVOC.workContent || updatedVOC.requestContent || 'VOC');
+        message = `${updatedVOC.workContent || updatedVOC.requestContent || 'VOC'}${josa} 성공적으로 수정되었습니다.`;
       }
 
       setSnackbar({
@@ -2762,24 +2804,173 @@ export default function VOCManagement() {
         severity: 'success'
       });
 
-      // 변경로그 추가
-      const changes = [];
-      if (originalVOC.status !== updatedVOC.status) {
-        changes.push(`상태: ${originalVOC.status} → ${updatedVOC.status}`);
-      }
-      if (originalVOC.assignee !== updatedVOC.assignee) {
-        changes.push(`담당자: ${originalVOC.assignee} → ${updatedVOC.assignee}`);
-      }
-      if (originalVOC.completedDate !== updatedVOC.completedDate) {
-        changes.push(`완료일: ${originalVOC.completedDate} → ${updatedVOC.completedDate}`);
+      // 변경로그 생성 전 originalVOC 존재 확인 (하드웨어관리 패턴)
+      if (!originalVOC) {
+        console.log('⚠️ originalVOC가 없어서 변경로그 생성 불가');
+        handleEditDialogClose();
+        return;
       }
 
-      if (changes.length > 0) {
-        const vocTitle = updatedVOC.requestContent || updatedVOC.workContent || 'VOC';
-        const vocCode = updatedVOC.code;
-        const description = `VOC관리 ${vocTitle}(${vocCode}) 개요탭의 ${changes.join(', ')}가 수정 되었습니다.`;
-        addChangeLog('수정', vocCode, description, updatedVOC.team);
+      // 변경로그 추가 (하드웨어관리와 동일한 방식으로 필드별 세밀하게 추적)
+      console.log('🔍 [handleEditVOCSave] 변경로그 생성 시작');
+      console.log('🔍 [handleEditVOCSave] originalVOC:', originalVOC);
+      console.log('🔍 [handleEditVOCSave] updatedVOC:', updatedVOC);
+
+      const vocCode = updatedVOC.code || `VOC-${updatedVOC.id}`;
+      const vocTitle = updatedVOC.requestContent || updatedVOC.workContent || 'VOC';
+      const normalizeValue = (value: any) => (value === undefined || value === null || value === '' ? '' : String(value).trim());
+
+      // VOC요청자 변경
+      if (originalVOC.customerName !== updatedVOC.customerName &&
+          normalizeValue(originalVOC.customerName) !== normalizeValue(updatedVOC.customerName)) {
+        console.log('✅ [변경로그] VOC요청자 변경 감지:', originalVOC.customerName, '→', updatedVOC.customerName);
+        addChangeLog(
+          '수정',
+          vocCode,
+          `VOC관리 ${vocTitle}(${vocCode}) 개요탭의 VOC요청자가 ${originalVOC.customerName || ''} → ${updatedVOC.customerName || ''}로 수정 되었습니다.`,
+          updatedVOC.team || '미분류',
+          originalVOC.customerName || '',
+          updatedVOC.customerName || '',
+          'VOC요청자',
+          vocTitle,
+          '칸반탭'
+        );
       }
+
+      // VOC유형 변경
+      if (originalVOC.vocType !== updatedVOC.vocType &&
+          normalizeValue(originalVOC.vocType) !== normalizeValue(updatedVOC.vocType)) {
+        addChangeLog(
+          '수정',
+          vocCode,
+          `VOC관리 ${vocTitle}(${vocCode}) 개요탭의 VOC유형이 ${originalVOC.vocType || ''} → ${updatedVOC.vocType || ''}로 수정 되었습니다.`,
+          updatedVOC.team || '미분류',
+          originalVOC.vocType || '',
+          updatedVOC.vocType || '',
+          'VOC유형',
+          vocTitle,
+          '칸반탭'
+        );
+      }
+
+      // 우선순위 변경
+      if (originalVOC.priority !== updatedVOC.priority &&
+          normalizeValue(originalVOC.priority) !== normalizeValue(updatedVOC.priority)) {
+        addChangeLog(
+          '수정',
+          vocCode,
+          `VOC관리 ${vocTitle}(${vocCode}) 개요탭의 우선순위가 ${originalVOC.priority || ''} → ${updatedVOC.priority || ''}로 수정 되었습니다.`,
+          updatedVOC.team || '미분류',
+          originalVOC.priority || '',
+          updatedVOC.priority || '',
+          '우선순위',
+          vocTitle,
+          '칸반탭'
+        );
+      }
+
+      // 요청내용 변경
+      const originalContent = originalVOC.requestContent || originalVOC.workContent || '';
+      const updatedContent = updatedVOC.requestContent || updatedVOC.workContent || '';
+      if (normalizeValue(originalContent) !== normalizeValue(updatedContent)) {
+        addChangeLog(
+          '수정',
+          vocCode,
+          `VOC관리 ${vocTitle}(${vocCode}) 개요탭의 요청내용이 ${originalContent || ''} → ${updatedContent || ''}로 수정 되었습니다.`,
+          updatedVOC.team || '미분류',
+          originalContent || '',
+          updatedContent || '',
+          '요청내용',
+          vocTitle,
+          '칸반탭'
+        );
+      }
+
+      // 처리내용 변경
+      const originalResponse = originalVOC.responseContent || originalVOC.actionContent || '';
+      const updatedResponse = updatedVOC.responseContent || updatedVOC.actionContent || '';
+      if (normalizeValue(originalResponse) !== normalizeValue(updatedResponse)) {
+        addChangeLog(
+          '수정',
+          vocCode,
+          `VOC관리 ${vocTitle}(${vocCode}) 개요탭의 처리내용이 ${originalResponse || ''} → ${updatedResponse || ''}로 수정 되었습니다.`,
+          updatedVOC.team || '미분류',
+          originalResponse || '',
+          updatedResponse || '',
+          '처리내용',
+          vocTitle,
+          '칸반탭'
+        );
+      }
+
+      // 상태 변경
+      if (originalVOC.status !== updatedVOC.status &&
+          normalizeValue(originalVOC.status) !== normalizeValue(updatedVOC.status)) {
+        console.log('✅ [변경로그] 상태 변경 감지:', originalVOC.status, '→', updatedVOC.status);
+        addChangeLog(
+          '수정',
+          vocCode,
+          `VOC관리 ${vocTitle}(${vocCode}) 개요탭의 상태가 ${originalVOC.status || ''} → ${updatedVOC.status || ''}로 수정 되었습니다.`,
+          updatedVOC.team || '미분류',
+          originalVOC.status || '',
+          updatedVOC.status || '',
+          '상태',
+          vocTitle,
+          '칸반탭'
+        );
+      }
+
+      // 담당자 변경
+      if (originalVOC.assignee !== updatedVOC.assignee &&
+          normalizeValue(originalVOC.assignee) !== normalizeValue(updatedVOC.assignee)) {
+        console.log('✅ [변경로그] 담당자 변경 감지:', originalVOC.assignee, '→', updatedVOC.assignee);
+        addChangeLog(
+          '수정',
+          vocCode,
+          `VOC관리 ${vocTitle}(${vocCode}) 개요탭의 담당자가 ${originalVOC.assignee || ''} → ${updatedVOC.assignee || ''}로 수정 되었습니다.`,
+          updatedVOC.team || '미분류',
+          originalVOC.assignee || '',
+          updatedVOC.assignee || '',
+          '담당자',
+          vocTitle,
+          '칸반탭'
+        );
+      }
+
+      // 팀 변경
+      if (originalVOC.team !== updatedVOC.team &&
+          normalizeValue(originalVOC.team) !== normalizeValue(updatedVOC.team)) {
+        addChangeLog(
+          '수정',
+          vocCode,
+          `VOC관리 ${vocTitle}(${vocCode}) 개요탭의 팀이 ${originalVOC.team || ''} → ${updatedVOC.team || ''}로 수정 되었습니다.`,
+          updatedVOC.team || '미분류',
+          originalVOC.team || '',
+          updatedVOC.team || '',
+          '팀',
+          vocTitle,
+          '칸반탭'
+        );
+      }
+
+      // 완료일 변경
+      const originalCompletedDate = originalVOC.completedDate || originalVOC.resolutionDate || '';
+      const updatedCompletedDate = updatedVOC.completedDate || updatedVOC.resolutionDate || '';
+      if (normalizeValue(originalCompletedDate) !== normalizeValue(updatedCompletedDate)) {
+        addChangeLog(
+          '수정',
+          vocCode,
+          `VOC관리 ${vocTitle}(${vocCode}) 개요탭의 완료일이 ${originalCompletedDate || ''} → ${updatedCompletedDate || ''}로 수정 되었습니다.`,
+          updatedVOC.team || '미분류',
+          originalCompletedDate || '',
+          updatedCompletedDate || '',
+          '완료일',
+          vocTitle,
+          '칸반탭'
+        );
+      }
+
+      console.log('🎉 [handleEditVOCSave] 변경로그 생성 완료');
     } else {
       // 새로 생성
       setVOCs((prevVOCs) => [...prevVOCs, updatedVOC]);

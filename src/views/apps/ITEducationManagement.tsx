@@ -160,6 +160,7 @@ interface KanbanViewProps {
   isDraggingState?: boolean;
   onDragStart?: (event: any) => void;
   onDragEnd?: (event: any) => void;
+  onCardClick?: (task: ITEducationTableData) => void;
 }
 
 function KanbanView({
@@ -182,7 +183,8 @@ function KanbanView({
   activeTask,
   isDraggingState,
   onDragStart,
-  onDragEnd
+  onDragEnd,
+  onCardClick
 }: KanbanViewProps) {
   const theme = useTheme();
   const { data: session } = useSession();
@@ -255,11 +257,9 @@ function KanbanView({
 
   // 카드 클릭 핸들러
   const handleCardClick = (task: ITEducationTableData) => {
-    setEditingTask(task);
-    if (setOriginalTask) {
-      setOriginalTask(JSON.parse(JSON.stringify(task))); // Deep copy - 원본 데이터 저장
+    if (onCardClick) {
+      onCardClick(task);
     }
-    setEditDialog(true);
   };
 
   // 상태별 컬럼 정의
@@ -2001,7 +2001,7 @@ export default function ITEducationManagement() {
   });
 
   // Supabase 훅 사용
-  const { loading, error, getItEducationData, updateItEducation } = useSupabaseItEducation();
+  const { loading, error, getItEducationData, updateItEducation, getItEducationById } = useSupabaseItEducation();
   const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 가져오기
 
   // 🔐 권한 관리
@@ -2083,33 +2083,38 @@ export default function ITEducationManagement() {
 
   // DB 변경로그를 UI 형식으로 변환
   const changeLogs = React.useMemo(() => {
-    return dbChangeLogs.map((log: ChangeLogData) => {
-      // record_id로 해당 IT교육 찾기 (record_id는 코드로 저장되어 있음)
-      const education = tasks.find((t) => t.code === log.record_id);
+    return dbChangeLogs
+      .filter((log: ChangeLogData) => {
+        // IT-EDU로 시작하는 코드만 필터링
+        return log.record_id && log.record_id.startsWith('IT-EDU');
+      })
+      .map((log: ChangeLogData) => {
+        // record_id로 해당 IT교육 찾기 (record_id는 코드로 저장되어 있음)
+        const education = tasks.find((t) => t.code === log.record_id);
 
-      const date = new Date(log.created_at);
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      const hour = String(date.getHours()).padStart(2, '0');
-      const minute = String(date.getMinutes()).padStart(2, '0');
-      const formattedDateTime = `${year}.${month}.${day} ${hour}:${minute}`;
+        const date = new Date(log.created_at);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hour = String(date.getHours()).padStart(2, '0');
+        const minute = String(date.getMinutes()).padStart(2, '0');
+        const formattedDateTime = `${year}.${month}.${day} ${hour}:${minute}`;
 
-      return {
-        id: log.id,
-        dateTime: formattedDateTime,
-        code: log.record_id, // record_id가 이미 코드임
-        target: education?.educationName || log.record_id,
-        location: log.change_location || '개요탭', // DB의 변경위치 값 사용
-        action: log.action_type,
-        changedField: log.changed_field || '-', // 변경필드
-        description: log.description,
-        beforeValue: log.before_value,
-        afterValue: log.after_value,
-        team: log.team || log.user_department || '-',
-        user: log.user_name
-      };
-    });
+        return {
+          id: log.id,
+          dateTime: formattedDateTime,
+          code: log.record_id, // record_id가 이미 코드임
+          target: education?.educationName || log.record_id,
+          location: log.change_location || '개요탭', // DB의 변경위치 값 사용
+          action: log.action_type,
+          changedField: log.changed_field || '-', // 변경필드
+          description: log.description,
+          beforeValue: log.before_value,
+          afterValue: log.after_value,
+          team: log.team || log.user_department || '-',
+          user: log.user_name
+        };
+      });
   }, [dbChangeLogs, tasks]);
 
   // 필터 상태
@@ -2263,9 +2268,38 @@ export default function ITEducationManagement() {
   );
 
   // 카드 클릭 핸들러
-  const handleCardClick = (task: ITEducationTableData) => {
+  const handleCardClick = async (task: ITEducationTableData) => {
     setEditingTask(task);
-    setOriginalTask(JSON.parse(JSON.stringify(task))); // Deep copy - 원본 데이터 저장
+
+    // 🔍 DB에서 최신 데이터를 가져와서 원본으로 저장 (메모리 데이터는 구버전일 수 있음)
+    try {
+      const latestData = await getItEducationById(task.id);
+      if (latestData) {
+        // DB 데이터를 ITEducationTableData 형식으로 변환
+        const originalData: ITEducationTableData = {
+          ...task,
+          description: latestData.description || '',
+          educationName: latestData.education_name || task.educationName,
+          educationType: latestData.education_type || task.educationType,
+          participantCount: latestData.participant_count ?? task.participantCount,
+          executionDate: latestData.execution_date || task.executionDate,
+          registrationDate: latestData.registration_date || task.registrationDate,
+          location: latestData.location || task.location,
+          status: latestData.status || task.status,
+          assignee: latestData.assignee || task.assignee,
+          team: latestData.team || task.team
+        };
+        setOriginalTask(originalData);
+        console.log('🔍 [handleCardClick] DB에서 가져온 최신 원본 데이터:', originalData);
+      } else {
+        // DB 조회 실패 시 메모리 데이터 사용 (fallback)
+        setOriginalTask(JSON.parse(JSON.stringify(task)));
+      }
+    } catch (error) {
+      console.error('❌ [handleCardClick] DB 조회 실패, 메모리 데이터 사용:', error);
+      setOriginalTask(JSON.parse(JSON.stringify(task))); // Deep copy - 원본 데이터 저장
+    }
+
     setEditDialog(true);
   };
 
@@ -2337,7 +2371,8 @@ export default function ITEducationManagement() {
         Object.keys(fieldMap).forEach((key) => {
           const oldValue = (originalTask as any)[key];
           const newValue = (updatedTask as any)[key];
-          if (oldValue !== newValue && !changedFields.includes(fieldMap[key])) {
+          // undefined인 필드는 수정되지 않은 것으로 간주
+          if (newValue !== undefined && oldValue !== newValue && !changedFields.includes(fieldMap[key])) {
             changedFields.push(fieldMap[key]);
           }
         });
@@ -2372,7 +2407,169 @@ export default function ITEducationManagement() {
       // Supabase 데이터 새로고침
       refreshData();
 
-      // 변경로그는 ITEducationTable.tsx에서 추가됨 (중복 방지)
+      // 변경로그 추가 - 필드별 상세 추적
+      if (originalTask) {
+        console.log('🔴 [ITEducationManagement] addChangeLog 시작 - 개요탭 필드 체크');
+        const taskCode = updatedTask.code || `IT-EDU-${updatedTask.id}`;
+        const educationName = updatedTask.educationName || 'IT교육';
+
+        // 정규화 함수: 빈 값(null, undefined, '')을 빈 문자열로 통일
+        const normalizeValue = (value: any): string => {
+          if (value === null || value === undefined || value === '') {
+            return '';
+          }
+          return String(value);
+        };
+
+        // 교육유형 변경 (updatedTask에 값이 있을 때만 비교)
+        if (updatedTask.educationType !== undefined &&
+            normalizeValue(originalTask.educationType) !== normalizeValue(updatedTask.educationType)) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `IT교육관리 ${educationName}(${taskCode}) 개요탭의 교육유형이 ${originalTask.educationType} → ${updatedTask.educationType}로 수정 되었습니다.`,
+            updatedTask.team || '미분류',
+            originalTask.educationType,
+            updatedTask.educationType,
+            '교육유형',
+            educationName,
+            '개요탭'
+          );
+        }
+
+        // 교육명 변경 (updatedTask에 값이 있을 때만 비교)
+        if (updatedTask.educationName !== undefined &&
+            normalizeValue(originalTask.educationName) !== normalizeValue(updatedTask.educationName)) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `IT교육관리 ${originalTask.educationName || ''}(${taskCode}) 개요탭의 교육명이 ${originalTask.educationName || ''} → ${updatedTask.educationName || ''}로 수정 되었습니다.`,
+            updatedTask.team || '미분류',
+            originalTask.educationName || '',
+            updatedTask.educationName || '',
+            '교육명',
+            updatedTask.educationName,
+            '개요탭'
+          );
+        }
+
+        // 장소 변경 (updatedTask에 값이 있을 때만 비교)
+        if (updatedTask.location !== undefined &&
+            normalizeValue(originalTask.location) !== normalizeValue(updatedTask.location)) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `IT교육관리 ${educationName}(${taskCode}) 개요탭의 장소가 ${originalTask.location || ''} → ${updatedTask.location || ''}로 수정 되었습니다.`,
+            updatedTask.team || '미분류',
+            originalTask.location || '',
+            updatedTask.location || '',
+            '장소',
+            educationName,
+            '개요탭'
+          );
+        }
+
+        // 참석수 변경 (undefined와 null을 0으로 처리)
+        if (updatedTask.attendeeCount !== undefined) {
+          const oldCount = originalTask.attendeeCount ?? 0;
+          const newCount = updatedTask.attendeeCount ?? 0;
+          if (oldCount !== newCount) {
+            addChangeLog(
+              '수정',
+              taskCode,
+              `IT교육관리 ${educationName}(${taskCode}) 개요탭의 참석수가 ${oldCount} → ${newCount}로 수정 되었습니다.`,
+              updatedTask.team || '미분류',
+              String(oldCount),
+              String(newCount),
+              '참석수',
+              educationName,
+              '개요탭'
+            );
+          }
+        }
+
+        // 상태 변경 (updatedTask에 값이 있을 때만 비교)
+        if (updatedTask.status !== undefined && originalTask.status !== updatedTask.status) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `IT교육관리 ${educationName}(${taskCode}) 개요탭의 상태가 ${originalTask.status} → ${updatedTask.status}로 수정 되었습니다.`,
+            updatedTask.team || '미분류',
+            originalTask.status,
+            updatedTask.status,
+            '상태',
+            educationName,
+            '개요탭'
+          );
+        }
+
+        // 담당자 변경 (updatedTask에 값이 있을 때만 비교)
+        if (updatedTask.assignee !== undefined &&
+            normalizeValue(originalTask.assignee) !== normalizeValue(updatedTask.assignee)) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `IT교육관리 ${educationName}(${taskCode}) 개요탭의 담당자가 ${originalTask.assignee || ''} → ${updatedTask.assignee || ''}로 수정 되었습니다.`,
+            updatedTask.team || '미분류',
+            originalTask.assignee || '',
+            updatedTask.assignee || '',
+            '담당자',
+            educationName,
+            '개요탭'
+          );
+        }
+
+        // 팀 변경 (updatedTask에 값이 있을 때만 비교)
+        if (updatedTask.team !== undefined &&
+            normalizeValue(originalTask.team) !== normalizeValue(updatedTask.team)) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `IT교육관리 ${educationName}(${taskCode}) 개요탭의 팀이 ${originalTask.team || ''} → ${updatedTask.team || ''}로 수정 되었습니다.`,
+            updatedTask.team || '미분류',
+            originalTask.team || '',
+            updatedTask.team || '',
+            '팀',
+            educationName,
+            '개요탭'
+          );
+        }
+
+        // 실행일 변경 (updatedTask에 값이 있을 때만 비교)
+        if (updatedTask.executionDate !== undefined &&
+            normalizeValue(originalTask.executionDate) !== normalizeValue(updatedTask.executionDate)) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `IT교육관리 ${educationName}(${taskCode}) 개요탭의 실행일이 ${originalTask.executionDate || ''} → ${updatedTask.executionDate || ''}로 수정 되었습니다.`,
+            updatedTask.team || '미분류',
+            originalTask.executionDate || '',
+            updatedTask.executionDate || '',
+            '실행일',
+            educationName,
+            '개요탭'
+          );
+        }
+
+        // 교육설명 변경 (updatedTask에 값이 있을 때만 비교)
+        if (updatedTask.description !== undefined &&
+            normalizeValue(originalTask.description) !== normalizeValue(updatedTask.description)) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `IT교육관리 ${educationName}(${taskCode}) 개요탭의 교육설명이 ${originalTask.description || ''} → ${updatedTask.description || ''}로 수정 되었습니다.`,
+            updatedTask.team || '미분류',
+            originalTask.description || '',
+            updatedTask.description || '',
+            '교육설명',
+            educationName,
+            '개요탭'
+          );
+        }
+
+        // 교육실적보고 필드 변경로그는 ITEducationEditDialog에서 생성됨 (중복 방지)
+        console.log('🟢 [ITEducationManagement] addChangeLog 블록 완료');
+      }
     } else {
       // 새 데이터 추가 - DB 저장 없이 토스트만
       console.log('✅ 새 교육 데이터 추가 (ITEducationEditDialog에서 이미 저장됨)');
@@ -2396,7 +2593,17 @@ export default function ITEducationManagement() {
       refreshData();
 
       // 변경로그 추가
-      addChangeLog('추가', updatedTask.code, `새로운 교육이 생성되었습니다: ${updatedTask.educationName}`);
+      addChangeLog(
+        '추가',
+        updatedTask.code || '',
+        `IT교육관리 ${updatedTask.educationName}(${updatedTask.code}) 데이터가 생성 되었습니다.`,
+        updatedTask.team || '경영기획SF팀',
+        undefined,
+        undefined,
+        undefined,
+        updatedTask.educationName, // 제목
+        '개요탭' // location
+      );
     }
 
     handleEditDialogClose();
@@ -3020,6 +3227,7 @@ export default function ITEducationManagement() {
                   isDraggingState={isDraggingState}
                   onDragStart={handleDragStart}
                   onDragEnd={handleDragEnd}
+                  onCardClick={handleCardClick}
                 />
               </Box>
             </TabPanel>

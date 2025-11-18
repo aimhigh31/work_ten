@@ -695,7 +695,7 @@ export default function SoftwareTable({
         addChangeLog(
           '추가',
           newTaskWithNumber.code,
-          `${newTaskWithNumber.workContent || '새 업무'} 생성`,
+          `소프트웨어관리 ${softwareName}(${newTaskWithNumber.code}) 데이터가 생성 되었습니다.`,
           newTaskWithNumber.team || '미분류',
           undefined,
           undefined,

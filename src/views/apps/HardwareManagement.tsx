@@ -134,6 +134,7 @@ interface KanbanViewProps {
   statusTypes?: any[];
   users?: any[];
   onHardwareSave?: (hardware: Partial<HardwareRecord>) => Promise<void>;
+  onCardClick?: (hardware: HardwareTableData) => void | Promise<void>;
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
@@ -156,6 +157,7 @@ function KanbanView({
   statusTypes = [],
   users = [],
   onHardwareSave,
+  onCardClick,
   canCreateData = true,
   canEditOwn = true,
   canEditOthers = true,
@@ -201,10 +203,6 @@ function KanbanView({
     );
   }, [currentUser]);
 
-  // 편집 팝업 관련 상태
-  const [editDialog, setEditDialog] = useState(false);
-  const [editingHardware, setEditingHardware] = useState<HardwareTableData | null>(null);
-
   // 센서 설정
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -236,15 +234,11 @@ function KanbanView({
 
   // 드래그 시작 핸들러
   // 카드 클릭 핸들러
-  const handleCardClick = (hardware: HardwareTableData) => {
-    setEditingHardware(hardware);
-    setEditDialog(true);
-  };
-
-  // 편집 다이얼로그 닫기
-  const handleEditDialogClose = () => {
-    setEditDialog(false);
-    setEditingHardware(null);
+  const handleCardClick = async (hardware: HardwareTableData) => {
+    // 메인 컴포넌트의 onCardClick 호출 (다이얼로그는 메인 컴포넌트에서 관리)
+    if (onCardClick) {
+      await onCardClick(hardware);
+    }
   };
 
   // Hardware 저장 핸들러
@@ -703,71 +697,6 @@ function KanbanView({
 
         <DragOverlay>{activeHardware ? <DraggableCard task={activeHardware} canEditOwn={canEditOwn} canEditOthers={canEditOthers} /> : null}</DragOverlay>
       </DndContext>
-
-      {/* Hardware 편집 다이얼로그 */}
-      {editDialog && (
-        <HardwareEditDialog
-          open={editDialog}
-          onClose={handleEditDialogClose}
-          data={
-            editingHardware
-              ? (() => {
-                  console.log('🔍 KanbanView editingHardware 전체 데이터:', editingHardware);
-                  console.log('🔍 KanbanView 주요 필드들:', {
-                    status: editingHardware.status,
-                    assignee: editingHardware.assignee,
-                    model: editingHardware.model,
-                    manufacturer: editingHardware.manufacturer,
-                    vendor: editingHardware.vendor,
-                    location: editingHardware.location,
-                    currentUser: editingHardware.currentUser,
-                    serialNumber: editingHardware.serialNumber
-                  });
-
-                  const hardwareRecord = {
-                    id: String(editingHardware.id),
-                    no: editingHardware.no,
-                    registrationDate: editingHardware.registrationDate,
-                    code: editingHardware.code,
-                    assetCategory: editingHardware.assetCategory || '',
-                    assetName: editingHardware.assetName || '',
-                    assetDescription: editingHardware.assetDescription || '',
-                    model: editingHardware.model || '',
-                    manufacturer: editingHardware.manufacturer || '',
-                    vendor: editingHardware.vendor || '',
-                    detailSpec: editingHardware.detailSpec || '',
-                    status: editingHardware.status || '예비',
-                    purchaseDate: editingHardware.purchaseDate || '',
-                    warrantyEndDate: editingHardware.warrantyEndDate || '',
-                    serialNumber: editingHardware.serialNumber || '',
-                    currentUser: editingHardware.currentUser || '',
-                    location: editingHardware.location || '',
-                    assignee: editingHardware.assignee || '',
-                    team: editingHardware.team || '',
-                    registrant: editingHardware.registrant || '',
-                    images: [],
-                    image_1_url: editingHardware.image_1_url || '',
-                    image_2_url: editingHardware.image_2_url || ''
-                  };
-
-                  console.log('🔍 KanbanView Dialog에 전달할 데이터:', {
-                    status: hardwareRecord.status,
-                    assignee: hardwareRecord.assignee,
-                    image_1_url: hardwareRecord.image_1_url,
-                    image_2_url: hardwareRecord.image_2_url
-                  });
-                  return hardwareRecord;
-                })()
-              : null
-          }
-          mode={editingHardware ? 'edit' : 'add'}
-          onSave={onHardwareSave || (() => Promise.resolve())}
-          statusOptions={statusTypes.length > 0 ? statusTypes.map((s) => s.subcode_name) : undefined}
-          canCreateData={canCreateData}
-          canEditOwn={canEditOwn}
-          canEditOthers={canEditOthers}
-        />
-      )}
     </Box>
   );
 }
@@ -2064,6 +1993,7 @@ export default function HardwareManagement() {
   const {
     hardware: hardwareFromHook,
     getHardware,
+    getHardwareById,
     createHardware,
     updateHardware,
     deleteHardware,
@@ -2139,6 +2069,7 @@ export default function HardwareManagement() {
   // 편집 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);
   const [editingHardware, setEditingHardware] = useState<HardwareTableData | null>(null);
+  const [originalHardware, setOriginalHardware] = useState<HardwareTableData | null>(null);
 
   // Snackbar 상태
   const [snackbar, setSnackbar] = useState<{
@@ -2321,8 +2252,43 @@ export default function HardwareManagement() {
   };
 
   // 카드 클릭 핸들러
-  const handleCardClick = (hardware: HardwareTableData) => {
+  const handleCardClick = async (hardware: HardwareTableData) => {
     setEditingHardware(hardware);
+
+    // 🔍 DB에서 최신 데이터를 가져와서 원본으로 저장 (메모리 데이터는 구버전일 수 있음)
+    try {
+      const latestData = await getHardwareById(hardware.id);
+      if (latestData) {
+        // DB 데이터를 HardwareTableData 형식으로 변환
+        const originalData: HardwareTableData = {
+          ...hardware,
+          assetCategory: latestData.asset_category || hardware.assetCategory,
+          assetName: latestData.asset_name || hardware.assetName,
+          assetDescription: latestData.asset_description || hardware.assetDescription,
+          location: latestData.location || hardware.location,
+          currentUser: latestData.assigned_user || hardware.currentUser,
+          status: latestData.status || hardware.status,
+          assignee: latestData.assignee || hardware.assignee,
+          team: latestData.team || hardware.team,
+          model: latestData.model || hardware.model,
+          manufacturer: latestData.manufacturer || hardware.manufacturer,
+          vendor: latestData.vendor || hardware.vendor,
+          detailSpec: latestData.detail_spec || hardware.detailSpec,
+          purchaseDate: latestData.purchase_date || hardware.purchaseDate,
+          warrantyEndDate: latestData.warranty_end_date || hardware.warrantyEndDate,
+          serialNumber: latestData.serial_number || hardware.serialNumber,
+          registrationDate: latestData.registration_date || hardware.registrationDate
+        };
+        setOriginalHardware(originalData);
+        console.log('🔍 [handleCardClick] DB에서 가져온 최신 원본 데이터:', originalData);
+      } else {
+        setOriginalHardware(JSON.parse(JSON.stringify(hardware)));
+      }
+    } catch (error) {
+      console.error('❌ [handleCardClick] DB 조회 실패, 메모리 데이터 사용:', error);
+      setOriginalHardware(JSON.parse(JSON.stringify(hardware)));
+    }
+
     setEditDialog(true);
   };
 
@@ -2330,6 +2296,7 @@ export default function HardwareManagement() {
   const handleEditDialogClose = () => {
     setEditDialog(false);
     setEditingHardware(null);
+    setOriginalHardware(null);
   };
 
   // Hardware 저장 핸들러
@@ -2341,8 +2308,10 @@ export default function HardwareManagement() {
     // 여기서는 로컬 상태 업데이트, 토스트 알림, 변경로그만 처리
 
     try {
-      const originalHardware = tasks.find((t) => t.id === Number(updatedHardware.id));
-      console.log('🔍 originalHardware 검색:', originalHardware ? '찾음' : '없음 (신규)');
+      // tasks 배열에서 해당 ID가 존재하는지 확인 (업데이트 vs 신규)
+      const existingHardware = tasks.find((t) => t.id === Number(updatedHardware.id));
+      console.log('🔍 existingHardware 확인:', existingHardware ? '있음 (업데이트)' : '없음 (신규)');
+      console.log('🔍 originalHardware 확인:', originalHardware ? '있음' : '없음');
 
       // HardwareRecord → HardwareTableData 변환
       const convertedHardware: HardwareTableData = {
@@ -2395,7 +2364,7 @@ export default function HardwareManagement() {
         return '가';
       };
 
-      if (originalHardware) {
+      if (existingHardware) {
         // 업데이트 - 로컬 상태 업데이트 (소프트웨어관리 패턴)
         console.log('✅ 하드웨어 업데이트 - UI 즉시 반영');
         setTasks((prevTasks) => {
@@ -2403,6 +2372,265 @@ export default function HardwareManagement() {
           console.log('🔄 업데이트 후 tasks 개수:', updated.length);
           return updated;
         });
+
+        // 변경로그 생성 (필드별 비교) - originalHardware가 있을 때만
+        if (!originalHardware) {
+          console.log('⚠️ originalHardware가 없어서 변경로그 생성 불가');
+          // 토스트 알림만 표시하고 변경로그는 생성하지 않음
+          const assetName = updatedHardware.assetName || '하드웨어';
+          const josa = getKoreanParticle(assetName);
+          setSnackbar({
+            open: true,
+            message: `${assetName}${josa} 성공적으로 수정되었습니다.`,
+            severity: 'success'
+          });
+          handleEditDialogClose();
+          return;
+        }
+
+        // 변경로그 생성 (필드별 비교)
+        const taskCode = updatedHardware.code || `HW-${updatedHardware.id}`;
+        const normalizeValue = (value: any) => (value === undefined || value === null || value === '' ? '' : String(value).trim());
+
+        // 자산 분류 변경
+        if (updatedHardware.assetCategory !== undefined &&
+            normalizeValue(originalHardware.assetCategory) !== normalizeValue(updatedHardware.assetCategory)) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `하드웨어관리 ${originalHardware.assetName || ''}(${taskCode}) 개요탭의 자산 분류가 ${originalHardware.assetCategory || ''} → ${updatedHardware.assetCategory || ''}로 수정 되었습니다.`,
+            updatedHardware.team || '미분류',
+            originalHardware.assetCategory || '',
+            updatedHardware.assetCategory || '',
+            '자산 분류',
+            updatedHardware.assetName,
+            '개요탭'
+          );
+        }
+
+        // 자산명 변경
+        if (updatedHardware.assetName !== undefined &&
+            normalizeValue(originalHardware.assetName) !== normalizeValue(updatedHardware.assetName)) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `하드웨어관리 ${originalHardware.assetName || ''}(${taskCode}) 개요탭의 자산명이 ${originalHardware.assetName || ''} → ${updatedHardware.assetName || ''}로 수정 되었습니다.`,
+            updatedHardware.team || '미분류',
+            originalHardware.assetName || '',
+            updatedHardware.assetName || '',
+            '자산명',
+            updatedHardware.assetName,
+            '개요탭'
+          );
+        }
+
+        // 설명 변경
+        if (updatedHardware.assetDescription !== undefined &&
+            normalizeValue(originalHardware.assetDescription) !== normalizeValue(updatedHardware.assetDescription)) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `하드웨어관리 ${updatedHardware.assetName || ''}(${taskCode}) 개요탭의 설명이 ${originalHardware.assetDescription || ''} → ${updatedHardware.assetDescription || ''}로 수정 되었습니다.`,
+            updatedHardware.team || '미분류',
+            originalHardware.assetDescription || '',
+            updatedHardware.assetDescription || '',
+            '설명',
+            updatedHardware.assetName,
+            '개요탭'
+          );
+        }
+
+        // 위치 변경
+        if (updatedHardware.location !== undefined &&
+            normalizeValue(originalHardware.location) !== normalizeValue(updatedHardware.location)) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `하드웨어관리 ${updatedHardware.assetName || ''}(${taskCode}) 개요탭의 위치가 ${originalHardware.location || ''} → ${updatedHardware.location || ''}로 수정 되었습니다.`,
+            updatedHardware.team || '미분류',
+            originalHardware.location || '',
+            updatedHardware.location || '',
+            '위치',
+            updatedHardware.assetName,
+            '개요탭'
+          );
+        }
+
+        // 현재 사용자 변경
+        if (updatedHardware.currentUser !== undefined &&
+            normalizeValue(originalHardware.currentUser) !== normalizeValue(updatedHardware.currentUser)) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `하드웨어관리 ${updatedHardware.assetName || ''}(${taskCode}) 개요탭의 현재 사용자가 ${originalHardware.currentUser || ''} → ${updatedHardware.currentUser || ''}로 수정 되었습니다.`,
+            updatedHardware.team || '미분류',
+            originalHardware.currentUser || '',
+            updatedHardware.currentUser || '',
+            '현재 사용자',
+            updatedHardware.assetName,
+            '개요탭'
+          );
+        }
+
+        // 상태 변경 (칸반탭에서 드래그앤드롭으로도 변경 가능하므로 개요탭에서도 체크)
+        if (updatedHardware.status !== undefined &&
+            normalizeValue(originalHardware.status) !== normalizeValue(updatedHardware.status)) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `하드웨어관리 ${updatedHardware.assetName || ''}(${taskCode}) 개요탭의 상태가 ${originalHardware.status || ''} → ${updatedHardware.status || ''}로 수정 되었습니다.`,
+            updatedHardware.team || '미분류',
+            originalHardware.status || '',
+            updatedHardware.status || '',
+            '상태',
+            updatedHardware.assetName,
+            '개요탭'
+          );
+        }
+
+        // 담당자 변경
+        if (updatedHardware.assignee !== undefined &&
+            normalizeValue(originalHardware.assignee) !== normalizeValue(updatedHardware.assignee)) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `하드웨어관리 ${updatedHardware.assetName || ''}(${taskCode}) 개요탭의 담당자가 ${originalHardware.assignee || ''} → ${updatedHardware.assignee || ''}로 수정 되었습니다.`,
+            updatedHardware.team || '미분류',
+            originalHardware.assignee || '',
+            updatedHardware.assignee || '',
+            '담당자',
+            updatedHardware.assetName,
+            '개요탭'
+          );
+        }
+
+        // 팀 변경
+        if (updatedHardware.team !== undefined &&
+            normalizeValue(originalHardware.team) !== normalizeValue(updatedHardware.team)) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `하드웨어관리 ${updatedHardware.assetName || ''}(${taskCode}) 개요탭의 팀이 ${originalHardware.team || ''} → ${updatedHardware.team || ''}로 수정 되었습니다.`,
+            updatedHardware.team || '미분류',
+            originalHardware.team || '',
+            updatedHardware.team || '',
+            '팀',
+            updatedHardware.assetName,
+            '개요탭'
+          );
+        }
+
+        // 모델명 변경
+        if (updatedHardware.model !== undefined &&
+            normalizeValue(originalHardware.model) !== normalizeValue(updatedHardware.model)) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `하드웨어관리 ${updatedHardware.assetName || ''}(${taskCode}) 상세정보탭의 모델명이 ${originalHardware.model || ''} → ${updatedHardware.model || ''}로 수정 되었습니다.`,
+            updatedHardware.team || '미분류',
+            originalHardware.model || '',
+            updatedHardware.model || '',
+            '모델명',
+            updatedHardware.assetName,
+            '상세정보탭'
+          );
+        }
+
+        // 제조사 변경
+        if (updatedHardware.manufacturer !== undefined &&
+            normalizeValue(originalHardware.manufacturer) !== normalizeValue(updatedHardware.manufacturer)) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `하드웨어관리 ${updatedHardware.assetName || ''}(${taskCode}) 상세정보탭의 제조사가 ${originalHardware.manufacturer || ''} → ${updatedHardware.manufacturer || ''}로 수정 되었습니다.`,
+            updatedHardware.team || '미분류',
+            originalHardware.manufacturer || '',
+            updatedHardware.manufacturer || '',
+            '제조사',
+            updatedHardware.assetName,
+            '상세정보탭'
+          );
+        }
+
+        // 공급업체 변경
+        if (updatedHardware.vendor !== undefined &&
+            normalizeValue(originalHardware.vendor) !== normalizeValue(updatedHardware.vendor)) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `하드웨어관리 ${updatedHardware.assetName || ''}(${taskCode}) 상세정보탭의 공급업체가 ${originalHardware.vendor || ''} → ${updatedHardware.vendor || ''}로 수정 되었습니다.`,
+            updatedHardware.team || '미분류',
+            originalHardware.vendor || '',
+            updatedHardware.vendor || '',
+            '공급업체',
+            updatedHardware.assetName,
+            '상세정보탭'
+          );
+        }
+
+        // 상세 스펙 변경
+        if (updatedHardware.detailSpec !== undefined &&
+            normalizeValue(originalHardware.detailSpec) !== normalizeValue(updatedHardware.detailSpec)) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `하드웨어관리 ${updatedHardware.assetName || ''}(${taskCode}) 상세정보탭의 상세 스펙이 ${originalHardware.detailSpec || ''} → ${updatedHardware.detailSpec || ''}로 수정 되었습니다.`,
+            updatedHardware.team || '미분류',
+            originalHardware.detailSpec || '',
+            updatedHardware.detailSpec || '',
+            '상세 스펙',
+            updatedHardware.assetName,
+            '상세정보탭'
+          );
+        }
+
+        // 구매일 변경
+        if (updatedHardware.purchaseDate !== undefined &&
+            normalizeValue(originalHardware.purchaseDate) !== normalizeValue(updatedHardware.purchaseDate)) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `하드웨어관리 ${updatedHardware.assetName || ''}(${taskCode}) 상세정보탭의 구매일이 ${originalHardware.purchaseDate || ''} → ${updatedHardware.purchaseDate || ''}로 수정 되었습니다.`,
+            updatedHardware.team || '미분류',
+            originalHardware.purchaseDate || '',
+            updatedHardware.purchaseDate || '',
+            '구매일',
+            updatedHardware.assetName,
+            '상세정보탭'
+          );
+        }
+
+        // 보증 종료일 변경
+        if (updatedHardware.warrantyEndDate !== undefined &&
+            normalizeValue(originalHardware.warrantyEndDate) !== normalizeValue(updatedHardware.warrantyEndDate)) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `하드웨어관리 ${updatedHardware.assetName || ''}(${taskCode}) 상세정보탭의 보증 종료일이 ${originalHardware.warrantyEndDate || ''} → ${updatedHardware.warrantyEndDate || ''}로 수정 되었습니다.`,
+            updatedHardware.team || '미분류',
+            originalHardware.warrantyEndDate || '',
+            updatedHardware.warrantyEndDate || '',
+            '보증 종료일',
+            updatedHardware.assetName,
+            '상세정보탭'
+          );
+        }
+
+        // 시리얼 번호 변경
+        if (updatedHardware.serialNumber !== undefined &&
+            normalizeValue(originalHardware.serialNumber) !== normalizeValue(updatedHardware.serialNumber)) {
+          addChangeLog(
+            '수정',
+            taskCode,
+            `하드웨어관리 ${updatedHardware.assetName || ''}(${taskCode}) 상세정보탭의 시리얼 번호가 ${originalHardware.serialNumber || ''} → ${updatedHardware.serialNumber || ''}로 수정 되었습니다.`,
+            updatedHardware.team || '미분류',
+            originalHardware.serialNumber || '',
+            updatedHardware.serialNumber || '',
+            '시리얼 번호',
+            updatedHardware.assetName,
+            '상세정보탭'
+          );
+        }
 
         // 토스트 알림 (수정)
         const assetName = updatedHardware.assetName || '하드웨어';
@@ -2434,7 +2662,16 @@ export default function HardwareManagement() {
           return newTasks;
         });
 
-        addChangeLog('추가', updatedHardware.code || '', `새로운 하드웨어가 생성되었습니다: ${updatedHardware.assetName}`, '개발팀');
+        addChangeLog(
+          '추가',
+          updatedHardware.code || '',
+          `하드웨어관리 ${updatedHardware.assetName}(${updatedHardware.code}) 데이터가 생성 되었습니다.`,
+          updatedHardware.team || '개발팀',
+          undefined,
+          undefined,
+          undefined,
+          updatedHardware.assetName // 제목
+        );
 
         // 토스트 알림 (추가)
         const assetName = updatedHardware.assetName || '하드웨어';
@@ -2930,6 +3167,7 @@ export default function HardwareManagement() {
                   statusTypes={statusTypes}
                   users={users}
                   onHardwareSave={handleEditHardwareSave}
+                  onCardClick={handleCardClick}
                   canCreateData={canCreateData}
                   canEditOwn={canEditOwn}
                   canEditOthers={canEditOthers}
@@ -3055,10 +3293,10 @@ export default function HardwareManagement() {
                     <TableHead>
                       <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
                         <TableCell sx={{ fontWeight: 600, width: 50, fontSize: '12px' }}>NO</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 110, fontSize: '12px' }}>변경시간</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 130, fontSize: '12px' }}>변경시간</TableCell>
                         <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>코드</TableCell>
                         <TableCell sx={{ fontWeight: 600, width: 150, fontSize: '12px' }}>제목</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 80, fontSize: '12px' }}>변경분류</TableCell>
+                        <TableCell sx={{ fontWeight: 600, width: 70, fontSize: '12px' }}>변경분류</TableCell>
                         <TableCell sx={{ fontWeight: 600, width: 80, fontSize: '12px' }}>변경위치</TableCell>
                         <TableCell sx={{ fontWeight: 600, width: 100, fontSize: '12px' }}>변경필드</TableCell>
                         <TableCell sx={{ fontWeight: 600, width: 120, fontSize: '12px' }}>변경전</TableCell>

@@ -6,7 +6,6 @@ import { useState, useEffect, MouseEvent, ReactNode, SyntheticEvent, useMemo } f
 import Button from '@mui/material/Button';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
-import ListItemAvatar from '@mui/material/ListItemAvatar';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
 import Menu from '@mui/material/Menu';
@@ -18,7 +17,6 @@ import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 
 // project-imports
-import Avatar from 'components/@extended/Avatar';
 import IconButton from 'components/@extended/IconButton';
 import MoreIcon from 'components/@extended/MoreIcon';
 import MainCard from 'components/MainCard';
@@ -188,16 +186,6 @@ export default function Transactions() {
                     </Stack>
                   }
                 >
-                  <ListItemAvatar>
-                    <Avatar
-                      variant="rounded"
-                      type="outlined"
-                      color="secondary"
-                      sx={{ color: 'secondary.darker', borderColor: 'secondary.light', fontWeight: 600 }}
-                    >
-                      {task.team?.charAt(0) || 'T'}
-                    </Avatar>
-                  </ListItemAvatar>
                   <ListItemText
                     primary={<Typography variant="subtitle1">{task.work_content || '업무 제목 없음'}</Typography>}
                     secondary={
@@ -246,16 +234,6 @@ export default function Transactions() {
                     </Stack>
                   }
                 >
-                  <ListItemAvatar>
-                    <Avatar
-                      variant="rounded"
-                      type="outlined"
-                      color="secondary"
-                      sx={{ color: 'secondary.darker', borderColor: 'secondary.light', fontWeight: 600 }}
-                    >
-                      {task.team?.charAt(0) || 'T'}
-                    </Avatar>
-                  </ListItemAvatar>
                   <ListItemText
                     primary={<Typography variant="subtitle1">{task.work_content || '업무 제목 없음'}</Typography>}
                     secondary={
@@ -304,16 +282,6 @@ export default function Transactions() {
                     </Stack>
                   }
                 >
-                  <ListItemAvatar>
-                    <Avatar
-                      variant="rounded"
-                      type="outlined"
-                      color="secondary"
-                      sx={{ color: 'secondary.darker', borderColor: 'secondary.light', fontWeight: 600 }}
-                    >
-                      {task.team?.charAt(0) || 'T'}
-                    </Avatar>
-                  </ListItemAvatar>
                   <ListItemText
                     primary={<Typography variant="subtitle1">{task.work_content || '업무 제목 없음'}</Typography>}
                     secondary={
@@ -362,16 +330,6 @@ export default function Transactions() {
                     </Stack>
                   }
                 >
-                  <ListItemAvatar>
-                    <Avatar
-                      variant="rounded"
-                      type="outlined"
-                      color="secondary"
-                      sx={{ color: 'secondary.darker', borderColor: 'secondary.light', fontWeight: 600 }}
-                    >
-                      {task.team?.charAt(0) || 'T'}
-                    </Avatar>
-                  </ListItemAvatar>
                   <ListItemText
                     primary={<Typography variant="subtitle1">{task.work_content || '업무 제목 없음'}</Typography>}
                     secondary={
@@ -420,16 +378,6 @@ export default function Transactions() {
                     </Stack>
                   }
                 >
-                  <ListItemAvatar>
-                    <Avatar
-                      variant="rounded"
-                      type="outlined"
-                      color="secondary"
-                      sx={{ color: 'secondary.darker', borderColor: 'secondary.light', fontWeight: 600 }}
-                    >
-                      {task.team?.charAt(0) || 'T'}
-                    </Avatar>
-                  </ListItemAvatar>
                   <ListItemText
                     primary={<Typography variant="subtitle1">{task.work_content || '업무 제목 없음'}</Typography>}
                     secondary={
@@ -453,15 +401,6 @@ export default function Transactions() {
             )}
           </List>
         </TabPanel>
-
-        <Stack direction="row" sx={{ gap: 1.25, alignItems: 'center', p: 3 }}>
-          <Button variant="outlined" fullWidth color="secondary">
-            업무 이력
-          </Button>
-          <Button variant="contained" fullWidth>
-            새 업무 생성
-          </Button>
-        </Stack>
       </Box>
     </MainCard>
   );

@@ -39,6 +39,7 @@ import { useOptimizedInput } from '../hooks/useDebounce';
 import { useCommonData } from '../contexts/CommonDataContext';
 import { useSupabaseKpiTask } from '../hooks/useSupabaseKpiTask';
 import { useSupabaseKpiRecord } from '../hooks/useSupabaseKpiRecord';
+import { useSupabaseKpi } from '../hooks/useSupabaseKpi';
 import { useSession } from 'next-auth/react';
 import { useSupabaseFeedback } from '../hooks/useSupabaseFeedback';
 import { PAGE_IDENTIFIERS } from '../types/feedback';
@@ -3951,7 +3952,8 @@ const TaskEditDialog = memo(
       addTask,
       updateTask,
       deleteTask,
-      deleteTasks
+      deleteTasks,
+      deleteAllTasksByKpiId
     } = useSupabaseKpiTask(task?.id);
 
     // KPI Record 데이터 관리
@@ -3974,6 +3976,9 @@ const TaskEditDialog = memo(
       updateFeedback,
       deleteFeedback
     } = useSupabaseFeedback(PAGE_IDENTIFIERS.KPI, task?.id);
+
+    // KPI 메인 데이터 관리
+    const { addKpi, updateKpi } = useSupabaseKpi();
 
     const [editTab, setEditTab] = useState(0);
     const [draggedItemId, setDraggedItemId] = useState<number | null>(null);
@@ -4087,8 +4092,11 @@ const TaskEditDialog = memo(
       }
     }, [task?.id, open, fetchTasks]);
 
-    // DB Tasks를 로컬 상태와 동기화
+    // DB Tasks를 로컬 상태와 동기화 (로딩 완료 후에만)
     React.useEffect(() => {
+      // 로딩 중이면 아무 작업도 하지 않음
+      if (tasksLoading) return;
+
       if (dbTasks && dbTasks.length > 0) {
         const transformedTasks = dbTasks.map((dbTask) => ({
           id: dbTask.id,
@@ -4107,11 +4115,13 @@ const TaskEditDialog = memo(
           weight: dbTask.weight || 0
         }));
         setChecklistItems(transformedTasks);
+        console.log('✅ 계획 데이터 로드 완료:', transformedTasks.length, '개');
       } else if (dbTasks && dbTasks.length === 0 && open && task?.id) {
-        // DB에 데이터가 없으면 로컬 상태도 비움
+        // 로딩 완료 후 DB에 데이터가 없으면 로컬 상태도 비움
         setChecklistItems([]);
+        console.log('📭 계획 데이터 없음');
       }
-    }, [dbTasks, open, task?.id]);
+    }, [dbTasks, open, task?.id, tasksLoading]);
 
     // KPI Record 데이터 로드
     React.useEffect(() => {
@@ -4384,6 +4394,7 @@ const TaskEditDialog = memo(
       // 약간의 지연을 두고 저장 (상태 업데이트 완료 대기)
       setTimeout(async () => {
         let taskId: number;
+        let savedData: any;
 
         if (!task) {
           // 새 Task 생성
@@ -4410,8 +4421,70 @@ const TaskEditDialog = memo(
           } as any;
 
           console.log('🚀 새 Task 생성 중:', newTask);
-          taskId = newTask.id;
-          onSave(newTask);
+
+          // DB에 저장
+          try {
+            const kpiData = {
+              code: newTask.code,
+              work_content: newTask.workContent,
+              description: newTask.description || null,
+              selection_background: newTask.selectionBackground || null,
+              impact: newTask.impact || null,
+              evaluation_criteria_s: newTask.evaluationCriteria?.s || null,
+              evaluation_criteria_a: newTask.evaluationCriteria?.a || null,
+              evaluation_criteria_b: newTask.evaluationCriteria?.b || null,
+              evaluation_criteria_c: newTask.evaluationCriteria?.c || null,
+              evaluation_criteria_d: newTask.evaluationCriteria?.d || null,
+              management_category: newTask.managementCategory || null,
+              target_kpi: newTask.targetKpi || null,
+              current_kpi: newTask.currentKpi || null,
+              department: newTask.department || null,
+              progress: newTask.progress,
+              status: newTask.status,
+              start_date: newTask.startDate || null,
+              completed_date: newTask.completedDate || null,
+              team: newTask.team || null,
+              assignee: newTask.assignee || null,
+              registration_date: newTask.registrationDate
+            };
+            savedData = await addKpi(kpiData);
+            taskId = savedData.id;
+            newTask.id = savedData.id;
+
+            // 신규 KPI: 로컬 체크리스트 항목들을 DB에 저장
+            if (checklistItems.length > 0) {
+              console.log('📝 로컬 체크리스트 항목 DB 저장 시작:', checklistItems.length, '개');
+              try {
+                for (const item of checklistItems) {
+                  const taskData = {
+                    kpi_id: taskId,
+                    text: item.text,
+                    checked: item.checked,
+                    level: item.level,
+                    expanded: item.expanded,
+                    status: item.status || '대기',
+                    due_date: item.dueDate || null,
+                    start_date: item.startDate || null,
+                    progress_rate: item.progressRate || 0,
+                    assignee: item.assignee || null,
+                    team: null,
+                    priority: null,
+                    weight: 0
+                  };
+                  await addTask(taskData);
+                  console.log('✅ 체크리스트 항목 저장 완료:', item.text);
+                }
+                setChecklistItems([]); // 저장 후 로컬 상태 초기화
+              } catch (error) {
+                console.error('❌ 체크리스트 항목 저장 실패:', error);
+              }
+            }
+
+            onSave(newTask);
+          } catch (error) {
+            console.error('❌ KPI DB 저장 오류:', error);
+            throw error;
+          }
         } else {
           // 기존 Task 수정
           const updatedTask: TaskTableData = {
@@ -4435,8 +4508,75 @@ const TaskEditDialog = memo(
           } as any;
 
           console.log('📝 기존 Task 수정 중:', updatedTask);
-          taskId = updatedTask.id;
-          onSave(updatedTask);
+
+          // DB에 업데이트
+          try {
+            const kpiUpdates = {
+              code: updatedTask.code,
+              work_content: updatedTask.workContent,
+              description: updatedTask.description || null,
+              selection_background: updatedTask.selectionBackground || null,
+              impact: updatedTask.impact || null,
+              evaluation_criteria_s: updatedTask.evaluationCriteria?.s || null,
+              evaluation_criteria_a: updatedTask.evaluationCriteria?.a || null,
+              evaluation_criteria_b: updatedTask.evaluationCriteria?.b || null,
+              evaluation_criteria_c: updatedTask.evaluationCriteria?.c || null,
+              evaluation_criteria_d: updatedTask.evaluationCriteria?.d || null,
+              management_category: updatedTask.managementCategory || null,
+              target_kpi: updatedTask.targetKpi || null,
+              current_kpi: updatedTask.currentKpi || null,
+              department: updatedTask.department || null,
+              progress: updatedTask.progress,
+              status: updatedTask.status,
+              start_date: updatedTask.startDate || null,
+              completed_date: updatedTask.completedDate || null,
+              team: updatedTask.team || null,
+              assignee: updatedTask.assignee || null,
+              registration_date: updatedTask.registrationDate
+            };
+            await updateKpi(task.id, kpiUpdates);
+            taskId = updatedTask.id;
+
+            // 기존 KPI: 계획 항목 저장 (기존 데이터 삭제 후 재저장)
+            console.log('📝 기존 KPI 계획 항목 저장 시작:', checklistItems.length, '개');
+            try {
+              // 1. 기존 계획 항목 삭제
+              await deleteAllTasksByKpiId(taskId);
+              console.log('✅ 기존 계획 항목 삭제 완료');
+
+              // 2. 새 계획 항목 저장 (checklistItems가 있을 경우에만)
+              if (checklistItems.length > 0) {
+                for (const item of checklistItems) {
+                  const taskData = {
+                    kpi_id: taskId,
+                    text: item.text,
+                    checked: item.checked,
+                    level: item.level,
+                    expanded: item.expanded,
+                    status: item.status || '대기',
+                    due_date: item.dueDate || null,
+                    start_date: item.startDate || null,
+                    progress_rate: item.progressRate || 0,
+                    assignee: item.assignee || null,
+                    team: null,
+                    priority: null,
+                    weight: 0
+                  };
+                  await addTask(taskData);
+                  console.log('✅ 계획 항목 저장 완료:', item.text);
+                }
+              }
+              console.log('✅ 모든 계획 항목 저장 완료');
+            } catch (error) {
+              console.error('❌ 계획 항목 저장 실패:', error);
+              // 계획 항목 저장 실패는 전체 저장을 중단하지 않음 (KPI 데이터는 이미 저장됨)
+            }
+
+            onSave(updatedTask);
+          } catch (error) {
+            console.error('❌ KPI DB 업데이트 오류:', error);
+            throw error;
+          }
         }
 
         // 기록(피드백) 데이터 저장
@@ -4528,29 +4668,50 @@ const TaskEditDialog = memo(
 
     // 체크리스트 핸들러들
     const handleAddChecklistItem = useCallback(async () => {
-      if (!newChecklistText.trim() || !task?.id) return;
+      if (!newChecklistText.trim()) return;
 
-      try {
-        const newTaskData = {
-          kpi_id: task.id,
+      // task.id가 있으면 DB에 바로 저장, 없으면 로컬 상태에만 저장
+      if (task?.id) {
+        try {
+          const newTaskData = {
+            kpi_id: task.id,
+            text: newChecklistText.trim(),
+            checked: false,
+            level: 0,
+            expanded: true,
+            status: '대기',
+            due_date: null,
+            start_date: null,
+            progress_rate: 0,
+            assignee: null,
+            team: null,
+            priority: null,
+            weight: 0
+          };
+
+          await addTask(newTaskData);
+          setNewChecklistText('');
+        } catch (error) {
+          console.error('❌ Task 추가 실패:', error);
+        }
+      } else {
+        // 신규 KPI: 임시 ID로 로컬 상태에만 저장
+        const newItem = {
+          id: Date.now(),
           text: newChecklistText.trim(),
           checked: false,
           level: 0,
           expanded: true,
           status: '대기',
-          due_date: null,
-          start_date: null,
-          progress_rate: 0,
-          assignee: null,
-          team: null,
-          priority: null,
-          weight: 0
+          dueDate: '',
+          progressRate: 0,
+          assignee: '',
+          priority: 'Medium' as const,
+          startDate: ''
         };
 
-        await addTask(newTaskData);
+        setChecklistItems((prev) => [...prev, newItem]);
         setNewChecklistText('');
-      } catch (error) {
-        console.error('❌ Task 추가 실패:', error);
       }
     }, [newChecklistText, task?.id, addTask]);
 

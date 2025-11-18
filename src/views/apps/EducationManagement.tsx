@@ -127,6 +127,7 @@ interface KanbanViewProps {
   setSnackbar: React.Dispatch<React.SetStateAction<{ open: boolean; message: string; severity: 'success' | 'error' | 'warning' | 'info' }>>;
   assigneeList?: any[];
   getStatusName: (subcode: string) => string;
+  onCardClick: (education: EducationTableData) => void;
   // 🔐 권한 관리
   canCreateData?: boolean;
   canEditOwn?: boolean;
@@ -144,6 +145,7 @@ function KanbanView({
   setSnackbar,
   assigneeList,
   getStatusName,
+  onCardClick,
   canCreateData = true,
   canEditOwn = true,
   canEditOthers = true
@@ -225,12 +227,6 @@ function KanbanView({
     const draggedEducation = educations.find((education) => education.id === active.id);
     setActiveEducation(draggedEducation || null);
     setIsDraggingState(true);
-  };
-
-  // 카드 클릭 핸들러
-  const handleCardClick = (education: EducationTableData) => {
-    setEditingEducation(education);
-    setEditDialog(true);
   };
 
   // 편집 다이얼로그 닫기
@@ -527,7 +523,7 @@ function KanbanView({
         onClick={(e) => {
           if (!isDraggingState && !isDragging) {
             e.stopPropagation();
-            handleCardClick(education);
+            onCardClick(education);
           }
         }}
       >
@@ -2505,6 +2501,7 @@ export default function EducationManagement() {
   // useSupabaseEducation 훅 사용 (다른 훅들보다 먼저 선언)
   const {
     getEducations,
+    getEducationById,
     createEducation,
     updateEducation,
     convertToEducationData,
@@ -2578,6 +2575,7 @@ export default function EducationManagement() {
   // 편집 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);
   const [editingEducation, setEditingEducation] = useState<EducationTableData | null>(null);
+  const [originalEducation, setOriginalEducation] = useState<EducationTableData | null>(null);
 
   // 변경로그 페이지네이션 상태
   const [changeLogPage, setChangeLogPage] = useState(0);
@@ -2698,9 +2696,42 @@ export default function EducationManagement() {
     [currentUser, user, userName, fetchChangeLogs]
   );
 
-  // 카드 클릭 핸들러
-  const handleCardClick = (education: EducationTableData) => {
+  // 카드 클릭 핸들러 (하드웨어관리/VOC관리와 동일한 패턴)
+  const handleCardClick = async (education: EducationTableData) => {
     setEditingEducation(education);
+
+    // 🔍 DB에서 최신 데이터를 가져와서 원본으로 저장 (메모리 데이터는 구버전일 수 있음)
+    try {
+      const latestData = await getEducationById(education.id);
+      if (latestData) {
+        // DB 데이터를 EducationTableData 형식으로 변환
+        const originalData: EducationTableData = {
+          ...education,
+          customerName: latestData.customer_name || education.customerName,
+          companyName: latestData.company_name || education.companyName,
+          educationType: latestData.education_type || education.educationType,
+          channel: latestData.channel || education.channel,
+          title: latestData.title || education.title,
+          content: latestData.content || education.content,
+          responseContent: latestData.response_content || education.responseContent,
+          team: latestData.team || education.team,
+          assignee: latestData.assignee || education.assignee,
+          status: latestData.status || education.status,
+          priority: latestData.priority || education.priority,
+          resolutionDate: latestData.resolution_date || education.resolutionDate,
+          registrationDate: latestData.registration_date || education.registrationDate,
+          receptionDate: latestData.reception_date || education.receptionDate
+        };
+        setOriginalEducation(originalData);
+        console.log('🔍 [handleCardClick] DB에서 가져온 최신 원본 데이터:', originalData);
+      } else {
+        setOriginalEducation(JSON.parse(JSON.stringify(education)));
+      }
+    } catch (error) {
+      console.error('❌ [handleCardClick] DB 조회 실패, 메모리 데이터 사용:', error);
+      setOriginalEducation(JSON.parse(JSON.stringify(education)));
+    }
+
     setEditDialog(true);
   };
 
@@ -2708,88 +2739,234 @@ export default function EducationManagement() {
   const handleEditDialogClose = () => {
     setEditDialog(false);
     setEditingEducation(null);
+    setOriginalEducation(null);
   };
 
   // Education 저장 핸들러
   const handleEditEducationSave = async (updatedEducation: EducationTableData) => {
-    const originalEducation = educations.find((t) => t.id === updatedEducation.id);
+    // EducationEditDialog에서 이미 DB 저장을 완료했으므로
+    // 여기서는 로컬 상태 업데이트, 토스트 알림, 변경로그만 처리
+
+    // 변경로그 생성 전 originalEducation 존재 확인 (하드웨어/VOC 패턴)
+    if (!originalEducation) {
+      console.log('⚠️ originalEducation이 없어서 변경로그 생성 불가');
+      // 로컬 상태 업데이트만 하고 변경로그는 생성하지 않음
+      setEducations((prevEducations) =>
+        prevEducations.map((education) => (education.id === updatedEducation.id ? { ...updatedEducation} : education))
+      );
+      setSnackbar({
+        open: true,
+        message: `${updatedEducation.title || '개인교육관리'}이 성공적으로 수정되었습니다.`,
+        severity: 'success'
+      });
+      handleEditDialogClose();
+      return;
+    }
 
     if (originalEducation) {
       // 업데이트
       console.log('📝 Education 업데이트 중:', updatedEducation);
 
-      // DB 형식으로 변환
-      const dbData = convertToDbEducationData(updatedEducation);
-      console.log('💾 변환된 DB 데이터:', dbData);
+      // 로컬 상태 업데이트
+      setEducations((prevEducations) =>
+        prevEducations.map((education) => (education.id === updatedEducation.id ? { ...updatedEducation } : education))
+      );
 
-      // DB에 저장
-      const success = await updateEducation(updatedEducation.id, dbData);
+      console.log('🔍 [handleEditEducationSave] 변경로그 생성 시작');
+      console.log('🔍 [handleEditEducationSave] originalEducation:', originalEducation);
+      console.log('🔍 [handleEditEducationSave] updatedEducation:', updatedEducation);
 
-      if (success) {
-        console.log('✅ DB 업데이트 성공');
-        // 로컬 상태 업데이트
-        setEducations((prevEducations) =>
-          prevEducations.map((education) => (education.id === updatedEducation.id ? { ...updatedEducation } : education))
+      const educationCode = updatedEducation.code || `MAIN-EDU-${new Date(updatedEducation.registrationDate).getFullYear().toString().slice(-2)}-${String(updatedEducation.no).padStart(3, '0')}`;
+      const educationTitle = updatedEducation.title || '개인교육관리';
+      const normalizeValue = (value: any) => (value === undefined || value === null || value === '' ? '' : String(value).trim());
+
+      const changedFields: string[] = [];
+
+      // 교육분야 변경
+      if (originalEducation.customerName !== updatedEducation.customerName &&
+          normalizeValue(originalEducation.customerName) !== normalizeValue(updatedEducation.customerName)) {
+        console.log('✅ [변경로그] 교육분야 변경 감지:', originalEducation.customerName, '→', updatedEducation.customerName);
+        addChangeLog(
+          '수정',
+          educationCode,
+          `개인교육관리 ${educationTitle}(${educationCode}) 개요탭의 교육분야가 ${originalEducation.customerName || ''} → ${updatedEducation.customerName || ''}로 수정 되었습니다.`,
+          updatedEducation.team || '미분류',
+          originalEducation.customerName || '',
+          updatedEducation.customerName || '',
+          '교육분야',
+          educationTitle,
+          '칸반탭'
         );
-
-        // 변경로그 추가
-        const changes = [];
-        const changedFields = [];
-        if (originalEducation.status !== updatedEducation.status) {
-          changes.push(`상태: ${originalEducation.status} → ${updatedEducation.status}`);
-          changedFields.push('상태');
-        }
-        if (originalEducation.assignee !== updatedEducation.assignee) {
-          changes.push(`담당자: ${originalEducation.assignee} → ${updatedEducation.assignee}`);
-          changedFields.push('담당자');
-        }
-        if (originalEducation.team !== updatedEducation.team) {
-          changes.push(`팀: ${originalEducation.team} → ${updatedEducation.team}`);
-          changedFields.push('팀');
-        }
-        if (originalEducation.resolutionDate !== updatedEducation.resolutionDate) {
-          changes.push(`완료일: ${originalEducation.resolutionDate || '미정'} → ${updatedEducation.resolutionDate || '미정'}`);
-          changedFields.push('완료일');
-        }
-
-        if (changes.length > 0) {
-          const educationCode = `MAIN-EDU-${new Date(updatedEducation.registrationDate).getFullYear().toString().slice(-2)}-${String(updatedEducation.no).padStart(3, '0')}`;
-          addChangeLog(
-            '교육 수정',
-            educationCode,
-            changes.join(', '),
-            updatedEducation.team,
-            undefined,
-            undefined,
-            undefined,
-            updatedEducation.title
-          );
-        }
-
-        // 토스트 알림
-        const educationTitle = updatedEducation.title || '개인교육관리';
-        let message = '';
-        if (changedFields.length > 0) {
-          const fieldsText = changedFields.join(', ');
-          const josa = changedFields.length === 1 ? '이' : '가';
-          message = `${educationTitle}의 ${fieldsText}${josa} 수정되었습니다.`;
-        } else {
-          message = `${educationTitle}이 성공적으로 수정되었습니다.`;
-        }
-        setSnackbar({
-          open: true,
-          message,
-          severity: 'success'
-        });
-      } else {
-        console.error('❌ DB 업데이트 실패');
-        setSnackbar({
-          open: true,
-          message: '교육 정보 업데이트에 실패했습니다.',
-          severity: 'error'
-        });
-        return;
+        changedFields.push('교육분야');
       }
+
+      // 교육유형 변경
+      if (originalEducation.educationType !== updatedEducation.educationType &&
+          normalizeValue(originalEducation.educationType) !== normalizeValue(updatedEducation.educationType)) {
+        console.log('✅ [변경로그] 교육유형 변경 감지:', originalEducation.educationType, '→', updatedEducation.educationType);
+        addChangeLog(
+          '수정',
+          educationCode,
+          `개인교육관리 ${educationTitle}(${educationCode}) 개요탭의 교육유형이 ${originalEducation.educationType || ''} → ${updatedEducation.educationType || ''}로 수정 되었습니다.`,
+          updatedEducation.team || '미분류',
+          originalEducation.educationType || '',
+          updatedEducation.educationType || '',
+          '교육유형',
+          educationTitle,
+          '칸반탭'
+        );
+        changedFields.push('교육유형');
+      }
+
+      // 우선순위 변경
+      if (originalEducation.priority !== updatedEducation.priority &&
+          normalizeValue(originalEducation.priority) !== normalizeValue(updatedEducation.priority)) {
+        addChangeLog(
+          '수정',
+          educationCode,
+          `개인교육관리 ${educationTitle}(${educationCode}) 개요탭의 우선순위가 ${originalEducation.priority || ''} → ${updatedEducation.priority || ''}로 수정 되었습니다.`,
+          updatedEducation.team || '미분류',
+          originalEducation.priority || '',
+          updatedEducation.priority || '',
+          '우선순위',
+          educationTitle,
+          '칸반탭'
+        );
+        changedFields.push('우선순위');
+      }
+
+      // 제목 변경
+      if (normalizeValue(originalEducation.title) !== normalizeValue(updatedEducation.title)) {
+        addChangeLog(
+          '수정',
+          educationCode,
+          `개인교육관리 ${educationTitle}(${educationCode}) 개요탭의 제목이 ${originalEducation.title || ''} → ${updatedEducation.title || ''}로 수정 되었습니다.`,
+          updatedEducation.team || '미분류',
+          originalEducation.title || '',
+          updatedEducation.title || '',
+          '제목',
+          educationTitle,
+          '칸반탭'
+        );
+        changedFields.push('제목');
+      }
+
+      // 교육내용 변경
+      if (normalizeValue(originalEducation.content) !== normalizeValue(updatedEducation.content)) {
+        addChangeLog(
+          '수정',
+          educationCode,
+          `개인교육관리 ${educationTitle}(${educationCode}) 개요탭의 교육내용이 ${originalEducation.content || ''} → ${updatedEducation.content || ''}로 수정 되었습니다.`,
+          updatedEducation.team || '미분류',
+          originalEducation.content || '',
+          updatedEducation.content || '',
+          '교육내용',
+          educationTitle,
+          '칸반탭'
+        );
+        changedFields.push('교육내용');
+      }
+
+      // 처리내용 변경
+      if (normalizeValue(originalEducation.responseContent) !== normalizeValue(updatedEducation.responseContent)) {
+        addChangeLog(
+          '수정',
+          educationCode,
+          `개인교육관리 ${educationTitle}(${educationCode}) 개요탭의 처리내용이 ${originalEducation.responseContent || ''} → ${updatedEducation.responseContent || ''}로 수정 되었습니다.`,
+          updatedEducation.team || '미분류',
+          originalEducation.responseContent || '',
+          updatedEducation.responseContent || '',
+          '처리내용',
+          educationTitle,
+          '칸반탭'
+        );
+        changedFields.push('처리내용');
+      }
+
+      // 상태 변경
+      if (originalEducation.status !== updatedEducation.status &&
+          normalizeValue(originalEducation.status) !== normalizeValue(updatedEducation.status)) {
+        console.log('✅ [변경로그] 상태 변경 감지:', originalEducation.status, '→', updatedEducation.status);
+        addChangeLog(
+          '수정',
+          educationCode,
+          `개인교육관리 ${educationTitle}(${educationCode}) 개요탭의 상태가 ${originalEducation.status || ''} → ${updatedEducation.status || ''}로 수정 되었습니다.`,
+          updatedEducation.team || '미분류',
+          originalEducation.status || '',
+          updatedEducation.status || '',
+          '상태',
+          educationTitle,
+          '칸반탭'
+        );
+        changedFields.push('상태');
+      }
+
+      // 담당자 변경
+      if (originalEducation.assignee !== updatedEducation.assignee &&
+          normalizeValue(originalEducation.assignee) !== normalizeValue(updatedEducation.assignee)) {
+        console.log('✅ [변경로그] 담당자 변경 감지:', originalEducation.assignee, '→', updatedEducation.assignee);
+        addChangeLog(
+          '수정',
+          educationCode,
+          `개인교육관리 ${educationTitle}(${educationCode}) 개요탭의 담당자가 ${originalEducation.assignee || ''} → ${updatedEducation.assignee || ''}로 수정 되었습니다.`,
+          updatedEducation.team || '미분류',
+          originalEducation.assignee || '',
+          updatedEducation.assignee || '',
+          '담당자',
+          educationTitle,
+          '칸반탭'
+        );
+        changedFields.push('담당자');
+      }
+
+      // 팀 변경
+      if (originalEducation.team !== updatedEducation.team &&
+          normalizeValue(originalEducation.team) !== normalizeValue(updatedEducation.team)) {
+        addChangeLog(
+          '수정',
+          educationCode,
+          `개인교육관리 ${educationTitle}(${educationCode}) 개요탭의 팀이 ${originalEducation.team || ''} → ${updatedEducation.team || ''}로 수정 되었습니다.`,
+          updatedEducation.team || '미분류',
+          originalEducation.team || '',
+          updatedEducation.team || '',
+          '팀',
+          educationTitle,
+          '칸반탭'
+        );
+        changedFields.push('팀');
+      }
+
+      // 종료일(완료일) 변경
+      if (normalizeValue(originalEducation.resolutionDate) !== normalizeValue(updatedEducation.resolutionDate)) {
+        addChangeLog(
+          '수정',
+          educationCode,
+          `개인교육관리 ${educationTitle}(${educationCode}) 개요탭의 종료일이 ${originalEducation.resolutionDate || ''} → ${updatedEducation.resolutionDate || ''}로 수정 되었습니다.`,
+          updatedEducation.team || '미분류',
+          originalEducation.resolutionDate || '',
+          updatedEducation.resolutionDate || '',
+          '종료일',
+          educationTitle,
+          '칸반탭'
+        );
+        changedFields.push('종료일');
+      }
+
+      console.log('🎉 [handleEditEducationSave] 변경로그 생성 완료');
+
+      // 토스트 알림
+      let message = '';
+      if (changedFields.length > 0) {
+        const fieldsText = changedFields.join(', ');
+        message = `${educationTitle}의 ${fieldsText}이(가) 수정되었습니다.`;
+      } else {
+        message = `${educationTitle}이 성공적으로 수정되었습니다.`;
+      }
+      setSnackbar({
+        open: true,
+        message,
+        severity: 'success'
+      });
     } else {
       // 새로 생성
       console.log('🆕 새 Education 생성 중:', updatedEducation);
@@ -3251,6 +3428,7 @@ export default function EducationManagement() {
                   setSnackbar={setSnackbar}
                   assigneeList={users}
                   getStatusName={getStatusName}
+                  onCardClick={handleCardClick}
                   canCreateData={canCreateData}
                   canEditOwn={canEditOwn}
                   canEditOthers={canEditOthers}

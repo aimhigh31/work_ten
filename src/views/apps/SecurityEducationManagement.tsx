@@ -3188,10 +3188,10 @@ export default function SecurityEducationManagement() {
           <Box sx={{ mb: 2, flexShrink: 0 }}>
             <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 2 }}>
               <Typography variant="h2" sx={{ fontWeight: 700 }}>
-                개인교육관리
+                보안교육관리
               </Typography>
               <Typography variant="body1" color="text.secondary" sx={{ pb: 0.5 }}>
-                메인메뉴 &gt; 개인교육관리
+                보안메뉴 &gt; 보안교육관리
               </Typography>
             </Box>
           </Box>

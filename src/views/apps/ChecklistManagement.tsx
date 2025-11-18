@@ -52,6 +52,11 @@ interface ChangeLog {
   user: string;
   action: string;
   target: string;
+  title: string;
+  location: string;
+  field: string;
+  oldValue: string;
+  newValue: string;
   description: string;
 }
 
@@ -183,13 +188,17 @@ function ChangeLogView({
           <TableHead>
             <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
               <TableCell sx={{ fontWeight: 600, width: 50 }}>NO</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 130 }}>변경시간</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 100 }}>코드</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 180 }}>업무내용</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 120 }}>변경분류</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 280 }}>변경 세부내용</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 110 }}>변경시간</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 140 }}>코드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 150 }}>제목</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 60 }}>변경분류</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 60 }}>변경위치</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 60 }}>변경필드</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 80 }}>변경전</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 80 }}>변경후</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 320 }}>변경 세부내용</TableCell>
               <TableCell sx={{ fontWeight: 600, width: 90 }}>팀</TableCell>
-              <TableCell sx={{ fontWeight: 600, width: 90 }}>담당자</TableCell>
+              <TableCell sx={{ fontWeight: 600, width: 90 }}>변경자</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -202,45 +211,55 @@ function ChangeLogView({
                 }}
               >
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {changeLogs.length - (page * rowsPerPage + index)}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.secondary' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.dateTime}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.target}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
-                    {(() => {
-                      const task = tasks.find((task) => task.code === log.target);
-                      return task?.workContent || log.description.split(' - ')[0] || '업무내용 없음';
-                    })()}
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                    {log.title || '-'}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontSize: '13px',
-                      fontWeight: 500
-                    }}
-                  >
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.action}
                   </Typography>
                 </TableCell>
                 <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                    {log.location || '-'}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                    {log.field || '-'}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                    {log.oldValue || '-'}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                    {log.newValue || '-'}
+                  </Typography>
+                </TableCell>
+                <TableCell>
                   <Typography
                     variant="body2"
                     sx={{
-                      fontSize: '13px',
-                      color: 'text.secondary',
+                      fontSize: '12px',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'normal',
@@ -255,20 +274,12 @@ function ChangeLogView({
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  <Chip
-                    label={log.team}
-                    size="small"
-                    variant="outlined"
-                    sx={{
-                      height: 22,
-                      fontSize: '13px',
-                      color: '#333333',
-                      fontWeight: 500
-                    }}
-                  />
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
+                    {log.team}
+                  </Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" sx={{ fontSize: '13px' }}>
+                  <Typography variant="body2" sx={{ fontSize: '12px' }}>
                     {log.user}
                   </Typography>
                 </TableCell>
@@ -506,45 +517,70 @@ export default function ChecklistManagement() {
       dateTime: '2024-12-15 14:30',
       team: '개발팀',
       user: '김철수',
-      action: '업무 상태 변경',
+      action: '수정',
       target: 'TASK-24-010',
-      description: '웹사이트 리뉴얼 프로젝트 상태를 "진행"에서 "완료"로 변경'
+      title: '웹사이트 리뉴얼 프로젝트',
+      location: '개요탭',
+      field: '상태',
+      oldValue: '진행',
+      newValue: '완료',
+      description: '업무관리 웹사이트 리뉴얼 프로젝트(TASK-24-010) 개요탭의 상태가 진행 → 완료로 수정 되었습니다.'
     },
     {
       id: 2,
       dateTime: '2024-12-14 10:15',
       team: '기획팀',
       user: '이영희',
-      action: '새 업무 생성',
+      action: '추가',
       target: 'TASK-24-011',
-      description: '모바일 앱 UI/UX 개선 업무 신규 등록'
+      title: '모바일 앱 UI/UX 개선',
+      location: '개요탭',
+      field: '-',
+      oldValue: '-',
+      newValue: '-',
+      description: '업무관리 모바일 앱 UI/UX 개선(TASK-24-011) 데이터가 생성 되었습니다.'
     },
     {
       id: 3,
       dateTime: '2024-12-13 16:45',
       team: '마케팅팀',
       user: '박민수',
-      action: '담당자 변경',
+      action: '수정',
       target: 'TASK-24-009',
-      description: '마케팅 캠페인 기획 담당자를 "최지연"에서 "박민수"로 변경'
+      title: '마케팅 캠페인 기획',
+      location: '개요탭',
+      field: '담당자',
+      oldValue: '최지연',
+      newValue: '박민수',
+      description: '업무관리 마케팅 캠페인 기획(TASK-24-009) 개요탭의 담당자가 최지연 → 박민수로 수정 되었습니다.'
     },
     {
       id: 4,
       dateTime: '2024-12-12 09:30',
       team: '디자인팀',
       user: '강민정',
-      action: '완료일 수정',
+      action: '수정',
       target: 'TASK-24-008',
-      description: '로고 디자인 작업의 완료 예정일을 2024-12-20으로 수정'
+      title: '로고 디자인 작업',
+      location: '개요탭',
+      field: '완료일',
+      oldValue: '2024-12-18',
+      newValue: '2024-12-20',
+      description: '업무관리 로고 디자인 작업(TASK-24-008) 개요탭의 완료일이 2024-12-18 → 2024-12-20로 수정 되었습니다.'
     },
     {
       id: 5,
       dateTime: '2024-12-11 15:20',
       team: '개발팀',
       user: '정현우',
-      action: '업무 삭제',
+      action: '삭제',
       target: 'TASK-24-007',
-      description: '중복된 데이터베이스 최적화 업무 삭제'
+      title: '데이터베이스 최적화',
+      location: '전체',
+      field: '-',
+      oldValue: '-',
+      newValue: '-',
+      description: '업무관리 데이터베이스 최적화(TASK-24-007) 데이터가 삭제 되었습니다.'
     }
   ]);
 
@@ -562,7 +598,17 @@ export default function ChecklistManagement() {
   }
 
   // 변경로그 추가 함수
-  const addChangeLog = (action: string, target: string, description: string, team: string = '시스템') => {
+  const addChangeLog = (
+    action: string,
+    target: string,
+    description: string,
+    team: string = '시스템',
+    title: string = '',
+    location: string = '전체',
+    field: string = '-',
+    oldValue: string = '-',
+    newValue: string = '-'
+  ) => {
     const now = new Date();
     const dateTime = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
@@ -573,6 +619,11 @@ export default function ChecklistManagement() {
       user: '시스템', // 임시로 시스템으로 설정, 나중에 실제 사용자 정보로 교체 가능
       action,
       target,
+      title,
+      location,
+      field,
+      oldValue,
+      newValue,
       description
     };
 
@@ -595,9 +646,8 @@ export default function ChecklistManagement() {
   const handleEditTaskSave = (updatedTask: TaskTableData) => {
     console.log('📝 ChecklistManagement에서 Task 저장:', updatedTask);
 
-    // ChecklistTable에서 이미 Supabase 저장을 처리하므로,
-    // 여기서는 변경로그만 추가
-    addChangeLog('수정', updatedTask.code, `업무가 수정되었습니다: ${updatedTask.workContent}`, updatedTask.team || '기본팀');
+    // ChecklistTable에서 이미 Supabase 저장 및 변경로그를 처리하므로,
+    // 여기서는 다이얼로그 닫기만 수행
 
     handleEditDialogClose();
   };

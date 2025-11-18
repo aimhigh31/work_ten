@@ -349,13 +349,13 @@ const OverviewTab = memo(
                 notched
                 renderValue={(selected) => {
                   if (!selected) return '선택';
-                  const item = categoriesFromDB.find((c) => c.subcode === selected);
+                  const item = categoriesFromDB.find((c) => c.subcode_name === selected);
                   return item ? item.subcode_name : selected;
                 }}
               >
                 <MenuItem value="">선택</MenuItem>
                 {categoriesFromDB.map((option) => (
-                  <MenuItem key={option.subcode} value={option.subcode}>
+                  <MenuItem key={option.subcode} value={option.subcode_name}>
                     {option.subcode_name}
                   </MenuItem>
                 ))}
@@ -372,7 +372,7 @@ const OverviewTab = memo(
                 notched
                 renderValue={(selected) => {
                   if (!selected) return '';
-                  const item = statusTypesFromDB.find((s) => s.subcode === selected);
+                  const item = statusTypesFromDB.find((s) => s.subcode_name === selected);
                   const statusName = item ? item.subcode_name : selected;
                   const getStatusStyle = (statusName: string) => {
                     switch (statusName) {
@@ -428,7 +428,7 @@ const OverviewTab = memo(
                   };
                   const statusStyle = getStatusStyle(option.subcode_name);
                   return (
-                    <MenuItem key={option.subcode} value={option.subcode}>
+                    <MenuItem key={option.subcode} value={option.subcode_name}>
                       <Box
                         sx={{
                           px: 2,
@@ -572,8 +572,8 @@ const OverviewTab = memo(
             <TextField
               fullWidth
               label="코드"
-              value={taskState.code}
-              placeholder="자동 생성됩니다"
+              value={taskState.code || '저장 시 자동 생성됩니다'}
+              placeholder="저장 시 자동 생성됩니다"
               InputLabelProps={{ shrink: true }}
               variant="outlined"
               InputProps={{
@@ -2020,20 +2020,18 @@ const ChecklistEditDialog = memo(
         if (task) {
           dispatch({ type: 'SET_TASK', task });
         } else if (open) {
-          // 새 Task 생성 시 자동으로 코드, 등록일, 담당자 설정
+          // 새 Task 생성 시 자동으로 등록일, 담당자 설정
           console.log('🟢 [ChecklistEditDialog] 다이얼로그 열림: 새 체크리스트 생성');
           console.log('🟢 [ChecklistEditDialog] task 값:', task);
           console.log('🟢 [ChecklistEditDialog] open 값:', open);
           const newRegistrationDate = getCurrentDate();
 
-          // 코드 자동 생성
-          console.log('🟢 [ChecklistEditDialog] generateTaskCode 호출 시작');
-          const newCode = await generateTaskCode();
-          console.log('🟢 [ChecklistEditDialog] 생성된 코드:', newCode);
+          // 코드는 서버에서 자동 생성되므로 빈 문자열로 설정
+          console.log('🟢 [ChecklistEditDialog] 코드는 서버에서 자동 생성됨');
 
           dispatch({
             type: 'INIT_NEW_TASK',
-            code: newCode,
+            code: '', // 서버에서 자동 생성
             registrationDate: newRegistrationDate,
             assignee: currentUserCode
           });

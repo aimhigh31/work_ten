@@ -1737,13 +1737,13 @@ const InvestmentAmountTab = memo(({ mode, investmentId, amountItems, setAmountIt
               displayEmpty
               renderValue={(selected) => {
                 if (!selected) return '선택';
-                const found = investmentDetailTypesFromDB.find(t => t.subcode === selected);
+                const found = investmentDetailTypesFromDB.find(t => t.subcode_name === selected);
                 return found ? found.subcode_name : selected;
               }}
             >
               <MenuItem value="">선택</MenuItem>
               {investmentDetailTypesFromDB.map((option) => (
-                <MenuItem key={option.subcode} value={option.subcode}>
+                <MenuItem key={option.subcode} value={option.subcode_name}>
                   {option.subcode_name}
                 </MenuItem>
               ))}

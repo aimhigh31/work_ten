@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 
 // material-ui
 import List from '@mui/material/List';
@@ -17,6 +17,7 @@ import MenuItem from '@mui/material/MenuItem';
 import MainCard from 'components/MainCard';
 import useUser from 'hooks/useUser';
 import { useSupabaseEducation } from 'hooks/useSupabaseEducation';
+import { masterCodeService } from 'services/supabase/mastercode.service';
 
 // utils
 import dayjs from 'dayjs';
@@ -31,6 +32,32 @@ export default function EducationWidget() {
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState('Total');
   const itemsPerPage = 5;
+  const [masterCodeMap, setMasterCodeMap] = useState<Map<string, string>>(new Map());
+
+  // 마스터코드 데이터 로드 (서브코드 -> 서브코드명 매핑)
+  useEffect(() => {
+    const loadMasterCodes = async () => {
+      try {
+        const data = await masterCodeService.getAllFlatCodes();
+        const map = new Map<string, string>();
+        data.forEach((item: any) => {
+          const key = `${item.group_code}:${item.sub_code}`;
+          map.set(key, item.sub_name);
+        });
+        setMasterCodeMap(map);
+      } catch (err) {
+        console.error('❌ 마스터코드 로드 실패:', err);
+      }
+    };
+    loadMasterCodes();
+  }, []);
+
+  // 서브코드를 서브코드명으로 변환하는 헬퍼 함수
+  const getSubCodeName = useCallback((groupCode: string, subCode: string) => {
+    if (!subCode) return '';
+    const key = `${groupCode}:${subCode}`;
+    return masterCodeMap.get(key) || subCode;
+  }, [masterCodeMap]);
 
   // 개인교육 데이터 로드
   useEffect(() => {
@@ -206,7 +233,15 @@ export default function EducationWidget() {
                         {edu.title || '제목 없음'}
                       </Typography>
                       <Chip
-                        label={edu.status}
+                        label={(() => {
+                          const status = edu.status || '';
+                          // 서브코드 형식인지 확인 (예: GROUP002-SUB004)
+                          if (status.includes('GROUP') && status.includes('-SUB')) {
+                            const [groupCode, subCode] = status.split('-');
+                            return getSubCodeName(groupCode, subCode);
+                          }
+                          return status;
+                        })()}
                         size="small"
                         sx={{
                           ...getStatusColor(edu.status),
@@ -223,7 +258,15 @@ export default function EducationWidget() {
                   <ListItemText
                     primary={
                       <Typography variant="body2" sx={{ fontWeight: 400, color: 'text.secondary' }}>
-                        {edu.description || edu.education_category || '설명 없음'}
+                        {(() => {
+                          const category = edu.education_category || '';
+                          // 서브코드 형식인지 확인 (예: GROUP002-SUB004)
+                          if (category.includes('GROUP') && category.includes('-SUB')) {
+                            const [groupCode, subCode] = category.split('-');
+                            return getSubCodeName(groupCode, subCode);
+                          }
+                          return edu.description || category || '설명 없음';
+                        })()}
                       </Typography>
                     }
                   />

@@ -335,13 +335,13 @@ const OverviewTab = memo(
                 notched
                 renderValue={(selected) => {
                   if (!selected) return '선택';
-                  const item = vocTypesFromDB.find(t => t.subcode === selected);
+                  const item = vocTypesFromDB.find(t => t.subcode_name === selected);
                   return item ? item.subcode_name : selected;
                 }}
               >
                 <MenuItem value="">선택</MenuItem>
                 {vocTypesFromDB.map((option) => (
-                  <MenuItem key={option.subcode} value={option.subcode}>
+                  <MenuItem key={option.subcode} value={option.subcode_name}>
                     {option.subcode_name}
                   </MenuItem>
                 ))}
@@ -375,13 +375,13 @@ const OverviewTab = memo(
                 notched
                 renderValue={(selected) => {
                   if (!selected) return '선택';
-                  const item = priorityTypesFromDB.find(p => p.subcode === selected);
+                  const item = priorityTypesFromDB.find(p => p.subcode_name === selected);
                   return item ? item.subcode_name : selected;
                 }}
               >
                 <MenuItem value="">선택</MenuItem>
                 {priorityTypesFromDB.map((option) => (
-                  <MenuItem key={option.subcode} value={option.subcode}>
+                  <MenuItem key={option.subcode} value={option.subcode_name}>
                     {option.subcode_name}
                   </MenuItem>
                 ))}
@@ -399,7 +399,7 @@ const OverviewTab = memo(
                 onChange={handleFieldChange('status')}
                 notched
                 renderValue={(selected) => {
-                  const item = statusTypesFromDB.find(s => s.subcode === selected);
+                  const item = statusTypesFromDB.find(s => s.subcode_name === selected);
                   const displayName = item ? item.subcode_name : selected;
 
                   const getStatusStyle = (status: string) => {
@@ -471,7 +471,7 @@ const OverviewTab = memo(
                     }
                   };
                   return (
-                    <MenuItem key={option.subcode} value={option.subcode}>
+                    <MenuItem key={option.subcode} value={option.subcode_name}>
                       <Chip
                         label={option.subcode_name}
                         size="small"
@@ -1466,8 +1466,8 @@ const VOCEditDialog = memo(
       return found ? found.name : subcode;
     }, []);
 
-    // VOC 훅 사용 (코드 생성용)
-    const { generateVocCode } = useSupabaseVoc();
+    // VOC 훅 사용 (코드 생성 및 DB 저장용)
+    const { generateVocCode, createVoc, updateVoc, convertToDbVocData } = useSupabaseVoc();
 
     // 피드백 훅 사용 (DB 연동)
     const {
@@ -1719,55 +1719,103 @@ const VOCEditDialog = memo(
         console.log('✅ 기록 탭 변경사항 저장 완료');
       }
 
-      // 약간의 지연을 두고 저장 (상태 업데이트 완료 대기)
-      setTimeout(async () => {
-        if (!voc) {
-          // 새 VOC 생성
-          const newVOC: VocData = {
-            id: Date.now(),
-            no: Date.now(),
-            registrationDate: vocState.registrationDate || new Date().toISOString().split('T')[0],
-            receptionDate: new Date().toISOString().split('T')[0],
-            customerName: vocState.customerName,
-            companyName: '',
-            vocType: vocState.vocType,
-            channel: '전화',
-            title: `${vocState.vocType} - ${vocState.customerName}`,
-            content: currentValues.content,
-            team: '고객지원팀',
-            assignee: vocState.assignee,
-            status: vocState.status,
-            priority: vocState.priority,
-            responseContent: currentValues.responseContent,
-            resolutionDate: vocState.resolutionDate,
-            satisfactionScore: null,
-            attachments: [],
-            code: vocState.code
-          };
+      // 🔄 VOC 데이터 DB 저장 (하드웨어관리 패턴)
+      try {
+        // VocData 객체 생성 (프론트엔드 형식)
+        const vocData: VocData = !voc ? {
+          id: 0, // DB에서 자동 생성
+          no: 0, // DB에서 자동 생성
+          registrationDate: vocState.registrationDate || new Date().toISOString().split('T')[0],
+          receptionDate: vocState.receptionDate || new Date().toISOString().split('T')[0],
+          customerName: vocState.customerName,
+          companyName: vocState.companyName || '',
+          vocType: vocState.vocType,
+          channel: vocState.channel || '전화',
+          title: `${vocState.vocType} - ${vocState.customerName}`,
+          content: currentValues.content,
+          team: vocState.team || currentUser?.department || '고객지원팀',
+          assignee: vocState.assignee,
+          status: vocState.status,
+          priority: vocState.priority,
+          responseContent: currentValues.responseContent,
+          resolutionDate: vocState.resolutionDate,
+          satisfactionScore: null,
+          attachments: [],
+          code: vocState.code,
+          createdBy: currentUser?.user_name || 'system'
+        } : {
+          ...voc,
+          customerName: vocState.customerName,
+          companyName: vocState.companyName || '',
+          vocType: vocState.vocType,
+          channel: vocState.channel || '전화',
+          title: `${vocState.vocType} - ${vocState.customerName}`,
+          content: currentValues.content,
+          team: vocState.team,
+          assignee: vocState.assignee,
+          status: vocState.status,
+          priority: vocState.priority,
+          responseContent: currentValues.responseContent,
+          resolutionDate: vocState.resolutionDate,
+          code: vocState.code
+        };
 
-          console.log('🚀 새 VOC 생성 중:', newVOC);
-          onSave(newVOC);
+        // DB 형식으로 변환
+        const dbVocData = convertToDbVocData(vocData);
+
+        let savedData;
+        if (!voc || !voc.id) {
+          // 새 VOC 생성
+          console.log('🚀 새 VOC 생성 중:', dbVocData);
+          savedData = await createVoc(dbVocData);
+          if (!savedData) {
+            setValidationError('VOC 생성에 실패했습니다.');
+            return;
+          }
+          console.log('✅ 새 VOC 생성 성공:', savedData);
         } else {
           // 기존 VOC 수정
-          const updatedVOC: VocData = {
-            ...voc,
-            customerName: vocState.customerName,
-            vocType: vocState.vocType,
-            title: `${vocState.vocType} - ${vocState.customerName}`,
-            content: currentValues.content,
-            assignee: vocState.assignee,
-            status: vocState.status,
-            priority: vocState.priority,
-            responseContent: currentValues.responseContent,
-            resolutionDate: vocState.resolutionDate,
-            code: vocState.code
-          };
-
-          console.log('📝 기존 VOC 수정 중:', updatedVOC);
-          onSave(updatedVOC);
+          console.log('📝 기존 VOC 수정 중:', { id: voc.id, data: dbVocData });
+          const success = await updateVoc(voc.id, dbVocData);
+          if (!success) {
+            setValidationError('VOC 수정에 실패했습니다.');
+            return;
+          }
+          console.log('✅ VOC 수정 성공');
+          savedData = { ...dbVocData, id: voc.id };
         }
+
+        // 저장된 데이터를 VocData 형식으로 변환하여 부모에 전달
+        const savedVocData: VocData = {
+          id: savedData.id || voc?.id || 0,
+          no: savedData.no || voc?.no || 0,
+          registrationDate: savedData.registration_date || vocState.registrationDate,
+          receptionDate: savedData.reception_date || vocState.receptionDate,
+          customerName: savedData.customer_name || vocState.customerName,
+          companyName: savedData.company_name || vocState.companyName || '',
+          vocType: savedData.voc_type || vocState.vocType,
+          channel: savedData.channel || vocState.channel || '전화',
+          title: `${savedData.voc_type || vocState.vocType} - ${savedData.customer_name || vocState.customerName}`,
+          content: savedData.content || currentValues.content,
+          team: savedData.team || vocState.team,
+          assignee: savedData.assignee || vocState.assignee,
+          status: savedData.status || vocState.status,
+          priority: savedData.priority || vocState.priority,
+          responseContent: savedData.response_content || currentValues.responseContent,
+          resolutionDate: savedData.resolution_date || vocState.resolutionDate,
+          satisfactionScore: savedData.satisfaction_score || null,
+          attachments: savedData.attachments || [],
+          code: savedData.code || vocState.code,
+          createdBy: savedData.created_by || currentUser?.user_name || 'system'
+        };
+
+        console.log('📤 부모 컴포넌트로 전달:', savedVocData);
+        onSave(savedVocData);
         onClose();
-      }, 50); // 50ms 지연
+      } catch (error) {
+        console.error('❌ VOC 저장 실패:', error);
+        setValidationError('VOC 저장 중 오류가 발생했습니다.');
+      }
     }, [
       voc,
       vocState,
@@ -1779,7 +1827,11 @@ const VOCEditDialog = memo(
       feedbacks,
       addFeedback,
       updateFeedback,
-      deleteFeedback
+      deleteFeedback,
+      createVoc,
+      updateVoc,
+      convertToDbVocData,
+      currentUser
     ]);
 
     const handleClose = useCallback(() => {

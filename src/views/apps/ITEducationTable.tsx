@@ -787,6 +787,21 @@ export default function ITEducationTable({
               severity: 'success'
             });
           }
+
+          // 변경로그 추가
+          if (addChangeLog) {
+            addChangeLog(
+              '추가',
+              updatedTask.code || '',
+              `IT교육관리 ${updatedTask.educationName}(${updatedTask.code}) 데이터가 생성 되었습니다.`,
+              updatedTask.team || '경영기획SF팀',
+              undefined,
+              undefined,
+              undefined,
+              updatedTask.educationName, // 제목
+              '개요탭' // location
+            );
+          }
         } catch (error) {
           console.error('❌ 데이터 로드 실패:', error);
         }

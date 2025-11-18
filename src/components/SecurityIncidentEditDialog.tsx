@@ -1370,12 +1370,12 @@ const SecurityIncidentEditDialog = memo(
           console.error('🔴 개선사항 데이터 형식 변환 중 오류:', error);
           setImprovementItemsState([]);
         }
-      } else if (open && !task?.id) {
-        // 신규 모드일 때는 빈 배열로 초기화
+      } else if (open && !task?.id && improvementItemsState.length === 0) {
+        // 신규 모드일 때는 빈 배열로 초기화 (단, 이미 데이터가 있으면 초기화하지 않음)
         console.log('📝 신규 모드 - 개선사항 빈 배열로 초기화');
         setImprovementItemsState([]);
       }
-    }, [improvementItems, open, task?.id]);
+    }, [improvementItems, open, task?.id, improvementItemsState.length]);
 
     // 최적화된 핸들러들
     const handleFieldChange = useCallback((field: keyof EditSecurityIncidentState, value: string) => {
@@ -1447,7 +1447,7 @@ const SecurityIncidentEditDialog = memo(
         setValidationError('');
 
         // 저장할 데이터 준비
-        if (!task) {
+        if (!task || !task.id) {
           // 새 보안사고 생성
           const newTask: SecurityIncidentRecord = {
             id: Date.now(),

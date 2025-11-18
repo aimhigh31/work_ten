@@ -201,6 +201,29 @@ export const useSupabaseSoftware = () => {
     }
   }, []);
 
+  // ID로 특정 소프트웨어 조회
+  const getSoftwareById = useCallback(async (id: number): Promise<SoftwareData | null> => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { data, error } = await supabase.from('it_software_data').select('*').eq('id', id).eq('is_active', true).single();
+
+      if (error) {
+        console.error('소프트웨어 데이터 조회 실패:', error);
+        throw error;
+      }
+
+      return data;
+    } catch (err: any) {
+      console.error('getSoftwareById 실패:', err);
+      setError(err.message || '소프트웨어 조회 실패');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // 여러 소프트웨어 삭제 (soft delete)
   const deleteMultipleSoftware = useCallback(async (ids: number[]) => {
     console.log('🗑️ 여러 소프트웨어 삭제 시작:', ids);
@@ -246,6 +269,7 @@ export const useSupabaseSoftware = () => {
   return {
     software,
     getSoftware,
+    getSoftwareById,
     createSoftware,
     updateSoftware,
     deleteSoftware,

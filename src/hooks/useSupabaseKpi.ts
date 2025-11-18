@@ -73,7 +73,8 @@ export const useSupabaseKpi = () => {
 
       const { data, error: insertError } = await supabase.from('main_kpi_data').insert([kpiData]).select().single();
 
-      if (insertError) {
+      // 실제 에러 메시지가 있는 경우만 에러로 처리 (빈 객체 무시)
+      if (insertError && (insertError.message || insertError.code)) {
         console.error('❌ Supabase Insert 오류:', insertError);
         throw insertError;
       }
@@ -146,6 +147,25 @@ export const useSupabaseKpi = () => {
     }
   }, []);
 
+  // ID로 KPI 조회
+  const getKpiById = useCallback(async (id: number): Promise<KpiData | null> => {
+    try {
+      console.log('📞 getKpiById 호출:', id);
+      const { data, error: fetchError } = await supabase.from('main_kpi_data').select('*').eq('id', id).single();
+
+      if (fetchError) {
+        console.error('❌ Supabase 조회 오류:', fetchError);
+        throw fetchError;
+      }
+
+      console.log('✅ getKpiById 성공:', data);
+      return data;
+    } catch (err: any) {
+      console.error('KPI 조회 오류:', err);
+      return null;
+    }
+  }, []);
+
   // 코드로 KPI 조회
   const getKpiByCode = useCallback(async (code: string) => {
     try {
@@ -182,6 +202,7 @@ export const useSupabaseKpi = () => {
     loading,
     error,
     fetchKpis,
+    getKpiById,
     addKpi,
     updateKpi,
     deleteKpi,

@@ -3907,13 +3907,12 @@ export default function SecurityEducationDialog({
     console.log('🔍 savedEducation:', savedEducation);
     console.log('🔍 educationData.id:', educationData.id);
 
-    // add 모드에서 커리큘럼 데이터 저장 (체크리스트 방식)
-    const currentCurriculumData = (window as any).getCurrentCurriculumData?.() || [];
-    console.log('📦 커리큘럼 데이터 수집 결과:', currentCurriculumData.length, '개 항목');
-    console.log('📦 수집된 커리큘럼 데이터 상세:', JSON.stringify(currentCurriculumData, null, 2));
+    // 커리큘럼 데이터 저장 (IT교육관리 패턴: 부모 state 직접 사용)
+    console.log('📦 커리큘럼 데이터 수집 결과:', curriculumItems.length, '개 항목');
+    console.log('📦 수집된 커리큘럼 데이터 상세:', JSON.stringify(curriculumItems, null, 2));
 
     // 각 항목의 내용 확인
-    currentCurriculumData.forEach((item: any, index: number) => {
+    curriculumItems.forEach((item: any, index: number) => {
       console.log(`📦 수집된 항목 ${index + 1}:`, {
         session_title: item.session_title,
         session_description: item.session_description,
@@ -3925,8 +3924,8 @@ export default function SecurityEducationDialog({
       });
     });
 
-    if (currentCurriculumData.length > 0) {
-      console.log('📦 커리큘럼 데이터 DB 저장 시작:', currentCurriculumData.length, '개 항목');
+    if (curriculumItems.length > 0) {
+      console.log('📦 커리큘럼 데이터 DB 저장 시작:', curriculumItems.length, '개 항목');
       console.log('📦 현재 모드:', mode);
 
       try {
@@ -3950,7 +3949,7 @@ export default function SecurityEducationDialog({
           console.log('✅ 기존 커리큘럼 데이터 삭제 완료');
         }
 
-        const curriculumDataToSave = currentCurriculumData
+        const curriculumDataToSave = curriculumItems
           .filter((item) => item && typeof item === 'object') // 유효한 객체만 필터링
           .map((item, index) => {
             const mappedItem = {
@@ -4008,17 +4007,14 @@ export default function SecurityEducationDialog({
       }
     }
 
-    // 5. 참석자 데이터 저장 (data_relation.md 패턴 준수)
-    console.log('🔍 getCurrentParticipantData 함수 확인:', typeof (window as any).getCurrentParticipantData);
-
-    const currentParticipantData = (window as any).getCurrentParticipantData?.() || [];
-    console.log('👥 참석자 데이터 수집 결과:', currentParticipantData.length, '개 항목');
-    console.log('👥 수집된 참석자 데이터 상세:', JSON.stringify(currentParticipantData, null, 2));
+    // 참석자 데이터 저장 (IT교육관리 패턴: 부모 state 직접 사용)
+    console.log('👥 참석자 데이터 수집 결과:', participantItems.length, '개 항목');
+    console.log('👥 수집된 참석자 데이터 상세:', JSON.stringify(participantItems, null, 2));
     console.log('👥 현재 모드:', mode);
     console.log('👥 education_id 사용할 값:', educationIdToUse);
 
     // 각 항목의 내용 확인
-    currentParticipantData.forEach((item: any, index: number) => {
+    participantItems.forEach((item: any, index: number) => {
       console.log(`👥 수집된 참석자 ${index + 1}:`, {
         user_name: item.user_name,
         position: item.position,
@@ -4028,8 +4024,8 @@ export default function SecurityEducationDialog({
       });
     });
 
-    if (currentParticipantData.length > 0) {
-      console.log('👥 참석자 데이터 DB 저장 시작:', currentParticipantData.length, '개 항목');
+    if (participantItems.length > 0) {
+      console.log('👥 참석자 데이터 DB 저장 시작:', participantItems.length, '개 항목');
 
       try {
         // 중앙화된 Supabase 클라이언트를 사용하여 참석자 데이터 저장
@@ -4054,7 +4050,7 @@ export default function SecurityEducationDialog({
 
         console.log('👥 사용할 education_id:', educationIdToUse);
 
-        const participantDataToSave = currentParticipantData
+        const participantDataToSave = participantItems
           .filter((item: any) => item && typeof item === 'object' && item.user_name?.trim()) // 참석자명이 있는 항목만
           .map((item: any) => {
             const cleanData = {

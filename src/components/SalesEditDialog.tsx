@@ -1444,7 +1444,7 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
                       notched
                       renderValue={(selected) => {
                         if (!selected) return '선택';
-                        const item = businessUnitsFromDB.find(b => b.subcode === selected);
+                        const item = businessUnitsFromDB.find(b => b.subcode_name === selected);
                         return item ? item.subcode_name : selected;
                       }}
                       sx={{
@@ -1455,7 +1455,7 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
                     >
                       <MenuItem value="">선택</MenuItem>
                       {businessUnitsFromDB.map((option) => (
-                        <MenuItem key={option.subcode} value={option.subcode}>
+                        <MenuItem key={option.subcode} value={option.subcode_name}>
                           {option.subcode_name}
                         </MenuItem>
                       ))}
@@ -1474,7 +1474,7 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
                       notched
                       renderValue={(selected) => {
                         if (!selected) return '선택';
-                        const item = customerNamesFromDB.find(c => c.subcode === selected);
+                        const item = customerNamesFromDB.find(c => c.subcode_name === selected);
                         return item ? item.subcode_name : selected;
                       }}
                       sx={{
@@ -1485,7 +1485,7 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
                     >
                       <MenuItem value="">선택</MenuItem>
                       {customerNamesFromDB.map((option) => (
-                        <MenuItem key={option.subcode} value={option.subcode}>
+                        <MenuItem key={option.subcode} value={option.subcode_name}>
                           {option.subcode_name}
                         </MenuItem>
                       ))}
@@ -1644,7 +1644,7 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
                       notched
                       renderValue={(selected) => {
                         if (!selected) return '선택';
-                        const item = salesTypesFromDB.find(s => s.subcode === selected);
+                        const item = salesTypesFromDB.find(s => s.subcode_name === selected);
                         return item ? item.subcode_name : selected;
                       }}
                       sx={{
@@ -1655,7 +1655,7 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
                     >
                       <MenuItem value="">선택</MenuItem>
                       {salesTypesFromDB.map((option) => (
-                        <MenuItem key={option.subcode} value={option.subcode}>
+                        <MenuItem key={option.subcode} value={option.subcode_name}>
                           {option.subcode_name}
                         </MenuItem>
                       ))}
@@ -1690,7 +1690,7 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
                       notched
                       renderValue={(selected) => {
                         if (!selected) return '';
-                        const item = statusTypesFromDB.find(s => s.subcode === selected);
+                        const item = statusTypesFromDB.find(s => s.subcode_name === selected);
                         const displayName = item ? item.subcode_name : selected;
 
                         const getStatusColor = (statusName: string) => {
@@ -1748,7 +1748,7 @@ const SalesEditDialog: React.FC<SalesEditDialogProps> = ({ open, onClose, salesR
                         };
 
                         return (
-                          <MenuItem key={option.subcode} value={option.subcode}>
+                          <MenuItem key={option.subcode} value={option.subcode_name}>
                             <Chip
                               label={option.subcode_name}
                               size="small"

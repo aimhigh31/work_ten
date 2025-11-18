@@ -145,6 +145,7 @@ interface KanbanViewProps {
   taskStatusOptions: string[];
   taskStatusColors: any;
   teams: string[];
+  onCardClick: (task: TaskTableData) => void;
   // 🔐 권한 관리
   canCreateData?: boolean;
   canEditOwn?: boolean;
@@ -167,6 +168,7 @@ function KanbanView({
   taskStatusOptions,
   taskStatusColors,
   teams,
+  onCardClick,
   canCreateData = true,
   canEditOwn = true,
   canEditOthers = true
@@ -256,139 +258,16 @@ function KanbanView({
   };
 
   // 카드 클릭 핸들러
-  const handleCardClick = (task: TaskTableData) => {
-    setEditingTask(task);
-    setEditDialog(true);
-  };
-
-  // 편집 다이얼로그 닫기
-  const handleEditDialogClose = () => {
-    setEditDialog(false);
-    setEditingTask(null);
-  };
-
-  // Task 저장 핸들러
-  const handleEditTaskSave = async (updatedTask: TaskTableData) => {
-    const originalTask = tasks.find((t) => t.id === updatedTask.id);
-
-    console.log('📝 칸반뷰 - Task 저장 중:', updatedTask);
-
-    try {
-      if (originalTask) {
-        // DB 형식으로 변환
-        const kpiData: Partial<KpiData> = {
-          code: updatedTask.code,
-          work_content: updatedTask.workContent,
-          description: updatedTask.description,
-          selection_background: (updatedTask as any).selectionBackground,
-          impact: (updatedTask as any).impact,
-          evaluation_criteria_s: (updatedTask as any).evaluationCriteria?.S,
-          evaluation_criteria_a: (updatedTask as any).evaluationCriteria?.A,
-          evaluation_criteria_b: (updatedTask as any).evaluationCriteria?.B,
-          evaluation_criteria_c: (updatedTask as any).evaluationCriteria?.C,
-          evaluation_criteria_d: (updatedTask as any).evaluationCriteria?.D,
-          management_category: (updatedTask as any).managementCategory,
-          target_kpi: (updatedTask as any).targetKpi,
-          current_kpi: (updatedTask as any).currentKpi,
-          department: updatedTask.department,
-          progress: updatedTask.progress,
-          status: updatedTask.status,
-          start_date: (updatedTask as any).startDate,
-          completed_date: updatedTask.completedDate,
-          team: updatedTask.team,
-          assignee: updatedTask.assignee
-        };
-
-        console.log('💾 칸반뷰 - DB 업데이트 데이터:', kpiData);
-
-        // DB에 업데이트
-        await updateKpi(updatedTask.id, kpiData);
-        console.log('✅ 칸반뷰 - DB 업데이트 성공');
-
-        // DB에서 최신 데이터 다시 가져오기
-        if (fetchKpis) {
-          await fetchKpis();
-          console.log('✅ 칸반뷰 - 데이터 새로고침 완료');
-        }
-
-        // 변경로그 추가 - 변경된 필드 확인
-        const changes: string[] = [];
-        const changedFields: string[] = [];
-        const taskCode = updatedTask.code || `TASK-${updatedTask.id}`;
-
-        if (originalTask.status !== updatedTask.status) {
-          changes.push(`상태: "${getStatusName(originalTask.status)}" → "${getStatusName(updatedTask.status)}"`);
-          changedFields.push('상태');
-        }
-        if (originalTask.assignee !== updatedTask.assignee) {
-          changes.push(`담당자: "${originalTask.assignee || '미할당'}" → "${updatedTask.assignee || '미할당'}"`);
-          changedFields.push('담당자');
-        }
-        if (originalTask.workContent !== updatedTask.workContent) {
-          changes.push(`업무내용 수정`);
-          changedFields.push('업무내용');
-        }
-        if (originalTask.progress !== updatedTask.progress) {
-          changes.push(`진행율: ${originalTask.progress || 0}% → ${updatedTask.progress || 0}%`);
-          changedFields.push('진행률');
-        }
-        if (originalTask.completedDate !== updatedTask.completedDate) {
-          changes.push(`완료일: "${originalTask.completedDate || '미정'}" → "${updatedTask.completedDate || '미정'}"`);
-          changedFields.push('완료일');
-        }
-
-        if (changes.length > 0) {
-          addChangeLog(
-            '업무 정보 수정',
-            taskCode,
-            `${updatedTask.workContent || '업무'} - ${changes.join(', ')}`,
-            updatedTask.team || '미분류'
-          );
-        }
-
-        // 토스트 알림
-        const workContent = updatedTask.workContent || 'KPI';
-
-        if (changedFields.length > 0) {
-          const firstField = changedFields[0];
-          const josaField = getJosa(firstField, '이/가');
-
-          if (changedFields.length === 1) {
-            // 1개 필드만 수정된 경우
-            setSnackbar({
-              open: true,
-              message: `${workContent}의 ${firstField}${josaField} 성공적으로 수정되었습니다.`,
-              severity: 'success'
-            });
-          } else {
-            // 여러 필드가 수정된 경우
-            setSnackbar({
-              open: true,
-              message: `${workContent}의 ${changedFields.length}개 항목이 성공적으로 수정되었습니다.`,
-              severity: 'success'
-            });
-          }
-        } else {
-          // 변경사항이 없는 경우도 성공 메시지 표시
-          const josa = getJosa(workContent, '이/가');
-          setSnackbar({
-            open: true,
-            message: `${workContent}${josa} 성공적으로 저장되었습니다.`,
-            severity: 'success'
-          });
-        }
-      }
-
-      handleEditDialogClose();
-    } catch (error) {
-      console.error('❌ 칸반뷰 - Task 저장 실패:', error);
-      setSnackbar({
-        open: true,
-        message: 'KPI 정보 저장에 실패했습니다.',
-        severity: 'error'
-      });
+  const handleCardClick = async (task: TaskTableData) => {
+    // 메인 컴포넌트의 onCardClick 호출 (다이얼로그는 메인 컴포넌트에서 관리)
+    if (onCardClick) {
+      await onCardClick(task);
     }
   };
+
+  // Task 저장 핸들러 (데이터 탭 인라인 편집용 - 삭제됨)
+  // ⚠️ 주의: 이 함수는 칸반 탭 편집에서 중복 저장을 유발하므로 삭제되었습니다.
+  // 칸반 탭 편집은 2922번 라인의 handleEditTaskSave가 처리합니다.
 
   // 드래그 종료 핸들러
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -2622,7 +2501,7 @@ export default function KpiManagement() {
 
   // Supabase 훅 사용
   const { users, departments, masterCodes } = useCommonData(); // 🏪 공용 창고에서 가져오기
-  const { kpis, loading: kpisLoading, addKpi, updateKpi, deleteKpi, deleteKpis, fetchKpis } = useSupabaseKpi();
+  const { kpis, loading: kpisLoading, addKpi, updateKpi, deleteKpi, deleteKpis, fetchKpis, getKpiById } = useSupabaseKpi();
 
   // 변경로그 Hook (page='main_kpi')
   const { logs: dbChangeLogs, loading: changeLogsLoading, fetchChangeLogs } = useSupabaseChangeLog('main_kpi');
@@ -2744,6 +2623,7 @@ export default function KpiManagement() {
   // 편집 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskTableData | null>(null);
+  const [originalKpi, setOriginalKpi] = useState<TaskTableData | null>(null);
 
   // 변경로그 페이지네이션 상태
   const [changeLogPage, setChangeLogPage] = useState(0);
@@ -2869,8 +2749,47 @@ export default function KpiManagement() {
   );
 
   // 카드 클릭 핸들러
-  const handleCardClick = (task: TaskTableData) => {
+  const handleCardClick = async (task: TaskTableData) => {
     setEditingTask(task);
+
+    // DB에서 최신 데이터 가져오기 (변경로그 비교용)
+    try {
+      const latestData = await getKpiById(task.id);
+      if (latestData) {
+        // TaskTableData 형식으로 변환
+        const originalData: TaskTableData = {
+          ...task,
+          workContent: latestData.work_content || task.workContent,
+          description: latestData.description || task.description,
+          selectionBackground: latestData.selection_background as any,
+          impact: latestData.impact as any,
+          evaluationCriteria: {
+            s: latestData.evaluation_criteria_s || '',
+            a: latestData.evaluation_criteria_a || '',
+            b: latestData.evaluation_criteria_b || '',
+            c: latestData.evaluation_criteria_c || '',
+            d: latestData.evaluation_criteria_d || ''
+          } as any,
+          managementCategory: latestData.management_category as any,
+          targetKpi: latestData.target_kpi as any,
+          currentKpi: latestData.current_kpi as any,
+          department: latestData.department || task.department,
+          progress: latestData.progress !== null ? latestData.progress : task.progress,
+          status: latestData.status,
+          startDate: latestData.start_date || task.startDate,
+          completedDate: latestData.completed_date || task.completedDate,
+          team: latestData.team || task.team,
+          assignee: latestData.assignee || task.assignee,
+          code: latestData.code,
+          registrationDate: latestData.registration_date
+        };
+        setOriginalKpi(originalData);
+        console.log('✅ originalKpi 설정 완료:', originalData);
+      }
+    } catch (error) {
+      console.error('❌ KPI DB 조회 오류:', error);
+    }
+
     setEditDialog(true);
   };
 
@@ -2882,8 +2801,6 @@ export default function KpiManagement() {
 
   // KPI 저장 핸들러
   const handleEditTaskSave = async (updatedTask: TaskTableData) => {
-    const originalTask = tasks.find((t) => t.id === updatedTask.id);
-
     console.log('🔍 handleEditTaskSave 호출됨:', {
       updatedTask,
       managementCategory: (updatedTask as any).managementCategory,
@@ -2891,34 +2808,13 @@ export default function KpiManagement() {
       currentKpi: (updatedTask as any).currentKpi
     });
 
-    try {
-      if (originalTask) {
-        // 업데이트
-        const kpiData: Partial<KpiData> = {
-          code: updatedTask.code,
-          work_content: updatedTask.workContent,
-          description: updatedTask.description,
-          selection_background: (updatedTask as any).selectionBackground,
-          impact: (updatedTask as any).impact,
-          evaluation_criteria_s: (updatedTask as any).evaluationCriteria?.S,
-          evaluation_criteria_a: (updatedTask as any).evaluationCriteria?.A,
-          evaluation_criteria_b: (updatedTask as any).evaluationCriteria?.B,
-          evaluation_criteria_c: (updatedTask as any).evaluationCriteria?.C,
-          evaluation_criteria_d: (updatedTask as any).evaluationCriteria?.D,
-          management_category: (updatedTask as any).managementCategory,
-          target_kpi: (updatedTask as any).targetKpi,
-          current_kpi: (updatedTask as any).currentKpi,
-          department: updatedTask.department,
-          progress: updatedTask.progress,
-          status: updatedTask.status,
-          start_date: (updatedTask as any).startDate,
-          completed_date: updatedTask.completedDate,
-          team: updatedTask.team,
-          assignee: updatedTask.assignee
-        };
+    // ⚠️ 중요: KPIEditDialog에서 이미 DB 저장을 완료했으므로
+    // 여기서는 로컬 상태 업데이트, 토스트 알림, 변경로그만 처리
 
-        console.log('📦 업데이트용 kpiData:', kpiData);
-        await updateKpi(updatedTask.id, kpiData);
+    try {
+      if (originalKpi) {
+        // 값 정규화 함수 (하드웨어관리와 동일)
+        const normalizeValue = (value: any) => (value === undefined || value === null || value === '' ? '' : String(value).trim());
 
         // 변경로그 추가 - 필드별 추적
         const fieldNameMap: Record<string, string> = {
@@ -2943,11 +2839,11 @@ export default function KpiManagement() {
 
         // 일반 필드 비교
         Object.keys(fieldNameMap).forEach((field) => {
-          const beforeVal = (originalTask as any)[field];
+          const beforeVal = (originalKpi as any)[field];
           const afterVal = (updatedTask as any)[field];
 
-          // 값이 다른 경우만 추가
-          if (beforeVal !== afterVal) {
+          // normalizeValue로 정규화 후 비교
+          if (normalizeValue(beforeVal) !== normalizeValue(afterVal)) {
             changes.push({
               field,
               fieldKorean: fieldNameMap[field],
@@ -2960,10 +2856,10 @@ export default function KpiManagement() {
         // 평가기준표 비교 (객체 형태)
         const evaluationGrades = ['S', 'A', 'B', 'C', 'D'];
         evaluationGrades.forEach((grade) => {
-          const beforeVal = (originalTask as any).evaluationCriteria?.[grade];
+          const beforeVal = (originalKpi as any).evaluationCriteria?.[grade];
           const afterVal = (updatedTask as any).evaluationCriteria?.[grade];
 
-          if (beforeVal !== afterVal) {
+          if (normalizeValue(beforeVal) !== normalizeValue(afterVal)) {
             changes.push({
               field: `evaluationCriteria.${grade}`,
               fieldKorean: `평가기준 ${grade}`,
@@ -2980,21 +2876,24 @@ export default function KpiManagement() {
         // 변경된 필드가 있으면 각각 로그 기록
         if (changes.length > 0) {
           for (const change of changes) {
-            const description = `KPI관리 ${kpiTitle}(${updatedTask.code}) 정보의 개요탭 ${change.fieldKorean}이 ${change.before} → ${change.after} 로 수정 되었습니다.`;
+            const description = `KPI관리 ${kpiTitle}(${updatedTask.code}) 개요탭의 ${change.fieldKorean}가 ${change.before || ''} → ${change.after || ''}로 수정 되었습니다.`;
 
             await addChangeLog(
               '수정',
               updatedTask.code,
               description,
               updatedTask.team || '시스템',
-              String(change.before),
-              String(change.after),
+              change.before || '',
+              change.after || '',
               change.fieldKorean,
               kpiTitle,
               '개요탭'
             );
           }
         }
+
+        // DB에서 최신 데이터 다시 가져오기
+        await fetchKpis();
 
         // 토스트 알림 (수정)
         if (changes.length > 0) {
@@ -3026,35 +2925,8 @@ export default function KpiManagement() {
           });
         }
       } else {
-        // 새로 생성
-        console.log('📝 신규 KPI 생성 시작:', updatedTask);
-
-        const kpiData: Omit<KpiData, 'id' | 'created_at' | 'updated_at'> = {
-          code: updatedTask.code,
-          work_content: updatedTask.workContent,
-          description: updatedTask.description || null,
-          selection_background: (updatedTask as any).selectionBackground || null,
-          impact: (updatedTask as any).impact || null,
-          evaluation_criteria_s: (updatedTask as any).evaluationCriteria?.S || null,
-          evaluation_criteria_a: (updatedTask as any).evaluationCriteria?.A || null,
-          evaluation_criteria_b: (updatedTask as any).evaluationCriteria?.B || null,
-          evaluation_criteria_c: (updatedTask as any).evaluationCriteria?.C || null,
-          evaluation_criteria_d: (updatedTask as any).evaluationCriteria?.D || null,
-          management_category: (updatedTask as any).managementCategory || null,
-          target_kpi: (updatedTask as any).targetKpi || null,
-          current_kpi: (updatedTask as any).currentKpi || null,
-          department: updatedTask.department || null,
-          progress: updatedTask.progress || 0,
-          status: updatedTask.status,
-          start_date: (updatedTask as any).startDate || updatedTask.registrationDate || null,
-          completed_date: updatedTask.completedDate || null,
-          team: updatedTask.team || null,
-          assignee: updatedTask.assignee || null,
-          registration_date: updatedTask.registrationDate
-        };
-
-        console.log('📦 Supabase에 전송할 데이터:', kpiData);
-        await addKpi(kpiData);
+        // 새로 생성 - KPIEditDialog에서 이미 DB 저장 완료
+        console.log('📝 신규 KPI 생성 - 변경로그 추가');
 
         const kpiTitle = updatedTask.workContent || 'KPI';
         await addChangeLog(
@@ -3068,6 +2940,9 @@ export default function KpiManagement() {
           kpiTitle,
           '개요탭'
         );
+
+        // DB에서 최신 데이터 다시 가져오기
+        await fetchKpis();
 
         // 토스트 알림 (추가)
         const josaAdd = getJosa(kpiTitle, '이/가');
@@ -3507,6 +3382,7 @@ export default function KpiManagement() {
                   canCreateData={canCreateData}
                   canEditOwn={canEditOwn}
                   canEditOthers={canEditOthers}
+                  onCardClick={handleCardClick}
                 />
               </Box>
             </TabPanel>

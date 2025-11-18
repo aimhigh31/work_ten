@@ -74,7 +74,17 @@ interface ChecklistTableProps {
   selectedAssignee?: string;
   tasks?: TaskTableData[];
   setTasks?: React.Dispatch<React.SetStateAction<TaskTableData[]>>;
-  addChangeLog?: (action: string, target: string, description: string, team?: string) => void;
+  addChangeLog?: (
+    action: string,
+    target: string,
+    description: string,
+    team?: string,
+    title?: string,
+    location?: string,
+    field?: string,
+    oldValue?: string,
+    newValue?: string
+  ) => void;
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
@@ -368,7 +378,17 @@ export default function ChecklistTable({
       // 삭제될 업무들의 정보를 변경로그에 추가
       if (addChangeLog && successCount > 0) {
         deletedTasks.forEach((task) => {
-          addChangeLog('업무 삭제', task.code || `TASK-${task.id}`, `${task.workContent || '업무'} 삭제`, task.team || '미분류');
+          addChangeLog(
+            '삭제',
+            task.code || `TASK-${task.id}`,
+            `업무관리 ${task.workContent || '업무'}(${task.code || `TASK-${task.id}`}) 데이터가 삭제 되었습니다.`,
+            task.team || '미분류',
+            task.workContent || '업무',
+            '전체',
+            '-',
+            '-',
+            '-'
+          );
         });
       }
 
@@ -461,6 +481,22 @@ export default function ChecklistTable({
       if (existingIndex === -1 && createdId) {
         // 새로 생성된 체크리스트의 경우 목록 새로고침
         await fetchChecklists();
+
+        // 변경로그 추가 - 새 체크리스트 생성
+        if (addChangeLog) {
+          addChangeLog(
+            '추가',
+            updatedTask.code,
+            `업무관리 ${updatedTask.workContent || '새 체크리스트'}(${updatedTask.code}) 데이터가 생성 되었습니다.`,
+            updatedTask.team || '미분류',
+            updatedTask.workContent || '새 체크리스트',
+            '개요탭',
+            '-',
+            '-',
+            '-'
+          );
+        }
+
         setSnackbar({
           open: true,
           message: '체크리스트가 성공적으로 생성되었습니다.',
@@ -481,31 +517,89 @@ export default function ChecklistTable({
 
         // 변경로그 추가 - 변경된 필드 확인
         if (addChangeLog) {
-          const changes: string[] = [];
           const taskCode = updatedTask.code || `TASK-${updatedTask.id}`;
+          const taskName = updatedTask.workContent || '업무';
 
+          // 정규화 함수: 빈 값(null, undefined, '')을 빈 문자열로 통일
+          const normalizeValue = (value: any): string => {
+            if (value === null || value === undefined || value === '') {
+              return '';
+            }
+            return String(value);
+          };
+
+          // 상태 변경
           if (originalTask.status !== updatedTask.status) {
-            changes.push(`상태: "${originalTask.status}" → "${updatedTask.status}"`);
-          }
-          if (originalTask.assignee !== updatedTask.assignee) {
-            changes.push(`담당자: "${originalTask.assignee || '미할당'}" → "${updatedTask.assignee || '미할당'}"`);
-          }
-          if (originalTask.workContent !== updatedTask.workContent) {
-            changes.push(`업무내용 수정`);
-          }
-          if (originalTask.progress !== updatedTask.progress) {
-            changes.push(`진행율: ${originalTask.progress || 0}% → ${updatedTask.progress || 0}%`);
-          }
-          if (originalTask.completedDate !== updatedTask.completedDate) {
-            changes.push(`완료일: "${originalTask.completedDate || '미정'}" → "${updatedTask.completedDate || '미정'}"`);
+            addChangeLog(
+              '수정',
+              taskCode,
+              `업무관리 ${taskName}(${taskCode}) 개요탭의 상태가 ${originalTask.status} → ${updatedTask.status}로 수정 되었습니다.`,
+              updatedTask.team || '미분류',
+              taskName,
+              '개요탭',
+              '상태',
+              originalTask.status,
+              updatedTask.status
+            );
           }
 
-          if (changes.length > 0) {
+          // 담당자 변경
+          if (normalizeValue(originalTask.assignee) !== normalizeValue(updatedTask.assignee)) {
             addChangeLog(
-              '업무 정보 수정',
+              '수정',
               taskCode,
-              `${updatedTask.workContent || '업무'} - ${changes.join(', ')}`,
-              updatedTask.team || '미분류'
+              `업무관리 ${taskName}(${taskCode}) 개요탭의 담당자가 ${originalTask.assignee || '미할당'} → ${updatedTask.assignee || '미할당'}로 수정 되었습니다.`,
+              updatedTask.team || '미분류',
+              taskName,
+              '개요탭',
+              '담당자',
+              originalTask.assignee || '미할당',
+              updatedTask.assignee || '미할당'
+            );
+          }
+
+          // 업무내용 변경
+          if (normalizeValue(originalTask.workContent) !== normalizeValue(updatedTask.workContent)) {
+            addChangeLog(
+              '수정',
+              taskCode,
+              `업무관리 ${originalTask.workContent || '업무'}(${taskCode}) 개요탭의 업무내용이 ${originalTask.workContent || ''} → ${updatedTask.workContent || ''}로 수정 되었습니다.`,
+              updatedTask.team || '미분류',
+              updatedTask.workContent || '업무',
+              '개요탭',
+              '업무내용',
+              originalTask.workContent || '',
+              updatedTask.workContent || ''
+            );
+          }
+
+          // 진행율 변경
+          if ((originalTask.progress || 0) !== (updatedTask.progress || 0)) {
+            addChangeLog(
+              '수정',
+              taskCode,
+              `업무관리 ${taskName}(${taskCode}) 개요탭의 진행율이 ${originalTask.progress || 0}% → ${updatedTask.progress || 0}%로 수정 되었습니다.`,
+              updatedTask.team || '미분류',
+              taskName,
+              '개요탭',
+              '진행율',
+              `${originalTask.progress || 0}%`,
+              `${updatedTask.progress || 0}%`
+            );
+          }
+
+          // 완료일 변경
+          if (normalizeValue(originalTask.completedDate) !== normalizeValue(updatedTask.completedDate)) {
+            addChangeLog(
+              '수정',
+              taskCode,
+              `업무관리 ${taskName}(${taskCode}) 개요탭의 완료일이 ${originalTask.completedDate || '미정'} → ${updatedTask.completedDate || '미정'}로 수정 되었습니다.`,
+              updatedTask.team || '미분류',
+              taskName,
+              '개요탭',
+              '완료일',
+              originalTask.completedDate || '미정',
+              updatedTask.completedDate || '미정'
             );
           }
         }
@@ -543,10 +637,15 @@ export default function ChecklistTable({
         // 변경로그 추가 - 새 업무 생성
         if (addChangeLog) {
           addChangeLog(
-            '새 업무 생성',
+            '추가',
             newTaskWithNumber.code,
-            `${newTaskWithNumber.workContent || '새 업무'} 생성`,
-            newTaskWithNumber.team || '미분류'
+            `업무관리 ${newTaskWithNumber.workContent || '새 업무'}(${newTaskWithNumber.code}) 데이터가 생성 되었습니다.`,
+            newTaskWithNumber.team || '미분류',
+            newTaskWithNumber.workContent || '새 업무',
+            '개요탭',
+            '-',
+            '-',
+            '-'
           );
         }
 

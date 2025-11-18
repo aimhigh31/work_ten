@@ -120,14 +120,28 @@ interface KanbanViewProps {
   selectedAssignee: string;
   solutions: SolutionTableData[];
   setSolutions: React.Dispatch<React.SetStateAction<SolutionTableData[]>>;
-  addChangeLog: (action: string, target: string, description: string, team?: string) => void;
+  addChangeLog: (
+    action: string,
+    target: string,
+    description: string,
+    team?: string,
+    beforeValue?: string,
+    afterValue?: string,
+    changedField?: string,
+    title?: string,
+    location?: string
+  ) => void;
   assigneeList?: any[];
   users?: any[];
   canCreateData?: boolean;
   canEditOwn?: boolean;
   canEditOthers?: boolean;
   updateSolution?: (id: number, data: Partial<DbSolutionData>) => Promise<boolean>;
+  getSolutionById?: (id: number) => Promise<DbSolutionData | null>;
   onSaveSolution?: (updatedSolution: SolutionTableData) => Promise<void>;
+  setSnackbar?: React.Dispatch<React.SetStateAction<{ open: boolean; message: string; severity: 'success' | 'error' | 'warning' | 'info' }>>;
+  convertToDbSolutionData?: (solution: SolutionTableData) => Partial<DbSolutionData>;
+  departments?: any[];
   activeTask?: SolutionTableData | null;
   isDraggingState?: boolean;
   onDragStart?: (event: any) => void;
@@ -148,7 +162,11 @@ function KanbanView({
   canEditOwn = true,
   canEditOthers = true,
   updateSolution,
+  getSolutionById,
   onSaveSolution,
+  setSnackbar,
+  convertToDbSolutionData,
+  departments = [],
   activeTask,
   isDraggingState,
   onDragStart,
@@ -177,6 +195,7 @@ function KanbanView({
   // 편집 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);
   const [editingSolution, setEditingSolution] = useState<SolutionTableData | null>(null);
+  const [originalSolution, setOriginalSolution] = useState<SolutionTableData | null>(null);
 
   // 센서 설정
   const sensors = useSensors(
@@ -208,8 +227,44 @@ function KanbanView({
   });
 
   // 카드 클릭 핸들러
-  const handleCardClick = (solution: SolutionTableData) => {
+  const handleCardClick = async (solution: SolutionTableData) => {
     setEditingSolution(solution);
+
+    // 🔍 DB에서 최신 데이터를 가져와서 원본으로 저장 (메모리 데이터는 구버전일 수 있음)
+    try {
+      if (!getSolutionById) {
+        console.warn('⚠️ [KanbanView] getSolutionById가 정의되지 않음');
+        setOriginalSolution(JSON.parse(JSON.stringify(solution)));
+        setEditDialog(true);
+        return;
+      }
+      const latestData = await getSolutionById(solution.id);
+      if (latestData) {
+        // DB 데이터를 SolutionTableData 형식으로 변환
+        const originalData: SolutionTableData = {
+          ...solution,
+          title: latestData.title || solution.title,
+          detailContent: latestData.detail_content || solution.detailContent,
+          solutionType: latestData.solution_type || solution.solutionType,
+          developmentType: latestData.development_type || solution.developmentType,
+          status: latestData.status || solution.status,
+          progress: latestData.progress || solution.progress,
+          team: latestData.team || solution.team,
+          assignee: latestData.assignee || solution.assignee,
+          startDate: latestData.start_date || solution.startDate,
+          completedDate: latestData.completed_date || solution.completedDate,
+          registrationDate: latestData.registration_date || solution.registrationDate
+        };
+        setOriginalSolution(originalData);
+        console.log('🔍 [KanbanView handleCardClick] DB에서 가져온 최신 원본 데이터:', originalData);
+      } else {
+        setOriginalSolution(JSON.parse(JSON.stringify(solution)));
+      }
+    } catch (error) {
+      console.error('❌ [KanbanView handleCardClick] DB 조회 실패, 메모리 데이터 사용:', error);
+      setOriginalSolution(JSON.parse(JSON.stringify(solution)));
+    }
+
     setEditDialog(true);
   };
 
@@ -217,41 +272,264 @@ function KanbanView({
   const handleEditDialogClose = () => {
     setEditDialog(false);
     setEditingSolution(null);
+    setOriginalSolution(null);
   };
 
   // Solution 저장 핸들러
-  const handleEditSolutionSave = (updatedSolution: SolutionTableData) => {
-    const originalSolution = solutions.find((t) => t.id === updatedSolution.id);
+  const handleEditSolutionSave = async (updatedSolution: SolutionTableData) => {
+    console.log('💾 SolutionManagement (칸반) - Solution 저장 핸들러 호출:', updatedSolution);
 
-    if (originalSolution) {
-      // 업데이트
-      setSolutions((prev) => prev.map((solution) => (solution.id === updatedSolution.id ? updatedSolution : solution)));
+    try {
+      // 팀 필드 검증 - 유효하지 않으면 빈 문자열로 대체
+      const isTeamValid = updatedSolution.team && departments.some(dept => dept.department_name === updatedSolution.team && dept.is_active);
+      const validatedTeam = isTeamValid ? updatedSolution.team : '';
 
-      // 변경로그 추가 - 변경된 필드 확인
-      const changes: string[] = [];
-      const solutionCode = updatedSolution.code || `TASK-${updatedSolution.id}`;
-
-      if (originalSolution.status !== updatedSolution.status) {
-        changes.push(`상태: "${originalSolution.status}" → "${updatedSolution.status}"`);
-      }
-      if (originalSolution.assignee !== updatedSolution.assignee) {
-        changes.push(`담당자: "${originalSolution.assignee || '미할당'}" → "${updatedSolution.assignee || '미할당'}"`);
-      }
-      if (originalSolution.detailContent !== updatedSolution.detailContent) {
-        changes.push(`업무내용 수정`);
-      }
-      if (originalSolution.completedDate !== updatedSolution.completedDate) {
-        changes.push(`완료일: "${originalSolution.completedDate || '미정'}" → "${updatedSolution.completedDate || '미정'}"`);
+      if (!isTeamValid && updatedSolution.team) {
+        console.warn('⚠️ [KanbanView] 저장 시점 팀 필드 검증 실패:', updatedSolution.team, '→ 빈 문자열로 대체');
       }
 
-      if (changes.length > 0) {
-        addChangeLog(
-          '업무 정보 수정',
-          solutionCode,
-          `${updatedSolution.detailContent || '업무'} - ${changes.join(', ')}`,
-          updatedSolution.team || '미분류'
-        );
+      // ✅ 서브코드명(subcode_name) 그대로 저장 (CLAUDE.md 규칙)
+      const solutionForDb = {
+        ...updatedSolution,
+        team: validatedTeam
+      };
+
+      // DB 저장
+      if (updateSolution && convertToDbSolutionData) {
+        const dbData = convertToDbSolutionData(solutionForDb);
+        console.log('🔄 [KanbanView] DB 형식으로 변환된 데이터:', dbData);
+
+        const success = await updateSolution(updatedSolution.id, dbData);
+
+        if (success) {
+          // UI 업데이트 시 검증된 팀 값 사용
+          const updatedSolutionForUI = { ...updatedSolution, team: validatedTeam };
+          setSolutions((prev) => prev.map((solution) => (solution.id === updatedSolution.id ? updatedSolutionForUI : solution)));
+          console.log('✅ [KanbanView] 솔루션 업데이트 성공');
+
+          // 토스트 알림 (수정)
+          if (setSnackbar) {
+            const solutionName = updatedSolution.title || updatedSolution.detailContent || '솔루션';
+            const getKoreanParticle = (word: string): string => {
+              const lastChar = word.charAt(word.length - 1);
+              const code = lastChar.charCodeAt(0);
+              if (code >= 0xAC00 && code <= 0xD7A3) {
+                const hasJongseong = (code - 0xAC00) % 28 !== 0;
+                return hasJongseong ? '이' : '가';
+              }
+              return '가';
+            };
+            const josa = getKoreanParticle(solutionName);
+            setSnackbar({
+              open: true,
+              message: `${solutionName}${josa} 성공적으로 수정되었습니다.`,
+              severity: 'success'
+            });
+          }
+        } else {
+          console.error('❌ [KanbanView] 솔루션 업데이트 실패');
+          if (setSnackbar) {
+            setSnackbar({
+              open: true,
+              message: '솔루션 수정에 실패했습니다.',
+              severity: 'error'
+            });
+          }
+          handleEditDialogClose();
+          return;
+        }
+      } else {
+        console.warn('⚠️ [KanbanView] updateSolution 또는 convertToDbSolutionData가 정의되지 않음');
+        // 즉시 UI 업데이트만 수행 (fallback)
+        setSolutions((prev) => prev.map((solution) => (solution.id === updatedSolution.id ? updatedSolution : solution)));
+        console.log('✅ 솔루션 업데이트 완료 (즉시 UI 반영, DB 저장 스킵)');
       }
+
+      // 변경로그 생성 (필드별 비교) - originalSolution이 있을 때만
+      if (!originalSolution) {
+        console.log('⚠️ originalSolution이 없어서 변경로그 생성 불가');
+        handleEditDialogClose();
+        return;
+      }
+    } catch (err: any) {
+      console.error('❌ [KanbanView] 솔루션 저장 중 오류:', err);
+      if (setSnackbar) {
+        setSnackbar({
+          open: true,
+          message: '솔루션 저장 중 오류가 발생했습니다.',
+          severity: 'error'
+        });
+      }
+      handleEditDialogClose();
+      return;
+    }
+
+    // 변경로그 생성 (필드별 비교)
+    const taskCode = updatedSolution.code || `SOL-${updatedSolution.id}`;
+    const normalizeValue = (value: any) => (value === undefined || value === null || value === '' ? '' : String(value).trim());
+    const normalizeNumber = (value: any) => {
+      if (value === undefined || value === null || value === '') return 0;
+      return Number(value);
+    };
+
+    // 1. 제목 변경
+    if (updatedSolution.title !== undefined &&
+        normalizeValue(originalSolution.title) !== normalizeValue(updatedSolution.title)) {
+      addChangeLog(
+        '수정',
+        taskCode,
+        `솔루션관리 ${originalSolution.title || '솔루션'}(${taskCode}) 개요탭의 제목이 ${originalSolution.title || ''} → ${updatedSolution.title || ''}로 수정 되었습니다.`,
+        updatedSolution.team || '미분류',
+        originalSolution.title || '',
+        updatedSolution.title || '',
+        '제목',
+        updatedSolution.title,
+        '개요탭'
+      );
+    }
+
+    // 2. 설명 변경
+    if (updatedSolution.detailContent !== undefined &&
+        normalizeValue(originalSolution.detailContent) !== normalizeValue(updatedSolution.detailContent)) {
+      addChangeLog(
+        '수정',
+        taskCode,
+        `솔루션관리 ${updatedSolution.title || '솔루션'}(${taskCode}) 개요탭의 설명이 수정 되었습니다.`,
+        updatedSolution.team || '미분류',
+        originalSolution.detailContent || '',
+        updatedSolution.detailContent || '',
+        '설명',
+        updatedSolution.title,
+        '개요탭'
+      );
+    }
+
+    // 3. 솔루션유형 변경
+    if (updatedSolution.solutionType !== undefined &&
+        normalizeValue(originalSolution.solutionType) !== normalizeValue(updatedSolution.solutionType)) {
+      addChangeLog(
+        '수정',
+        taskCode,
+        `솔루션관리 ${updatedSolution.title || '솔루션'}(${taskCode}) 개요탭의 솔루션유형이 ${originalSolution.solutionType || ''} → ${updatedSolution.solutionType || ''}로 수정 되었습니다.`,
+        updatedSolution.team || '미분류',
+        originalSolution.solutionType || '',
+        updatedSolution.solutionType || '',
+        '솔루션유형',
+        updatedSolution.title,
+        '개요탭'
+      );
+    }
+
+    // 4. 개발유형 변경
+    if (updatedSolution.developmentType !== undefined &&
+        normalizeValue(originalSolution.developmentType) !== normalizeValue(updatedSolution.developmentType)) {
+      addChangeLog(
+        '수정',
+        taskCode,
+        `솔루션관리 ${updatedSolution.title || '솔루션'}(${taskCode}) 개요탭의 개발유형이 ${originalSolution.developmentType || ''} → ${updatedSolution.developmentType || ''}로 수정 되었습니다.`,
+        updatedSolution.team || '미분류',
+        originalSolution.developmentType || '',
+        updatedSolution.developmentType || '',
+        '개발유형',
+        updatedSolution.title,
+        '개요탭'
+      );
+    }
+
+    // 5. 진행율 변경
+    if (updatedSolution.progress !== undefined &&
+        normalizeNumber(originalSolution.progress) !== normalizeNumber(updatedSolution.progress)) {
+      addChangeLog(
+        '수정',
+        taskCode,
+        `솔루션관리 ${updatedSolution.title || '솔루션'}(${taskCode}) 개요탭의 진행율이 ${originalSolution.progress || 0}% → ${updatedSolution.progress || 0}%로 수정 되었습니다.`,
+        updatedSolution.team || '미분류',
+        String(originalSolution.progress || 0),
+        String(updatedSolution.progress || 0),
+        '진행율',
+        updatedSolution.title,
+        '개요탭'
+      );
+    }
+
+    // 6. 상태 변경
+    if (updatedSolution.status !== undefined &&
+        normalizeValue(originalSolution.status) !== normalizeValue(updatedSolution.status)) {
+      addChangeLog(
+        '수정',
+        taskCode,
+        `솔루션관리 ${updatedSolution.title || '솔루션'}(${taskCode}) 개요탭의 상태가 ${originalSolution.status || ''} → ${updatedSolution.status || ''}로 수정 되었습니다.`,
+        updatedSolution.team || '미분류',
+        originalSolution.status || '',
+        updatedSolution.status || '',
+        '상태',
+        updatedSolution.title,
+        '개요탭'
+      );
+    }
+
+    // 7. 시작일 변경
+    if (updatedSolution.startDate !== undefined &&
+        normalizeValue(originalSolution.startDate) !== normalizeValue(updatedSolution.startDate)) {
+      addChangeLog(
+        '수정',
+        taskCode,
+        `솔루션관리 ${updatedSolution.title || '솔루션'}(${taskCode}) 개요탭의 시작일이 ${originalSolution.startDate || ''} → ${updatedSolution.startDate || ''}로 수정 되었습니다.`,
+        updatedSolution.team || '미분류',
+        originalSolution.startDate || '',
+        updatedSolution.startDate || '',
+        '시작일',
+        updatedSolution.title,
+        '개요탭'
+      );
+    }
+
+    // 8. 완료일 변경
+    if (updatedSolution.completedDate !== undefined &&
+        normalizeValue(originalSolution.completedDate) !== normalizeValue(updatedSolution.completedDate)) {
+      addChangeLog(
+        '수정',
+        taskCode,
+        `솔루션관리 ${updatedSolution.title || '솔루션'}(${taskCode}) 개요탭의 완료일이 ${originalSolution.completedDate || ''} → ${updatedSolution.completedDate || ''}로 수정 되었습니다.`,
+        updatedSolution.team || '미분류',
+        originalSolution.completedDate || '',
+        updatedSolution.completedDate || '',
+        '완료일',
+        updatedSolution.title,
+        '개요탭'
+      );
+    }
+
+    // 9. 팀 변경
+    if (updatedSolution.team !== undefined &&
+        normalizeValue(originalSolution.team) !== normalizeValue(updatedSolution.team)) {
+      addChangeLog(
+        '수정',
+        taskCode,
+        `솔루션관리 ${updatedSolution.title || '솔루션'}(${taskCode}) 개요탭의 팀이 ${originalSolution.team || ''} → ${updatedSolution.team || ''}로 수정 되었습니다.`,
+        updatedSolution.team || '미분류',
+        originalSolution.team || '',
+        updatedSolution.team || '',
+        '팀',
+        updatedSolution.title,
+        '개요탭'
+      );
+    }
+
+    // 10. 담당자 변경
+    if (updatedSolution.assignee !== undefined &&
+        normalizeValue(originalSolution.assignee) !== normalizeValue(updatedSolution.assignee)) {
+      addChangeLog(
+        '수정',
+        taskCode,
+        `솔루션관리 ${updatedSolution.title || '솔루션'}(${taskCode}) 개요탭의 담당자가 ${originalSolution.assignee || ''} → ${updatedSolution.assignee || ''}로 수정 되었습니다.`,
+        updatedSolution.team || '미분류',
+        originalSolution.assignee || '',
+        updatedSolution.assignee || '',
+        '담당자',
+        updatedSolution.title,
+        '개요탭'
+      );
     }
 
     handleEditDialogClose();
@@ -389,7 +667,7 @@ function KanbanView({
         </div>
 
         {/* 2. 카드 제목 */}
-        <h3 className="card-title">{solution.detailContent || '세부내용 없음'}</h3>
+        <h3 className="card-title">{solution.title || '제목 없음'}</h3>
 
         {/* 3. 정보 라인들 */}
         <div className="card-info">
@@ -2350,6 +2628,7 @@ export default function SolutionManagement() {
   const {
     solutions: solutionsFromHook,
     getSolutions,
+    getSolutionById,
     convertToSolutionData,
     createSolution,
     updateSolution,
@@ -2464,6 +2743,7 @@ export default function SolutionManagement() {
   // 편집 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);
   const [editingSolution, setEditingSolution] = useState<SolutionTableData | null>(null);
+  const [originalSolution, setOriginalSolution] = useState<SolutionTableData | null>(null);
 
   // Snackbar 상태
   const [snackbar, setSnackbar] = useState<{
@@ -2627,8 +2907,44 @@ export default function SolutionManagement() {
   };
 
   // 카드 클릭 핸들러
-  const handleCardClick = (solution: SolutionTableData) => {
+  const handleCardClick = async (solution: SolutionTableData) => {
     setEditingSolution(solution);
+
+    // 🔍 DB에서 최신 데이터를 가져와서 원본으로 저장 (메모리 데이터는 구버전일 수 있음)
+    try {
+      if (!getSolutionById) {
+        console.warn('⚠️ getSolutionById가 정의되지 않음');
+        setOriginalSolution(JSON.parse(JSON.stringify(solution)));
+        setEditDialog(true);
+        return;
+      }
+      const latestData = await getSolutionById(solution.id);
+      if (latestData) {
+        // DB 데이터를 SolutionTableData 형식으로 변환
+        const originalData: SolutionTableData = {
+          ...solution,
+          title: latestData.title || solution.title,
+          detailContent: latestData.detail_content || solution.detailContent,
+          solutionType: latestData.solution_type || solution.solutionType,
+          developmentType: latestData.development_type || solution.developmentType,
+          status: latestData.status || solution.status,
+          progress: latestData.progress || solution.progress,
+          team: latestData.team || solution.team,
+          assignee: latestData.assignee || solution.assignee,
+          startDate: latestData.start_date || solution.startDate,
+          completedDate: latestData.completed_date || solution.completedDate,
+          registrationDate: latestData.registration_date || solution.registrationDate
+        };
+        setOriginalSolution(originalData);
+        console.log('🔍 [handleCardClick] DB에서 가져온 최신 원본 데이터:', originalData);
+      } else {
+        setOriginalSolution(JSON.parse(JSON.stringify(solution)));
+      }
+    } catch (error) {
+      console.error('❌ [handleCardClick] DB 조회 실패, 메모리 데이터 사용:', error);
+      setOriginalSolution(JSON.parse(JSON.stringify(solution)));
+    }
+
     setEditDialog(true);
   };
 
@@ -2636,17 +2952,18 @@ export default function SolutionManagement() {
   const handleEditDialogClose = () => {
     setEditDialog(false);
     setEditingSolution(null);
+    setOriginalSolution(null);
   };
 
   // Solution 저장 핸들러
   const handleEditSolutionSave = async (updatedSolution: SolutionTableData) => {
     console.log('🚀 handleEditSolutionSave 시작:', { updatedSolution });
 
-    const originalSolution = solutions.find((t) => t.id === updatedSolution.id);
+    const existingSolution = solutions.find((t) => t.id === updatedSolution.id);
 
-    if (originalSolution) {
+    if (existingSolution) {
       // 기존 솔루션 업데이트
-      console.log('📝 기존 솔루션 업데이트 시작:', originalSolution.id);
+      console.log('📝 기존 솔루션 업데이트 시작:', existingSolution.id);
 
       try {
         // 팀 필드 검증 - 유효하지 않으면 빈 문자열로 대체
@@ -2693,6 +3010,181 @@ export default function SolutionManagement() {
             message: `${solutionName}${josa} 성공적으로 수정되었습니다.`,
             severity: 'success'
           });
+
+          // 변경로그 생성 (필드별 비교) - originalSolution이 있을 때만
+          if (!originalSolution) {
+            console.log('⚠️ originalSolution이 없어서 변경로그 생성 불가');
+            handleEditDialogClose();
+            return;
+          }
+
+          // 변경로그 생성 (필드별 비교)
+          const taskCode = updatedSolution.code || `SOL-${updatedSolution.id}`;
+          const normalizeValue = (value: any) => (value === undefined || value === null || value === '' ? '' : String(value).trim());
+          const normalizeNumber = (value: any) => {
+            if (value === undefined || value === null || value === '') return 0;
+            return Number(value);
+          };
+
+          // 1. 제목 변경
+          if (updatedSolution.title !== undefined &&
+              normalizeValue(originalSolution.title) !== normalizeValue(updatedSolution.title)) {
+            addChangeLog(
+              '수정',
+              taskCode,
+              `솔루션관리 ${originalSolution.title || '솔루션'}(${taskCode}) 개요탭의 제목이 ${originalSolution.title || ''} → ${updatedSolution.title || ''}로 수정 되었습니다.`,
+              updatedSolution.team || '미분류',
+              originalSolution.title || '',
+              updatedSolution.title || '',
+              '제목',
+              updatedSolution.title,
+              '개요탭'
+            );
+          }
+
+          // 2. 설명 변경
+          if (updatedSolution.detailContent !== undefined &&
+              normalizeValue(originalSolution.detailContent) !== normalizeValue(updatedSolution.detailContent)) {
+            addChangeLog(
+              '수정',
+              taskCode,
+              `솔루션관리 ${updatedSolution.title || '솔루션'}(${taskCode}) 개요탭의 설명이 수정 되었습니다.`,
+              updatedSolution.team || '미분류',
+              originalSolution.detailContent || '',
+              updatedSolution.detailContent || '',
+              '설명',
+              updatedSolution.title,
+              '개요탭'
+            );
+          }
+
+          // 3. 솔루션유형 변경
+          if (updatedSolution.solutionType !== undefined &&
+              normalizeValue(originalSolution.solutionType) !== normalizeValue(updatedSolution.solutionType)) {
+            addChangeLog(
+              '수정',
+              taskCode,
+              `솔루션관리 ${updatedSolution.title || '솔루션'}(${taskCode}) 개요탭의 솔루션유형이 ${originalSolution.solutionType || ''} → ${updatedSolution.solutionType || ''}로 수정 되었습니다.`,
+              updatedSolution.team || '미분류',
+              originalSolution.solutionType || '',
+              updatedSolution.solutionType || '',
+              '솔루션유형',
+              updatedSolution.title,
+              '개요탭'
+            );
+          }
+
+          // 4. 개발유형 변경
+          if (updatedSolution.developmentType !== undefined &&
+              normalizeValue(originalSolution.developmentType) !== normalizeValue(updatedSolution.developmentType)) {
+            addChangeLog(
+              '수정',
+              taskCode,
+              `솔루션관리 ${updatedSolution.title || '솔루션'}(${taskCode}) 개요탭의 개발유형이 ${originalSolution.developmentType || ''} → ${updatedSolution.developmentType || ''}로 수정 되었습니다.`,
+              updatedSolution.team || '미분류',
+              originalSolution.developmentType || '',
+              updatedSolution.developmentType || '',
+              '개발유형',
+              updatedSolution.title,
+              '개요탭'
+            );
+          }
+
+          // 5. 진행율 변경
+          if (updatedSolution.progress !== undefined &&
+              normalizeNumber(originalSolution.progress) !== normalizeNumber(updatedSolution.progress)) {
+            addChangeLog(
+              '수정',
+              taskCode,
+              `솔루션관리 ${updatedSolution.title || '솔루션'}(${taskCode}) 개요탭의 진행율이 ${originalSolution.progress || 0}% → ${updatedSolution.progress || 0}%로 수정 되었습니다.`,
+              updatedSolution.team || '미분류',
+              String(originalSolution.progress || 0),
+              String(updatedSolution.progress || 0),
+              '진행율',
+              updatedSolution.title,
+              '개요탭'
+            );
+          }
+
+          // 6. 상태 변경
+          if (updatedSolution.status !== undefined &&
+              normalizeValue(originalSolution.status) !== normalizeValue(updatedSolution.status)) {
+            addChangeLog(
+              '수정',
+              taskCode,
+              `솔루션관리 ${updatedSolution.title || '솔루션'}(${taskCode}) 개요탭의 상태가 ${originalSolution.status || ''} → ${updatedSolution.status || ''}로 수정 되었습니다.`,
+              updatedSolution.team || '미분류',
+              originalSolution.status || '',
+              updatedSolution.status || '',
+              '상태',
+              updatedSolution.title,
+              '개요탭'
+            );
+          }
+
+          // 7. 시작일 변경
+          if (updatedSolution.startDate !== undefined &&
+              normalizeValue(originalSolution.startDate) !== normalizeValue(updatedSolution.startDate)) {
+            addChangeLog(
+              '수정',
+              taskCode,
+              `솔루션관리 ${updatedSolution.title || '솔루션'}(${taskCode}) 개요탭의 시작일이 ${originalSolution.startDate || ''} → ${updatedSolution.startDate || ''}로 수정 되었습니다.`,
+              updatedSolution.team || '미분류',
+              originalSolution.startDate || '',
+              updatedSolution.startDate || '',
+              '시작일',
+              updatedSolution.title,
+              '개요탭'
+            );
+          }
+
+          // 8. 완료일 변경
+          if (updatedSolution.completedDate !== undefined &&
+              normalizeValue(originalSolution.completedDate) !== normalizeValue(updatedSolution.completedDate)) {
+            addChangeLog(
+              '수정',
+              taskCode,
+              `솔루션관리 ${updatedSolution.title || '솔루션'}(${taskCode}) 개요탭의 완료일이 ${originalSolution.completedDate || ''} → ${updatedSolution.completedDate || ''}로 수정 되었습니다.`,
+              updatedSolution.team || '미분류',
+              originalSolution.completedDate || '',
+              updatedSolution.completedDate || '',
+              '완료일',
+              updatedSolution.title,
+              '개요탭'
+            );
+          }
+
+          // 9. 팀 변경
+          if (validatedTeam !== undefined &&
+              normalizeValue(originalSolution.team) !== normalizeValue(validatedTeam)) {
+            addChangeLog(
+              '수정',
+              taskCode,
+              `솔루션관리 ${updatedSolution.title || '솔루션'}(${taskCode}) 개요탭의 팀이 ${originalSolution.team || ''} → ${validatedTeam || ''}로 수정 되었습니다.`,
+              validatedTeam || '미분류',
+              originalSolution.team || '',
+              validatedTeam || '',
+              '팀',
+              updatedSolution.title,
+              '개요탭'
+            );
+          }
+
+          // 10. 담당자 변경
+          if (updatedSolution.assignee !== undefined &&
+              normalizeValue(originalSolution.assignee) !== normalizeValue(updatedSolution.assignee)) {
+            addChangeLog(
+              '수정',
+              taskCode,
+              `솔루션관리 ${updatedSolution.title || '솔루션'}(${taskCode}) 개요탭의 담당자가 ${originalSolution.assignee || ''} → ${updatedSolution.assignee || ''}로 수정 되었습니다.`,
+              updatedSolution.team || '미분류',
+              originalSolution.assignee || '',
+              updatedSolution.assignee || '',
+              '담당자',
+              updatedSolution.title,
+              '개요탭'
+            );
+          }
         } else {
           console.warn('⚠️ 솔루션 업데이트 실패');
           setSnackbar({
@@ -3310,6 +3802,10 @@ export default function SolutionManagement() {
                   canEditOwn={canEditOwn}
                   canEditOthers={canEditOthers}
                   updateSolution={updateSolution}
+                  getSolutionById={getSolutionById}
+                  setSnackbar={setSnackbar}
+                  convertToDbSolutionData={convertToDbSolutionData}
+                  departments={departments}
                   activeTask={activeTask}
                   isDraggingState={isDraggingState}
                   onDragStart={handleDragStart}

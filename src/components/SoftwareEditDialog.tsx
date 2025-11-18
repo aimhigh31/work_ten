@@ -731,13 +731,12 @@ const OverviewTab = memo(
                 notched
                 renderValue={(selected) => {
                   if (!selected) return '선택';
-                  const item = softwareCategoriesFromDB.find(c => c.subcode === selected);
-                  return item ? item.subcode_name : selected;
+                  return selected;
                 }}
               >
                 <MenuItem value="">선택</MenuItem>
                 {softwareCategoriesFromDB.map((option) => (
-                  <MenuItem key={option.subcode} value={option.subcode}>
+                  <MenuItem key={option.subcode} value={option.subcode_name}>
                     {option.subcode_name}
                   </MenuItem>
                 ))}
@@ -761,8 +760,7 @@ const OverviewTab = memo(
                 onChange={handleFieldChange('status')}
                 notched
                 renderValue={(selected) => {
-                  const item = statusTypesFromDB.find(s => s.subcode === selected);
-                  return item ? item.subcode_name : selected;
+                  return selected;
                 }}
               >
                 {statusTypesFromDB.map((option) => {
@@ -784,7 +782,7 @@ const OverviewTab = memo(
                   };
 
                   return (
-                    <MenuItem key={option.subcode} value={option.subcode}>
+                    <MenuItem key={option.subcode} value={option.subcode_name}>
                       <Chip
                         label={option.subcode_name}
                         size="small"
@@ -854,13 +852,12 @@ const OverviewTab = memo(
                 notched
                 renderValue={(selected) => {
                   if (!selected) return '선택';
-                  const item = licenseTypesFromDB.find(l => l.subcode === selected);
-                  return item ? item.subcode_name : selected;
+                  return selected;
                 }}
               >
                 <MenuItem value="">선택</MenuItem>
                 {licenseTypesFromDB.map((option) => (
-                  <MenuItem key={option.subcode} value={option.subcode}>
+                  <MenuItem key={option.subcode} value={option.subcode_name}>
                     {option.subcode_name}
                   </MenuItem>
                 ))}

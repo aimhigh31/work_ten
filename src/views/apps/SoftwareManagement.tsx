@@ -140,10 +140,12 @@ interface KanbanViewProps {
   canEditOwn?: boolean;
   canEditOthers?: boolean;
   updateSoftware?: (id: number, data: Partial<any>) => Promise<any>;
+  getSoftwareById?: (id: number) => Promise<any>;
   activeTask?: TaskTableData | null;
   isDraggingState?: boolean;
   onDragStart?: (event: any) => void;
   onDragEnd?: (event: any) => void;
+  setSnackbar?: React.Dispatch<React.SetStateAction<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' | 'warning' }>>;
 }
 
 function KanbanView({
@@ -164,10 +166,12 @@ function KanbanView({
   canEditOwn = true,
   canEditOthers = true,
   updateSoftware,
+  getSoftwareById,
   activeTask,
   isDraggingState,
   onDragStart,
-  onDragEnd
+  onDragEnd,
+  setSnackbar
 }: KanbanViewProps) {
   const theme = useTheme();
   const { masterCodes } = useCommonData();
@@ -207,6 +211,7 @@ function KanbanView({
   // 편집 팝업 관련 상태
   const [editDialog, setEditDialog] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskTableData | null>(null);
+  const [originalTask, setOriginalTask] = useState<TaskTableData | null>(null);
 
   // 센서 설정
   const sensors = useSensors(
@@ -238,8 +243,47 @@ function KanbanView({
   });
 
   // 카드 클릭 핸들러
-  const handleCardClick = (task: TaskTableData) => {
+  const handleCardClick = async (task: TaskTableData) => {
     setEditingTask(task);
+
+    // 🔍 DB에서 최신 데이터를 가져와서 원본으로 저장 (메모리 데이터는 구버전일 수 있음)
+    try {
+      if (!getSoftwareById) {
+        setOriginalTask(JSON.parse(JSON.stringify(task)));
+        setEditDialog(true);
+        return;
+      }
+      const latestData = await getSoftwareById(task.id);
+      if (latestData) {
+        // DB 데이터를 TaskTableData 형식으로 변환
+        const originalData: TaskTableData = {
+          ...task,
+          softwareCategory: latestData.software_category || task.softwareCategory,
+          softwareName: latestData.software_name || task.softwareName,
+          description: latestData.description || task.description,
+          spec: latestData.spec || task.spec,
+          currentUsers: latestData.current_users || task.currentUsers,
+          status: latestData.status || task.status,
+          assignee: latestData.assignee || task.assignee,
+          team: latestData.team || task.team,
+          solutionProvider: latestData.solution_provider || task.solutionProvider,
+          userCount: latestData.user_count || task.userCount,
+          licenseType: latestData.license_type || task.licenseType,
+          licenseKey: latestData.license_key || task.licenseKey,
+          startDate: latestData.start_date || task.startDate,
+          completedDate: latestData.completed_date || task.completedDate,
+          registrationDate: latestData.registration_date || task.registrationDate
+        };
+        setOriginalTask(originalData);
+        console.log('🔍 [handleCardClick] DB에서 가져온 최신 원본 데이터:', originalData);
+      } else {
+        setOriginalTask(JSON.parse(JSON.stringify(task)));
+      }
+    } catch (error) {
+      console.error('❌ [handleCardClick] DB 조회 실패, 메모리 데이터 사용:', error);
+      setOriginalTask(JSON.parse(JSON.stringify(task)));
+    }
+
     setEditDialog(true);
   };
 
@@ -247,20 +291,255 @@ function KanbanView({
   const handleEditDialogClose = () => {
     setEditDialog(false);
     setEditingTask(null);
+    setOriginalTask(null);
   };
 
   // Task 저장 핸들러
   const handleEditTaskSave = async (updatedTask: TaskTableData) => {
     console.log('💾 SoftwareManagement (칸반) - Task 저장 핸들러 호출:', updatedTask);
 
-    const originalTask = tasks.find((t) => t.id === updatedTask.id);
+    // 즉시 UI 업데이트
+    setTasks((prev) => prev.map((task) => (task.id === updatedTask.id ? updatedTask : task)));
+    console.log('✅ 소프트웨어 업데이트 완료 (즉시 UI 반영)');
 
+    // 한국어 조사 판별 함수
+    const getKoreanParticle = (word: string): string => {
+      const lastChar = word.charAt(word.length - 1);
+      const code = lastChar.charCodeAt(0);
+      if (code >= 0xAC00 && code <= 0xD7A3) {
+        const hasJongseong = (code - 0xAC00) % 28 !== 0;
+        return hasJongseong ? '이' : '가';
+      }
+      return '가';
+    };
+
+    // 변경로그 생성 (필드별 비교) - originalTask가 있을 때만
+    if (!originalTask) {
+      console.log('⚠️ originalTask가 없어서 변경로그 생성 불가');
+      // 토스트 알림만 표시하고 변경로그는 생성하지 않음
+      const softwareName = updatedTask.softwareName || updatedTask.workContent || '소프트웨어';
+      const josa = getKoreanParticle(softwareName);
+      if (setSnackbar) {
+        setSnackbar({
+          open: true,
+          message: `${softwareName}${josa} 성공적으로 수정되었습니다.`,
+          severity: 'success'
+        });
+      }
+      handleEditDialogClose();
+      return;
+    }
+
+    // 변경로그 생성 (필드별 비교)
     if (originalTask) {
-      // 즉시 UI 업데이트
-      setTasks((prev) => prev.map((task) => (task.id === updatedTask.id ? updatedTask : task)));
-      console.log('✅ 소프트웨어 업데이트 완료 (즉시 UI 반영)');
+      const taskCode = updatedTask.code || `IT-SW-${updatedTask.id}`;
+      const softwareName = updatedTask.softwareName || updatedTask.workContent || '소프트웨어';
+      const normalizeValue = (value: any) => (value === undefined || value === null || value === '' ? '' : String(value).trim());
 
-      // 변경로그는 SoftwareTable.tsx에서 자동으로 처리됨
+      // 1. 소프트웨어분류 변경
+      if (updatedTask.softwareCategory !== undefined &&
+          normalizeValue(originalTask.softwareCategory) !== normalizeValue(updatedTask.softwareCategory)) {
+        addChangeLog(
+          '수정',
+          taskCode,
+          `소프트웨어관리 ${softwareName} (코드: ${taskCode}) 정보의 개요탭 소프트웨어분류가 ${originalTask.softwareCategory || ''} → ${updatedTask.softwareCategory || ''} 로 수정 되었습니다.`,
+          updatedTask.team || '미분류',
+          originalTask.softwareCategory || '',
+          updatedTask.softwareCategory || '',
+          '소프트웨어분류',
+          softwareName
+        );
+      }
+
+      // 2. 스펙 변경
+      if (updatedTask.spec !== undefined &&
+          normalizeValue(originalTask.spec) !== normalizeValue(updatedTask.spec)) {
+        addChangeLog(
+          '수정',
+          taskCode,
+          `소프트웨어관리 ${softwareName} (코드: ${taskCode}) 정보의 개요탭 스펙이 ${originalTask.spec || ''} → ${updatedTask.spec || ''} 로 수정 되었습니다.`,
+          updatedTask.team || '미분류',
+          originalTask.spec || '',
+          updatedTask.spec || '',
+          '스펙',
+          softwareName
+        );
+      }
+
+      // 3. 사용자 변경
+      if (updatedTask.currentUser !== undefined &&
+          normalizeValue(originalTask.currentUser) !== normalizeValue(updatedTask.currentUser)) {
+        addChangeLog(
+          '수정',
+          taskCode,
+          `소프트웨어관리 ${softwareName} (코드: ${taskCode}) 정보의 개요탭 사용자가 ${originalTask.currentUser || ''} → ${updatedTask.currentUser || ''} 로 수정 되었습니다.`,
+          updatedTask.team || '미분류',
+          originalTask.currentUser || '',
+          updatedTask.currentUser || '',
+          '사용자',
+          softwareName
+        );
+      }
+
+      // 4. 담당자 변경
+      if (updatedTask.assignee !== undefined &&
+          normalizeValue(originalTask.assignee) !== normalizeValue(updatedTask.assignee)) {
+        addChangeLog(
+          '수정',
+          taskCode,
+          `소프트웨어관리 ${softwareName} (코드: ${taskCode}) 정보의 개요탭 담당자가 ${originalTask.assignee || ''} → ${updatedTask.assignee || ''} 로 수정 되었습니다.`,
+          updatedTask.team || '미분류',
+          originalTask.assignee || '',
+          updatedTask.assignee || '',
+          '담당자',
+          softwareName
+        );
+      }
+
+      // 5. 상태 변경
+      if (updatedTask.status !== undefined &&
+          normalizeValue(originalTask.status) !== normalizeValue(updatedTask.status)) {
+        addChangeLog(
+          '수정',
+          taskCode,
+          `소프트웨어관리 ${softwareName} (코드: ${taskCode}) 개요탭의 상태가 ${originalTask.status || ''} → ${updatedTask.status || ''} 로 수정 되었습니다.`,
+          updatedTask.team || '미분류',
+          originalTask.status || '',
+          updatedTask.status || '',
+          '상태',
+          softwareName
+        );
+      }
+
+      // 6. 시작일 변경
+      if (updatedTask.startDate !== undefined &&
+          normalizeValue(originalTask.startDate) !== normalizeValue(updatedTask.startDate)) {
+        addChangeLog(
+          '수정',
+          taskCode,
+          `소프트웨어관리 ${softwareName} (코드: ${taskCode}) 정보의 개요탭 시작일이 ${originalTask.startDate || ''} → ${updatedTask.startDate || ''} 로 수정 되었습니다.`,
+          updatedTask.team || '미분류',
+          originalTask.startDate || '',
+          updatedTask.startDate || '',
+          '시작일',
+          softwareName
+        );
+      }
+
+      // 7. 완료일 변경
+      if (updatedTask.completedDate !== undefined &&
+          normalizeValue(originalTask.completedDate) !== normalizeValue(updatedTask.completedDate)) {
+        addChangeLog(
+          '수정',
+          taskCode,
+          `소프트웨어관리 ${softwareName} (코드: ${taskCode}) 정보의 개요탭 완료일이 ${originalTask.completedDate || ''} → ${updatedTask.completedDate || ''} 로 수정 되었습니다.`,
+          updatedTask.team || '미분류',
+          originalTask.completedDate || '',
+          updatedTask.completedDate || '',
+          '완료일',
+          softwareName
+        );
+      }
+
+      // 8. 소프트웨어명 변경
+      if (updatedTask.softwareName !== undefined &&
+          normalizeValue(originalTask.softwareName) !== normalizeValue(updatedTask.softwareName)) {
+        addChangeLog(
+          '수정',
+          taskCode,
+          `소프트웨어관리 ${originalTask.softwareName || '소프트웨어'} (코드: ${taskCode}) 정보의 개요탭 소프트웨어명이 ${originalTask.softwareName || ''} → ${updatedTask.softwareName || ''} 로 수정 되었습니다.`,
+          updatedTask.team || '미분류',
+          originalTask.softwareName || '',
+          updatedTask.softwareName || '',
+          '소프트웨어명',
+          updatedTask.softwareName || '소프트웨어'
+        );
+      }
+
+      // 9. 설명 변경
+      if (updatedTask.description !== undefined &&
+          normalizeValue(originalTask.description) !== normalizeValue(updatedTask.description)) {
+        addChangeLog(
+          '수정',
+          taskCode,
+          `소프트웨어관리 ${softwareName} (코드: ${taskCode}) 정보의 개요탭 설명이 수정 되었습니다.`,
+          updatedTask.team || '미분류',
+          originalTask.description || '',
+          updatedTask.description || '',
+          '설명',
+          softwareName
+        );
+      }
+
+      // 10. 라이센스키 변경
+      if (updatedTask.licenseKey !== undefined &&
+          normalizeValue(originalTask.licenseKey) !== normalizeValue(updatedTask.licenseKey)) {
+        addChangeLog(
+          '수정',
+          taskCode,
+          `소프트웨어관리 ${softwareName} (코드: ${taskCode}) 정보의 개요탭 라이센스키가 수정 되었습니다.`,
+          updatedTask.team || '미분류',
+          originalTask.licenseKey || '',
+          updatedTask.licenseKey || '',
+          '라이센스키',
+          softwareName
+        );
+      }
+
+      // 11. 솔루션업체 변경
+      if (updatedTask.solutionProvider !== undefined &&
+          normalizeValue(originalTask.solutionProvider) !== normalizeValue(updatedTask.solutionProvider)) {
+        addChangeLog(
+          '수정',
+          taskCode,
+          `소프트웨어관리 ${softwareName} (코드: ${taskCode}) 정보의 개요탭 솔루션업체가 ${originalTask.solutionProvider || ''} → ${updatedTask.solutionProvider || ''} 로 수정 되었습니다.`,
+          updatedTask.team || '미분류',
+          originalTask.solutionProvider || '',
+          updatedTask.solutionProvider || '',
+          '솔루션업체',
+          softwareName
+        );
+      }
+
+      // 12. 사용자수 변경
+      if (updatedTask.userCount !== undefined &&
+          normalizeValue(originalTask.userCount) !== normalizeValue(updatedTask.userCount)) {
+        addChangeLog(
+          '수정',
+          taskCode,
+          `소프트웨어관리 ${softwareName} (코드: ${taskCode}) 정보의 개요탭 사용자수가 ${originalTask.userCount || ''} → ${updatedTask.userCount || ''} 로 수정 되었습니다.`,
+          updatedTask.team || '미분류',
+          String(originalTask.userCount || ''),
+          String(updatedTask.userCount || ''),
+          '사용자수',
+          softwareName
+        );
+      }
+
+      // 13. 라이센스유형 변경
+      if (updatedTask.licenseType !== undefined &&
+          normalizeValue(originalTask.licenseType) !== normalizeValue(updatedTask.licenseType)) {
+        addChangeLog(
+          '수정',
+          taskCode,
+          `소프트웨어관리 ${softwareName} (코드: ${taskCode}) 정보의 개요탭 라이센스유형이 ${originalTask.licenseType || ''} → ${updatedTask.licenseType || ''} 로 수정 되었습니다.`,
+          updatedTask.team || '미분류',
+          originalTask.licenseType || '',
+          updatedTask.licenseType || '',
+          '라이센스유형',
+          softwareName
+        );
+      }
+
+      // 🎉 변경로그 생성 완료 후 토스트 알림 표시
+      const josa = getKoreanParticle(softwareName);
+      if (setSnackbar) {
+        setSnackbar({
+          open: true,
+          message: `${softwareName}${josa} 성공적으로 수정되었습니다.`,
+          severity: 'success'
+        });
+      }
     }
 
     handleEditDialogClose();
@@ -2430,6 +2709,7 @@ export default function SoftwareManagement() {
   const {
     software: softwareFromHook,
     getSoftware,
+    getSoftwareById,
     createSoftware,
     updateSoftware,
     deleteSoftware,
@@ -3305,10 +3585,12 @@ export default function SoftwareManagement() {
                   canEditOwn={canEditOwn}
                   canEditOthers={canEditOthers}
                   updateSoftware={updateSoftware}
+                  getSoftwareById={getSoftwareById}
                   activeTask={activeTask}
                   isDraggingState={isDraggingState}
                   onDragStart={handleDragStart}
                   onDragEnd={handleDragEnd}
+                  setSnackbar={setSnackbar}
                 />
               </Box>
             </TabPanel>

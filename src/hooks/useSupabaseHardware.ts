@@ -192,6 +192,38 @@ export const useSupabaseHardware = () => {
     }
   }, []);
 
+  // ID로 특정 하드웨어 조회
+  const getHardwareById = useCallback(async (id: number): Promise<HardwareData | null> => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { data, error } = await supabase.from('it_hardware_data').select('*').eq('id', id).eq('is_active', true).single();
+
+      if (error) {
+        console.error('하드웨어 데이터 조회 실패:', error);
+        throw error;
+      }
+
+      return data;
+    } catch (err) {
+      console.error('하드웨어 데이터 조회 오류 (ID별):', {
+        id,
+        error: err,
+        message: err instanceof Error ? err.message : '알 수 없는 오류',
+        stack: err instanceof Error ? err.stack : undefined,
+        type: typeof err,
+        stringified: JSON.stringify(err)
+      });
+
+      const errorMessage = err instanceof Error ? err.message : '하드웨어 데이터 조회 중 오류가 발생했습니다.';
+      setError(errorMessage);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // 하드웨어 삭제 (soft delete)
   const deleteHardware = useCallback(async (id: number) => {
     console.log('🗑️ 하드웨어 삭제 시작:', id);
@@ -267,6 +299,7 @@ export const useSupabaseHardware = () => {
   return {
     hardware,
     getHardware,
+    getHardwareById,
     createHardware,
     updateHardware,
     deleteHardware,
