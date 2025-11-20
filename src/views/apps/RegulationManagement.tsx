@@ -1496,7 +1496,7 @@ const MaterialTab = React.memo(({ selectedItem, attachedFiles, setAttachedFiles,
             startIcon={<Add size={16} />}
             size="small"
             component="label"
-            disabled={!canCreateData}
+            disabled={!canCreateData || !selectedItem || selectedItem.type !== 'file'}
             sx={{
               px: 2,
               '&.Mui-disabled': {
@@ -1504,6 +1504,13 @@ const MaterialTab = React.memo(({ selectedItem, attachedFiles, setAttachedFiles,
                 color: 'grey.500'
               }
             }}
+            title={
+              !selectedItem || selectedItem.type !== 'file'
+                ? '파일을 먼저 선택해주세요'
+                : !canCreateData
+                ? '파일 추가 권한이 없습니다'
+                : '파일 추가'
+            }
           >
             추가
             <input type="file" multiple hidden onChange={handleFileUpload} accept="*/*" />
@@ -1912,6 +1919,67 @@ const OverviewPanel = React.memo(
 
       return latestFile?.createdDate || ''; // 빈 문자열로 변경
     }, [attachedFiles, getLatestRevision]);
+
+    // 최종리비전과 리비전수정일 변경 감지를 위한 ref
+    const prevLatestRevisionRef = React.useRef<string>('');
+    const prevLatestRevisionDateRef = React.useRef<string>('');
+
+    // attachedFiles 변경 시 최종리비전과 리비전수정일 변경 감지 및 변경로그 추가
+    React.useEffect(() => {
+      if (!selectedItem || selectedItem.type !== 'file' || !addChangeLog) return;
+
+      const currentLatestRevision = getLatestRevision();
+      const currentLatestRevisionDate = getLatestRevisionDate();
+
+      // 초기화 시에는 변경로그를 추가하지 않음 (빈 문자열에서 처음 값으로 변경될 때)
+      const isInitializing = prevLatestRevisionRef.current === '' && prevLatestRevisionDateRef.current === '';
+
+      if (!isInitializing) {
+        const team = user?.department || user?.name || '시스템';
+
+        // 최종리비전 변경 감지
+        if (prevLatestRevisionRef.current !== currentLatestRevision && currentLatestRevision !== '') {
+          const beforeValue = prevLatestRevisionRef.current || '없음';
+          const afterValue = currentLatestRevision;
+          const description = `최종리비전이 "${beforeValue}"에서 "${afterValue}"(으)로 변경되었습니다.`;
+
+          addChangeLog(
+            '수정',
+            selectedItem.code || `REG-${selectedItem.id}`,
+            description,
+            team,
+            beforeValue,
+            afterValue,
+            '최종리비전',
+            selectedItem.name || '규정제목 없음',
+            '폴더탭'
+          );
+        }
+
+        // 리비전수정일 변경 감지
+        if (prevLatestRevisionDateRef.current !== currentLatestRevisionDate && currentLatestRevisionDate !== '') {
+          const beforeValue = prevLatestRevisionDateRef.current || '없음';
+          const afterValue = currentLatestRevisionDate;
+          const description = `리비전수정일이 "${beforeValue}"에서 "${afterValue}"(으)로 변경되었습니다.`;
+
+          addChangeLog(
+            '수정',
+            selectedItem.code || `REG-${selectedItem.id}`,
+            description,
+            team,
+            beforeValue,
+            afterValue,
+            '리비전수정일',
+            selectedItem.name || '규정제목 없음',
+            '폴더탭'
+          );
+        }
+      }
+
+      // 현재 값을 ref에 저장 (다음 비교를 위해)
+      prevLatestRevisionRef.current = currentLatestRevision;
+      prevLatestRevisionDateRef.current = currentLatestRevisionDate;
+    }, [attachedFiles, selectedItem, getLatestRevision, getLatestRevisionDate, addChangeLog, user]);
 
     // 기록 핸들러들
     const handleAddComment = useCallback(async () => {
@@ -2502,6 +2570,31 @@ function FolderView({
       try {
         const success = await createItem(folderData);
         if (success) {
+          // 변경로그 추가
+          const folderName = newItemName.trim();
+          const parentName = selectedItem?.name || '루트';
+          const description = `"${parentName}" 폴더에 새로운 폴더 "${folderName}"${getJosa(folderName, '이가')} 추가되었습니다.`;
+          const team = user?.department || user?.name || '시스템';
+
+          addChangeLog(
+            '추가',
+            'FOLDER-NEW',
+            description,
+            team,
+            '',
+            folderName,
+            '폴더명',
+            folderName,
+            '폴더탭'
+          );
+
+          // 토스트 알림
+          setSnackbar({
+            open: true,
+            message: `폴더 "${folderName}"이(가) 성공적으로 추가되었습니다.`,
+            severity: 'success'
+          });
+
           // DB에서 전체 트리 다시 로드
           if (fetchTree) {
             await fetchTree();
@@ -2510,12 +2603,17 @@ function FolderView({
           setIsAddingFolder(false);
         } else {
           console.error('폴더 생성에 실패했습니다.');
+          setSnackbar({
+            open: true,
+            message: '폴더 생성에 실패했습니다.',
+            severity: 'error'
+          });
         }
       } catch (error) {
         console.error('폴더 생성 오류:', error);
       }
     }
-  }, [newItemName, selectedItem, createItem, fetchTree]);
+  }, [newItemName, selectedItem, createItem, fetchTree, user, addChangeLog, setSnackbar]);
 
   // 파일 추가 (선택된 폴더에 추가)
   const handleAddFile = React.useCallback(async () => {
@@ -2551,6 +2649,31 @@ function FolderView({
       try {
         const success = await createItem(fileData);
         if (success) {
+          // 변경로그 추가
+          const fileName = newItemName.trim();
+          const folderName = selectedItem.name;
+          const description = `"${folderName}" 폴더에 새로운 파일 "${fileName}"${getJosa(fileName, '이가')} 추가되었습니다.`;
+          const team = user?.department || user?.name || '시스템';
+
+          addChangeLog(
+            '추가',
+            secDocCode,
+            description,
+            team,
+            '',
+            fileName,
+            '파일명',
+            fileName,
+            '폴더탭'
+          );
+
+          // 토스트 알림
+          setSnackbar({
+            open: true,
+            message: `파일 "${fileName}"이(가) 성공적으로 추가되었습니다.`,
+            severity: 'success'
+          });
+
           // DB에서 전체 트리 다시 로드
           if (fetchTree) {
             await fetchTree();
@@ -2558,14 +2681,22 @@ function FolderView({
           setNewItemName('');
           setIsAddingFile(false);
         } else {
-          alert('파일 생성에 실패했습니다.');
+          setSnackbar({
+            open: true,
+            message: '파일 생성에 실패했습니다.',
+            severity: 'error'
+          });
         }
       } catch (error) {
         console.error('파일 생성 오류:', error);
-        alert('파일 생성 중 오류가 발생했습니다.');
+        setSnackbar({
+          open: true,
+          message: '파일 생성 중 오류가 발생했습니다.',
+          severity: 'error'
+        });
       }
     }
-  }, [newItemName, selectedItem, folderData, getAllFiles, createItem, fetchTree, user]);
+  }, [newItemName, selectedItem, folderData, getAllFiles, createItem, fetchTree, user, addChangeLog, setSnackbar]);
 
   // 아이템 삭제
   const handleDeleteItem = React.useCallback(
@@ -2585,7 +2716,7 @@ function FolderView({
             const regulationTitle = itemToDelete.name || '규정제목 없음';
             const itemType = itemToDelete.type === 'folder' ? '폴더' : '파일';
             const josa = getJosa(regulationTitle, '이가');
-            const description = `보안규정관리 ${regulationTitle}(${regulationCode}) 폴더탭의 ${itemType}${josa} 삭제되었습니다.`;
+            const description = `${itemType} "${regulationTitle}"${josa} 삭제되었습니다.`;
 
             addChangeLog(
               '삭제',
@@ -5984,6 +6115,68 @@ export default function RegulationManagement() {
     },
     [currentUser, user, fetchChangeLogs]
   );
+
+  // 최종리비전과 리비전수정일 변경 감지를 위한 ref (칸반 팝업창용)
+  const prevLatestRevisionKanbanRef = React.useRef<string>('');
+  const prevLatestRevisionDateKanbanRef = React.useRef<string>('');
+
+  // sharedAttachedFiles 변경 시 최종리비전과 리비전수정일 변경 감지 및 변경로그 추가 (칸반 팝업창용)
+  React.useEffect(() => {
+    if (!selectedFile || selectedFile.type !== 'file' || !folderDetailDialog) return;
+
+    const latestInfo = getLatestRevisionInfo();
+    const currentLatestRevision = latestInfo.latestRevision;
+    const currentLatestRevisionDate = latestInfo.latestRevisionDate;
+
+    // 초기화 시에는 변경로그를 추가하지 않음 (빈 문자열에서 처음 값으로 변경될 때)
+    const isInitializing = prevLatestRevisionKanbanRef.current === '' && prevLatestRevisionDateKanbanRef.current === '';
+
+    if (!isInitializing) {
+      const team = user?.department || user?.name || '시스템';
+
+      // 최종리비전 변경 감지
+      if (prevLatestRevisionKanbanRef.current !== currentLatestRevision && currentLatestRevision !== '') {
+        const beforeValue = prevLatestRevisionKanbanRef.current || '없음';
+        const afterValue = currentLatestRevision;
+        const description = `최종리비전이 "${beforeValue}"에서 "${afterValue}"(으)로 변경되었습니다.`;
+
+        addChangeLog(
+          '수정',
+          selectedFile.code || `REG-${selectedFile.id}`,
+          description,
+          team,
+          beforeValue,
+          afterValue,
+          '최종리비전',
+          selectedFile.name || '규정제목 없음',
+          '칸반탭'
+        );
+      }
+
+      // 리비전수정일 변경 감지
+      if (prevLatestRevisionDateKanbanRef.current !== currentLatestRevisionDate && currentLatestRevisionDate !== '') {
+        const beforeValue = prevLatestRevisionDateKanbanRef.current || '없음';
+        const afterValue = currentLatestRevisionDate;
+        const description = `리비전수정일이 "${beforeValue}"에서 "${afterValue}"(으)로 변경되었습니다.`;
+
+        addChangeLog(
+          '수정',
+          selectedFile.code || `REG-${selectedFile.id}`,
+          description,
+          team,
+          beforeValue,
+          afterValue,
+          '리비전수정일',
+          selectedFile.name || '규정제목 없음',
+          '칸반탭'
+        );
+      }
+    }
+
+    // 현재 값을 ref에 저장 (다음 비교를 위해)
+    prevLatestRevisionKanbanRef.current = currentLatestRevision;
+    prevLatestRevisionDateKanbanRef.current = currentLatestRevisionDate;
+  }, [sharedAttachedFiles, selectedFile, folderDetailDialog, getLatestRevisionInfo, user, addChangeLog]);
 
   // folderData의 이전 값을 저장하는 ref
   const prevFolderDataRef = React.useRef<FolderItem[]>(folderData);

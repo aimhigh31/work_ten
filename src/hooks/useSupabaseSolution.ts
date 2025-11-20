@@ -40,6 +40,7 @@ console.log('🔗 Supabase 클라이언트 검증:', {
 export interface UseSupabaseSolutionReturn {
   solutions: DbSolutionData[];
   getSolutions: () => Promise<DbSolutionData[]>;
+  getAllSolutionsForCodeGeneration: () => Promise<DbSolutionData[]>;
   getSolutionById: (id: number) => Promise<DbSolutionData | null>;
   createSolution: (solution: Omit<DbSolutionData, 'id' | 'created_at' | 'updated_at'>) => Promise<DbSolutionData | null>;
   updateSolution: (id: number, solution: Partial<DbSolutionData>) => Promise<boolean>;
@@ -96,6 +97,29 @@ export const useSupabaseSolution = (): UseSupabaseSolutionReturn => {
       return [];
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  // 코드 생성을 위한 모든 솔루션 조회 (is_active 무관)
+  const getAllSolutionsForCodeGeneration = useCallback(async (): Promise<DbSolutionData[]> => {
+    try {
+      console.log('📞 getAllSolutionsForCodeGeneration 호출 - is_active 필터 없이 전체 조회');
+
+      const { data, error: supabaseError } = await supabase
+        .from('it_solution_data')
+        .select('code')
+        .order('created_at', { ascending: false });
+
+      if (supabaseError) {
+        console.error('❌ Supabase 조회 오류:', supabaseError);
+        throw supabaseError;
+      }
+
+      console.log('✅ getAllSolutionsForCodeGeneration 성공:', data?.length || 0, '개 (삭제된 레코드 포함)');
+      return data || [];
+    } catch (error) {
+      console.error('❌ getAllSolutionsForCodeGeneration 실패:', error);
+      return [];
     }
   }, []);
 
@@ -462,6 +486,7 @@ export const useSupabaseSolution = (): UseSupabaseSolutionReturn => {
   return {
     solutions,
     getSolutions,
+    getAllSolutionsForCodeGeneration,
     getSolutionById,
     createSolution,
     updateSolution,

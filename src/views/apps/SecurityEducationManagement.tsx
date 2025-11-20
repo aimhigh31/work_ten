@@ -2859,19 +2859,114 @@ export default function SecurityEducationManagement() {
       if (record.id && record.id !== 'new' && record.id !== '' && !isNaN(parseInt(record.id.toString()))) {
         // 기존 교육 수정
         console.log('🔵 기존 교육 수정 시작:', record.id);
+
+        // 변경로그 생성을 위해 원본 데이터 찾기
+        const originalTask = tasks.find((t) => t.id === record.id);
+
         const success = await updateEducation(parseInt(record.id.toString()), educationData);
         console.log('🔵 수정 결과:', success);
         if (success) {
-          addChangeLog(
-            '수정',
-            record.code || record.educationName,
-            `보안교육 "${record.educationName}" 정보가 수정되었습니다.`,
-            record.educationType,
-            undefined,
-            undefined,
-            undefined,
-            record.educationName
-          );
+          // 변경로그 추가 (데이터탭과 동일한 로직)
+          if (originalTask) {
+            // 필드 한글명 매핑
+            const fieldNameMap: Record<string, string> = {
+              educationName: '교육명',
+              status: '상태',
+              educationType: '교육유형',
+              location: '장소',
+              executionDate: '실행일',
+              assignee: '담당자',
+              participantCount: '참석수',
+              team: '팀',
+              description: '설명',
+              achievements: '성과',
+              improvements: '개선사항',
+              feedback: '피드백'
+            };
+
+            // 변경된 필드 찾기
+            const changes: Array<{ field: string; fieldKorean: string; before: any; after: any }> = [];
+
+            // record와 originalTask 필드 매핑
+            const recordFields: Record<string, any> = {
+              educationName: record.educationName,
+              status: record.status,
+              educationType: record.educationType,
+              location: record.location,
+              executionDate: record.executionDate,
+              assignee: record.assignee,
+              participantCount: record.participantCount,
+              team: record.team,
+              description: record.description,
+              achievements: record.achievements,
+              improvements: record.improvement_points,
+              feedback: record.feedback
+            };
+
+            const originalFields: Record<string, any> = {
+              educationName: originalTask.educationName,
+              status: originalTask.status,
+              educationType: originalTask.educationType,
+              location: originalTask.location,
+              executionDate: originalTask.executionDate,
+              assignee: originalTask.assignee,
+              participantCount: originalTask.attendeeCount,
+              team: originalTask.team,
+              description: originalTask.description,
+              achievements: originalTask.achievements,
+              improvements: originalTask.improvements,
+              feedback: originalTask.feedback
+            };
+
+            Object.keys(fieldNameMap).forEach((field) => {
+              const beforeVal = originalFields[field];
+              const afterVal = recordFields[field];
+
+              // 값이 다른 경우만 추가
+              if (beforeVal !== afterVal) {
+                // 상태와 교육유형은 서브코드명으로 변환
+                let beforeDisplay = beforeVal || '';
+                let afterDisplay = afterVal || '';
+
+                if (field === 'status') {
+                  beforeDisplay = getStatusName(beforeVal) || beforeVal || '';
+                  afterDisplay = getStatusName(afterVal) || afterVal || '';
+                } else if (field === 'educationType') {
+                  beforeDisplay = getEducationTypeName(beforeVal) || beforeVal || '';
+                  afterDisplay = getEducationTypeName(afterVal) || afterVal || '';
+                }
+
+                changes.push({
+                  field,
+                  fieldKorean: fieldNameMap[field],
+                  before: beforeDisplay,
+                  after: afterDisplay
+                });
+              }
+            });
+
+            console.log('🔍 변경 감지된 필드들:', changes);
+
+            // 변경된 필드가 있으면 각각 로그 기록
+            const codeToUse = originalTask.code || record.code || `ID-${record.id}`;
+            if (changes.length > 0) {
+              for (const change of changes) {
+                const description = `보안교육관리 ${record.educationName}(${codeToUse}) 개요탭의 ${change.fieldKorean}이 ${change.before} → ${change.after} 로 수정 되었습니다.`;
+
+                await addChangeLog(
+                  '수정',
+                  codeToUse,
+                  description,
+                  record.educationType || '보안팀',
+                  String(change.before),
+                  String(change.after),
+                  change.fieldKorean,
+                  record.educationName
+                );
+              }
+            }
+          }
+
           // 수정 후 즉시 데이터 새로고침
           console.log('🔄 수정 후 데이터 새로고침');
           await handleRefreshData();
@@ -2882,16 +2977,18 @@ export default function SecurityEducationManagement() {
         const success = await createEducation(educationData);
         console.log('🔵 생성 결과:', success);
         if (success) {
-          addChangeLog(
+          // 생성 시 변경로그 추가
+          await addChangeLog(
             '생성',
-            record.code || record.educationName,
+            record.code || '자동생성',
             `보안교육 "${record.educationName}"이 생성되었습니다.`,
-            record.educationType,
+            record.educationType || '보안팀',
             undefined,
             undefined,
             undefined,
             record.educationName
           );
+
           // 생성 후 즉시 데이터 새로고침
           console.log('🔄 생성 후 데이터 새로고침');
           await handleRefreshData();

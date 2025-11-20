@@ -42,6 +42,12 @@ import { createClient } from '@supabase/supabase-js';
 // Icons
 import { TableDocument, Category, Element } from '@wandersonalwes/iconsax-react';
 
+// Supabase 클라이언트 (컴포넌트 외부에서 생성하여 안정성 확보)
+const supabaseClient = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
 // 상태 관리를 위한 reducer
 interface EditSolutionState {
   title: string;
@@ -1485,14 +1491,6 @@ const SolutionEditDialog = memo(
     const [editTab, setEditTab] = useState(0);
     const [draggedItemId, setDraggedItemId] = useState<number | null>(null);
 
-    // 마스터코드 데이터 로드를 위한 Supabase 클라이언트
-    const supabaseClient = useMemo(() => {
-      return createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      );
-    }, []);
-
     // 마스터코드 데이터 state
     const [solutionTypesFromDB, setSolutionTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
     const [developmentTypesFromDB, setDevelopmentTypesFromDB] = useState<Array<{ subcode: string; subcode_name: string }>>([]);
@@ -1548,32 +1546,37 @@ const SolutionEditDialog = memo(
       const currentYear = new Date().getFullYear();
       const currentYearStr = currentYear.toString().slice(-2); // 연도 뒤 2자리
 
-      // DB에서 모든 솔루션 조회
-      const allSolutions = await getSolutions();
+      try {
+        // Supabase에서 현재 연도의 최대 일련번호 조회 (is_active 필터 없음 - 삭제된 레코드도 포함)
+        const { data, error } = await supabaseClient
+          .from('it_solution_data')
+          .select('code')
+          .like('code', `IT-SOL-${currentYearStr}-%`)
+          .order('code', { ascending: false })
+          .limit(1);
 
-      // 현재 연도의 코드만 필터링 (IT-SOL-25-XXX 형식)
-      const currentYearSolutions = allSolutions.filter((sol) => {
-        const codePattern = `IT-SOL-${currentYearStr}-`;
-        return sol.code && sol.code.startsWith(codePattern);
-      });
+        let nextSequence = 1;
 
-      // 일련번호 추출 및 최대값 찾기
-      let maxSequence = 0;
-      currentYearSolutions.forEach((sol) => {
-        const match = sol.code.match(/IT-SOL-\d{2}-(\d{3})$/);
-        if (match) {
-          const sequence = parseInt(match[1], 10);
-          if (sequence > maxSequence) {
-            maxSequence = sequence;
+        if (data && data.length > 0 && data[0].code) {
+          // 기존 코드에서 일련번호 추출 (IT-SOL-25-001 -> 001)
+          const lastCode = data[0].code;
+          const sequencePart = lastCode.split('-')[3];
+          if (sequencePart) {
+            nextSequence = parseInt(sequencePart) + 1;
           }
         }
-      });
 
-      // 다음 일련번호 생성 (최대값 + 1, 3자리 패딩)
-      const nextSequence = (maxSequence + 1).toString().padStart(3, '0');
+        // 일련번호를 3자리로 포맷 (001, 002, ...)
+        const formattedSequence = nextSequence.toString().padStart(3, '0');
 
-      return `IT-SOL-${currentYearStr}-${nextSequence}`;
-    }, [getSolutions]);
+        return `IT-SOL-${currentYearStr}-${formattedSequence}`;
+      } catch (error) {
+        console.error('❌ 코드 생성 중 오류:', error);
+        // 오류 시 임시 코드 생성
+        const sequence = String(Date.now()).slice(-3);
+        return `IT-SOL-${currentYearStr}-${sequence}`;
+      }
+    }, []);
 
     // 현재 날짜 생성 함수
     const getCurrentDate = useCallback(() => {

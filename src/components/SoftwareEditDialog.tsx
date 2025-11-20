@@ -2266,18 +2266,17 @@ const PurchaseMaintenanceTab = memo(
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(7);
 
-    // 신규행(음수 ID)을 맨 위로, 기존 행(양수 ID)은 DB 순서 유지 (이미 DESC로 정렬됨)
+    // ID 역순 정렬 (최신 항목이 위로)
     const sortedMaintenanceHistories = [...maintenanceHistories].sort((a, b) => {
       const aId = parseInt(a.id) || 0;
       const bId = parseInt(b.id) || 0;
 
-      // 신규행(음수 ID)을 맨 위에 배치
+      // 음수 ID(새 항목)는 항상 위로
       if (aId < 0 && bId >= 0) return -1;
       if (aId >= 0 && bId < 0) return 1;
-      // 둘 다 신규행이면 ID 역순 (가장 최근 추가된 것이 위, 큰 음수가 더 최근)
-      if (aId < 0 && bId < 0) return bId - aId;
-      // 둘 다 기존 행이면 원래 순서 유지 (DB에서 이미 DESC로 정렬됨)
-      return 0;
+
+      // 둘 다 음수이거나 둘 다 양수인 경우 ID 역순
+      return bId - aId;
     });
 
     // 페이지네이션 계산

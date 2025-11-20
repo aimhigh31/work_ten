@@ -257,36 +257,220 @@ function KanbanView({
       // 업데이트
       setInspections((prev) => prev.map((inspection) => (inspection.id === updatedInspection.id ? updatedInspection : inspection)));
 
-      // 변경로그 추가 - 변경된 필드 확인
-      const changes: string[] = [];
-      const inspectionCode = updatedInspection.code || `TASK-${updatedInspection.id}`;
+      // 변경로그 추가 - 각 필드별로 개별 로그 생성 (IT교육관리 패턴)
+      const evaluationCode = updatedInspection.code || `EVAL-${updatedInspection.id}`;
+      const evaluationName = updatedInspection.evaluationTitle || '평가';
+      const team = updatedInspection.team || '미분류';
 
-      if (originalInspection.status !== updatedInspection.status) {
-        changes.push(`상태: "${originalInspection.status}" → "${updatedInspection.status}"`);
-      }
-      if (originalInspection.assignee !== updatedInspection.assignee) {
-        changes.push(`담당자: "${originalInspection.assignee || '미할당'}" → "${updatedInspection.assignee || '미할당'}"`);
-      }
-      if (originalInspection.inspectionTitle !== updatedInspection.inspectionTitle) {
-        changes.push(`점검내용 수정`);
-      }
-      if (originalInspection.progress !== updatedInspection.progress) {
-        changes.push(`진행율: ${originalInspection.progress || 0}% → ${updatedInspection.progress || 0}%`);
-      }
-      if (originalInspection.completedDate !== updatedInspection.completedDate) {
-        changes.push(`완료일: "${originalInspection.completedDate || '미정'}" → "${updatedInspection.completedDate || '미정'}"`);
-      }
-
-      if (changes.length > 0) {
+      // 개요탭 필드 변경 감지
+      if (originalInspection.evaluationTitle !== updatedInspection.evaluationTitle) {
         addChangeLog(
           '수정',
-          inspectionCode,
-          `${updatedInspection.evaluationTitle || '평가'} - ${changes.join(', ')}`,
-          updatedInspection.team || '미분류',
-          undefined,
-          undefined,
-          undefined,
-          updatedInspection.evaluationTitle
+          evaluationCode,
+          `인사평가 ${evaluationName}(${evaluationCode}) 개요탭의 평가제목이 ${originalInspection.evaluationTitle} → ${updatedInspection.evaluationTitle}로 수정 되었습니다.`,
+          team,
+          originalInspection.evaluationTitle,
+          updatedInspection.evaluationTitle,
+          '평가제목',
+          evaluationName,
+          '개요탭'
+        );
+      }
+
+      if (originalInspection.evaluationType !== updatedInspection.evaluationType) {
+        addChangeLog(
+          '수정',
+          evaluationCode,
+          `인사평가 ${evaluationName}(${evaluationCode}) 개요탭의 평가유형이 ${originalInspection.evaluationType} → ${updatedInspection.evaluationType}로 수정 되었습니다.`,
+          team,
+          originalInspection.evaluationType,
+          updatedInspection.evaluationType,
+          '평가유형',
+          evaluationName,
+          '개요탭'
+        );
+      }
+
+      if (originalInspection.managementCategory !== updatedInspection.managementCategory) {
+        addChangeLog(
+          '수정',
+          evaluationCode,
+          `인사평가 ${evaluationName}(${evaluationCode}) 개요탭의 관리분류가 ${originalInspection.managementCategory} → ${updatedInspection.managementCategory}로 수정 되었습니다.`,
+          team,
+          originalInspection.managementCategory,
+          updatedInspection.managementCategory,
+          '관리분류',
+          evaluationName,
+          '개요탭'
+        );
+      }
+
+      if (originalInspection.team !== updatedInspection.team) {
+        addChangeLog(
+          '수정',
+          evaluationCode,
+          `인사평가 ${evaluationName}(${evaluationCode}) 개요탭의 팀이 ${originalInspection.team} → ${updatedInspection.team}로 수정 되었습니다.`,
+          team,
+          originalInspection.team,
+          updatedInspection.team,
+          '팀',
+          evaluationName,
+          '개요탭'
+        );
+      }
+
+      if (originalInspection.assignee !== updatedInspection.assignee) {
+        addChangeLog(
+          '수정',
+          evaluationCode,
+          `인사평가 ${evaluationName}(${evaluationCode}) 개요탭의 담당자가 ${originalInspection.assignee} → ${updatedInspection.assignee}로 수정 되었습니다.`,
+          team,
+          originalInspection.assignee,
+          updatedInspection.assignee,
+          '담당자',
+          evaluationName,
+          '개요탭'
+        );
+      }
+
+      if (originalInspection.status !== updatedInspection.status) {
+        addChangeLog(
+          '수정',
+          evaluationCode,
+          `인사평가 ${evaluationName}(${evaluationCode}) 개요탭의 상태가 ${originalInspection.status} → ${updatedInspection.status}로 수정 되었습니다.`,
+          team,
+          originalInspection.status,
+          updatedInspection.status,
+          '상태',
+          evaluationName,
+          '개요탭'
+        );
+      }
+
+      if (originalInspection.startDate !== updatedInspection.startDate) {
+        addChangeLog(
+          '수정',
+          evaluationCode,
+          `인사평가 ${evaluationName}(${evaluationCode}) 개요탭의 시작일이 ${originalInspection.startDate || '미정'} → ${updatedInspection.startDate || '미정'}로 수정 되었습니다.`,
+          team,
+          originalInspection.startDate || '',
+          updatedInspection.startDate || '',
+          '시작일',
+          evaluationName,
+          '개요탭'
+        );
+      }
+
+      if (originalInspection.endDate !== updatedInspection.endDate) {
+        addChangeLog(
+          '수정',
+          evaluationCode,
+          `인사평가 ${evaluationName}(${evaluationCode}) 개요탭의 종료일이 ${originalInspection.endDate || '미정'} → ${updatedInspection.endDate || '미정'}로 수정 되었습니다.`,
+          team,
+          originalInspection.endDate || '',
+          updatedInspection.endDate || '',
+          '종료일',
+          evaluationName,
+          '개요탭'
+        );
+      }
+
+      if (originalInspection.inspectionDate !== updatedInspection.inspectionDate) {
+        addChangeLog(
+          '수정',
+          evaluationCode,
+          `인사평가 ${evaluationName}(${evaluationCode}) 개요탭의 평가일이 ${originalInspection.inspectionDate || '미정'} → ${updatedInspection.inspectionDate || '미정'}로 수정 되었습니다.`,
+          team,
+          originalInspection.inspectionDate || '',
+          updatedInspection.inspectionDate || '',
+          '평가일',
+          evaluationName,
+          '개요탭'
+        );
+      }
+
+      if (originalInspection.details !== updatedInspection.details) {
+        addChangeLog(
+          '수정',
+          evaluationCode,
+          `인사평가 ${evaluationName}(${evaluationCode}) 개요탭의 세부내용이 수정 되었습니다.`,
+          team,
+          originalInspection.details || '',
+          updatedInspection.details || '',
+          '세부내용',
+          evaluationName,
+          '개요탭'
+        );
+      }
+
+      if (originalInspection.checklistGuide !== updatedInspection.checklistGuide) {
+        addChangeLog(
+          '수정',
+          evaluationCode,
+          `인사평가 ${evaluationName}(${evaluationCode}) 체크리스트탭의 가이드가 수정 되었습니다.`,
+          team,
+          originalInspection.checklistGuide || '',
+          updatedInspection.checklistGuide || '',
+          '가이드',
+          evaluationName,
+          '체크리스트탭'
+        );
+      }
+
+      // 평가성과보고탭 필드 변경 감지
+      if (originalInspection.performance !== updatedInspection.performance) {
+        addChangeLog(
+          '수정',
+          evaluationCode,
+          `인사평가 ${evaluationName}(${evaluationCode}) 평가성과보고탭의 성과가 수정 되었습니다.`,
+          team,
+          originalInspection.performance || '',
+          updatedInspection.performance || '',
+          '성과',
+          evaluationName,
+          '평가성과보고탭'
+        );
+      }
+
+      if (originalInspection.improvements !== updatedInspection.improvements) {
+        addChangeLog(
+          '수정',
+          evaluationCode,
+          `인사평가 ${evaluationName}(${evaluationCode}) 평가성과보고탭의 개선사항이 수정 되었습니다.`,
+          team,
+          originalInspection.improvements || '',
+          updatedInspection.improvements || '',
+          '개선사항',
+          evaluationName,
+          '평가성과보고탭'
+        );
+      }
+
+      if (originalInspection.thoughts !== updatedInspection.thoughts) {
+        addChangeLog(
+          '수정',
+          evaluationCode,
+          `인사평가 ${evaluationName}(${evaluationCode}) 평가성과보고탭의 평가소감이 수정 되었습니다.`,
+          team,
+          originalInspection.thoughts || '',
+          updatedInspection.thoughts || '',
+          '평가소감',
+          evaluationName,
+          '평가성과보고탭'
+        );
+      }
+
+      if (originalInspection.notes !== updatedInspection.notes) {
+        addChangeLog(
+          '수정',
+          evaluationCode,
+          `인사평가 ${evaluationName}(${evaluationCode}) 평가성과보고탭의 비고가 수정 되었습니다.`,
+          team,
+          originalInspection.notes || '',
+          updatedInspection.notes || '',
+          '비고',
+          evaluationName,
+          '평가성과보고탭'
         );
       }
     }
@@ -2649,7 +2833,224 @@ export default function EvaluationManagement() {
 
           console.log('📋 최종 변경된 필드:', changedFields);
 
-          // 변경로그는 EvaluationTable.tsx에서 각 필드별로 추가됨 (중복 방지)
+          // 변경로그 추가 - 각 필드별로 개별 로그 생성 (IT교육관리 패턴)
+          if (originalData) {
+            const evaluationCode = updatedInspection.code || `EVAL-${updatedInspection.id}`;
+            const evaluationName = updatedInspection.evaluationTitle || '평가';
+            const team = updatedInspection.team || '미분류';
+
+            // 개요탭 필드 변경 감지
+            if (originalData.evaluationTitle !== updatedInspection.evaluationTitle) {
+              addChangeLog(
+                '수정',
+                evaluationCode,
+                `인사평가 ${evaluationName}(${evaluationCode}) 개요탭의 평가제목이 ${originalData.evaluationTitle} → ${updatedInspection.evaluationTitle}로 수정 되었습니다.`,
+                team,
+                originalData.evaluationTitle,
+                updatedInspection.evaluationTitle,
+                '평가제목',
+                evaluationName,
+                '개요탭'
+              );
+            }
+
+            if (originalData.evaluationType !== updatedInspection.evaluationType) {
+              addChangeLog(
+                '수정',
+                evaluationCode,
+                `인사평가 ${evaluationName}(${evaluationCode}) 개요탭의 평가유형이 ${originalData.evaluationType} → ${updatedInspection.evaluationType}로 수정 되었습니다.`,
+                team,
+                originalData.evaluationType,
+                updatedInspection.evaluationType,
+                '평가유형',
+                evaluationName,
+                '개요탭'
+              );
+            }
+
+            if (originalData.managementCategory !== updatedInspection.managementCategory) {
+              addChangeLog(
+                '수정',
+                evaluationCode,
+                `인사평가 ${evaluationName}(${evaluationCode}) 개요탭의 관리분류가 ${originalData.managementCategory} → ${updatedInspection.managementCategory}로 수정 되었습니다.`,
+                team,
+                originalData.managementCategory,
+                updatedInspection.managementCategory,
+                '관리분류',
+                evaluationName,
+                '개요탭'
+              );
+            }
+
+            if (originalData.team !== updatedInspection.team) {
+              addChangeLog(
+                '수정',
+                evaluationCode,
+                `인사평가 ${evaluationName}(${evaluationCode}) 개요탭의 팀이 ${originalData.team} → ${updatedInspection.team}로 수정 되었습니다.`,
+                team,
+                originalData.team,
+                updatedInspection.team,
+                '팀',
+                evaluationName,
+                '개요탭'
+              );
+            }
+
+            if (originalData.assignee !== updatedInspection.assignee) {
+              addChangeLog(
+                '수정',
+                evaluationCode,
+                `인사평가 ${evaluationName}(${evaluationCode}) 개요탭의 담당자가 ${originalData.assignee} → ${updatedInspection.assignee}로 수정 되었습니다.`,
+                team,
+                originalData.assignee,
+                updatedInspection.assignee,
+                '담당자',
+                evaluationName,
+                '개요탭'
+              );
+            }
+
+            if (originalData.status !== updatedInspection.status) {
+              addChangeLog(
+                '수정',
+                evaluationCode,
+                `인사평가 ${evaluationName}(${evaluationCode}) 개요탭의 상태가 ${originalData.status} → ${updatedInspection.status}로 수정 되었습니다.`,
+                team,
+                originalData.status,
+                updatedInspection.status,
+                '상태',
+                evaluationName,
+                '개요탭'
+              );
+            }
+
+            if (originalData.startDate !== updatedInspection.startDate) {
+              addChangeLog(
+                '수정',
+                evaluationCode,
+                `인사평가 ${evaluationName}(${evaluationCode}) 개요탭의 시작일이 ${originalData.startDate || '미정'} → ${updatedInspection.startDate || '미정'}로 수정 되었습니다.`,
+                team,
+                originalData.startDate || '',
+                updatedInspection.startDate || '',
+                '시작일',
+                evaluationName,
+                '개요탭'
+              );
+            }
+
+            if (originalData.endDate !== updatedInspection.endDate) {
+              addChangeLog(
+                '수정',
+                evaluationCode,
+                `인사평가 ${evaluationName}(${evaluationCode}) 개요탭의 종료일이 ${originalData.endDate || '미정'} → ${updatedInspection.endDate || '미정'}로 수정 되었습니다.`,
+                team,
+                originalData.endDate || '',
+                updatedInspection.endDate || '',
+                '종료일',
+                evaluationName,
+                '개요탭'
+              );
+            }
+
+            if (originalData.inspectionDate !== updatedInspection.inspectionDate) {
+              addChangeLog(
+                '수정',
+                evaluationCode,
+                `인사평가 ${evaluationName}(${evaluationCode}) 개요탭의 평가일이 ${originalData.inspectionDate || '미정'} → ${updatedInspection.inspectionDate || '미정'}로 수정 되었습니다.`,
+                team,
+                originalData.inspectionDate || '',
+                updatedInspection.inspectionDate || '',
+                '평가일',
+                evaluationName,
+                '개요탭'
+              );
+            }
+
+            if (originalData.details !== updatedInspection.details) {
+              addChangeLog(
+                '수정',
+                evaluationCode,
+                `인사평가 ${evaluationName}(${evaluationCode}) 개요탭의 세부내용이 수정 되었습니다.`,
+                team,
+                originalData.details || '',
+                updatedInspection.details || '',
+                '세부내용',
+                evaluationName,
+                '개요탭'
+              );
+            }
+
+            if (originalData.checklistGuide !== updatedInspection.checklistGuide) {
+              addChangeLog(
+                '수정',
+                evaluationCode,
+                `인사평가 ${evaluationName}(${evaluationCode}) 체크리스트탭의 가이드가 수정 되었습니다.`,
+                team,
+                originalData.checklistGuide || '',
+                updatedInspection.checklistGuide || '',
+                '가이드',
+                evaluationName,
+                '체크리스트탭'
+              );
+            }
+
+            // 평가성과보고탭 필드 변경 감지
+            if (originalData.performance !== updatedInspection.performance) {
+              addChangeLog(
+                '수정',
+                evaluationCode,
+                `인사평가 ${evaluationName}(${evaluationCode}) 평가성과보고탭의 성과가 수정 되었습니다.`,
+                team,
+                originalData.performance || '',
+                updatedInspection.performance || '',
+                '성과',
+                evaluationName,
+                '평가성과보고탭'
+              );
+            }
+
+            if (originalData.improvements !== updatedInspection.improvements) {
+              addChangeLog(
+                '수정',
+                evaluationCode,
+                `인사평가 ${evaluationName}(${evaluationCode}) 평가성과보고탭의 개선사항이 수정 되었습니다.`,
+                team,
+                originalData.improvements || '',
+                updatedInspection.improvements || '',
+                '개선사항',
+                evaluationName,
+                '평가성과보고탭'
+              );
+            }
+
+            if (originalData.thoughts !== updatedInspection.thoughts) {
+              addChangeLog(
+                '수정',
+                evaluationCode,
+                `인사평가 ${evaluationName}(${evaluationCode}) 평가성과보고탭의 평가소감이 수정 되었습니다.`,
+                team,
+                originalData.thoughts || '',
+                updatedInspection.thoughts || '',
+                '평가소감',
+                evaluationName,
+                '평가성과보고탭'
+              );
+            }
+
+            if (originalData.notes !== updatedInspection.notes) {
+              addChangeLog(
+                '수정',
+                evaluationCode,
+                `인사평가 ${evaluationName}(${evaluationCode}) 평가성과보고탭의 비고가 수정 되었습니다.`,
+                team,
+                originalData.notes || '',
+                updatedInspection.notes || '',
+                '비고',
+                evaluationName,
+                '평가성과보고탭'
+              );
+            }
+          }
 
           // 데이터 새로고침
           await fetchEvaluationDataList();

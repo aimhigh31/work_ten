@@ -3614,6 +3614,9 @@ export default function EvaluationEditDialog({
                   onChange={handleFieldChange('performance')}
                   placeholder="평가를 통해 달성한 구체적인 성과나 결과를 기록하세요."
                   disabled={!canEdit}
+                  InputLabelProps={{
+                    shrink: true
+                  }}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -3626,6 +3629,9 @@ export default function EvaluationEditDialog({
                   onChange={handleFieldChange('improvements')}
                   placeholder="향후 평가에서 개선이 필요한 사항이나 보완점을 기록하세요."
                   disabled={!canEdit}
+                  InputLabelProps={{
+                    shrink: true
+                  }}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -3638,6 +3644,9 @@ export default function EvaluationEditDialog({
                   onChange={handleFieldChange('thoughts')}
                   placeholder="평가 과정에서의 전반적인 소감과 피드백을 종합하여 작성하세요."
                   disabled={!canEdit}
+                  InputLabelProps={{
+                    shrink: true
+                  }}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -3650,6 +3659,9 @@ export default function EvaluationEditDialog({
                   onChange={handleFieldChange('notes')}
                   placeholder="기타 특이사항이나 추가로 기록할 내용을 작성하세요."
                   disabled={!canEdit}
+                  InputLabelProps={{
+                    shrink: true
+                  }}
                 />
               </Grid>
             </Grid>

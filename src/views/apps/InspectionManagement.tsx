@@ -2310,7 +2310,168 @@ export default function InspectionManagement() {
         if (result) {
           console.log('✅ [InspectionManagement] 보안점검 데이터 업데이트 성공');
 
-          // 변경로그는 InspectionTable.tsx에서 자동으로 추가됨 (중복 방지)
+          // 변경로그 추가 - 각 필드별로 개별 로그 생성 (IT교육관리 패턴)
+          const inspectionCode = updatedInspection.code || `INSP-${updatedInspection.id}`;
+          const inspectionName = updatedInspection.inspectionContent || '보안점검';
+          const team = updatedInspection.team || '미분류';
+
+          // 개요탭 필드 변경 감지
+          if (originalInspection.inspectionContent !== updatedInspection.inspectionContent) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검 ${inspectionName}(${inspectionCode}) 개요탭의 점검내용이 ${originalInspection.inspectionContent} → ${updatedInspection.inspectionContent}로 수정 되었습니다.`,
+              team,
+              originalInspection.inspectionContent,
+              updatedInspection.inspectionContent,
+              '점검내용',
+              inspectionName
+            );
+          }
+
+          if (originalInspection.inspectionType !== updatedInspection.inspectionType) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검 ${inspectionName}(${inspectionCode}) 개요탭의 점검유형이 ${originalInspection.inspectionType} → ${updatedInspection.inspectionType}로 수정 되었습니다.`,
+              team,
+              originalInspection.inspectionType,
+              updatedInspection.inspectionType,
+              '점검유형',
+              inspectionName
+            );
+          }
+
+          if (originalInspection.inspectionTarget !== updatedInspection.inspectionTarget) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검 ${inspectionName}(${inspectionCode}) 개요탭의 점검대상이 ${originalInspection.inspectionTarget} → ${updatedInspection.inspectionTarget}로 수정 되었습니다.`,
+              team,
+              originalInspection.inspectionTarget,
+              updatedInspection.inspectionTarget,
+              '점검대상',
+              inspectionName
+            );
+          }
+
+          if (originalInspection.team !== updatedInspection.team) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검 ${inspectionName}(${inspectionCode}) 개요탭의 팀이 ${originalInspection.team} → ${updatedInspection.team}로 수정 되었습니다.`,
+              team,
+              originalInspection.team,
+              updatedInspection.team,
+              '팀',
+              inspectionName
+            );
+          }
+
+          if (originalInspection.assignee !== updatedInspection.assignee) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검 ${inspectionName}(${inspectionCode}) 개요탭의 담당자가 ${originalInspection.assignee} → ${updatedInspection.assignee}로 수정 되었습니다.`,
+              team,
+              originalInspection.assignee,
+              updatedInspection.assignee,
+              '담당자',
+              inspectionName
+            );
+          }
+
+          if (originalInspection.status !== updatedInspection.status) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검 ${inspectionName}(${inspectionCode}) 개요탭의 상태가 ${originalInspection.status} → ${updatedInspection.status}로 수정 되었습니다.`,
+              team,
+              originalInspection.status,
+              updatedInspection.status,
+              '상태',
+              inspectionName
+            );
+          }
+
+          if (originalInspection.inspectionDate !== updatedInspection.inspectionDate) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검 ${inspectionName}(${inspectionCode}) 개요탭의 점검일자가 ${originalInspection.inspectionDate || '미정'} → ${updatedInspection.inspectionDate || '미정'}로 수정 되었습니다.`,
+              team,
+              originalInspection.inspectionDate || '',
+              updatedInspection.inspectionDate || '',
+              '점검일자',
+              inspectionName
+            );
+          }
+
+          if (originalInspection.details !== updatedInspection.details) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검 ${inspectionName}(${inspectionCode}) 개요탭의 세부내용이 수정 되었습니다.`,
+              team,
+              originalInspection.details || '',
+              updatedInspection.details || '',
+              '세부내용',
+              inspectionName
+            );
+          }
+
+          // 점검성과보고탭 필드 변경 감지
+          if (originalInspection.performance !== updatedInspection.performance) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검 ${inspectionName}(${inspectionCode}) 점검성과보고탭의 성과가 수정 되었습니다.`,
+              team,
+              originalInspection.performance || '',
+              updatedInspection.performance || '',
+              '성과',
+              inspectionName
+            );
+          }
+
+          if (originalInspection.improvements !== updatedInspection.improvements) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검 ${inspectionName}(${inspectionCode}) 점검성과보고탭의 개선사항이 수정 되었습니다.`,
+              team,
+              originalInspection.improvements || '',
+              updatedInspection.improvements || '',
+              '개선사항',
+              inspectionName
+            );
+          }
+
+          if (originalInspection.thoughts !== updatedInspection.thoughts) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검 ${inspectionName}(${inspectionCode}) 점검성과보고탭의 점검소감이 수정 되었습니다.`,
+              team,
+              originalInspection.thoughts || '',
+              updatedInspection.thoughts || '',
+              '점검소감',
+              inspectionName
+            );
+          }
+
+          if (originalInspection.notes !== updatedInspection.notes) {
+            addChangeLog(
+              '수정',
+              inspectionCode,
+              `보안점검 ${inspectionName}(${inspectionCode}) 점검성과보고탭의 비고가 수정 되었습니다.`,
+              team,
+              originalInspection.notes || '',
+              updatedInspection.notes || '',
+              '비고',
+              inspectionName
+            );
+          }
 
           // 데이터 새로고침
           console.log('🔄 [InspectionManagement] loadInspectionsFromSupabase 호출 시작');

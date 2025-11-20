@@ -730,12 +730,12 @@ export default function VOCDataTable({
         }
       } else {
         // 새 VOC 추가
-        const dbVocData = convertToDbVocData(updatedVOC);
-        const createdVOC = await createVoc(dbVocData);
+        // updatedVOC에 id가 있으면 이미 VOCEditDialog에서 생성된 것이므로 createVoc 호출하지 않음
+        if (updatedVOC.id) {
+          console.log('🔍 VOCEditDialog에서 이미 저장된 VOC 수신:', updatedVOC.id);
 
-        if (createdVOC) {
-          const newVocData = convertToVocData(createdVOC);
-          const newData = [newVocData, ...data];
+          // DB에 이미 저장되어 있으므로 data 배열에만 추가
+          const newData = [updatedVOC, ...data];
           setData(newData);
 
           // 부모 컴포넌트로 동기화
@@ -743,15 +743,15 @@ export default function VOCDataTable({
             setVOCs(newData);
           }
 
-          // 변경로그 추가 - 새 VOC 생성
+          // 변경로그 추가
           if (addChangeLog) {
-            const vocCode = `IT-VOC-${new Date(createdVOC.registration_date).getFullYear().toString().slice(-2)}-${String(createdVOC.no).padStart(3, '0')}`;
-            const vocContent = newVocData.content || '새 VOC';
+            const vocCode = `IT-VOC-${new Date(updatedVOC.registrationDate).getFullYear().toString().slice(-2)}-${String(updatedVOC.no).padStart(3, '0')}`;
+            const vocContent = updatedVOC.content || '새 VOC';
             addChangeLog(
               '추가',
               vocCode,
               `VOC관리 ${vocContent}(${vocCode})이 신규 등록되었습니다.`,
-              newVocData.team || '미분류',
+              updatedVOC.team || '미분류',
               undefined,
               undefined,
               undefined,
@@ -761,7 +761,7 @@ export default function VOCDataTable({
 
           // 토스트 알림 with Korean particle detection
           if (setSnackbar) {
-            const vocTitle = newVocData.content || 'VOC';
+            const vocTitle = updatedVOC.content || 'VOC';
             const lastChar = vocTitle.charAt(vocTitle.length - 1);
             const code = lastChar.charCodeAt(0);
             const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
@@ -775,9 +775,59 @@ export default function VOCDataTable({
             });
           }
 
-          console.log('✅ 새 VOC 추가 완료:', newVocData);
+          console.log('✅ 새 VOC 추가 완료 (이미 DB에 저장됨):', updatedVOC);
         } else {
-          throw new Error('VOC 생성 실패');
+          // id가 없으면 이전 방식대로 createVoc 호출 (하위 호환성)
+          console.log('🚀 createVoc 호출 (id 없음)');
+          const dbVocData = convertToDbVocData(updatedVOC);
+          const createdVOC = await createVoc(dbVocData);
+
+          if (createdVOC) {
+            const newVocData = convertToVocData(createdVOC);
+            const newData = [newVocData, ...data];
+            setData(newData);
+
+            // 부모 컴포넌트로 동기화
+            if (setVOCs) {
+              setVOCs(newData);
+            }
+
+            // 변경로그 추가 - 새 VOC 생성
+            if (addChangeLog) {
+              const vocCode = `IT-VOC-${new Date(createdVOC.registration_date).getFullYear().toString().slice(-2)}-${String(createdVOC.no).padStart(3, '0')}`;
+              const vocContent = newVocData.content || '새 VOC';
+              addChangeLog(
+                '추가',
+                vocCode,
+                `VOC관리 ${vocContent}(${vocCode})이 신규 등록되었습니다.`,
+                newVocData.team || '미분류',
+                undefined,
+                undefined,
+                undefined,
+                vocContent
+              );
+            }
+
+            // 토스트 알림 with Korean particle detection
+            if (setSnackbar) {
+              const vocTitle = newVocData.content || 'VOC';
+              const lastChar = vocTitle.charAt(vocTitle.length - 1);
+              const code = lastChar.charCodeAt(0);
+              const hasJongseong = (code >= 0xAC00 && code <= 0xD7A3) && ((code - 0xAC00) % 28 !== 0);
+              const josa = hasJongseong ? '이' : '가';
+
+              const addMessage = `${vocTitle}${josa} 성공적으로 추가되었습니다.`;
+              setSnackbar({
+                open: true,
+                message: addMessage,
+                severity: 'success'
+              });
+            }
+
+            console.log('✅ 새 VOC 추가 완료:', newVocData);
+          } else {
+            throw new Error('VOC 생성 실패');
+          }
         }
       }
 

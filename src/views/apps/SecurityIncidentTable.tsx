@@ -679,13 +679,13 @@ export default function SecurityIncidentTable({
 
         const newIncident = await createAccident(supabaseData);
         if (newIncident) {
-          // 변경로그 추가 - 새 보안사고 생성
+          // 변경로그 추가 - 새 보안사고 추가
           if (addChangeLog) {
             const incidentTitle = updatedIncident.mainContent || '새 보안사고';
             addChangeLog(
-              '생성',
+              '추가',
               newCode,
-              `보안사고관리 ${incidentTitle}(${newCode}) 데이터가 생성 되었습니다.`,
+              `보안사고관리 ${incidentTitle}(${newCode}) 데이터가 추가 되었습니다.`,
               updatedIncident.team || '미분류',
               '',
               '',

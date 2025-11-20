@@ -123,6 +123,7 @@ interface KanbanViewProps {
   getVocTypeName?: (subcode: string) => string;
   getPriorityName?: (subcode: string) => string;
   getStatusName?: (subcode: string) => string;
+  getStatusCode?: (subcodeName: string) => string;
   updateVoc?: (id: number, voc: Partial<any>) => Promise<boolean>;
   onSaveVOC?: (updatedVOC: VOCTableData) => Promise<void>;
   snackbar: {
@@ -153,6 +154,7 @@ function KanbanView({
   getVocTypeName = (subcode: string) => subcode,
   getPriorityName = (subcode: string) => subcode,
   getStatusName = (subcode: string) => subcode,
+  getStatusCode = (subcodeName: string) => subcodeName,
   updateVoc,
   onSaveVOC,
   snackbar,
@@ -245,41 +247,30 @@ function KanbanView({
 
   // VOC 저장 핸들러
   const handleEditVOCSave = (updatedVOC: VOCTableData) => {
-    const originalVOC = vocs.find((t) => t.id === updatedVOC.id);
+    // VOCEditDialog에서 이미 DB 저장 및 변경로그 생성이 완료됨
+    // 여기서는 메모리 상태만 업데이트
+    setVOCs((prev) => prev.map((voc) => (voc.id === updatedVOC.id ? updatedVOC : voc)));
 
-    if (originalVOC) {
-      // 업데이트
-      setVOCs((prev) => prev.map((voc) => (voc.id === updatedVOC.id ? updatedVOC : voc)));
+    // 토스트 알림 표시
+    const vocTitle = updatedVOC.workContent || updatedVOC.requestContent || updatedVOC.content || 'VOC';
 
-      // 변경로그 추가 - 변경된 필드 확인
-      const changes: string[] = [];
-      const vocCode = updatedVOC.code || `TASK-${updatedVOC.id}`;
+    // 한글 받침 감지 함수
+    const getKoreanParticle = (word: string): string => {
+      const lastChar = word.charAt(word.length - 1);
+      const code = lastChar.charCodeAt(0);
+      if (code >= 0xAC00 && code <= 0xD7A3) {
+        const hasJongseong = (code - 0xAC00) % 28 !== 0;
+        return hasJongseong ? '이' : '가';
+      }
+      return '가';
+    };
 
-      if (originalVOC.status !== updatedVOC.status) {
-        changes.push(`상태: "${originalVOC.status}" → "${updatedVOC.status}"`);
-      }
-      if (originalVOC.assignee !== updatedVOC.assignee) {
-        changes.push(`담당자: "${originalVOC.assignee || '미할당'}" → "${updatedVOC.assignee || '미할당'}"`);
-      }
-      if (originalVOC.requestContent !== updatedVOC.requestContent) {
-        changes.push(`요청내용 수정`);
-      }
-      if (originalVOC.actionContent !== updatedVOC.actionContent) {
-        changes.push(`조치내용 수정`);
-      }
-      if (originalVOC.completedDate !== updatedVOC.completedDate) {
-        changes.push(`완료일: "${originalVOC.completedDate || '미정'}" → "${updatedVOC.completedDate || '미정'}"`);
-      }
-
-      if (changes.length > 0) {
-        addChangeLog(
-          'VOC 정보 수정',
-          vocCode,
-          `${updatedVOC.requestContent || 'VOC'} - ${changes.join(', ')}`,
-          updatedVOC.team || '미분류'
-        );
-      }
-    }
+    const josa = getKoreanParticle(vocTitle);
+    setSnackbar({
+      open: true,
+      message: `${vocTitle}${josa} 성공적으로 수정되었습니다.`,
+      severity: 'success'
+    });
 
     handleEditDialogClose();
   };
@@ -293,27 +284,29 @@ function KanbanView({
     if (!over) return;
 
     const vocId = active.id;
-    const newStatus = over.id as VOCStatus;
+    const newStatusName = over.id as string; // 서브코드명 (예: '대기', '진행')
+    const newStatusCode = getStatusCode(newStatusName); // 서브코드로 변환 (예: 'GROUP002-SUB001')
 
     // 상태가 변경된 경우만 업데이트
     const currentVOC = vocs.find((voc) => voc.id === vocId);
-    if (currentVOC && currentVOC.status !== newStatus) {
-      const oldStatus = currentVOC.status;
+    if (currentVOC && currentVOC.status !== newStatusName) {
+      const oldStatusName = currentVOC.status;
 
-      // 로컬 상태 업데이트
-      setVOCs((prev) => prev.map((voc) => (voc.id === vocId ? { ...voc, status: newStatus } : voc)));
+      // 로컬 상태 업데이트 (화면에는 서브코드명 사용)
+      setVOCs((prev) => prev.map((voc) => (voc.id === vocId ? { ...voc, status: newStatusName } : voc)));
 
-      // DB에 상태 변경 저장
+      // DB에 상태 변경 저장 (DB에는 서브코드 저장)
       if (updateVoc && typeof currentVOC.id === 'number') {
         try {
           console.log('🔄 칸반 드래그: 상태 변경 DB 저장 시작', {
             vocId: currentVOC.id,
-            oldStatus,
-            newStatus
+            oldStatusName,
+            newStatusName,
+            newStatusCode
           });
 
           const success = await updateVoc(currentVOC.id, {
-            status: newStatus
+            status: newStatusCode // DB에는 서브코드 저장
           });
 
           if (!success) {
@@ -323,17 +316,17 @@ function KanbanView({
           console.log('✅ 칸반 드래그: 상태 변경 DB 저장 성공');
 
           // 토스트 알림 - 상태 변경 성공
-          const vocTitle = currentVOC.requestContent || currentVOC.workContent || 'VOC';
+          const vocTitle = currentVOC.content || currentVOC.title || 'VOC';
           const vocCode = currentVOC.code || `VOC-${vocId}`;
           setSnackbar({
             open: true,
-            message: `VOC관리 ${vocTitle}(${vocCode}) 개요탭의 상태가 ${oldStatus} → ${newStatus}로 수정 되었습니다.`,
+            message: `VOC관리 ${vocTitle}(${vocCode}) 개요탭의 상태가 ${oldStatusName} → ${newStatusName}로 수정 되었습니다.`,
             severity: 'success'
           });
         } catch (error) {
           console.error('🔴 칸반 드래그: 상태 변경 DB 저장 실패:', error);
           // 실패 시 원래 상태로 되돌림
-          setVOCs((prev) => prev.map((voc) => (voc.id === vocId ? { ...voc, status: oldStatus } : voc)));
+          setVOCs((prev) => prev.map((voc) => (voc.id === vocId ? { ...voc, status: oldStatusName } : voc)));
 
           // 토스트 알림 - 에러
           setSnackbar({
@@ -347,10 +340,10 @@ function KanbanView({
 
       // 변경로그 추가
       const vocCode = currentVOC.code || `VOC-${vocId}`;
-      const vocTitle = currentVOC.requestContent || currentVOC.workContent || 'VOC';
-      const description = `VOC관리 ${vocTitle}(${vocCode}) 개요탭의 상태가 ${oldStatus} → ${newStatus}로 수정 되었습니다.`;
+      const vocTitle = currentVOC.content || currentVOC.title || 'VOC';
+      const description = `VOC관리 ${vocTitle}(${vocCode}) 개요탭의 상태가 ${oldStatusName} → ${newStatusName}로 수정 되었습니다.`;
 
-      addChangeLog('수정', vocCode, description, currentVOC.team || '미분류', oldStatus, newStatus, '상태', vocTitle, '칸반탭');
+      addChangeLog('수정', vocCode, description, currentVOC.team || '미분류', oldStatusName, newStatusName, '상태', vocTitle, '칸반탭');
     }
   };
 
@@ -2523,6 +2516,12 @@ export default function VOCManagement() {
     return found ? found.subcode_name : subcode;
   }, [statusTypes]);
 
+  // 서브코드명 → 서브코드 역변환 함수 (상태용)
+  const getStatusCode = React.useCallback((subcodeName: string) => {
+    const found = statusTypes.find(item => item.subcode_name === subcodeName);
+    return found ? found.subcode : subcodeName;
+  }, [statusTypes]);
+
   // ⭐ Investment 패턴: 데이터 로딩 함수만 가져오기 (KPI 패턴 적용)
   const {
     vocs: vocsFromHook,
@@ -2633,6 +2632,15 @@ export default function VOCManagement() {
       console.log('📝 변환된 첫 번째 VOC 샘플:', vocData[0]);
     }
   }, [vocsFromHook, error, convertToVocData, getVocTypeName, getPriorityName, getStatusName]);
+
+  // 변경로그 탭 전환 시 자동 갱신
+  useEffect(() => {
+    if (value === 4) {
+      // 변경로그 탭으로 전환되면 최신 데이터 로드
+      console.log('📊 변경로그 탭 활성화 - 최신 데이터 로드 중...');
+      fetchChangeLogs();
+    }
+  }, [value, fetchChangeLogs]);
 
   // 연도 옵션 생성
   const currentYearValue = new Date().getFullYear();
@@ -2747,21 +2755,25 @@ export default function VOCManagement() {
     return '가'; // 한글이 아닌 경우 기본값
   };
 
-  // VOC 저장 핸들러
+  // VOC 저장 핸들러 (데이터탭용)
   const handleEditVOCSave = (updatedVOC: VOCTableData) => {
-    // VOCEditDialog에서 이미 DB 저장을 완료했으므로
-    // 여기서는 로컬 상태 업데이트, 토스트 알림, 변경로그만 처리
+    console.log('🔔 [handleEditVOCSave] 호출됨, originalVOC:', originalVOC ? 'exists' : 'null', 'updatedVOC:', updatedVOC);
+    // VOCEditDialog에서 이미 DB 저장 및 변경로그 생성이 완료됨
+    // 여기서는 로컬 상태 업데이트와 토스트 알림만 처리
 
+    // 로컬 상태 업데이트
+    setVOCs((prevVOCs) => prevVOCs.map((voc) => (voc.id === updatedVOC.id ? { ...updatedVOC } : voc)));
+
+    // 토스트 알림 표시 (originalVOC 유무와 관계없이 항상 표시)
+    let message = '';
     if (originalVOC) {
-      // 업데이트
-      setVOCs((prevVOCs) => prevVOCs.map((voc) => (voc.id === updatedVOC.id ? { ...updatedVOC } : voc)));
-
       // 필드 변경 감지 (fieldMap)
       const fieldMap: { [key: string]: string } = {
         vocType: 'VOC유형',
         workCategory: '업무분류',
         workContent: '요청내용',
         requestContent: '요청내용',
+        content: '요청내용',
         actionContent: '조치내용',
         requester: '요청자',
         requestDate: '요청일',
@@ -2784,8 +2796,7 @@ export default function VOCManagement() {
         }
       });
 
-      // 토스트 알림 with Korean particle detection
-      let message = '';
+      // 토스트 메시지 생성 with Korean particle detection
       if (changedFields.length > 0) {
         const fieldsText = changedFields.join(', ');
         // 마지막 필드명의 받침 유무에 따라 조사 결정
@@ -2797,12 +2808,22 @@ export default function VOCManagement() {
         const josa = getKoreanParticle(updatedVOC.workContent || updatedVOC.requestContent || 'VOC');
         message = `${updatedVOC.workContent || updatedVOC.requestContent || 'VOC'}${josa} 성공적으로 수정되었습니다.`;
       }
+    } else {
+      // originalVOC가 없는 경우 (칸반 탭 수정 시 발생 가능)
+      const vocTitle = updatedVOC.workContent || updatedVOC.requestContent || 'VOC';
+      const josa = getKoreanParticle(vocTitle);
+      message = `${vocTitle}${josa} 성공적으로 수정되었습니다.`;
+      console.log('⚠️ originalVOC가 없어서 기본 토스트 알림 표시');
+    }
 
-      setSnackbar({
-        open: true,
-        message: message,
-        severity: 'success'
-      });
+    // 토스트 알림 표시
+    setSnackbar({
+      open: true,
+      message: message,
+      severity: 'success'
+    });
+
+    if (originalVOC) {
 
       // 변경로그 생성 전 originalVOC 존재 확인 (하드웨어관리 패턴)
       if (!originalVOC) {
@@ -3405,6 +3426,7 @@ export default function VOCManagement() {
                   getVocTypeName={getVocTypeName}
                   getPriorityName={getPriorityName}
                   getStatusName={getStatusName}
+                  getStatusCode={getStatusCode}
                   updateVoc={updateVoc}
                   snackbar={snackbar}
                   setSnackbar={setSnackbar}

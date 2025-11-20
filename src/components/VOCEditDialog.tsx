@@ -37,6 +37,7 @@ import { useSupabaseFiles } from '../hooks/useSupabaseFiles';
 import { FileData } from '../types/files';
 import { createClient } from '@supabase/supabase-js';
 import { useSupabaseVoc } from '../hooks/useSupabaseVoc';
+import { useSupabaseChangeLog } from '../hooks/useSupabaseChangeLog';
 // import { usePerformanceMonitor } from '../utils/performance';
 
 // Icons
@@ -1469,6 +1470,9 @@ const VOCEditDialog = memo(
     // VOC 훅 사용 (코드 생성 및 DB 저장용)
     const { generateVocCode, createVoc, updateVoc, convertToDbVocData } = useSupabaseVoc();
 
+    // 변경로그 훅 사용 (record_id 없이 전체 조회 - VOCManagement에서 필터링)
+    const { addChangeLog: addSupabaseChangeLog } = useSupabaseChangeLog('it_voc');
+
     // 피드백 훅 사용 (DB 연동)
     const {
       feedbacks,
@@ -1485,6 +1489,9 @@ const VOCEditDialog = memo(
     // 초기화 여부를 추적 (무한 루프 방지)
     const feedbacksInitializedRef = useRef(false);
     const feedbacksRef = useRef<FeedbackData[]>([]);
+
+    // 초기 데이터 스냅샷 (변경 감지용)
+    const initialDataSnapshotRef = useRef<EditVOCState | null>(null);
 
     const [editTab, setEditTab] = useState(0);
     const [draggedItemId, setDraggedItemId] = useState<number | null>(null);
@@ -1505,6 +1512,9 @@ const VOCEditDialog = memo(
       team: ''
     });
 
+    // 저장 중 상태 (버튼 disabled 처리용)
+    const [isSaving, setIsSaving] = useState(false);
+
     // 현재 날짜 생성 함수
     const getCurrentDate = useCallback(() => {
       const today = new Date();
@@ -1514,10 +1524,30 @@ const VOCEditDialog = memo(
     // 이전 open 값 추적
     const prevOpenRef = useRef(false);
 
-    // VOC 변경 시 상태 업데이트
+    // VOC 변경 시 상태 업데이트 및 초기 스냅샷 저장
     React.useEffect(() => {
       if (voc) {
         dispatch({ type: 'SET_TASK', voc });
+        // 초기 데이터 스냅샷 저장
+        initialDataSnapshotRef.current = {
+          customerName: voc.customerName || '',
+          companyName: voc.companyName || '',
+          vocType: voc.vocType || '',
+          channel: voc.channel || '',
+          title: voc.title || '',
+          content: voc.content || '',
+          responseContent: voc.responseContent || '',
+          assignee: voc.assignee || '',
+          status: voc.status || '',
+          priority: voc.priority || '',
+          registrationDate: voc.registrationDate || '',
+          receptionDate: voc.receptionDate || '',
+          resolutionDate: voc.resolutionDate || '',
+          team: voc.team || ''
+        };
+      } else {
+        // 새 VOC 생성 시에는 초기화
+        initialDataSnapshotRef.current = null;
       }
     }, [voc]);
 
@@ -1641,86 +1671,99 @@ const VOCEditDialog = memo(
     }, []);
 
     const handleSave = useCallback(async () => {
-      // OverviewTab의 현재 입력값 가져오기
-      const currentValues = (window as any).getOverviewTabCurrentValues?.() || {
-        content: vocState.content,
-        responseContent: vocState.responseContent
-      };
-
-      // 필수 입력 검증
-      if (!vocState.content || !vocState.content.trim()) {
-        setValidationError('요청내용은 필수 입력 항목입니다.');
+      // 중복 실행 방지
+      if (isSaving) {
+        console.warn('⚠️ 이미 저장 중입니다. 중복 실행 방지됨');
         return;
       }
 
-      if (!vocState.customerName || !vocState.customerName.trim()) {
-        setValidationError('VOC요청자를 입력해주세요.');
-        return;
-      }
+      setIsSaving(true);
+      console.log('💾 handleSave 시작 (중복 방지 활성화)');
 
-      if (!vocState.vocType || !vocState.vocType.trim()) {
-        setValidationError('VOC유형을 선택해주세요.');
-        return;
-      }
-
-      if (!vocState.priority || !vocState.priority.trim()) {
-        setValidationError('우선순위를 선택해주세요.');
-        return;
-      }
-
-      // 에러 초기화
-      setValidationError('');
-
-      // 🔄 기록 탭 변경사항 DB 저장
-      console.log('💾 기록 탭 변경사항 저장 시작');
-      console.time('⏱️ 기록 저장 Total');
-
-      if (voc?.id) {
-        // 추가된 기록 (temp- ID)
-        const addedFeedbacks = pendingFeedbacks.filter(
-          (fb) => fb.id.toString().startsWith('temp-') && !initialFeedbacks.find((initial) => initial.id === fb.id)
-        );
-
-        // 수정된 기록
-        const updatedFeedbacks = pendingFeedbacks.filter((fb) => {
-          if (fb.id.toString().startsWith('temp-')) return false;
-          const initial = initialFeedbacks.find((initial) => initial.id === fb.id);
-          return initial && initial.description !== fb.description;
-        });
-
-        // 삭제된 기록
-        const deletedFeedbacks = initialFeedbacks.filter((initial) => !pendingFeedbacks.find((pending) => pending.id === initial.id));
-
-        // 추가 (역순으로 저장)
-        const reversedAddedFeedbacks = [...addedFeedbacks].reverse();
-        for (const feedback of reversedAddedFeedbacks) {
-          const { id, created_at, user_id, ...feedbackData } = feedback;
-          await addFeedback(feedbackData);
-        }
-
-        // 수정
-        for (const feedback of updatedFeedbacks) {
-          await updateFeedback(String(feedback.id), {
-            description: feedback.description
-          });
-        }
-
-        // 삭제 - feedbacks 배열에 존재하는 항목만 삭제
-        for (const feedback of deletedFeedbacks) {
-          const existsInFeedbacks = feedbacks.some((fb) => String(fb.id) === String(feedback.id));
-          if (existsInFeedbacks) {
-            await deleteFeedback(String(feedback.id));
-          } else {
-            console.warn(`⚠️ 피드백 ${feedback.id}가 feedbacks 배열에 없어 삭제 건너뜀 (이미 삭제됨)`);
-          }
-        }
-
-        console.timeEnd('⏱️ 기록 저장 Total');
-        console.log('✅ 기록 탭 변경사항 저장 완료');
-      }
-
-      // 🔄 VOC 데이터 DB 저장 (하드웨어관리 패턴)
       try {
+        // OverviewTab의 현재 입력값 가져오기
+        const currentValues = (window as any).getOverviewTabCurrentValues?.() || {
+          content: vocState.content,
+          responseContent: vocState.responseContent
+        };
+
+        // 필수 입력 검증
+        if (!vocState.content || !vocState.content.trim()) {
+          setValidationError('요청내용은 필수 입력 항목입니다.');
+          setIsSaving(false);
+          return;
+        }
+
+        if (!vocState.customerName || !vocState.customerName.trim()) {
+          setValidationError('VOC요청자를 입력해주세요.');
+          setIsSaving(false);
+          return;
+        }
+
+        if (!vocState.vocType || !vocState.vocType.trim()) {
+          setValidationError('VOC유형을 선택해주세요.');
+          setIsSaving(false);
+          return;
+        }
+
+        if (!vocState.priority || !vocState.priority.trim()) {
+          setValidationError('우선순위를 선택해주세요.');
+          setIsSaving(false);
+          return;
+        }
+
+        // 에러 초기화
+        setValidationError('');
+
+        // 🔄 기록 탭 변경사항 DB 저장
+        console.log('💾 기록 탭 변경사항 저장 시작');
+        console.time('⏱️ 기록 저장 Total');
+
+        if (voc?.id) {
+          // 추가된 기록 (temp- ID)
+          const addedFeedbacks = pendingFeedbacks.filter(
+            (fb) => fb.id.toString().startsWith('temp-') && !initialFeedbacks.find((initial) => initial.id === fb.id)
+          );
+
+          // 수정된 기록
+          const updatedFeedbacks = pendingFeedbacks.filter((fb) => {
+            if (fb.id.toString().startsWith('temp-')) return false;
+            const initial = initialFeedbacks.find((initial) => initial.id === fb.id);
+            return initial && initial.description !== fb.description;
+          });
+
+          // 삭제된 기록
+          const deletedFeedbacks = initialFeedbacks.filter((initial) => !pendingFeedbacks.find((pending) => pending.id === initial.id));
+
+          // 추가 (역순으로 저장)
+          const reversedAddedFeedbacks = [...addedFeedbacks].reverse();
+          for (const feedback of reversedAddedFeedbacks) {
+            const { id, created_at, user_id, ...feedbackData } = feedback;
+            await addFeedback(feedbackData);
+          }
+
+          // 수정
+          for (const feedback of updatedFeedbacks) {
+            await updateFeedback(String(feedback.id), {
+              description: feedback.description
+            });
+          }
+
+          // 삭제 - feedbacks 배열에 존재하는 항목만 삭제
+          for (const feedback of deletedFeedbacks) {
+            const existsInFeedbacks = feedbacks.some((fb) => String(fb.id) === String(feedback.id));
+            if (existsInFeedbacks) {
+              await deleteFeedback(String(feedback.id));
+            } else {
+              console.warn(`⚠️ 피드백 ${feedback.id}가 feedbacks 배열에 없어 삭제 건너뜀 (이미 삭제됨)`);
+            }
+          }
+
+          console.timeEnd('⏱️ 기록 저장 Total');
+          console.log('✅ 기록 탭 변경사항 저장 완료');
+        }
+
+        // 🔄 VOC 데이터 DB 저장 (하드웨어관리 패턴)
         // VocData 객체 생성 (프론트엔드 형식)
         const vocData: VocData = !voc ? {
           id: 0, // DB에서 자동 생성
@@ -1770,19 +1813,117 @@ const VOCEditDialog = memo(
           savedData = await createVoc(dbVocData);
           if (!savedData) {
             setValidationError('VOC 생성에 실패했습니다.');
+            setIsSaving(false);
             return;
           }
           console.log('✅ 새 VOC 생성 성공:', savedData);
+
+          // 생성 변경로그 추가
+          if (addSupabaseChangeLog && savedData) {
+            const vocCode = savedData.code || `VOC-${savedData.id}`;
+            const vocTitle = savedData.content || vocState.content || 'VOC';
+
+            await addSupabaseChangeLog({
+              page: 'it_voc',
+              record_id: vocCode,
+              action_type: '생성',
+              description: `VOC "${vocTitle.substring(0, 30)}..."이 생성되었습니다.`,
+              user_name: currentUser?.user_name || '알 수 없음',
+              team: vocState.team || currentUser?.department,
+              user_department: currentUser?.department,
+              user_position: currentUser?.position,
+              user_profile_image: currentUser?.profile_image_url,
+              metadata: {
+                changeType: 'create'
+              },
+              title: vocTitle.substring(0, 50)
+            });
+          }
         } else {
           // 기존 VOC 수정
           console.log('📝 기존 VOC 수정 중:', { id: voc.id, data: dbVocData });
           const success = await updateVoc(voc.id, dbVocData);
           if (!success) {
             setValidationError('VOC 수정에 실패했습니다.');
+            setIsSaving(false);
             return;
           }
           console.log('✅ VOC 수정 성공');
           savedData = { ...dbVocData, id: voc.id };
+
+          // 변경로그 생성 (수정 모드일 때만)
+          if (initialDataSnapshotRef.current && addSupabaseChangeLog) {
+            const fieldNameMap: Record<string, string> = {
+              customerName: 'VOC요청자',
+              companyName: '회사명',
+              vocType: 'VOC유형',
+              channel: '접수채널',
+              content: '요청내용',
+              responseContent: '응대내용',
+              assignee: '담당자',
+              status: '상태',
+              priority: '우선순위',
+              registrationDate: '등록일',
+              receptionDate: '접수일',
+              resolutionDate: '완료일',
+              team: '팀'
+            };
+
+            // 변경된 필드 찾기
+            const changes: Array<{ field: string; fieldKorean: string; before: any; after: any }> = [];
+
+            Object.keys(fieldNameMap).forEach((field) => {
+              let beforeVal = initialDataSnapshotRef.current![field as keyof EditVOCState];
+              let afterVal = vocState[field as keyof EditVOCState];
+
+              // content와 responseContent는 currentValues에서 가져오기
+              if (field === 'content') {
+                afterVal = currentValues.content;
+              } else if (field === 'responseContent') {
+                afterVal = currentValues.responseContent;
+              }
+
+              if (beforeVal !== afterVal) {
+                changes.push({
+                  field,
+                  fieldKorean: fieldNameMap[field],
+                  before: beforeVal || '',
+                  after: afterVal || ''
+                });
+              }
+            });
+
+            console.log('🔍 변경 감지된 필드들:', changes);
+
+            // 변경된 필드가 있으면 각각 로그 기록
+            const vocCode = voc.code || `VOC-${voc.id}`;
+            const vocTitle = vocState.content || voc.content || 'VOC';
+            if (changes.length > 0) {
+              for (const change of changes) {
+                const description = `VOC관리 ${vocTitle.substring(0, 30)}...(${vocCode}) 개요탭의 ${change.fieldKorean}이 ${change.before} → ${change.after} 로 수정 되었습니다.`;
+
+                await addSupabaseChangeLog({
+                  page: 'it_voc',
+                  record_id: vocCode,
+                  action_type: '수정',
+                  description: description,
+                  before_value: String(change.before),
+                  after_value: String(change.after),
+                  user_name: currentUser?.user_name || '알 수 없음',
+                  team: vocState.team || currentUser?.department,
+                  user_department: currentUser?.department,
+                  user_position: currentUser?.position,
+                  user_profile_image: currentUser?.profile_image_url,
+                  metadata: {
+                    fieldName: change.field,
+                    changeType: 'update'
+                  },
+                  changed_field: change.fieldKorean,
+                  title: vocTitle.substring(0, 50)
+                });
+              }
+            }
+          }
         }
 
         // 저장된 데이터를 VocData 형식으로 변환하여 부모에 전달
@@ -1815,8 +1956,13 @@ const VOCEditDialog = memo(
       } catch (error) {
         console.error('❌ VOC 저장 실패:', error);
         setValidationError('VOC 저장 중 오류가 발생했습니다.');
+      } finally {
+        // 중복 실행 방지 해제
+        setIsSaving(false);
+        console.log('✅ handleSave 완료 (중복 방지 해제)');
       }
     }, [
+      isSaving,
       voc,
       vocState,
       onSave,
@@ -1831,7 +1977,8 @@ const VOCEditDialog = memo(
       createVoc,
       updateVoc,
       convertToDbVocData,
-      currentUser
+      currentUser,
+      addSupabaseChangeLog
     ]);
 
     const handleClose = useCallback(() => {
@@ -1999,7 +2146,7 @@ const VOCEditDialog = memo(
               onClick={handleSave}
               variant="contained"
               size="small"
-              disabled={!voc ? !(canCreateData || canEditOwn) : !(canEditOthers || (canEditOwn && isOwner))}
+              disabled={isSaving || (!voc ? !(canCreateData || canEditOwn) : !(canEditOthers || (canEditOwn && isOwner)))}
               sx={{
                 minWidth: '60px',
                 '&.Mui-disabled': {
@@ -2008,7 +2155,7 @@ const VOCEditDialog = memo(
                 }
               }}
             >
-              저장
+              {isSaving ? '저장 중...' : '저장'}
             </Button>
           </Box>
         </DialogTitle>

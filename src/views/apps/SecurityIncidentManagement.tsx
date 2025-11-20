@@ -2507,9 +2507,9 @@ export default function SecurityIncidentManagement() {
 
       // 변경로그 추가
       addChangeLog(
-        '사고 생성',
+        '추가',
         updatedTask.code,
-        `새로운 보안사고가 생성되었습니다: ${updatedTask.mainContent}`,
+        `새로운 보안사고가 추가되었습니다: ${updatedTask.mainContent}`,
         updatedTask.team,
         undefined,
         undefined,

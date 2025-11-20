@@ -2400,16 +2400,6 @@ const ReportsTab = memo(
   }) => {
     return (
       <Box sx={{ p: 3 }}>
-        {/* 헤더 */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="h6" sx={{ fontSize: '16px', fontWeight: 600, mb: 1 }}>
-            교육실적보고
-          </Typography>
-          <Typography variant="body2" sx={{ fontSize: '12px', color: 'text.secondary' }}>
-            교육 완료 후 성과와 개선사항을 종합하여 보고서를 작성하세요.
-          </Typography>
-        </Box>
-
         {/* 컨텐츠 영역 */}
         <Box>
           {/* 성과 섹션 */}
@@ -2419,21 +2409,11 @@ const ReportsTab = memo(
               sx={{
                 fontSize: '14px',
                 fontWeight: 600,
-                mb: 1,
+                mb: 2,
                 color: 'primary.main'
               }}
             >
               📈 성과
-            </Typography>
-            <Typography
-              variant="body2"
-              sx={{
-                fontSize: '12px',
-                color: 'text.secondary',
-                mb: 2
-              }}
-            >
-              교육을 통해 달성한 구체적인 성과나 결과를 기록하세요.
             </Typography>
             <TextField
               value={educationReport.achievements}
@@ -2463,21 +2443,11 @@ const ReportsTab = memo(
               sx={{
                 fontSize: '14px',
                 fontWeight: 600,
-                mb: 1,
+                mb: 2,
                 color: 'warning.main'
               }}
             >
               🔧 개선사항
-            </Typography>
-            <Typography
-              variant="body2"
-              sx={{
-                fontSize: '12px',
-                color: 'text.secondary',
-                mb: 2
-              }}
-            >
-              향후 교육에서 개선이 필요한 사항이나 보완점을 기록하세요.
             </Typography>
             <TextField
               value={educationReport.improvements}
@@ -2507,21 +2477,11 @@ const ReportsTab = memo(
               sx={{
                 fontSize: '14px',
                 fontWeight: 600,
-                mb: 1,
+                mb: 2,
                 color: 'success.main'
               }}
             >
               💭 교육소감
-            </Typography>
-            <Typography
-              variant="body2"
-              sx={{
-                fontSize: '12px',
-                color: 'text.secondary',
-                mb: 2
-              }}
-            >
-              참석자들의 전반적인 교육 소감과 피드백을 종합하여 작성하세요.
             </Typography>
             <TextField
               value={educationReport.feedback}
@@ -2551,21 +2511,11 @@ const ReportsTab = memo(
               sx={{
                 fontSize: '14px',
                 fontWeight: 600,
-                mb: 1,
+                mb: 2,
                 color: 'text.primary'
               }}
             >
               📝 비고
-            </Typography>
-            <Typography
-              variant="body2"
-              sx={{
-                fontSize: '12px',
-                color: 'text.secondary',
-                mb: 2
-              }}
-            >
-              기타 특이사항이나 추가로 기록할 내용을 작성하세요.
             </Typography>
             <TextField
               value={educationReport.notes}
